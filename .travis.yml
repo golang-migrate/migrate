@@ -10,3 +10,5 @@ addons:
 
 before_script:
   - psql -c 'create database migratetest;' -U postgres
+
+script: go test -p 1 ./...
