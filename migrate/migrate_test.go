@@ -41,3 +41,5 @@ func TestCreate(t *testing.T) {
 		t.Error("not all expected files have been found")
 	}
 }
+
+// TODO add tests for commands (redo is broken atm?)

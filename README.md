@@ -58,7 +58,7 @@ See http://godoc.org/github.com/mattes/migrate/migrate
 import "github.com/mattes/migrate/migrate"
 
 
-migrate.Up postgres://user@host:port/database, "./db/migrations")
+migrate.Up(postgres://user@host:port/database, "./db/migrations")
 // ... 
 // ... 
 ```
