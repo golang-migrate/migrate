@@ -1,6 +1,8 @@
 # migrate
 
 [![Build Status](https://travis-ci.org/mattes/migrate.svg?branch=master)](https://travis-ci.org/mattes/migrate)
+[![GoDoc](https://godoc.org/github.com/mattes/migrate?status.svg)](https://godoc.org/github.com/mattes/migrate)
+
 
 migrate can be used as CLI or can be imported into your existing Go code.
 
