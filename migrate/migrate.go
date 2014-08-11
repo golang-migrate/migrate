@@ -12,8 +12,8 @@ import (
 	"strings"
 )
 
-func common(db, migrationsPath string) (driver.Driver, *file.MigrationFiles, uint64, error) {
-	d, err := driver.New(db)
+func common(url, migrationsPath string) (driver.Driver, *file.MigrationFiles, uint64, error) {
+	d, err := driver.New(url)
 	if err != nil {
 		return nil, nil, 0, err
 	}
@@ -28,8 +28,8 @@ func common(db, migrationsPath string) (driver.Driver, *file.MigrationFiles, uin
 	return d, &files, version, nil
 }
 
-func Up(db, migrationsPath string) error {
-	d, files, version, err := common(db, migrationsPath)
+func Up(url, migrationsPath string) error {
+	d, files, version, err := common(url, migrationsPath)
 	if err != nil {
 		return err
 	}
@@ -44,8 +44,8 @@ func Up(db, migrationsPath string) error {
 	return errors.New("No migrations to apply.")
 }
 
-func Down(db, migrationsPath string) error {
-	d, files, version, err := common(db, migrationsPath)
+func Down(url, migrationsPath string) error {
+	d, files, version, err := common(url, migrationsPath)
 	if err != nil {
 		return err
 	}
@@ -60,8 +60,8 @@ func Down(db, migrationsPath string) error {
 	return errors.New("No migrations to apply.")
 }
 
-func Redo(db, migrationsPath string) error {
-	d, files, version, err := common(db, migrationsPath)
+func Redo(url, migrationsPath string) error {
+	d, files, version, err := common(url, migrationsPath)
 	if err != nil {
 		return err
 	}
@@ -84,8 +84,8 @@ func Redo(db, migrationsPath string) error {
 	return errors.New("No migrations to apply.")
 }
 
-func Reset(db, migrationsPath string) error {
-	d, files, version, err := common(db, migrationsPath)
+func Reset(url, migrationsPath string) error {
+	d, files, version, err := common(url, migrationsPath)
 	if err != nil {
 		return err
 	}
@@ -108,8 +108,8 @@ func Reset(db, migrationsPath string) error {
 	return errors.New("No migrations to apply.")
 }
 
-func Migrate(db, migrationsPath string, relativeN int) error {
-	d, files, version, err := common(db, migrationsPath)
+func Migrate(url, migrationsPath string, relativeN int) error {
+	d, files, version, err := common(url, migrationsPath)
 	if err != nil {
 		return err
 	}
@@ -130,16 +130,16 @@ func Migrate(db, migrationsPath string, relativeN int) error {
 	return errors.New("No migrations to apply.")
 }
 
-func Version(db, migrationsPath string) (version uint64, err error) {
-	d, err := driver.New(db)
+func Version(url, migrationsPath string) (version uint64, err error) {
+	d, err := driver.New(url)
 	if err != nil {
 		return 0, err
 	}
 	return d.Version()
 }
 
-func Create(db, migrationsPath, name string) (*file.MigrationFile, error) {
-	d, err := driver.New(db)
+func Create(url, migrationsPath, name string) (*file.MigrationFile, error) {
+	d, err := driver.New(url)
 	if err != nil {
 		return nil, err
 	}
