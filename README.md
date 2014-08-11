@@ -20,33 +20,33 @@ Need another driver? Just implement the [Driver interface](http://godoc.org/gith
 go get github.com/mattes/migrate
 
 # create new migration
-migrate -url="postgres://user@host:port/database" -path=./db/migrations create
+migrate -url="postgres://user@host:port/database" -path="./db/migrations" create
 
 # apply all *up* migrations
-migrate -url="postgres://user@host:port/database" -path=./db/migrations up
+migrate -url="postgres://user@host:port/database" -path="./db/migrations" up
 
 # apply all *down* migrations
-migrate -url="postgres://user@host:port/database" -path=./db/migrations down
+migrate -url="postgres://user@host:port/database" -path="./db/migrations" down
 
 # roll back the most recently applied migration, then run it again.
-migrate -url="postgres://user@host:port/database" -path=./db/migrations redo
+migrate -url="postgres://user@host:port/database" -path="./db/migrations" redo
 
 # down and up again
-migrate -url="postgres://user@host:port/database" -path=./db/migrations reset
+migrate -url="postgres://user@host:port/database" -path="./db/migrations" reset
 
 # show current migration version
-migrate -url="postgres://user@host:port/database" -path=./db/migrations version
+migrate -url="postgres://user@host:port/database" -path="./db/migrations" version
 
 # apply the next n migrations
-migrate -url="postgres://user@host:port/database" -path=./db/migrations migrate +1
-migrate -url="postgres://user@host:port/database" -path=./db/migrations migrate +2
-migrate -url="postgres://user@host:port/database" -path=./db/migrations migrate +n
+migrate -url="postgres://user@host:port/database" -path="./db/migrations" migrate +1
+migrate -url="postgres://user@host:port/database" -path="./db/migrations" migrate +2
+migrate -url="postgres://user@host:port/database" -path="./db/migrations" migrate +n
 
 # apply the *down* migration of the current version 
 # and the previous n-1 migrations
-migrate -url="postgres://user@host:port/database" -path=./db/migrations migrate -1
-migrate -url="postgres://user@host:port/database" -path=./db/migrations migrate -2
-migrate -url="postgres://user@host:port/database" -path=./db/migrations migrate -n
+migrate -url="postgres://user@host:port/database" -path="./db/migrations" migrate -1
+migrate -url="postgres://user@host:port/database" -path="./db/migrations" migrate -2
+migrate -url="postgres://user@host:port/database" -path="./db/migrations" migrate -n
 ```
 
 
