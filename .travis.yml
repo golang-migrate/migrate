@@ -1,0 +1,12 @@
+language: go
+
+go:
+  - 1.2
+  - 1.3
+  - tip
+
+addons:
+  postgresql: "9.3"
+
+before_script:
+  - psql -c 'create database migratetest;' -U postgres
