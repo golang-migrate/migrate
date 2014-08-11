@@ -236,17 +236,17 @@ func parseFilenameSchema(filename string, filenameRegex *regexp.Regexp) (version
 // implement sort interface ...
 
 // Len is the number of elements in the collection.
-func (f MigrationFiles) Len() int {
-	return len(f)
+func (mf MigrationFiles) Len() int {
+	return len(mf)
 }
 
 // Less reports whether the element with
 // index i should sort before the element with index j.
-func (f MigrationFiles) Less(i, j int) bool {
-	return f[i].Version < f[j].Version
+func (mf MigrationFiles) Less(i, j int) bool {
+	return mf[i].Version < mf[j].Version
 }
 
 // Swap swaps the elements with indexes i and j.
-func (f MigrationFiles) Swap(i, j int) {
-	f[i], f[j] = f[j], f[i]
+func (mf MigrationFiles) Swap(i, j int) {
+	mf[i], mf[j] = mf[j], mf[i]
 }
