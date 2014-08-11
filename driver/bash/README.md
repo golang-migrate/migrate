@@ -4,4 +4,4 @@
 -url="bash://"
 ```
 
-* Runs all SQL commands in transcations
+### @TODO
