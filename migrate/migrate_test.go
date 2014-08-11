@@ -1,7 +1,6 @@
 package migrate
 
 import (
-	"github.com/mattes/migrate/searchpath"
 	"io/ioutil"
 	"testing"
 )
@@ -11,11 +10,10 @@ func TestCreate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	searchpath.SetSearchPath(tmpdir)
-	if _, err := Create("postgres://localhost/migratetest?sslmode=disable", "test_migration"); err != nil {
+	if _, err := Create("postgres://localhost/migratetest?sslmode=disable", tmpdir, "test_migration"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Create("postgres://localhost/migratetest?sslmode=disable", "another migration"); err != nil {
+	if _, err := Create("postgres://localhost/migratetest?sslmode=disable", tmpdir, "another migration"); err != nil {
 		t.Fatal(err)
 	}
 

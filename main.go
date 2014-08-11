@@ -23,9 +23,10 @@ func main() {
 	switch command {
 	case "create":
 		if *path != "" {
-			migrate.SetSearchPath(*path)
+			fmt.Println("Please specify path")
+			os.Exit(1)
 		}
-		files, err := migrate.Create(*db, "blablabla")
+		files, err := migrate.Create(*db, *path, "blablabla")
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)

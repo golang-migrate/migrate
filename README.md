@@ -20,44 +20,34 @@ Need another driver? Just implement the [Driver interface](http://godoc.org/gith
 go get github.com/mattes/migrate
 
 # create new migration
-migrate -url="postgres://user@host:port/database" create
+migrate -url="postgres://user@host:port/database" -path=./db/migrations create
 
 # apply all *up* migrations
-migrate -url="postgres://user@host:port/database" up
+migrate -url="postgres://user@host:port/database" -path=./db/migrations up
 
 # apply all *down* migrations
-migrate -url="postgres://user@host:port/database" down
+migrate -url="postgres://user@host:port/database" -path=./db/migrations down
 
 # roll back the most recently applied migration, then run it again.
-migrate -url="postgres://user@host:port/database" redo
+migrate -url="postgres://user@host:port/database" -path=./db/migrations redo
 
 # down and up again
-migrate -url="postgres://user@host:port/database" reset
+migrate -url="postgres://user@host:port/database" -path=./db/migrations reset
 
 # show current migration version
-migrate -url="postgres://user@host:port/database" version
+migrate -url="postgres://user@host:port/database" -path=./db/migrations version
 
 # apply the next n migrations
-migrate -url="postgres://user@host:port/database" migrate +1
-migrate -url="postgres://user@host:port/database" migrate +2
-migrate -url="postgres://user@host:port/database" migrate +n
+migrate -url="postgres://user@host:port/database" -path=./db/migrations migrate +1
+migrate -url="postgres://user@host:port/database" -path=./db/migrations migrate +2
+migrate -url="postgres://user@host:port/database" -path=./db/migrations migrate +n
 
 # apply the *down* migration of the current version 
 # and the previous n-1 migrations
-migrate -url="postgres://user@host:port/database" migrate -1
-migrate -url="postgres://user@host:port/database" migrate -2
-migrate -url="postgres://user@host:port/database" migrate -n
+migrate -url="postgres://user@host:port/database" -path=./db/migrations migrate -1
+migrate -url="postgres://user@host:port/database" -path=./db/migrations migrate -2
+migrate -url="postgres://user@host:port/database" -path=./db/migrations migrate -n
 ```
-
-``migrate`` looks for migration files in the following directories:
-
-```
-./db/migrations
-./migrations
-./db
-```
-
-You can explicitly set the search path with ``-path``.
 
 
 ## Usage from within Go
@@ -67,10 +57,8 @@ See http://godoc.org/github.com/mattes/migrate/migrate
 ```golang
 import "github.com/mattes/migrate/migrate"
 
-// optionally set search path
-// migrate.SetSearchPath("./location1", "./location2")
 
-migrate.Up("postgres://user@host:port/database")
+migrate.Up("postgres://user@host:port/database", "./db/migrations")
 // ... 
 // ... 
 ```

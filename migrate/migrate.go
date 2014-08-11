@@ -6,34 +6,18 @@ import (
 	"github.com/mattes/migrate/driver"
 	"github.com/mattes/migrate/file"
 	"github.com/mattes/migrate/migrate/direction"
-	"github.com/mattes/migrate/searchpath"
 	"io/ioutil"
 	"path"
 	"strconv"
 	"strings"
 )
 
-func init() {
-	SetSearchPath("./db/migrations", "./migrations", "./db")
-}
-
-// Convenience func for searchpath.SetSearchPath(), so users
-// don't have to import searchpath
-func SetSearchPath(paths ...string) {
-	searchpath.SetSearchPath(paths...)
-}
-
-func common(db string) (driver.Driver, *file.MigrationFiles, uint64, error) {
+func common(db, migrationsPath string) (driver.Driver, *file.MigrationFiles, uint64, error) {
 	d, err := driver.New(db)
 	if err != nil {
 		return nil, nil, 0, err
 	}
-
-	p, err := searchpath.FindPath(file.FilenameRegex(d.FilenameExtension()))
-	if err != nil {
-		return nil, nil, 0, err
-	}
-	files, err := file.ReadMigrationFiles(p, file.FilenameRegex(d.FilenameExtension()))
+	files, err := file.ReadMigrationFiles(migrationsPath, file.FilenameRegex(d.FilenameExtension()))
 	if err != nil {
 		return nil, nil, 0, err
 	}
@@ -44,8 +28,8 @@ func common(db string) (driver.Driver, *file.MigrationFiles, uint64, error) {
 	return d, &files, version, nil
 }
 
-func Up(db string) error {
-	d, files, version, err := common(db)
+func Up(db, migrationsPath string) error {
+	d, files, version, err := common(db, migrationsPath)
 	if err != nil {
 		return err
 	}
@@ -60,8 +44,8 @@ func Up(db string) error {
 	return errors.New("No migrations to apply.")
 }
 
-func Down(db string) error {
-	d, files, version, err := common(db)
+func Down(db, migrationsPath string) error {
+	d, files, version, err := common(db, migrationsPath)
 	if err != nil {
 		return err
 	}
@@ -76,8 +60,8 @@ func Down(db string) error {
 	return errors.New("No migrations to apply.")
 }
 
-func Redo(db string) error {
-	d, files, version, err := common(db)
+func Redo(db, migrationsPath string) error {
+	d, files, version, err := common(db, migrationsPath)
 	if err != nil {
 		return err
 	}
@@ -100,8 +84,8 @@ func Redo(db string) error {
 	return errors.New("No migrations to apply.")
 }
 
-func Reset(db string) error {
-	d, files, version, err := common(db)
+func Reset(db, migrationsPath string) error {
+	d, files, version, err := common(db, migrationsPath)
 	if err != nil {
 		return err
 	}
@@ -124,8 +108,8 @@ func Reset(db string) error {
 	return errors.New("No migrations to apply.")
 }
 
-func Migrate(db string, relativeN int) error {
-	d, files, version, err := common(db)
+func Migrate(db, migrationsPath string, relativeN int) error {
+	d, files, version, err := common(db, migrationsPath)
 	if err != nil {
 		return err
 	}
@@ -146,7 +130,7 @@ func Migrate(db string, relativeN int) error {
 	return errors.New("No migrations to apply.")
 }
 
-func Version(db string) (version uint64, err error) {
+func Version(db, migrationsPath string) (version uint64, err error) {
 	d, err := driver.New(db)
 	if err != nil {
 		return 0, err
@@ -154,22 +138,12 @@ func Version(db string) (version uint64, err error) {
 	return d.Version()
 }
 
-func Create(db, name string) (*file.MigrationFile, error) {
+func Create(db, migrationsPath, name string) (*file.MigrationFile, error) {
 	d, err := driver.New(db)
 	if err != nil {
 		return nil, err
 	}
-	p, _ := searchpath.FindPath(file.FilenameRegex(d.FilenameExtension()))
-	if p == "" {
-		paths := searchpath.GetSearchPath()
-		if len(paths) > 0 {
-			p = paths[0]
-		} else {
-			return nil, errors.New("Please specify at least one search path.")
-		}
-	}
-
-	files, err := file.ReadMigrationFiles(p, file.FilenameRegex(d.FilenameExtension()))
+	files, err := file.ReadMigrationFiles(migrationsPath, file.FilenameRegex(d.FilenameExtension()))
 	if err != nil {
 		return nil, err
 	}
@@ -193,14 +167,14 @@ func Create(db, name string) (*file.MigrationFile, error) {
 	mfile := &file.MigrationFile{
 		Version: version,
 		UpFile: &file.File{
-			Path:      p,
+			Path:      migrationsPath,
 			FileName:  fmt.Sprintf(filenamef, versionStr, name, "up", d.FilenameExtension()),
 			Name:      name,
 			Content:   []byte(""),
 			Direction: direction.Up,
 		},
 		DownFile: &file.File{
-			Path:      p,
+			Path:      migrationsPath,
 			FileName:  fmt.Sprintf(filenamef, versionStr, name, "down", d.FilenameExtension()),
 			Name:      name,
 			Content:   []byte(""),
