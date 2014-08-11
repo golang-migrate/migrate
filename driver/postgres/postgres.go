@@ -2,9 +2,11 @@ package postgres
 
 import (
 	"database/sql"
+	"fmt"
 	_ "github.com/lib/pq"
 	"github.com/mattes/migrate/file"
 	"github.com/mattes/migrate/migrate/direction"
+	"time"
 )
 
 type Driver struct {
@@ -42,44 +44,52 @@ func (driver *Driver) FilenameExtension() string {
 	return "sql"
 }
 
-func (driver *Driver) Migrate(files file.Files) error {
+func (driver *Driver) Migrate(files file.Files, pipe chan interface{}) {
+	defer close(pipe)
 	for _, f := range files {
 
 		tx, err := driver.db.Begin()
 		if err != nil {
-			return err
+			pipe <- err
+			return
 		}
 
 		if f.Direction == direction.Up {
 			if _, err := tx.Exec(`INSERT INTO `+tableName+` (version) VALUES ($1)`, f.Version); err != nil {
+				pipe <- err
 				if err := tx.Rollback(); err != nil {
-					// haha, what now?
+					pipe <- err
 				}
-				return err
+				return
 			}
 		} else if f.Direction == direction.Down {
 			if _, err := tx.Exec(`DELETE FROM `+tableName+` WHERE version=$1`, f.Version); err != nil {
+				pipe <- err
 				if err := tx.Rollback(); err != nil {
-					// haha, what now?
+					pipe <- err
 				}
-				return err
+				return
 			}
 		}
 
 		f.Read()
 		if _, err := tx.Exec(string(f.Content)); err != nil {
+			pipe <- err
 			if err := tx.Rollback(); err != nil {
-				// haha, what now?
+				pipe <- err
 			}
-			return err
+			return
 		}
+		pipe <- fmt.Sprintf("Applied %s", f.FileName)
+		time.Sleep(3 * time.Second)
 
 		if err := tx.Commit(); err != nil {
-			return err
+			pipe <- err
+			return
 		}
 	}
 
-	return nil
+	return
 }
 
 func (driver *Driver) Version() (uint64, error) {

@@ -3,7 +3,7 @@ package driver
 import (
 	"errors"
 	"fmt"
-	"github.com/mattes/migrate/driver/bash"
+	// "github.com/mattes/migrate/driver/bash"
 	"github.com/mattes/migrate/driver/postgres"
 	"github.com/mattes/migrate/file"
 	neturl "net/url" // alias to allow `url string` func signature in New
@@ -12,7 +12,7 @@ import (
 type Driver interface {
 	Initialize(url string) error
 	FilenameExtension() string
-	Migrate(files file.Files) error
+	Migrate(files file.Files, pipe chan interface{})
 	Version() (uint64, error)
 }
 
@@ -31,13 +31,13 @@ func New(url string) (Driver, error) {
 			return nil, err
 		}
 		return d, nil
-	case "bash":
-		d := &bash.Driver{}
-		verifyFilenameExtension("bash", d)
-		if err := d.Initialize(url); err != nil {
-			return nil, err
-		}
-		return d, nil
+	// case "bash":
+	// 	d := &bash.Driver{}
+	// 	verifyFilenameExtension("bash", d)
+	// 	if err := d.Initialize(url); err != nil {
+	// 		return nil, err
+	// 	}
+	// 	return d, nil
 	default:
 		return nil, errors.New(fmt.Sprintf("Driver '%s' not found.", u.Scheme))
 	}

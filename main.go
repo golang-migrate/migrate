@@ -66,6 +66,29 @@ func verifyMigrationsPath(path string) {
 	}
 }
 
+func writePipe(pipe chan interface{}) {
+	if pipe != nil {
+		for {
+			select {
+			case item, ok := <-pipe:
+				if !ok {
+					return
+
+				} else {
+					switch item.(type) {
+					case string:
+						fmt.Println(item.(string))
+					case error:
+						fmt.Println(item.(error).Error())
+					default:
+						fmt.Println("%v", item)
+					}
+				}
+			}
+		}
+	}
+}
+
 func createCmd(url, migrationsPath, name string) {
 	migrationFile, err := migrate.Create(url, migrationsPath, name)
 	if err != nil {
@@ -80,35 +103,19 @@ func createCmd(url, migrationsPath, name string) {
 }
 
 func upCmd(url, migrationsPath string) {
-	if err := migrate.Up(url, migrationsPath); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
+	writePipe(migrate.UpPipe(url, migrationsPath, nil))
 }
 
 func downCmd(url, migrationsPath string) {
-	if err := migrate.Down(url, migrationsPath); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
+	writePipe(migrate.DownPipe(url, migrationsPath, nil))
 }
 
 func redoCmd(url, migrationsPath string) {
-	if err := migrate.Redo(url, migrationsPath); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
+	writePipe(migrate.RedoPipe(url, migrationsPath, nil))
 }
 
 func resetCmd(url, migrationsPath string) {
-	if err := migrate.Reset(url, migrationsPath); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
+	writePipe(migrate.ResetPipe(url, migrationsPath, nil))
 }
 
 func versionCmd(url, migrationsPath string) {
@@ -121,10 +128,7 @@ func versionCmd(url, migrationsPath string) {
 }
 
 func migrateCmd(url, migrationsPath string, relativeN int) {
-	if err := migrate.Migrate(url, migrationsPath, relativeN); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
+	writePipe(migrate.MigratePipe(url, migrationsPath, relativeN, nil))
 }
 
 func helpCmd() {

@@ -66,8 +66,15 @@ func TestMigrate(t *testing.T) {
 	})
 
 	applyFiles, _ := files.ToLastFrom(0)
-	if err := d.Migrate(applyFiles); err != nil {
-		t.Fatal(err)
+	pipe1 := make(chan interface{}, 0)
+	go d.Migrate(applyFiles, pipe1)
+	for {
+		select {
+		case _, ok := <-pipe1:
+			if !ok {
+				return
+			}
+		}
 	}
 
 	version, _ = d.Version()
@@ -80,8 +87,15 @@ func TestMigrate(t *testing.T) {
 	}
 
 	applyFiles2, _ := files.ToFirstFrom(1)
-	if err := d.Migrate(applyFiles2); err != nil {
-		t.Fatal(err)
+	pipe2 := make(chan interface{}, 0)
+	go d.Migrate(applyFiles2, pipe2)
+	for {
+		select {
+		case _, ok := <-pipe2:
+			if !ok {
+				return
+			}
+		}
 	}
 
 	version, _ = d.Version()

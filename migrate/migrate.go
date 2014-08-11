@@ -12,7 +12,9 @@ import (
 	"strings"
 )
 
-func common(url, migrationsPath string) (driver.Driver, *file.MigrationFiles, uint64, error) {
+// initDriverAndReadMigrationFilesAndGetVersion is a small helper
+// function that is common to most of the Up and Down funcs
+func initDriverAndReadMigrationFilesAndGetVersion(url, migrationsPath string) (driver.Driver, *file.MigrationFiles, uint64, error) {
 	d, err := driver.New(url)
 	if err != nil {
 		return nil, nil, 0, err
@@ -28,106 +30,165 @@ func common(url, migrationsPath string) (driver.Driver, *file.MigrationFiles, ui
 	return d, &files, version, nil
 }
 
-func Up(url, migrationsPath string) error {
-	d, files, version, err := common(url, migrationsPath)
+// getErrorsFromPipe selects all received errors and returns them
+func getErrorsFromPipe(pipe chan interface{}) []error {
+	err := make([]error, 0)
+	if pipe != nil {
+		for {
+			select {
+			case item, ok := <-pipe:
+				if !ok {
+					return err
+				} else {
+					switch item.(type) {
+					case error:
+						err = append(err, item.(error))
+					}
+				}
+			}
+		}
+	}
+	return err
+}
+
+// sendErrorAndClosePipe sends the error to the pipe and closes the
+// pipe afterwards
+func sendErrorAndClosePipe(err error, pipe chan interface{}) {
+	pipe <- err
+	close(pipe)
+}
+
+func UpPipe(url, migrationsPath string, pipe chan interface{}) chan interface{} {
+	if pipe == nil {
+		pipe = make(chan interface{}, 1) // make buffered channel with cap 1
+	}
+
+	d, files, version, err := initDriverAndReadMigrationFilesAndGetVersion(url, migrationsPath)
 	if err != nil {
-		return err
+		sendErrorAndClosePipe(err, pipe)
+		return pipe
 	}
 
 	applyMigrationFiles, err := files.ToLastFrom(version)
 	if err != nil {
-		return err
+		sendErrorAndClosePipe(err, pipe)
+		return pipe
 	}
+
 	if len(applyMigrationFiles) > 0 {
-		return d.Migrate(applyMigrationFiles)
+		go d.Migrate(applyMigrationFiles, pipe)
+		return pipe
+	} else {
+		sendErrorAndClosePipe(errors.New("No migration files to apply."), pipe)
+		return pipe
 	}
-	return errors.New("No migrations to apply.")
 }
 
-func Down(url, migrationsPath string) error {
-	d, files, version, err := common(url, migrationsPath)
+func Up(url, migrationsPath string) (err []error, ok bool) {
+	pipe := UpPipe(url, migrationsPath, nil)
+	err = getErrorsFromPipe(pipe)
+	return err, len(err) == 0
+}
+
+func DownPipe(url, migrationsPath string, pipe chan interface{}) chan interface{} {
+	if pipe == nil {
+		pipe = make(chan interface{}, 1) // make buffered channel with cap 1
+	}
+
+	d, files, version, err := initDriverAndReadMigrationFilesAndGetVersion(url, migrationsPath)
 	if err != nil {
-		return err
+		sendErrorAndClosePipe(err, pipe)
+		return pipe
 	}
 
 	applyMigrationFiles, err := files.ToFirstFrom(version)
 	if err != nil {
-		return err
+		sendErrorAndClosePipe(err, pipe)
+		return pipe
 	}
 	if len(applyMigrationFiles) > 0 {
-		return d.Migrate(applyMigrationFiles)
+		go d.Migrate(applyMigrationFiles, nil)
+		return pipe
+	} else {
+		sendErrorAndClosePipe(errors.New("No migration files to apply."), pipe)
+		return pipe
 	}
-	return errors.New("No migrations to apply.")
 }
 
-func Redo(url, migrationsPath string) error {
-	d, files, version, err := common(url, migrationsPath)
-	if err != nil {
-		return err
-	}
-	applyMigrationFilesDown, err := files.From(version, -1)
-	if err != nil {
-		return err
-	}
-	if len(applyMigrationFilesDown) > 0 {
-		if err := d.Migrate(applyMigrationFilesDown); err != nil {
-			return err
-		}
-	}
-	applyMigrationFilesUp, err := files.From(version, +1)
-	if err != nil {
-		return err
-	}
-	if len(applyMigrationFilesUp) > 0 {
-		return d.Migrate(applyMigrationFilesUp)
-	}
-	return errors.New("No migrations to apply.")
+func Down(url, migrationsPath string) (err []error, ok bool) {
+	pipe := DownPipe(url, migrationsPath, nil)
+	err = getErrorsFromPipe(pipe)
+	return err, len(err) == 0
 }
 
-func Reset(url, migrationsPath string) error {
-	d, files, version, err := common(url, migrationsPath)
-	if err != nil {
-		return err
+func RedoPipe(url, migrationsPath string, pipe chan interface{}) chan interface{} {
+	if pipe == nil {
+		pipe = make(chan interface{}, 1) // make buffered channel with cap 1
 	}
-	applyMigrationFilesDown, err := files.ToFirstFrom(version)
-	if err != nil {
-		return err
-	}
-	if len(applyMigrationFilesDown) > 0 {
-		if err := d.Migrate(applyMigrationFilesDown); err != nil {
-			return err
-		}
-	}
-	applyMigrationFilesUp, err := files.ToLastFrom(0)
-	if err != nil {
-		return err
-	}
-	if len(applyMigrationFilesUp) > 0 {
-		return d.Migrate(applyMigrationFilesUp)
-	}
-	return errors.New("No migrations to apply.")
+
+	_ = MigratePipe(url, migrationsPath, -1, pipe)
+	_ = MigratePipe(url, migrationsPath, +1, pipe)
+	return pipe
 }
 
-func Migrate(url, migrationsPath string, relativeN int) error {
-	d, files, version, err := common(url, migrationsPath)
+func Redo(url, migrationsPath string) (err []error, ok bool) {
+	pipe := RedoPipe(url, migrationsPath, nil)
+	err = getErrorsFromPipe(pipe)
+	return err, len(err) == 0
+}
+
+func ResetPipe(url, migrationsPath string, pipe chan interface{}) chan interface{} {
+	if pipe == nil {
+		pipe = make(chan interface{}, 1) // make buffered channel with cap 1
+	}
+	// TODO check pipe pointer
+	_ = DownPipe(url, migrationsPath, pipe)
+	_ = UpPipe(url, migrationsPath, pipe)
+	return pipe
+}
+
+func Reset(url, migrationsPath string) (err []error, ok bool) {
+	pipe := ResetPipe(url, migrationsPath, nil)
+	err = getErrorsFromPipe(pipe)
+	return err, len(err) == 0
+}
+
+func MigratePipe(url, migrationsPath string, relativeN int, pipe chan interface{}) chan interface{} {
+	if pipe == nil {
+		pipe = make(chan interface{}, 1) // make buffered channel with cap 1
+	}
+
+	d, files, version, err := initDriverAndReadMigrationFilesAndGetVersion(url, migrationsPath)
 	if err != nil {
-		return err
+		sendErrorAndClosePipe(err, pipe)
+		return pipe
 	}
 
 	applyMigrationFiles, err := files.From(version, relativeN)
 	if err != nil {
-		return err
+		sendErrorAndClosePipe(err, pipe)
+		return pipe
 	}
 	if len(applyMigrationFiles) > 0 {
 		if relativeN > 0 {
-			return d.Migrate(applyMigrationFiles)
+			go d.Migrate(applyMigrationFiles, pipe)
+			return pipe
 		} else if relativeN < 0 {
-			return d.Migrate(applyMigrationFiles)
+			go d.Migrate(applyMigrationFiles, pipe)
+			return pipe
 		} else {
-			return errors.New("No migrations to apply.")
+			sendErrorAndClosePipe(errors.New("No migration files to apply."), pipe)
+			return pipe
 		}
 	}
-	return errors.New("No migrations to apply.")
+	sendErrorAndClosePipe(errors.New("No migration files to apply."), pipe)
+	return pipe
+}
+
+func Migrate(url, migrationsPath string, relativeN int) (err []error, ok bool) {
+	pipe := MigratePipe(url, migrationsPath, relativeN, nil)
+	err = getErrorsFromPipe(pipe)
+	return err, len(err) == 0
 }
 
 func Version(url, migrationsPath string) (version uint64, err error) {
