@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/mattes/migrate/migrate"
+	pipep "github.com/mattes/migrate/pipe"
 	"os"
 	"strconv"
 )
@@ -73,7 +74,6 @@ func writePipe(pipe chan interface{}) {
 			case item, ok := <-pipe:
 				if !ok {
 					return
-
 				} else {
 					switch item.(type) {
 					case string:
@@ -99,23 +99,36 @@ func createCmd(url, migrationsPath, name string) {
 	fmt.Printf("Version %v migration files created in %v:\n", migrationFile.Version, migrationsPath)
 	fmt.Println(migrationFile.UpFile.FileName)
 	fmt.Println(migrationFile.DownFile.FileName)
-
 }
 
 func upCmd(url, migrationsPath string) {
-	writePipe(migrate.UpPipe(url, migrationsPath, nil))
+	pipe := pipep.New()
+	go migrate.Up(pipe, url, migrationsPath)
+	writePipe(pipe)
 }
 
 func downCmd(url, migrationsPath string) {
-	writePipe(migrate.DownPipe(url, migrationsPath, nil))
+	pipe := pipep.New()
+	go migrate.Down(pipe, url, migrationsPath)
+	writePipe(pipe)
 }
 
 func redoCmd(url, migrationsPath string) {
-	writePipe(migrate.RedoPipe(url, migrationsPath, nil))
+	pipe := pipep.New()
+	go migrate.Redo(pipe, url, migrationsPath)
+	writePipe(pipe)
 }
 
 func resetCmd(url, migrationsPath string) {
-	writePipe(migrate.ResetPipe(url, migrationsPath, nil))
+	pipe := pipep.New()
+	go migrate.Reset(pipe, url, migrationsPath)
+	writePipe(pipe)
+}
+
+func migrateCmd(url, migrationsPath string, relativeN int) {
+	pipe := pipep.New()
+	go migrate.Migrate(pipe, url, migrationsPath, relativeN)
+	writePipe(pipe)
 }
 
 func versionCmd(url, migrationsPath string) {
@@ -125,10 +138,6 @@ func versionCmd(url, migrationsPath string) {
 		os.Exit(1)
 	}
 	fmt.Println(version)
-}
-
-func migrateCmd(url, migrationsPath string, relativeN int) {
-	writePipe(migrate.MigratePipe(url, migrationsPath, relativeN, nil))
 }
 
 func helpCmd() {

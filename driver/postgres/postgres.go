@@ -45,7 +45,16 @@ func (driver *Driver) FilenameExtension() string {
 
 func (driver *Driver) Migrate(files file.Files, pipe chan interface{}) {
 	defer close(pipe)
+
 	for _, f := range files {
+
+		direc := ""
+		if f.Direction == direction.Up {
+			direc = "  →"
+		} else if f.Direction == direction.Down {
+			direc = "←  "
+		}
+		pipe <- fmt.Sprintf("%s | %s", direc, f.FileName)
 
 		tx, err := driver.db.Begin()
 		if err != nil {
@@ -79,7 +88,6 @@ func (driver *Driver) Migrate(files file.Files, pipe chan interface{}) {
 			}
 			return
 		}
-		pipe <- fmt.Sprintf("Applied %s", f.FileName)
 
 		if err := tx.Commit(); err != nil {
 			pipe <- err
