@@ -106,8 +106,9 @@ func DownPipe(url, migrationsPath string, pipe chan interface{}) chan interface{
 		sendErrorAndClosePipe(err, pipe)
 		return pipe
 	}
+
 	if len(applyMigrationFiles) > 0 {
-		go d.Migrate(applyMigrationFiles, nil)
+		go d.Migrate(applyMigrationFiles, pipe)
 		return pipe
 	} else {
 		sendErrorAndClosePipe(errors.New("No migration files to apply."), pipe)
