@@ -1,14 +1,17 @@
 package file
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"github.com/mattes/migrate/migrate/direction"
+	"go/token"
 	"io/ioutil"
 	"path"
 	"regexp"
 	"sort"
 	"strconv"
+	"strings"
 )
 
 var filenameRegex = "^([0-9]+)_(.*)\\.(up|down)\\.%s$"
@@ -233,20 +236,69 @@ func parseFilenameSchema(filename string, filenameRegex *regexp.Regexp) (version
 	return version, matches[2], d, nil
 }
 
-// implement sort interface ...
-
 // Len is the number of elements in the collection.
+// Required by Sort Interface{}
 func (mf MigrationFiles) Len() int {
 	return len(mf)
 }
 
 // Less reports whether the element with
 // index i should sort before the element with index j.
+// Required by Sort Interface{}
 func (mf MigrationFiles) Less(i, j int) bool {
 	return mf[i].Version < mf[j].Version
 }
 
 // Swap swaps the elements with indexes i and j.
+// Required by Sort Interface{}
 func (mf MigrationFiles) Swap(i, j int) {
 	mf[i], mf[j] = mf[j], mf[i]
+}
+
+// LineColumnFromOffset reads data and returns line and column integer
+// for a given offset.
+// TODO is there a better way?
+func LineColumnFromOffset(data []byte, offset int) (line, column int) {
+	fs := token.NewFileSet()
+	tf := fs.AddFile("", fs.Base(), len(data))
+	tf.SetLinesForContent(data)
+	pos := tf.Position(tf.Pos(offset))
+	return pos.Line, pos.Column
+}
+
+// LinesBeforeAndAfter reads n lines before and after a given line.
+// Set lineNumbers to true, to prepend line numbers.
+// TODO Trim empty lines at the beginning and at the end
+// TODO Trim offset whitespace at the beginning of each line, so that indentation is preserved
+func LinesBeforeAndAfter(data []byte, line, before, after int, lineNumbers bool) []byte {
+	startLine := line - before
+	endLine := line + after
+	lines := bytes.SplitN(data, []byte("\n"), endLine+1)
+
+	if startLine < 0 {
+		startLine = 0
+	}
+	if endLine > len(lines) {
+		endLine = len(lines)
+	}
+
+	selectLines := lines[startLine:endLine]
+	newLines := make([][]byte, 0)
+	lineCounter := startLine + 1
+	lineNumberDigits := len(strconv.Itoa(len(selectLines)))
+	for _, l := range selectLines {
+		lineCounterStr := strconv.Itoa(lineCounter)
+		if len(lineCounterStr)%lineNumberDigits != 0 {
+			lineCounterStr = strings.Repeat(" ", lineNumberDigits-len(lineCounterStr)%lineNumberDigits) + lineCounterStr
+		}
+
+		lNew := l
+		if lineNumbers {
+			lNew = append([]byte(lineCounterStr+": "), lNew...)
+		}
+		newLines = append(newLines, lNew)
+		lineCounter += 1
+	}
+
+	return bytes.Join(newLines, []byte("\n"))
 }

@@ -3,12 +3,14 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/fatih/color"
 	"github.com/mattes/migrate/file"
 	"github.com/mattes/migrate/migrate"
 	"github.com/mattes/migrate/migrate/direction"
 	pipep "github.com/mattes/migrate/pipe"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -31,11 +33,10 @@ func main() {
 
 	case "migrate":
 		verifyMigrationsPath(*migrationsPath)
-
 		relativeN := flag.Arg(1)
 		relativeNInt, err := strconv.Atoi(relativeN)
 		if err != nil {
-			fmt.Println(err)
+			fmt.Println("Unable to parse parse param <n>.")
 			os.Exit(1)
 		}
 		migrateCmd(*url, *migrationsPath, relativeNInt)
@@ -75,6 +76,15 @@ func verifyMigrationsPath(path string) {
 	}
 }
 
+func textPadding(text string) string {
+	textSplit := strings.Split(text, "\n")
+	newText := make([]string, 0)
+	for _, line := range textSplit {
+		newText = append(newText, "    "+line)
+	}
+	return strings.Join(newText, "\n")
+}
+
 func writePipe(pipe chan interface{}) {
 	if pipe != nil {
 		for {
@@ -84,21 +94,27 @@ func writePipe(pipe chan interface{}) {
 					return
 				} else {
 					switch item.(type) {
+
 					case string:
-						fmt.Println("   ", item.(string))
+						fmt.Println(item.(string))
+
 					case error:
-						fmt.Println("   ", item.(error).Error())
+						c := color.New(color.FgRed)
+						c.Println(item.(error).Error())
+
 					case file.File:
 						f := item.(file.File)
-						direc := "   "
+
 						if f.Direction == direction.Up {
-							direc = "  →"
+							fmt.Print("[ → ]")
 						} else if f.Direction == direction.Down {
-							direc = "←  "
+							fmt.Print("[ ← ]")
 						}
-						fmt.Printf("%s %s\n", direc, f.FileName)
+						fmt.Printf(" %s\n", f.FileName)
+
 					default:
-						fmt.Printf("    %v\n", item)
+						text := fmt.Sprint(item)
+						fmt.Println(text)
 					}
 				}
 			}

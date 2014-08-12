@@ -2,9 +2,12 @@ package postgres
 
 import (
 	"database/sql"
-	_ "github.com/lib/pq"
+	"errors"
+	"fmt"
+	"github.com/lib/pq"
 	"github.com/mattes/migrate/file"
 	"github.com/mattes/migrate/migrate/direction"
+	"strconv"
 )
 
 type Driver struct {
@@ -77,7 +80,16 @@ func (driver *Driver) Migrate(files file.Files, pipe chan interface{}) {
 		}
 
 		if _, err := tx.Exec(string(f.Content)); err != nil {
-			pipe <- err
+			pqErr := err.(*pq.Error)
+			offset, err := strconv.Atoi(pqErr.Position)
+			if err == nil && offset >= 0 {
+				lineNo, columnNo := file.LineColumnFromOffset(f.Content, offset-1)
+				errorPart := file.LinesBeforeAndAfter(f.Content, lineNo, 5, 5, true)
+				pipe <- errors.New(fmt.Sprintf("%s %v: %s in line %v, column %v:\n\n%s", pqErr.Severity, pqErr.Code, pqErr.Message, lineNo, columnNo, string(errorPart)))
+			} else {
+				pipe <- errors.New(fmt.Sprintf("%s %v: %s", pqErr.Severity, pqErr.Code, pqErr.Message))
+			}
+
 			if err := tx.Rollback(); err != nil {
 				pipe <- err
 			}
