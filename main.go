@@ -125,7 +125,12 @@ func writePipe(pipe chan interface{}) {
 var timerStart time.Time
 
 func printTimer() {
-	fmt.Printf("\n%.4f seconds\n", time.Now().Sub(timerStart).Seconds())
+	diff := time.Now().Sub(timerStart).Seconds()
+	if diff > 60 {
+		fmt.Printf("\n%.4f minutes\n", diff/60)
+	} else {
+		fmt.Printf("\n%.4f seconds\n", diff)
+	}
 }
 
 func createCmd(url, migrationsPath, name string) {
