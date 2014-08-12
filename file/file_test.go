@@ -133,7 +133,7 @@ func TestFiles(t *testing.T) {
 	}
 
 	// test read
-	if err := files[4].DownFile.Read(); err != nil {
+	if err := files[4].DownFile.ReadContent(); err != nil {
 		t.Error("Unable to read file", err)
 	}
 	if files[4].DownFile.Content == nil {
