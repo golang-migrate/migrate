@@ -6,7 +6,6 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/mattes/migrate/file"
 	"github.com/mattes/migrate/migrate/direction"
-	"time"
 )
 
 type Driver struct {
@@ -81,7 +80,6 @@ func (driver *Driver) Migrate(files file.Files, pipe chan interface{}) {
 			return
 		}
 		pipe <- fmt.Sprintf("Applied %s", f.FileName)
-		time.Sleep(3 * time.Second)
 
 		if err := tx.Commit(); err != nil {
 			pipe <- err
