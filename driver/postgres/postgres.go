@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"database/sql"
-	"fmt"
 	_ "github.com/lib/pq"
 	"github.com/mattes/migrate/file"
 	"github.com/mattes/migrate/migrate/direction"
@@ -45,16 +44,8 @@ func (driver *Driver) FilenameExtension() string {
 
 func (driver *Driver) Migrate(files file.Files, pipe chan interface{}) {
 	defer close(pipe)
-
 	for _, f := range files {
-
-		direc := ""
-		if f.Direction == direction.Up {
-			direc = "  →"
-		} else if f.Direction == direction.Down {
-			direc = "←  "
-		}
-		pipe <- fmt.Sprintf("%s | %s", direc, f.FileName)
+		pipe <- f
 
 		tx, err := driver.db.Begin()
 		if err != nil {
@@ -80,7 +71,11 @@ func (driver *Driver) Migrate(files file.Files, pipe chan interface{}) {
 			}
 		}
 
-		f.Read()
+		if err := f.ReadContent(); err != nil {
+			pipe <- err
+			return
+		}
+
 		if _, err := tx.Exec(string(f.Content)); err != nil {
 			pipe <- err
 			if err := tx.Rollback(); err != nil {
@@ -94,8 +89,6 @@ func (driver *Driver) Migrate(files file.Files, pipe chan interface{}) {
 			return
 		}
 	}
-
-	return
 }
 
 func (driver *Driver) Version() (uint64, error) {

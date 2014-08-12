@@ -37,7 +37,7 @@ type MigrationFile struct {
 type MigrationFiles []MigrationFile
 
 // Read reads the file contents
-func (f *File) Read() error {
+func (f *File) ReadContent() error {
 	content, err := ioutil.ReadFile(path.Join(f.Path, f.FileName))
 	if err != nil {
 		return err

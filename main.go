@@ -3,10 +3,13 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/mattes/migrate/file"
 	"github.com/mattes/migrate/migrate"
+	"github.com/mattes/migrate/migrate/direction"
 	pipep "github.com/mattes/migrate/pipe"
 	"os"
 	"strconv"
+	"time"
 )
 
 var url = flag.String("url", "", "Driver connection URL, like schema://url")
@@ -19,7 +22,12 @@ func main() {
 	switch command {
 	case "create":
 		verifyMigrationsPath(*migrationsPath)
-		createCmd(*url, *migrationsPath, flag.Arg(1))
+		name := flag.Arg(1)
+		if name == "" {
+			fmt.Println("Please specify name.")
+			os.Exit(1)
+		}
+		createCmd(*url, *migrationsPath, name)
 
 	case "migrate":
 		verifyMigrationsPath(*migrationsPath)
@@ -77,16 +85,31 @@ func writePipe(pipe chan interface{}) {
 				} else {
 					switch item.(type) {
 					case string:
-						fmt.Println(item.(string))
+						fmt.Println("   ", item.(string))
 					case error:
-						fmt.Println(item.(error).Error())
+						fmt.Println("   ", item.(error).Error())
+					case file.File:
+						f := item.(file.File)
+						direc := "   "
+						if f.Direction == direction.Up {
+							direc = "  →"
+						} else if f.Direction == direction.Down {
+							direc = "←  "
+						}
+						fmt.Printf("%s %s\n", direc, f.FileName)
 					default:
-						fmt.Println("%v", item)
+						fmt.Printf("    %v\n", item)
 					}
 				}
 			}
 		}
 	}
+}
+
+var timerStart time.Time
+
+func printTimer() {
+	fmt.Printf("\n%.4f seconds\n", time.Now().Sub(timerStart).Seconds())
 }
 
 func createCmd(url, migrationsPath, name string) {
@@ -102,33 +125,43 @@ func createCmd(url, migrationsPath, name string) {
 }
 
 func upCmd(url, migrationsPath string) {
+	timerStart = time.Now()
 	pipe := pipep.New()
 	go migrate.Up(pipe, url, migrationsPath)
 	writePipe(pipe)
+	printTimer()
 }
 
 func downCmd(url, migrationsPath string) {
+	timerStart = time.Now()
 	pipe := pipep.New()
 	go migrate.Down(pipe, url, migrationsPath)
 	writePipe(pipe)
+	printTimer()
 }
 
 func redoCmd(url, migrationsPath string) {
+	timerStart = time.Now()
 	pipe := pipep.New()
 	go migrate.Redo(pipe, url, migrationsPath)
 	writePipe(pipe)
+	printTimer()
 }
 
 func resetCmd(url, migrationsPath string) {
+	timerStart = time.Now()
 	pipe := pipep.New()
 	go migrate.Reset(pipe, url, migrationsPath)
 	writePipe(pipe)
+	printTimer()
 }
 
 func migrateCmd(url, migrationsPath string, relativeN int) {
+	timerStart = time.Now()
 	pipe := pipep.New()
 	go migrate.Migrate(pipe, url, migrationsPath, relativeN)
 	writePipe(pipe)
+	printTimer()
 }
 
 func versionCmd(url, migrationsPath string) {
