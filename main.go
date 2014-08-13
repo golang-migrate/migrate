@@ -1,4 +1,6 @@
-// Package main is the CLI
+// Package main is the CLI.
+// You can use the CLI via Terminal.
+// import "github.com/mattes/migrate/migrate" for usage within Go.
 package main
 
 import (
