@@ -101,10 +101,9 @@ func main() {
 		}
 		fmt.Println(version)
 
-	case "help":
-		helpCmd()
-
 	default:
+		fallthrough
+	case "help":
 		helpCmd()
 	}
 }
