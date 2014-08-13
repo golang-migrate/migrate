@@ -101,10 +101,12 @@ func (mf *MigrationFiles) ToLastFrom(version uint64) (Files, error) {
 
 // From travels relatively through migration files.
 //
-// 		+1 will fetch the next up migration file.
+// 		+1 will fetch the next up migration file
 // 		+2 will fetch the next two up migration files
-// 		-1 will fetch the the current down migration file
-// 		-2 will fetch the current down and the next down migration file
+//    +n will fetch ...
+// 		-1 will fetch the the previous down migration file
+// 		-2 will fetch the next two previous down migration files
+//    -n will fetch ...
 func (mf *MigrationFiles) From(version uint64, relativeN int) (Files, error) {
 	var d direction.Direction
 	if relativeN > 0 {
