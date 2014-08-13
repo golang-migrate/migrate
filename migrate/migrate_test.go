@@ -42,4 +42,4 @@ func TestCreate(t *testing.T) {
 	}
 }
 
-// TODO add tests for commands (redo is broken atm?)
+// TODO add tests for commands
