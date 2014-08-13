@@ -95,7 +95,7 @@ need for any custom markup language to divide up and down migrations. Please not
 that the filename extension depends on the driver.
 
 
-### Alternatives
+## Alternatives
 
  * https://bitbucket.org/liamstask/goose
 
