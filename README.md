@@ -11,7 +11,7 @@ GoCode   import github.com/mattes/migrate/migrate
 CLI      go get github.com/mattes/migrate
 ```
 
-_Features_
+__Features__
 
 * Super easy to implement Driver interface.
 * Gracefully quit running migrations on ``^C``.
