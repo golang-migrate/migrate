@@ -13,7 +13,7 @@ CLI      go get github.com/mattes/migrate
 
 __Features__
 
-* Super easy to implement Driver interface.
+* Super easy to implement [Driver interface](http://godoc.org/github.com/mattes/migrate/driver#Driver).
 * Gracefully quit running migrations on ``^C``.
 * No magic search paths routines, no hard-coded config files.
 * CLI is build on top of the ``migrate package``.

@@ -16,6 +16,7 @@ import (
 	"strings"
 )
 
+// Up applies all available migrations
 func Up(pipe chan interface{}, url, migrationsPath string) {
 	d, files, version, err := initDriverAndReadMigrationFilesAndGetVersion(url, migrationsPath)
 	if err != nil {
