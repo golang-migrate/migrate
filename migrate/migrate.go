@@ -92,8 +92,7 @@ func DownSync(url, migrationsPath string) (err []error, ok bool) {
 func Redo(pipe chan interface{}, url, migrationsPath string) {
 	pipe1 := pipep.New()
 	go Migrate(pipe1, url, migrationsPath, -1)
-	go pipep.Redirect(pipe1, pipe)
-	pipep.Wait(pipe1)
+	pipep.WaitAndRedirect(pipe1, pipe)
 	go Migrate(pipe, url, migrationsPath, +1)
 }
 
@@ -107,8 +106,7 @@ func RedoSync(url, migrationsPath string) (err []error, ok bool) {
 func Reset(pipe chan interface{}, url, migrationsPath string) {
 	pipe1 := pipep.New()
 	go Down(pipe1, url, migrationsPath)
-	go pipep.Redirect(pipe1, pipe)
-	pipep.Wait(pipe1)
+	pipep.WaitAndRedirect(pipe1, pipe)
 	go Up(pipe, url, migrationsPath)
 }
 

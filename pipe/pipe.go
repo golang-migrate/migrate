@@ -1,9 +1,11 @@
 package pipe
 
+// New creates a new pipe. A pipe is basically a channel.
 func New() chan interface{} {
 	return make(chan interface{}, 0)
 }
 
+// Close closes pipe and optionally sends an error
 func Close(pipe chan interface{}, err error) {
 	if err != nil {
 		pipe <- err
@@ -11,35 +13,26 @@ func Close(pipe chan interface{}, err error) {
 	close(pipe)
 }
 
-func Redirect(fromPipe, toPipe chan interface{}) {
-	if fromPipe != nil && toPipe != nil {
+// WaitAndRedirect waits for pipe to be closed and
+// redirects all messages from pipe to redirectPipe
+// while it waits.
+func WaitAndRedirect(pipe, redirectPipe chan interface{}) {
+	if pipe != nil && redirectPipe != nil {
 		for {
 			select {
-			case item, ok := <-fromPipe:
+			case item, ok := <-pipe:
 				if !ok {
 					return
 				} else {
-					toPipe <- item
+					redirectPipe <- item
 				}
 			}
 		}
 	}
 }
 
-func Wait(pipe chan interface{}) {
-	if pipe != nil {
-		for {
-			select {
-			case _, ok := <-pipe:
-				if !ok {
-					return
-				}
-			}
-		}
-	}
-}
-
-// getErrorsFromPipe selects all received errors and returns them
+// ReadErrors selects all received errors and returns them.
+// This is helpful for synchronous migration functions.
 func ReadErrors(pipe chan interface{}) []error {
 	err := make([]error, 0)
 	if pipe != nil {

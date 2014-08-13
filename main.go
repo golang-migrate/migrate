@@ -10,7 +10,6 @@ import (
 	pipep "github.com/mattes/migrate/pipe"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -97,9 +96,9 @@ func writePipe(pipe chan interface{}) {
 						f := item.(file.File)
 
 						if f.Direction == direction.Up {
-							fmt.Print("[-> ]")
+							fmt.Print("o--> ")
 						} else if f.Direction == direction.Down {
-							fmt.Print("[ <-]")
+							fmt.Print(" <--o")
 						}
 						fmt.Printf(" %s\n", f.FileName)
 
