@@ -9,13 +9,43 @@ import (
 	"github.com/mattes/migrate/migrate/direction"
 	pipep "github.com/mattes/migrate/pipe"
 	"io/ioutil"
+	"os"
 	"path"
 	"strconv"
 	"strings"
 )
 
-// Up applies all available migrations
-func Up(pipe chan interface{}, url, migrationsPath string) {
+// // Up applies all available migrations
+// func Up(pipe chan interface{}, url, migrationsPath string) {
+// 	d, files, version, err := initDriverAndReadMigrationFilesAndGetVersion(url, migrationsPath)
+// 	if err != nil {
+// 		go pipep.Close(pipe, err)
+// 		return
+// 	}
+
+// 	applyMigrationFiles, err := files.ToLastFrom(version)
+// 	if err != nil {
+// 		go pipep.Close(pipe, err)
+// 		return
+// 	}
+
+// 	if len(applyMigrationFiles) > 0 {
+// 		for _, f := range applyMigrationFiles {
+// 			pipe1 := pipep.New()
+// 			go d.Migrate(f, pipe1)
+// 			if ok := pipep.WaitAndRedirect(pipe1, pipe); !ok {
+// 				break
+// 			}
+// 		}
+// 		go pipep.Close(pipe, nil)
+// 		return
+// 	} else {
+// 		go pipep.Close(pipe, nil)
+// 		return
+// 	}
+// }
+
+func Up(pipe chan interface{}, signal chan os.Signal, url, migrationsPath string) {
 	d, files, version, err := initDriverAndReadMigrationFilesAndGetVersion(url, migrationsPath)
 	if err != nil {
 		go pipep.Close(pipe, err)
@@ -29,7 +59,14 @@ func Up(pipe chan interface{}, url, migrationsPath string) {
 	}
 
 	if len(applyMigrationFiles) > 0 {
-		go d.Migrate(applyMigrationFiles, pipe)
+		for _, f := range applyMigrationFiles {
+			pipe1 := pipep.New()
+			go d.Migrate(f, pipe1)
+			if ok := pipep.WaitAndRedirect(pipe1, pipe, signal); !ok {
+				break
+			}
+		}
+		go pipep.Close(pipe, nil)
 		return
 	} else {
 		go pipep.Close(pipe, nil)
@@ -40,13 +77,13 @@ func Up(pipe chan interface{}, url, migrationsPath string) {
 // UpSync is synchronous version of Up
 func UpSync(url, migrationsPath string) (err []error, ok bool) {
 	pipe := pipep.New()
-	go Up(pipe, url, migrationsPath)
+	go Up(pipe, pipep.Signal(), url, migrationsPath)
 	err = pipep.ReadErrors(pipe)
 	return err, len(err) == 0
 }
 
 // Down rolls back all migrations
-func Down(pipe chan interface{}, url, migrationsPath string) {
+func Down(pipe chan interface{}, signal chan os.Signal, url, migrationsPath string) {
 	d, files, version, err := initDriverAndReadMigrationFilesAndGetVersion(url, migrationsPath)
 	if err != nil {
 		go pipep.Close(pipe, err)
@@ -60,7 +97,14 @@ func Down(pipe chan interface{}, url, migrationsPath string) {
 	}
 
 	if len(applyMigrationFiles) > 0 {
-		go d.Migrate(applyMigrationFiles, pipe)
+		for _, f := range applyMigrationFiles {
+			pipe1 := pipep.New()
+			go d.Migrate(f, pipe1)
+			if ok := pipep.WaitAndRedirect(pipe1, pipe, signal); !ok {
+				break
+			}
+		}
+		go pipep.Close(pipe, nil)
 		return
 	} else {
 		go pipep.Close(pipe, nil)
@@ -71,45 +115,53 @@ func Down(pipe chan interface{}, url, migrationsPath string) {
 // DownSync is synchronous version of Down
 func DownSync(url, migrationsPath string) (err []error, ok bool) {
 	pipe := pipep.New()
-	go Down(pipe, url, migrationsPath)
+	go Down(pipe, pipep.Signal(), url, migrationsPath)
 	err = pipep.ReadErrors(pipe)
 	return err, len(err) == 0
 }
 
 // Redo rolls back the most recently applied migration, then runs it again.
-func Redo(pipe chan interface{}, url, migrationsPath string) {
+func Redo(pipe chan interface{}, signal chan os.Signal, url, migrationsPath string) {
 	pipe1 := pipep.New()
-	go Migrate(pipe1, url, migrationsPath, -1)
-	pipep.WaitAndRedirect(pipe1, pipe)
-	go Migrate(pipe, url, migrationsPath, +1)
+	go Migrate(pipe1, signal, url, migrationsPath, -1)
+	if ok := pipep.WaitAndRedirect(pipe1, pipe, signal); !ok {
+		go pipep.Close(pipe, nil)
+		return
+	} else {
+		go Migrate(pipe, pipep.Signal(), url, migrationsPath, +1)
+	}
 }
 
 // RedoSync is synchronous version of Redo
 func RedoSync(url, migrationsPath string) (err []error, ok bool) {
 	pipe := pipep.New()
-	go Redo(pipe, url, migrationsPath)
+	go Redo(pipe, pipep.Signal(), url, migrationsPath)
 	err = pipep.ReadErrors(pipe)
 	return err, len(err) == 0
 }
 
 // Reset runs the down and up migration function
-func Reset(pipe chan interface{}, url, migrationsPath string) {
+func Reset(pipe chan interface{}, signal chan os.Signal, url, migrationsPath string) {
 	pipe1 := pipep.New()
-	go Down(pipe1, url, migrationsPath)
-	pipep.WaitAndRedirect(pipe1, pipe)
-	go Up(pipe, url, migrationsPath)
+	go Down(pipe1, signal, url, migrationsPath)
+	if ok := pipep.WaitAndRedirect(pipe1, pipe, signal); !ok {
+		go pipep.Close(pipe, nil)
+		return
+	} else {
+		go Up(pipe, signal, url, migrationsPath)
+	}
 }
 
 // ResetSync is synchronous version of Reset
 func ResetSync(url, migrationsPath string) (err []error, ok bool) {
 	pipe := pipep.New()
-	go Reset(pipe, url, migrationsPath)
+	go Reset(pipe, pipep.Signal(), url, migrationsPath)
 	err = pipep.ReadErrors(pipe)
 	return err, len(err) == 0
 }
 
 // Migrate applies relative +n/-n migrations
-func Migrate(pipe chan interface{}, url, migrationsPath string, relativeN int) {
+func Migrate(pipe chan interface{}, signal chan os.Signal, url, migrationsPath string, relativeN int) {
 	d, files, version, err := initDriverAndReadMigrationFilesAndGetVersion(url, migrationsPath)
 	if err != nil {
 		go pipep.Close(pipe, err)
@@ -121,17 +173,17 @@ func Migrate(pipe chan interface{}, url, migrationsPath string, relativeN int) {
 		go pipep.Close(pipe, err)
 		return
 	}
-	if len(applyMigrationFiles) > 0 {
-		if relativeN > 0 {
-			go d.Migrate(applyMigrationFiles, pipe)
-			return
-		} else if relativeN < 0 {
-			go d.Migrate(applyMigrationFiles, pipe)
-			return
-		} else {
-			go pipep.Close(pipe, nil)
-			return
+
+	if len(applyMigrationFiles) > 0 && relativeN != 0 {
+		for _, f := range applyMigrationFiles {
+			pipe1 := pipep.New()
+			go d.Migrate(f, pipe1)
+			if ok := pipep.WaitAndRedirect(pipe1, pipe, signal); !ok {
+				break
+			}
 		}
+		go pipep.Close(pipe, nil)
+		return
 	}
 	go pipep.Close(pipe, nil)
 	return
@@ -140,7 +192,7 @@ func Migrate(pipe chan interface{}, url, migrationsPath string, relativeN int) {
 // MigrateSync is synchronous version of Migrate
 func MigrateSync(url, migrationsPath string, relativeN int) (err []error, ok bool) {
 	pipe := pipep.New()
-	go Migrate(pipe, url, migrationsPath, relativeN)
+	go Migrate(pipe, pipep.Signal(), url, migrationsPath, relativeN)
 	err = pipep.ReadErrors(pipe)
 	return err, len(err) == 0
 }

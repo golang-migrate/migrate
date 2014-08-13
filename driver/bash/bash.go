@@ -17,7 +17,7 @@ func (driver *Driver) FilenameExtension() string {
 	return "sh"
 }
 
-func (driver *Driver) Migrate(files file.Files, pipe chan interface{}) {
+func (driver *Driver) Migrate(f file.File, pipe chan interface{}) {
 	defer close(pipe)
 	return
 }

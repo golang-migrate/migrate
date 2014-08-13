@@ -67,21 +67,21 @@ func TestMigrate(t *testing.T) {
 	}
 
 	pipe := pipep.New()
-	go d.Migrate(file.Files{files[0]}, pipe)
+	go d.Migrate(files[0], pipe)
 	errs := pipep.ReadErrors(pipe)
 	if len(errs) > 0 {
 		t.Fatal(errs)
 	}
 
 	pipe = pipep.New()
-	go d.Migrate(file.Files{files[1]}, pipe)
+	go d.Migrate(files[1], pipe)
 	errs = pipep.ReadErrors(pipe)
 	if len(errs) > 0 {
 		t.Fatal(errs)
 	}
 
 	pipe = pipep.New()
-	go d.Migrate(file.Files{files[2]}, pipe)
+	go d.Migrate(files[2], pipe)
 	errs = pipep.ReadErrors(pipe)
 	if len(errs) == 0 {
 		t.Error("Expected test case to fail")

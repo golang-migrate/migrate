@@ -23,14 +23,10 @@ type Driver interface {
 	FilenameExtension() string
 
 	// Migrate is the heart of the driver.
-	// It will receive a slice of files which the driver should apply
+	// It will receive a file which the driver should apply
 	// to its backend or whatever. The migration function should use
 	// the pipe channel to return any errors or other useful information.
-	//
-	// Please note that the order of the migration files is already
-	// sorted: Ascending for UP migration files, and descending for
-	// DOWN migration files.
-	Migrate(files file.Files, pipe chan interface{})
+	Migrate(file file.File, pipe chan interface{})
 
 	// Version returns the current migration version.
 	Version() (uint64, error)

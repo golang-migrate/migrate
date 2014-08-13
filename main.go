@@ -12,6 +12,7 @@ import (
 	"github.com/mattes/migrate/migrate/direction"
 	pipep "github.com/mattes/migrate/pipe"
 	"os"
+	// "os/signal"
 	"strconv"
 	"time"
 )
@@ -105,9 +106,12 @@ func writePipe(pipe chan interface{}) {
 						}
 						fmt.Printf(" %s\n", f.FileName)
 
+					case os.Signal:
+						fmt.Println("signal", item)
+
 					default:
 						text := fmt.Sprint(item)
-						fmt.Println(text)
+						fmt.Println("TEXT", text)
 					}
 				}
 			}
@@ -141,7 +145,7 @@ func createCmd(url, migrationsPath, name string) {
 func upCmd(url, migrationsPath string) {
 	timerStart = time.Now()
 	pipe := pipep.New()
-	go migrate.Up(pipe, url, migrationsPath)
+	go migrate.Up(pipe, pipep.Signal(), url, migrationsPath)
 	writePipe(pipe)
 	printTimer()
 }
@@ -149,7 +153,7 @@ func upCmd(url, migrationsPath string) {
 func downCmd(url, migrationsPath string) {
 	timerStart = time.Now()
 	pipe := pipep.New()
-	go migrate.Down(pipe, url, migrationsPath)
+	go migrate.Down(pipe, pipep.Signal(), url, migrationsPath)
 	writePipe(pipe)
 	printTimer()
 }
@@ -157,7 +161,7 @@ func downCmd(url, migrationsPath string) {
 func redoCmd(url, migrationsPath string) {
 	timerStart = time.Now()
 	pipe := pipep.New()
-	go migrate.Redo(pipe, url, migrationsPath)
+	go migrate.Redo(pipe, pipep.Signal(), url, migrationsPath)
 	writePipe(pipe)
 	printTimer()
 }
@@ -165,7 +169,7 @@ func redoCmd(url, migrationsPath string) {
 func resetCmd(url, migrationsPath string) {
 	timerStart = time.Now()
 	pipe := pipep.New()
-	go migrate.Reset(pipe, url, migrationsPath)
+	go migrate.Reset(pipe, pipep.Signal(), url, migrationsPath)
 	writePipe(pipe)
 	printTimer()
 }
@@ -173,7 +177,7 @@ func resetCmd(url, migrationsPath string) {
 func migrateCmd(url, migrationsPath string, relativeN int) {
 	timerStart = time.Now()
 	pipe := pipep.New()
-	go migrate.Migrate(pipe, url, migrationsPath, relativeN)
+	go migrate.Migrate(pipe, pipep.Signal(), url, migrationsPath, relativeN)
 	writePipe(pipe)
 	printTimer()
 }
