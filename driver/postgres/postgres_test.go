@@ -2,109 +2,89 @@ package postgres
 
 import (
 	"database/sql"
-	_ "github.com/lib/pq"
 	"github.com/mattes/migrate/file"
 	"github.com/mattes/migrate/migrate/direction"
+	pipep "github.com/mattes/migrate/pipe"
 	"testing"
 )
 
+// TestMigrate runs some additional tests on Migrate().
+// Basic testing is already done in migrate/migrate_test.go
 func TestMigrate(t *testing.T) {
-	connection, err := sql.Open("postgres", "postgres://localhost/migratetest?sslmode=disable")
+	driverUrl := "postgres://localhost/migratetest?sslmode=disable"
+
+	// prepare clean database
+	connection, err := sql.Open("postgres", driverUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	if _, err := connection.Exec(`DROP TABLE IF EXISTS hello; DROP TABLE IF EXISTS yolo; DROP TABLE IF EXISTS ` + tableName + `;`); err != nil {
+	if _, err := connection.Exec(`
+				DROP TABLE IF EXISTS yolo;
+				DROP TABLE IF EXISTS ` + tableName + `;`); err != nil {
 		t.Fatal(err)
 	}
 
 	d := &Driver{}
-	if err := d.Initialize("postgres://localhost/migratetest?sslmode=disable"); err != nil {
+	if err := d.Initialize(driverUrl); err != nil {
 		t.Fatal(err)
 	}
 
-	version, err := d.Version()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if version != 0 {
-		t.Fatal("wrong version", version)
-	}
-
-	files := make(file.MigrationFiles, 0)
-	files = append(files, file.MigrationFile{
-		Version: 1,
-		UpFile: &file.File{
-			Path:      "/tmp",
-			FileName:  "001_initial.up.sql",
+	files := []file.File{
+		{
+			Path:      "/foobar",
+			FileName:  "001_foobar.up.sql",
 			Version:   1,
-			Name:      "initial",
+			Name:      "foobar",
 			Direction: direction.Up,
 			Content: []byte(`
-				CREATE TABLE hello (
-					id serial not null primary key,
-					message varchar(255) not null default ''
-				);
-
 				CREATE TABLE yolo (
-					id serial not null primary key,
-					foobar varchar(255) not null default ''
+					id serial not null primary key
 				);
 			`),
 		},
-		DownFile: &file.File{
-			Path:      "/tmp",
-			FileName:  "001_initial.down.sql",
+		{
+			Path:      "/foobar",
+			FileName:  "002_foobar.down.sql",
 			Version:   1,
-			Name:      "initial",
+			Name:      "foobar",
 			Direction: direction.Down,
 			Content: []byte(`
-				DROP TABLE IF EXISTS hello;
-				DROP TABLE IF EXISTS yolo;
+				DROP TABLE yolo;
 			`),
 		},
-	})
-
-	applyFiles, _ := files.ToLastFrom(0)
-	pipe1 := make(chan interface{}, 0)
-	go d.Migrate(applyFiles, pipe1)
-	for {
-		select {
-		case _, ok := <-pipe1:
-			if !ok {
-				return
-			}
-		}
+		{
+			Path:      "/foobar",
+			FileName:  "002_foobar.up.sql",
+			Version:   2,
+			Name:      "foobar",
+			Direction: direction.Up,
+			Content: []byte(`
+				CREATE TABLE error (
+					id THIS WILL CAUSE AN ERROR
+				)
+			`),
+		},
 	}
 
-	version, _ = d.Version()
-	if version != 1 {
-		t.Fatalf("wrong version %v expected 1", version)
+	pipe := pipep.New()
+	go d.Migrate(file.Files{files[0]}, pipe)
+	errs := pipep.ReadErrors(pipe)
+	if len(errs) > 0 {
+		t.Fatal(errs)
 	}
 
-	if _, err := connection.Exec(`INSERT INTO hello (message) VALUES ($1)`, "whats up"); err != nil {
-		t.Fatal("Migrations failed")
+	pipe = pipep.New()
+	go d.Migrate(file.Files{files[1]}, pipe)
+	errs = pipep.ReadErrors(pipe)
+	if len(errs) > 0 {
+		t.Fatal(errs)
 	}
 
-	applyFiles2, _ := files.ToFirstFrom(1)
-	pipe2 := make(chan interface{}, 0)
-	go d.Migrate(applyFiles2, pipe2)
-	for {
-		select {
-		case _, ok := <-pipe2:
-			if !ok {
-				return
-			}
-		}
-	}
-
-	version, _ = d.Version()
-	if version != 0 {
-		t.Fatalf("wrong version %v expected 0", version)
-	}
-
-	if _, err := connection.Exec(`INSERT INTO hello (message) VALUES ($1)`, "whats up"); err == nil {
-		t.Fatal("Migrations failed")
+	pipe = pipep.New()
+	go d.Migrate(file.Files{files[2]}, pipe)
+	errs = pipep.ReadErrors(pipe)
+	if len(errs) == 0 {
+		t.Error("Expected test case to fail")
 	}
 
 }

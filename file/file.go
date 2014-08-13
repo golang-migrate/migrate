@@ -63,13 +63,15 @@ type MigrationFile struct {
 // MigrationFiles is a slice of MigrationFiles
 type MigrationFiles []MigrationFile
 
-// ReadContent reads the file's content.
+// ReadContent reads the file's content if the content is empty
 func (f *File) ReadContent() error {
-	content, err := ioutil.ReadFile(path.Join(f.Path, f.FileName))
-	if err != nil {
-		return err
+	if len(f.Content) == 0 {
+		content, err := ioutil.ReadFile(path.Join(f.Path, f.FileName))
+		if err != nil {
+			return err
+		}
+		f.Content = content
 	}
-	f.Content = content
 	return nil
 }
 

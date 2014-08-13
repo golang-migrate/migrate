@@ -3,7 +3,6 @@
 package migrate
 
 import (
-	"errors"
 	"fmt"
 	"github.com/mattes/migrate/driver"
 	"github.com/mattes/migrate/file"
@@ -14,24 +13,6 @@ import (
 	"strconv"
 	"strings"
 )
-
-// initDriverAndReadMigrationFilesAndGetVersion is a small helper
-// function that is common to most of the migration funcs
-func initDriverAndReadMigrationFilesAndGetVersion(url, migrationsPath string) (driver.Driver, *file.MigrationFiles, uint64, error) {
-	d, err := driver.New(url)
-	if err != nil {
-		return nil, nil, 0, err
-	}
-	files, err := file.ReadMigrationFiles(migrationsPath, file.FilenameRegex(d.FilenameExtension()))
-	if err != nil {
-		return nil, nil, 0, err
-	}
-	version, err := d.Version()
-	if err != nil {
-		return nil, nil, 0, err
-	}
-	return d, &files, version, nil
-}
 
 // Up applies all available migrations
 func Up(pipe chan interface{}, url, migrationsPath string) {
@@ -51,7 +32,7 @@ func Up(pipe chan interface{}, url, migrationsPath string) {
 		go d.Migrate(applyMigrationFiles, pipe)
 		return
 	} else {
-		go pipep.Close(pipe, errors.New("No migration files to apply."))
+		go pipep.Close(pipe, nil)
 		return
 	}
 }
@@ -82,7 +63,7 @@ func Down(pipe chan interface{}, url, migrationsPath string) {
 		go d.Migrate(applyMigrationFiles, pipe)
 		return
 	} else {
-		go pipep.Close(pipe, errors.New("No migration files to apply."))
+		go pipep.Close(pipe, nil)
 		return
 	}
 }
@@ -148,11 +129,11 @@ func Migrate(pipe chan interface{}, url, migrationsPath string, relativeN int) {
 			go d.Migrate(applyMigrationFiles, pipe)
 			return
 		} else {
-			go pipep.Close(pipe, errors.New("No migration files to apply."))
+			go pipep.Close(pipe, nil)
 			return
 		}
 	}
-	go pipep.Close(pipe, errors.New("No migration files to apply."))
+	go pipep.Close(pipe, nil)
 	return
 }
 
@@ -226,6 +207,24 @@ func Create(url, migrationsPath, name string) (*file.MigrationFile, error) {
 	}
 
 	return mfile, nil
+}
+
+// initDriverAndReadMigrationFilesAndGetVersion is a small helper
+// function that is common to most of the migration funcs
+func initDriverAndReadMigrationFilesAndGetVersion(url, migrationsPath string) (driver.Driver, *file.MigrationFiles, uint64, error) {
+	d, err := driver.New(url)
+	if err != nil {
+		return nil, nil, 0, err
+	}
+	files, err := file.ReadMigrationFiles(migrationsPath, file.FilenameRegex(d.FilenameExtension()))
+	if err != nil {
+		return nil, nil, 0, err
+	}
+	version, err := d.Version()
+	if err != nil {
+		return nil, nil, 0, err
+	}
+	return d, &files, version, nil
 }
 
 // NewPipe is a convenience function for pipe.New().
