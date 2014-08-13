@@ -3,13 +3,20 @@
 [![Build Status](https://travis-ci.org/mattes/migrate.svg?branch=master)](https://travis-ci.org/mattes/migrate)
 [![GoDoc](https://godoc.org/github.com/mattes/migrate?status.svg)](https://godoc.org/github.com/mattes/migrate)
 
-migrate is a migration helper written in Go. Use it in your existing Golang code 
-or run migration commands via the CLI. 
+A migration helper written in Go. Use it in your existing Golang code 
+or run commands via the CLI. 
 
 ```
-Go Code  import github.com/mattes/migrate/migrate
+GoCode   import github.com/mattes/migrate/migrate
 CLI      go get github.com/mattes/migrate
 ```
+
+_Features_
+
+* Super easy to implement Driver interface.
+* Gracefully quit running migrations on ``^C``.
+* No magic search paths routines, no hard-coded config files.
+* CLI is build on top of the ``migrate package``.
 
 
 ## Available Drivers
