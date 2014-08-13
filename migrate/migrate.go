@@ -1,3 +1,5 @@
+// Package migrate is imported by other Go code.
+// It is the entry point to all migration functions.
 package migrate
 
 import (
@@ -14,7 +16,7 @@ import (
 )
 
 // initDriverAndReadMigrationFilesAndGetVersion is a small helper
-// function that is common to most of the Up and Down funcs
+// function that is common to most of the migration funcs
 func initDriverAndReadMigrationFilesAndGetVersion(url, migrationsPath string) (driver.Driver, *file.MigrationFiles, uint64, error) {
 	d, err := driver.New(url)
 	if err != nil {
@@ -31,6 +33,7 @@ func initDriverAndReadMigrationFilesAndGetVersion(url, migrationsPath string) (d
 	return d, &files, version, nil
 }
 
+// Up applies all available migrations
 func Up(pipe chan interface{}, url, migrationsPath string) {
 	d, files, version, err := initDriverAndReadMigrationFilesAndGetVersion(url, migrationsPath)
 	if err != nil {
@@ -61,6 +64,7 @@ func UpSync(url, migrationsPath string) (err []error, ok bool) {
 	return err, len(err) == 0
 }
 
+// Down rolls back all migrations
 func Down(pipe chan interface{}, url, migrationsPath string) {
 	d, files, version, err := initDriverAndReadMigrationFilesAndGetVersion(url, migrationsPath)
 	if err != nil {
@@ -91,6 +95,7 @@ func DownSync(url, migrationsPath string) (err []error, ok bool) {
 	return err, len(err) == 0
 }
 
+// Redo rolls back the most recently applied migration, then runs it again.
 func Redo(pipe chan interface{}, url, migrationsPath string) {
 	pipe1 := pipep.New()
 	go Migrate(pipe1, url, migrationsPath, -1)
@@ -106,6 +111,7 @@ func RedoSync(url, migrationsPath string) (err []error, ok bool) {
 	return err, len(err) == 0
 }
 
+// Reset runs the down and up migration function
 func Reset(pipe chan interface{}, url, migrationsPath string) {
 	pipe1 := pipep.New()
 	go Down(pipe1, url, migrationsPath)
@@ -121,6 +127,7 @@ func ResetSync(url, migrationsPath string) (err []error, ok bool) {
 	return err, len(err) == 0
 }
 
+// Migrate applies relative +n/-n migrations
 func Migrate(pipe chan interface{}, url, migrationsPath string, relativeN int) {
 	d, files, version, err := initDriverAndReadMigrationFilesAndGetVersion(url, migrationsPath)
 	if err != nil {
@@ -157,6 +164,7 @@ func MigrateSync(url, migrationsPath string, relativeN int) (err []error, ok boo
 	return err, len(err) == 0
 }
 
+// Version returns the current migration version
 func Version(url, migrationsPath string) (version uint64, err error) {
 	d, err := driver.New(url)
 	if err != nil {
@@ -165,6 +173,7 @@ func Version(url, migrationsPath string) (version uint64, err error) {
 	return d.Version()
 }
 
+// Create creates new migration files on disk
 func Create(url, migrationsPath, name string) (*file.MigrationFile, error) {
 	d, err := driver.New(url)
 	if err != nil {
@@ -183,7 +192,7 @@ func Create(url, migrationsPath, name string) (*file.MigrationFile, error) {
 	version += 1
 	versionStr := strconv.FormatUint(version, 10)
 
-	length := 4 // TODO check existing files and try to guess length
+	length := 4 // TODO(mattes) check existing files and try to guess length
 	if len(versionStr)%length != 0 {
 		versionStr = strings.Repeat("0", length-len(versionStr)%length) + versionStr
 	}
