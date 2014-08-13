@@ -35,7 +35,7 @@ func WaitAndRedirect(pipe, redirectPipe chan interface{}, interrupt chan os.Sign
 					os.Exit(5)
 				} else {
 					// add white space at beginning for ^C splitting
-					redirectPipe <- " Aborting after this migration ..."
+					redirectPipe <- " Aborting after this migration ... Hit again to force quit."
 				}
 
 			case item, ok := <-pipe:
