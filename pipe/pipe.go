@@ -18,25 +18,29 @@ func Close(pipe chan interface{}, err error) {
 	close(pipe)
 }
 
-func WaitAndRedirect(pipe, redirectPipe chan interface{}, signal chan os.Signal) (ok bool) {
+// WaitAndRedirect waits for pipe to be closed and
+// redirects all messages from pipe to redirectPipe
+// while it waits. It also checks if there was an
+// interrupt send and will quit gracefully if yes.
+func WaitAndRedirect(pipe, redirectPipe chan interface{}, interrupt chan os.Signal) (ok bool) {
 	errorReceived := false
-	signalsReceived := 0
-
+	interruptsReceived := 0
 	if pipe != nil && redirectPipe != nil {
 		for {
 			select {
 
-			case <-signal:
-				signalsReceived += 1
-				if signalsReceived > 1 {
+			case <-interrupt:
+				interruptsReceived += 1
+				if interruptsReceived > 1 {
 					os.Exit(5)
 				} else {
+					// add white space at beginning for ^C splitting
 					redirectPipe <- " Aborting after this migration ..."
 				}
 
 			case item, ok := <-pipe:
 				if !ok {
-					return !errorReceived && signalsReceived == 0
+					return !errorReceived && interruptsReceived == 0
 				} else {
 					redirectPipe <- item
 					switch item.(type) {
@@ -47,7 +51,7 @@ func WaitAndRedirect(pipe, redirectPipe chan interface{}, signal chan os.Signal)
 			}
 		}
 	}
-	return !errorReceived && signalsReceived == 0
+	return !errorReceived && interruptsReceived == 0
 }
 
 // ReadErrors selects all received errors and returns them.

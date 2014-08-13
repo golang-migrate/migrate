@@ -9,7 +9,6 @@ import (
 	"github.com/mattes/migrate/file"
 	"github.com/mattes/migrate/migrate/direction"
 	"strconv"
-	"time"
 )
 
 type Driver struct {
@@ -51,8 +50,6 @@ func (driver *Driver) Migrate(f file.File, pipe chan interface{}) {
 	defer close(pipe)
 
 	pipe <- f
-
-	time.Sleep(3 * time.Second)
 
 	tx, err := driver.db.Begin()
 	if err != nil {

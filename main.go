@@ -12,7 +12,6 @@ import (
 	"github.com/mattes/migrate/migrate/direction"
 	pipep "github.com/mattes/migrate/pipe"
 	"os"
-	// "os/signal"
 	"strconv"
 	"time"
 )
@@ -106,12 +105,9 @@ func writePipe(pipe chan interface{}) {
 						}
 						fmt.Printf(" %s\n", f.FileName)
 
-					case os.Signal:
-						fmt.Println("signal", item)
-
 					default:
 						text := fmt.Sprint(item)
-						fmt.Println("TEXT", text)
+						fmt.Println(text)
 					}
 				}
 			}

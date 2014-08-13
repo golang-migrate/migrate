@@ -33,7 +33,7 @@ func Up(pipe chan interface{}, url, migrationsPath string) {
 		for _, f := range applyMigrationFiles {
 			pipe1 := pipep.New()
 			go d.Migrate(f, pipe1)
-			if ok := pipep.WaitAndRedirect(pipe1, pipe, handleSignal()); !ok {
+			if ok := pipep.WaitAndRedirect(pipe1, pipe, handleInterrupts()); !ok {
 				break
 			}
 		}
@@ -71,7 +71,7 @@ func Down(pipe chan interface{}, url, migrationsPath string) {
 		for _, f := range applyMigrationFiles {
 			pipe1 := pipep.New()
 			go d.Migrate(f, pipe1)
-			if ok := pipep.WaitAndRedirect(pipe1, pipe, handleSignal()); !ok {
+			if ok := pipep.WaitAndRedirect(pipe1, pipe, handleInterrupts()); !ok {
 				break
 			}
 		}
@@ -95,7 +95,7 @@ func DownSync(url, migrationsPath string) (err []error, ok bool) {
 func Redo(pipe chan interface{}, url, migrationsPath string) {
 	pipe1 := pipep.New()
 	go Migrate(pipe1, url, migrationsPath, -1)
-	if ok := pipep.WaitAndRedirect(pipe1, pipe, handleSignal()); !ok {
+	if ok := pipep.WaitAndRedirect(pipe1, pipe, handleInterrupts()); !ok {
 		go pipep.Close(pipe, nil)
 		return
 	} else {
@@ -115,7 +115,7 @@ func RedoSync(url, migrationsPath string) (err []error, ok bool) {
 func Reset(pipe chan interface{}, url, migrationsPath string) {
 	pipe1 := pipep.New()
 	go Down(pipe1, url, migrationsPath)
-	if ok := pipep.WaitAndRedirect(pipe1, pipe, handleSignal()); !ok {
+	if ok := pipep.WaitAndRedirect(pipe1, pipe, handleInterrupts()); !ok {
 		go pipep.Close(pipe, nil)
 		return
 	} else {
@@ -149,7 +149,7 @@ func Migrate(pipe chan interface{}, url, migrationsPath string, relativeN int) {
 		for _, f := range applyMigrationFiles {
 			pipe1 := pipep.New()
 			go d.Migrate(f, pipe1)
-			if ok := pipep.WaitAndRedirect(pipe1, pipe, handleSignal()); !ok {
+			if ok := pipep.WaitAndRedirect(pipe1, pipe, handleInterrupts()); !ok {
 				break
 			}
 		}
@@ -256,18 +256,28 @@ func NewPipe() chan interface{} {
 	return pipep.New()
 }
 
-var handleSignals = true
+// interrupts is an internal variable that holds the state of
+// interrupt handling
+var interrupts = true
 
-func EnableSignals() {
-	handleSignals = true
+// Graceful enables interrupts checking. Once the first ^C is received
+// it will finish the currently running migration and abort execution
+// of the next migration. If ^C is received twice, it will stop
+// execution immediately.
+func Graceful() {
+	interrupts = true
 }
 
-func DisableSignals() {
-	handleSignals = false
+// NonGraceful disables interrupts checking. The first received ^C will
+// stop execution immediately.
+func NonGraceful() {
+	interrupts = false
 }
 
-func handleSignal() chan os.Signal {
-	if handleSignals {
+// interrupts returns a signal channel if interrupts checking is
+// enabled. nil otherwise.
+func handleInterrupts() chan os.Signal {
+	if interrupts {
 		c := make(chan os.Signal, 1)
 		signal.Notify(c, os.Interrupt)
 		return c
