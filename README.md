@@ -6,8 +6,10 @@
 migrate is a migration helper written in Go. Use it in your existing Golang code 
 or run migration commands via the CLI. 
 
-| Go Code | ``import github.com/mattes/migrate/migrate`` |
-| CLI     | ``go get github.com/mattes/migrate``         |
+```
+Go Code  import github.com/mattes/migrate/migrate
+CLI      go get github.com/mattes/migrate
+```
 
 
 ## Available Drivers
@@ -61,15 +63,15 @@ See GoDoc here: http://godoc.org/github.com/mattes/migrate/migrate
 ```go
 import "github.com/mattes/migrate/migrate"
 
-# use synchronous versions of migration functions ...
-# means: run the migrations and return a slice of errors at the end
+// use synchronous versions of migration functions ...
+// means: run the migrations and return a slice of errors at the end
 errors, ok := migrate.UpSync("driver://url", "./path")
 if !ok {
   fmt.Println("Oh no ...")
   // do sth with error slice
 }
 
-# use the asynchronous version of migration functions ...
+// use the asynchronous version of migration functions ...
 pipe := migrate.NewPipe()
 go migrate.Up(pipe, "driver://url", "./path")
 // pipe is basically just a channel
