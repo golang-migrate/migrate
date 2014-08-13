@@ -1,3 +1,4 @@
+// Package postgres implements the Driver interface.
 package postgres
 
 import (

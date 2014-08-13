@@ -1,3 +1,4 @@
+// Package bash implements the Driver interface.
 package bash
 
 import (

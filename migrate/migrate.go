@@ -53,6 +53,7 @@ func Up(pipe chan interface{}, url, migrationsPath string) {
 	}
 }
 
+// UpSync is synchronous version of Up
 func UpSync(url, migrationsPath string) (err []error, ok bool) {
 	pipe := pipep.New()
 	go Up(pipe, url, migrationsPath)
@@ -82,6 +83,7 @@ func Down(pipe chan interface{}, url, migrationsPath string) {
 	}
 }
 
+// DownSync is synchronous version of Down
 func DownSync(url, migrationsPath string) (err []error, ok bool) {
 	pipe := pipep.New()
 	go Down(pipe, url, migrationsPath)
@@ -96,6 +98,7 @@ func Redo(pipe chan interface{}, url, migrationsPath string) {
 	go Migrate(pipe, url, migrationsPath, +1)
 }
 
+// RedoSync is synchronous version of Redo
 func RedoSync(url, migrationsPath string) (err []error, ok bool) {
 	pipe := pipep.New()
 	go Redo(pipe, url, migrationsPath)
@@ -110,6 +113,7 @@ func Reset(pipe chan interface{}, url, migrationsPath string) {
 	go Up(pipe, url, migrationsPath)
 }
 
+// ResetSync is synchronous version of Reset
 func ResetSync(url, migrationsPath string) (err []error, ok bool) {
 	pipe := pipep.New()
 	go Reset(pipe, url, migrationsPath)
@@ -145,6 +149,7 @@ func Migrate(pipe chan interface{}, url, migrationsPath string, relativeN int) {
 	return
 }
 
+// MigrateSync is synchronous version of Migrate
 func MigrateSync(url, migrationsPath string, relativeN int) (err []error, ok bool) {
 	pipe := pipep.New()
 	go Migrate(pipe, url, migrationsPath, relativeN)
@@ -178,7 +183,7 @@ func Create(url, migrationsPath, name string) (*file.MigrationFile, error) {
 	version += 1
 	versionStr := strconv.FormatUint(version, 10)
 
-	length := 4
+	length := 4 // TODO check existing files and try to guess length
 	if len(versionStr)%length != 0 {
 		versionStr = strings.Repeat("0", length-len(versionStr)%length) + versionStr
 	}
@@ -212,4 +217,10 @@ func Create(url, migrationsPath, name string) (*file.MigrationFile, error) {
 	}
 
 	return mfile, nil
+}
+
+// NewPipe is a convenience function for pipe.New().
+// This is helpful if the user just wants to import this package and nothing else.
+func NewPipe() chan interface{} {
+	return pipep.New()
 }

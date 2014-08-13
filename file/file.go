@@ -1,3 +1,4 @@
+// Package file contains functions for low-level migration files handling.
 package file
 
 import (
@@ -16,10 +17,14 @@ import (
 
 var filenameRegex = "^([0-9]+)_(.*)\\.(up|down)\\.%s$"
 
+// FilenameRegex build regular expression stmt with given
+// filename extension from driver.
 func FilenameRegex(filenameExtension string) *regexp.Regexp {
 	return regexp.MustCompile(fmt.Sprintf(filenameRegex, filenameExtension))
 }
 
+// File represents one file on disk.
+// Example: 001_initial_plan_to_do_sth.up.sql
 type File struct {
 	Path      string
 	FileName  string
@@ -29,17 +34,20 @@ type File struct {
 	Direction direction.Direction
 }
 
+// Files is a slice of Files
 type Files []File
 
+// MigrationFile represents both the UP and the DOWN migration file.
 type MigrationFile struct {
 	Version  uint64
 	UpFile   *File
 	DownFile *File
 }
 
+// MigrationFiles is a slice of MigrationFiles
 type MigrationFiles []MigrationFile
 
-// Read reads the file contents
+// ReadContent reads the file's content.
 func (f *File) ReadContent() error {
 	content, err := ioutil.ReadFile(path.Join(f.Path, f.FileName))
 	if err != nil {
@@ -76,10 +84,11 @@ func (mf *MigrationFiles) ToLastFrom(version uint64) (Files, error) {
 }
 
 // From travels relatively through migration files.
-// +1 will fetch the next up migration file
-// +2 will fetch the next two up migration files
-// -1 will fetch the the current down migration file
-// -2 will fetch the current down and the next down migration file
+//
+// 		+1 will fetch the next up migration file.
+// 		+2 will fetch the next two up migration files
+// 		-1 will fetch the the current down migration file
+// 		-2 will fetch the current down and the next down migration file
 func (mf *MigrationFiles) From(version uint64, relativeN int) (Files, error) {
 	var d direction.Direction
 	if relativeN > 0 {
@@ -120,7 +129,7 @@ func (mf *MigrationFiles) From(version uint64, relativeN int) (Files, error) {
 	return files, nil
 }
 
-// readMigrationFiles reads all migration files from a given path
+// ReadMigrationFiles reads all migration files from a given path
 func ReadMigrationFiles(path string, filenameRegex *regexp.Regexp) (files MigrationFiles, err error) {
 	// find all migration files in path
 	ioFiles, err := ioutil.ReadDir(path)
@@ -211,9 +220,7 @@ func ReadMigrationFiles(path string, filenameRegex *regexp.Regexp) (files Migrat
 	return newFiles, nil
 }
 
-// parseFilenameSchema parses the filename and returns
-// version, name, d (up|down)
-// the schema looks like 000_name.(up|down).extension
+// parseFilenameSchema parses the filename
 func parseFilenameSchema(filename string, filenameRegex *regexp.Regexp) (version uint64, name string, d direction.Direction, err error) {
 	matches := filenameRegex.FindStringSubmatch(filename)
 	if len(matches) != 4 {
@@ -268,8 +275,8 @@ func LineColumnFromOffset(data []byte, offset int) (line, column int) {
 
 // LinesBeforeAndAfter reads n lines before and after a given line.
 // Set lineNumbers to true, to prepend line numbers.
-// TODO Trim empty lines at the beginning and at the end
-// TODO Trim offset whitespace at the beginning of each line, so that indentation is preserved
+// TODO(mattes): Trim empty lines at the beginning and at the end
+// TODO(mattes): Trim offset whitespace at the beginning of each line, so that indentation is preserved
 func LinesBeforeAndAfter(data []byte, line, before, after int, lineNumbers bool) []byte {
 	startLine := line - before
 	endLine := line + after

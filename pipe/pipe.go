@@ -1,3 +1,4 @@
+// Package pipe has functions for pipe channel handling.
 package pipe
 
 // New creates a new pipe. A pipe is basically a channel.
@@ -5,7 +6,7 @@ func New() chan interface{} {
 	return make(chan interface{}, 0)
 }
 
-// Close closes pipe and optionally sends an error
+// Close closes a pipe and optionally sends an error
 func Close(pipe chan interface{}, err error) {
 	if err != nil {
 		pipe <- err

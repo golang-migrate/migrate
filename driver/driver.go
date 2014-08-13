@@ -1,3 +1,4 @@
+// Package driver holds the driver interface.
 package driver
 
 import (
@@ -9,14 +10,33 @@ import (
 	neturl "net/url" // alias to allow `url string` func signature in New
 )
 
+// Driver is the interface type that needs to implemented by all drivers.
 type Driver interface {
+
+	// Initialize is the first function to be called.
+	// Check the url string and open and verify any connection
+	// that has to be made.
 	Initialize(url string) error
+
+	// FilenameExtension returns the extension of the migration files.
+	// The returned string must not begin with a dot.
 	FilenameExtension() string
+
+	// Migrate is the heart of the driver.
+	// It will receive a slice of files which the driver should apply
+	// to its backend or whatever. The migration function should use
+	// the pipe channel to return any errors or other useful information.
+	//
+	// Please note that the order of the migration files is already
+	// sorted: Ascending for UP migration files, and descending for
+	// DOWN migration files.
 	Migrate(files file.Files, pipe chan interface{})
+
+	// Version returns the current migration version.
 	Version() (uint64, error)
 }
 
-// InitDriver returns Driver and initializes it
+// New returns Driver and calls Initialize on it
 func New(url string) (Driver, error) {
 	u, err := neturl.Parse(url)
 	if err != nil {
@@ -43,6 +63,8 @@ func New(url string) (Driver, error) {
 	}
 }
 
+// verifyFilenameExtension panics if the drivers filename extension
+// is not correct or empty.
 func verifyFilenameExtension(driverName string, d Driver) {
 	f := d.FilenameExtension()
 	if f == "" {

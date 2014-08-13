@@ -1,3 +1,4 @@
+// Package main is the CLI
 package main
 
 import (

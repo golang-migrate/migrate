@@ -3,13 +3,16 @@
 [![Build Status](https://travis-ci.org/mattes/migrate.svg?branch=master)](https://travis-ci.org/mattes/migrate)
 [![GoDoc](https://godoc.org/github.com/mattes/migrate?status.svg)](https://godoc.org/github.com/mattes/migrate)
 
+migrate is a migration helper written in Go. Use it in your existing Golang code 
+or run migration commands via the CLI. 
 
-migrate can be used as CLI or can be imported into your existing Go code.
+| Go Code | ``import github.com/mattes/migrate/migrate`` |
+| CLI     | ``go get github.com/mattes/migrate``         |
 
 
 ## Available Drivers
 
- * [Postgres](https://github.com/mattes/migrate/tree/master/driver/postgres)
+ * [PostgreSQL](https://github.com/mattes/migrate/tree/master/driver/postgres)
  * Bash (planned)
 
 Need another driver? Just implement the [Driver interface](http://godoc.org/github.com/mattes/migrate/driver#Driver) and open a PR.
@@ -21,60 +24,74 @@ Need another driver? Just implement the [Driver interface](http://godoc.org/gith
 # install
 go get github.com/mattes/migrate
 
-# create new migration
-migrate -url postgres://user@host:port/database -path ./db/migrations create add_field_to_table
+# create new migration file in path
+migrate -url driver://url -path ./migrations create migration_file_xyz
 
-# apply all *up* migrations
-migrate -url postgres://user@host:port/database -path ./db/migrations up
+# apply all available migrations
+migrate -url driver://url -path ./migrations up
 
-# apply all *down* migrations
-migrate -url postgres://user@host:port/database -path ./db/migrations down
+# roll back all migrations
+migrate -url driver://url -path ./migrations down
 
 # roll back the most recently applied migration, then run it again.
-migrate -url postgres://user@host:port/database -path ./db/migrations redo
+migrate -url driver://url -path ./migrations redo
 
-# down and up again
-migrate -url postgres://user@host:port/database -path ./db/migrations reset
+# run down and then up command
+migrate -url driver://url -path ./migrations reset
 
-# show current migration version
-migrate -url postgres://user@host:port/database -path ./db/migrations version
+# show the current migration version
+migrate -url driver://url -path ./migrations version
 
 # apply the next n migrations
-migrate -url postgres://user@host:port/database -path ./db/migrations migrate +1
-migrate -url postgres://user@host:port/database -path ./db/migrations migrate +2
-migrate -url postgres://user@host:port/database -path ./db/migrations migrate +n
+migrate -url driver://url -path ./migrations migrate +1
+migrate -url driver://url -path ./migrations migrate +2
+migrate -url driver://url -path ./migrations migrate +n
 
-# apply the *down* migration of the current version 
-# and the previous n-1 migrations
-migrate -url postgres://user@host:port/database -path ./db/migrations migrate -1
-migrate -url postgres://user@host:port/database -path ./db/migrations migrate -2
-migrate -url postgres://user@host:port/database -path ./db/migrations migrate -n
+# roll back the previous n migrations
+migrate -url driver://url -path ./migrations migrate -1
+migrate -url driver://url -path ./migrations migrate -2
+migrate -url driver://url -path ./migrations migrate -n
 ```
 
 
-## Usage from within Go
+## Usage in Go
 
-See http://godoc.org/github.com/mattes/migrate/migrate
+See GoDoc here: http://godoc.org/github.com/mattes/migrate/migrate
 
-```golang
+```go
 import "github.com/mattes/migrate/migrate"
 
+# use synchronous versions of migration functions ...
+# means: run the migrations and return a slice of errors at the end
+errors, ok := migrate.UpSync("driver://url", "./path")
+if !ok {
+  fmt.Println("Oh no ...")
+  // do sth with error slice
+}
 
-migrate.Up("postgres://user@host:port/database", "./db/migrations")
-// ... 
-// ... 
+# use the asynchronous version of migration functions ...
+pipe := migrate.NewPipe()
+go migrate.Up(pipe, "driver://url", "./path")
+// pipe is basically just a channel
+// write your own channel listener. see writePipe() in main.go as an example.
 ```
 
-## Migrations format
+## Migrations files
+
+The format of migration files looks like this:
 
 ```
-./db/migrations/001_initial.up.sql
-./db/migrations/001_initial.down.sql
+001_initial_plan_to_do_sth.up.sql     # up migration instructions
+001_initial_plan_to_do_sth.down.sql   # down migration instructions
 ```
 
-Why two files? This way you could do sth like ``psql -f ./db/migrations/001_initial.up.sql``.
+Why two files? This way you could still do sth like 
+``psql -f ./db/migrations/001_initial_plan_to_do_sth.up.sql`` and there is no
+need for any custom markup language to divide up and down migrations.
 
 
 ## Credits
 
  * https://bitbucket.org/liamstask/goose
+
+
