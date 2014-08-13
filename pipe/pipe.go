@@ -3,7 +3,6 @@ package pipe
 
 import (
 	"os"
-	"os/signal"
 )
 
 // New creates a new pipe. A pipe is basically a channel.
@@ -17,12 +16,6 @@ func Close(pipe chan interface{}, err error) {
 		pipe <- err
 	}
 	close(pipe)
-}
-
-func Signal() chan os.Signal {
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
-	return c
 }
 
 func WaitAndRedirect(pipe, redirectPipe chan interface{}, signal chan os.Signal) (ok bool) {
