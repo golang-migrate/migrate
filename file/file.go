@@ -17,7 +17,7 @@ import (
 
 var filenameRegex = "^([0-9]+)_(.*)\\.(up|down)\\.%s$"
 
-// FilenameRegex build regular expression stmt with given
+// FilenameRegex builds regular expression stmt with given
 // filename extension from driver.
 func FilenameRegex(filenameExtension string) *regexp.Regexp {
 	return regexp.MustCompile(fmt.Sprintf(filenameRegex, filenameExtension))
@@ -26,11 +26,22 @@ func FilenameRegex(filenameExtension string) *regexp.Regexp {
 // File represents one file on disk.
 // Example: 001_initial_plan_to_do_sth.up.sql
 type File struct {
-	Path      string
-	FileName  string
-	Version   uint64
-	Name      string
-	Content   []byte
+	// absolute path to file
+	Path string
+
+	// the name of the file
+	FileName string
+
+	// version parsed from filename
+	Version uint64
+
+	// the actual migration name parsed from filename
+	Name string
+
+	// content of the file
+	Content []byte
+
+	// UP or DOWN migration
 	Direction direction.Direction
 }
 
@@ -39,8 +50,13 @@ type Files []File
 
 // MigrationFile represents both the UP and the DOWN migration file.
 type MigrationFile struct {
-	Version  uint64
-	UpFile   *File
+	// version of the migration file, parsed from the filenames
+	Version uint64
+
+	// reference to the *up* migration file
+	UpFile *File
+
+	// reference to the *down* migration file
 	DownFile *File
 }
 
@@ -264,8 +280,8 @@ func (mf MigrationFiles) Swap(i, j int) {
 
 // LineColumnFromOffset reads data and returns line and column integer
 // for a given offset.
-// TODO is there a better way?
 func LineColumnFromOffset(data []byte, offset int) (line, column int) {
+	// TODO is there a better way?
 	fs := token.NewFileSet()
 	tf := fs.AddFile("", fs.Base(), len(data))
 	tf.SetLinesForContent(data)
@@ -275,9 +291,9 @@ func LineColumnFromOffset(data []byte, offset int) (line, column int) {
 
 // LinesBeforeAndAfter reads n lines before and after a given line.
 // Set lineNumbers to true, to prepend line numbers.
-// TODO(mattes): Trim empty lines at the beginning and at the end
-// TODO(mattes): Trim offset whitespace at the beginning of each line, so that indentation is preserved
 func LinesBeforeAndAfter(data []byte, line, before, after int, lineNumbers bool) []byte {
+	// TODO(mattes): Trim empty lines at the beginning and at the end
+	// TODO(mattes): Trim offset whitespace at the beginning of each line, so that indentation is preserved
 	startLine := line - before
 	endLine := line + after
 	lines := bytes.SplitN(data, []byte("\n"), endLine+1)
