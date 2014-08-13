@@ -165,7 +165,7 @@ func printTimer() {
 
 func helpCmd() {
 	os.Stderr.WriteString(
-		`usage: migrate [-path=<path>] [-url=<url>] <command> [<args>]
+		`usage: migrate [-path=<path>] -url=<url> <command> [<args>]
 
 Commands:
    create <name>  Create a new migration
