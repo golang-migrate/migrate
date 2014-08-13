@@ -64,11 +64,10 @@ See GoDoc here: http://godoc.org/github.com/mattes/migrate/migrate
 import "github.com/mattes/migrate/migrate"
 
 // use synchronous versions of migration functions ...
-// means: run the migrations and return a slice of errors at the end
-errors, ok := migrate.UpSync("driver://url", "./path")
+allErrors, ok := migrate.UpSync("driver://url", "./path")
 if !ok {
   fmt.Println("Oh no ...")
-  // do sth with error slice
+  // do sth with allErrors slice
 }
 
 // use the asynchronous version of migration functions ...
@@ -78,13 +77,16 @@ go migrate.Up(pipe, "driver://url", "./path")
 // write your own channel listener. see writePipe() in main.go as an example.
 ```
 
-## Migrations files
+## Migration files
 
 The format of migration files looks like this:
 
 ```
 001_initial_plan_to_do_sth.up.sql     # up migration instructions
 001_initial_plan_to_do_sth.down.sql   # down migration instructions
+002_xxx.up.sql
+002_xxx.down.sql
+...
 ```
 
 Why two files? This way you could still do sth like 
