@@ -91,7 +91,8 @@ The format of migration files looks like this:
 
 Why two files? This way you could still do sth like 
 ``psql -f ./db/migrations/001_initial_plan_to_do_sth.up.sql`` and there is no
-need for any custom markup language to divide up and down migrations.
+need for any custom markup language to divide up and down migrations. Please note
+that the filename extension depends on the driver.
 
 
 ## Credits
