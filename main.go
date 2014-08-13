@@ -76,15 +76,6 @@ func verifyMigrationsPath(path string) {
 	}
 }
 
-func textPadding(text string) string {
-	textSplit := strings.Split(text, "\n")
-	newText := make([]string, 0)
-	for _, line := range textSplit {
-		newText = append(newText, "    "+line)
-	}
-	return strings.Join(newText, "\n")
-}
-
 func writePipe(pipe chan interface{}) {
 	if pipe != nil {
 		for {
