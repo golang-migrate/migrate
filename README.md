@@ -107,5 +107,6 @@ that the filename extension depends on the driver.
  * https://bitbucket.org/liamstask/goose
  * https://github.com/tanel/dbmigrate
  * https://github.com/BurntSushi/migration
+ * https://github.com/DavidHuie/gomigrate
 
 
