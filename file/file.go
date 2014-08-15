@@ -17,7 +17,6 @@ import (
 
 var filenameRegex = `^([0-9]+)_(.*)\.(up|down)\.%s$`
 
-
 // FilenameRegex builds regular expression stmt with given
 // filename extension from driver.
 func FilenameRegex(filenameExtension string) *regexp.Regexp {
