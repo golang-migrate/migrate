@@ -15,7 +15,8 @@ import (
 	"strings"
 )
 
-var filenameRegex = "^([0-9]+)_(.*)\\.(up|down)\\.%s$"
+var filenameRegex = `^([0-9]+)_(.*)\.(up|down)\.%s$`
+
 
 // FilenameRegex builds regular expression stmt with given
 // filename extension from driver.
