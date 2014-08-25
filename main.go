@@ -18,10 +18,16 @@ import (
 
 var url = flag.String("url", "", "")
 var migrationsPath = flag.String("path", "", "")
+var version = flag.Bool("version", false, "Show migrate version")
 
 func main() {
 	flag.Parse()
 	command := flag.Arg(0)
+
+	if *version {
+		fmt.Printf("%.2f", Version)
+		os.Exit(0)
+	}
 
 	if *migrationsPath == "" {
 		*migrationsPath, _ = os.Getwd()
