@@ -87,4 +87,7 @@ func TestMigrate(t *testing.T) {
 		t.Error("Expected test case to fail")
 	}
 
+	if err := d.Close(); err != nil {
+		t.Fatal(err)
+	}
 }

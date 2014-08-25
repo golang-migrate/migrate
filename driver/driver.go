@@ -18,6 +18,10 @@ type Driver interface {
 	// that has to be made.
 	Initialize(url string) error
 
+	// Close is the last function to be called.
+	// Close any open connection here.
+	Close() error
+
 	// FilenameExtension returns the extension of the migration files.
 	// The returned string must not begin with a dot.
 	FilenameExtension() string

@@ -26,6 +26,9 @@ func Up(pipe chan interface{}, url, migrationsPath string) {
 
 	applyMigrationFiles, err := files.ToLastFrom(version)
 	if err != nil {
+		if err2 := d.Close(); err != nil {
+			pipe <- err2
+		}
 		go pipep.Close(pipe, err)
 		return
 	}
@@ -38,9 +41,15 @@ func Up(pipe chan interface{}, url, migrationsPath string) {
 				break
 			}
 		}
+		if err2 := d.Close(); err != nil {
+			pipe <- err2
+		}
 		go pipep.Close(pipe, nil)
 		return
 	} else {
+		if err2 := d.Close(); err != nil {
+			pipe <- err2
+		}
 		go pipep.Close(pipe, nil)
 		return
 	}
@@ -64,6 +73,9 @@ func Down(pipe chan interface{}, url, migrationsPath string) {
 
 	applyMigrationFiles, err := files.ToFirstFrom(version)
 	if err != nil {
+		if err2 := d.Close(); err != nil {
+			pipe <- err2
+		}
 		go pipep.Close(pipe, err)
 		return
 	}
@@ -76,9 +88,15 @@ func Down(pipe chan interface{}, url, migrationsPath string) {
 				break
 			}
 		}
+		if err2 := d.Close(); err != nil {
+			pipe <- err2
+		}
 		go pipep.Close(pipe, nil)
 		return
 	} else {
+		if err2 := d.Close(); err != nil {
+			pipe <- err2
+		}
 		go pipep.Close(pipe, nil)
 		return
 	}
@@ -142,6 +160,9 @@ func Migrate(pipe chan interface{}, url, migrationsPath string, relativeN int) {
 
 	applyMigrationFiles, err := files.From(version, relativeN)
 	if err != nil {
+		if err2 := d.Close(); err != nil {
+			pipe <- err2
+		}
 		go pipep.Close(pipe, err)
 		return
 	}
@@ -154,8 +175,14 @@ func Migrate(pipe chan interface{}, url, migrationsPath string, relativeN int) {
 				break
 			}
 		}
+		if err2 := d.Close(); err != nil {
+			pipe <- err2
+		}
 		go pipep.Close(pipe, nil)
 		return
+	}
+	if err2 := d.Close(); err != nil {
+		pipe <- err2
 	}
 	go pipep.Close(pipe, nil)
 	return
@@ -242,10 +269,12 @@ func initDriverAndReadMigrationFilesAndGetVersion(url, migrationsPath string) (d
 	}
 	files, err := file.ReadMigrationFiles(migrationsPath, file.FilenameRegex(d.FilenameExtension()))
 	if err != nil {
+		d.Close() // TODO what happens with errors from this func?
 		return nil, nil, 0, err
 	}
 	version, err := d.Version()
 	if err != nil {
+		d.Close() // TODO what happens with errors from this func?
 		return nil, nil, 0, err
 	}
 	return d, &files, version, nil

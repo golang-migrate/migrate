@@ -33,6 +33,13 @@ func (driver *Driver) Initialize(url string) error {
 	return nil
 }
 
+func (driver *Driver) Close() error {
+	if err := driver.db.Close(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (driver *Driver) ensureVersionTableExists() error {
 	if _, err := driver.db.Exec("CREATE TABLE IF NOT EXISTS " + tableName + " (version int not null primary key);"); err != nil {
 		return err
@@ -46,7 +53,6 @@ func (driver *Driver) FilenameExtension() string {
 
 func (driver *Driver) Migrate(f file.File, pipe chan interface{}) {
 	defer close(pipe)
-
 	pipe <- f
 
 	tx, err := driver.db.Begin()
