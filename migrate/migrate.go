@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/dinedal/migrate/driver"
+	"github.com/mattes/migrate/driver"
 	"github.com/mattes/migrate/file"
 	"github.com/mattes/migrate/migrate/direction"
 	pipep "github.com/mattes/migrate/pipe"
