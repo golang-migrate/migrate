@@ -15,6 +15,7 @@ type Driver struct {
 }
 
 const tableName = "schema_migrations"
+const versionRow = 1
 
 // Cassandra Driver URL format:
 // cassandra://host:port/keyspace
@@ -47,7 +48,7 @@ func (driver *Driver) Close() error {
 }
 
 func (driver *Driver) ensureVersionTableExists() error {
-	err := driver.session.Query("CREATE TABLE IF NOT EXISTS " + tableName + " (version bigint primary key);").Exec()
+	err := driver.session.Query("CREATE TABLE IF NOT EXISTS " + tableName + " (version counter, versionRow bigint primary key);").Exec()
 	if err != nil {
 		return err
 	}
@@ -63,13 +64,13 @@ func (driver *Driver) Migrate(f file.File, pipe chan interface{}) {
 	pipe <- f
 
 	if f.Direction == direction.Up {
-		err := driver.session.Query("INSERT INTO "+tableName+" (version) VALUES (?)", f.Version).Exec()
+		err := driver.session.Query("UPDATE "+tableName+" SET version = version + 1 where versionRow = ?", versionRow).Exec()
 		if err != nil {
 			pipe <- err
 			return
 		}
 	} else if f.Direction == direction.Down {
-		err := driver.session.Query("DELETE FROM "+tableName+" WHERE version = ?", f.Version).Exec()
+		err := driver.session.Query("UPDATE "+tableName+" SET version = version - 1 where versionRow = ?", versionRow).Exec()
 		if err != nil {
 			pipe <- err
 			return
@@ -91,6 +92,6 @@ func (driver *Driver) Migrate(f file.File, pipe chan interface{}) {
 
 func (driver *Driver) Version() (uint64, error) {
 	var version int64
-	err := driver.session.Query("SELECT version FROM " + tableName + " ORDER BY version DESC LIMIT 1").Scan(&version)
+	err := driver.session.Query("SELECT version FROM "+tableName+" WHERE versionRow = ?", versionRow).Scan(&version)
 	return uint64(version), err
 }
