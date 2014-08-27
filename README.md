@@ -22,7 +22,7 @@ __Features__
 ## Available Drivers
 
  * [PostgreSQL](https://github.com/mattes/migrate/tree/master/driver/postgres)
- * [Cassandra](https://github.com/mattes/migrate/tree/master/driver/cassandra) ([@dinedal](https://github.com/dinedal))
+ * [Cassandra](https://github.com/mattes/migrate/tree/master/driver/cassandra) [@dinedal](https://github.com/dinedal)
  * Bash (planned)
 
 Need another driver? Just implement the [Driver interface](http://godoc.org/github.com/mattes/migrate/driver#Driver) and open a PR.
