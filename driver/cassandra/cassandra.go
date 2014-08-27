@@ -58,9 +58,6 @@ func (driver *Driver) ensureVersionTableExists() error {
 		driver.session.Query("UPDATE "+tableName+" SET version = version + 1 where versionRow = ?", versionRow).Exec()
 	}
 
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
