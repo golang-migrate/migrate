@@ -4,16 +4,17 @@ package migrate
 
 import (
 	"fmt"
-	"github.com/mattes/migrate/driver"
-	"github.com/mattes/migrate/file"
-	"github.com/mattes/migrate/migrate/direction"
-	pipep "github.com/mattes/migrate/pipe"
 	"io/ioutil"
 	"os"
 	"os/signal"
 	"path"
 	"strconv"
 	"strings"
+
+	"github.com/mattes/migrate/driver"
+	"github.com/mattes/migrate/file"
+	"github.com/mattes/migrate/migrate/direction"
+	pipep "github.com/mattes/migrate/pipe"
 )
 
 // Up applies all available migrations

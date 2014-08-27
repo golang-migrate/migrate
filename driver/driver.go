@@ -4,10 +4,12 @@ package driver
 import (
 	"errors"
 	"fmt"
+	neturl "net/url" // alias to allow `url string` func signature in New
+
 	"github.com/mattes/migrate/driver/bash"
+	"github.com/mattes/migrate/driver/cassandra"
 	"github.com/mattes/migrate/driver/postgres"
 	"github.com/mattes/migrate/file"
-	neturl "net/url" // alias to allow `url string` func signature in New
 )
 
 // Driver is the interface type that needs to implemented by all drivers.
@@ -54,6 +56,13 @@ func New(url string) (Driver, error) {
 	case "bash":
 		d := &bash.Driver{}
 		verifyFilenameExtension("bash", d)
+		if err := d.Initialize(url); err != nil {
+			return nil, err
+		}
+		return d, nil
+	case "cassandra":
+		d := &cassandra.Driver{}
+		verifyFilenameExtension("cassanda", d)
 		if err := d.Initialize(url); err != nil {
 			return nil, err
 		}

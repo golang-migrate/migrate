@@ -8,7 +8,12 @@ go:
 addons:
   postgresql: "9.3"
 
+services:
+  - cassandra
+
 before_script:
+  - >
+      /usr/local/cassandra/bin/cqlsh -e "CREATE KEYSPACE migratetest WITH REPLICATION = {'class': 'SimpleStrategy', 'replication_factor' : 1};"
   - psql -c 'create database migratetest;' -U postgres
 
 script: go test -p 1 ./...
