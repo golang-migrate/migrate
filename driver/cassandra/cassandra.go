@@ -52,6 +52,12 @@ func (driver *Driver) ensureVersionTableExists() error {
 	if err != nil {
 		return err
 	}
+
+	driver.session.Query("UPDATE "+tableName+" SET version = version + 1 where versionRow = ?", versionRow).Exec()
+
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -93,5 +99,5 @@ func (driver *Driver) Migrate(f file.File, pipe chan interface{}) {
 func (driver *Driver) Version() (uint64, error) {
 	var version int64
 	err := driver.session.Query("SELECT version FROM "+tableName+" WHERE versionRow = ?", versionRow).Scan(&version)
-	return uint64(version), err
+	return uint64(version) - 1, err
 }
