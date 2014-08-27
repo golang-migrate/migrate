@@ -7,3 +7,7 @@ migrate -url cassandra://host:port/keyspace -path ./db/migrations create add_fie
 migrate -url cassandra://host:port/keyspace -path ./db/migrations up
 migrate help # for more info
 ```
+
+## Authors
+
+* Paul Bergeron, https://github.com/dinedal
