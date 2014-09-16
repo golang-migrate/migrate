@@ -22,7 +22,7 @@ __Features__
 ## Available Drivers
 
  * [PostgreSQL](https://github.com/mattes/migrate/tree/master/driver/postgres)
- * [Cassandra](https://github.com/mattes/migrate/tree/master/driver/cassandra) [@dinedal](https://github.com/dinedal)
+ * [Cassandra](https://github.com/mattes/migrate/tree/master/driver/cassandra)
  * SQLite ([planned](https://github.com/mattes/migrate/issues/2))
  * MySQL ([planned](https://github.com/mattes/migrate/issues/1))
  * Bash (planned)
