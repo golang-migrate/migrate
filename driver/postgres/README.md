@@ -17,3 +17,7 @@ migrate help # for more info
 # TODO(mattes): thinking about adding some custom flag to allow migration within schemas:
 -url="postgres://user@host:port/database?schema=name" 
 ```
+
+## Authors
+
+* Matthias Kadenbach, https://github.com/mattes
