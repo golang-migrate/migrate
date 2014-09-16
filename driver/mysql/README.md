@@ -10,10 +10,12 @@
 ## Usage
 
 ```bash
-migrate -url postgres://user@host:port/database -path ./db/migrations create add_field_to_table
-migrate -url postgres://user@host:port/database -path ./db/migrations up
+migrate -url mysql://user@host:port/database -path ./db/migrations create add_field_to_table
+migrate -url mysql://user@host:port/database -path ./db/migrations up
 migrate help # for more info
 ```
+
+See full [DSN (Data Source Name) documentation](https://github.com/go-sql-driver/mysql/#dsn-data-source-name).
 
 ## Authors
 

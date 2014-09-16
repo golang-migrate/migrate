@@ -8,6 +8,7 @@ import (
 
 	"github.com/mattes/migrate/driver/bash"
 	"github.com/mattes/migrate/driver/cassandra"
+	"github.com/mattes/migrate/driver/mysql"
 	"github.com/mattes/migrate/driver/postgres"
 	"github.com/mattes/migrate/file"
 )
@@ -53,6 +54,15 @@ func New(url string) (Driver, error) {
 			return nil, err
 		}
 		return d, nil
+
+	case "mysql":
+		d := &mysql.Driver{}
+		verifyFilenameExtension("mysql", d)
+		if err := d.Initialize(url); err != nil {
+			return nil, err
+		}
+		return d, nil
+
 	case "bash":
 		d := &bash.Driver{}
 		verifyFilenameExtension("bash", d)
@@ -60,6 +70,7 @@ func New(url string) (Driver, error) {
 			return nil, err
 		}
 		return d, nil
+
 	case "cassandra":
 		d := &cassandra.Driver{}
 		verifyFilenameExtension("cassanda", d)

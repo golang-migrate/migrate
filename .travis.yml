@@ -15,5 +15,6 @@ before_script:
   - >
       /usr/local/cassandra/bin/cqlsh -e "CREATE KEYSPACE migratetest WITH REPLICATION = {'class': 'SimpleStrategy', 'replication_factor' : 1};"
   - psql -c 'create database migratetest;' -U postgres
+  - mysql -e 'create database migratetest;'
 
 script: go test -p 1 ./...

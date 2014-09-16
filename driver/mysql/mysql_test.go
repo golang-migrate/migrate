@@ -1,4 +1,4 @@
-package postgres
+package mysql
 
 import (
 	"database/sql"
@@ -11,15 +11,17 @@ import (
 // TestMigrate runs some additional tests on Migrate().
 // Basic testing is already done in migrate/migrate_test.go
 func TestMigrate(t *testing.T) {
-	driverUrl := "postgres://localhost/migratetest?sslmode=disable"
+	driverUrl := "root@tcp(127.0.0.1:3306)/migratetest"
 
 	// prepare clean database
-	connection, err := sql.Open("postgres", driverUrl)
+	connection, err := sql.Open("mysql", driverUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if _, err := connection.Exec(`
         DROP TABLE IF EXISTS yolo;
+        DROP TABLE IF EXISTS yolo1;
         DROP TABLE IF EXISTS ` + tableName + `;`); err != nil {
 		t.Fatal(err)
 	}
@@ -38,8 +40,12 @@ func TestMigrate(t *testing.T) {
 			Direction: direction.Up,
 			Content: []byte(`
         CREATE TABLE yolo (
-          id serial not null primary key
+          id int(11) not null primary key auto_increment
         );
+
+				CREATE TABLE yolo1 (
+				  id int(11) not null primary key auto_increment
+				);
       `),
 		},
 		{
@@ -59,9 +65,11 @@ func TestMigrate(t *testing.T) {
 			Name:      "foobar",
 			Direction: direction.Up,
 			Content: []byte(`
-        CREATE TABLE error (
+
+      	// a comment
+				CREATE TABLE error (
           id THIS WILL CAUSE AN ERROR
-        )
+        );
       `),
 		},
 	}
@@ -86,6 +94,9 @@ func TestMigrate(t *testing.T) {
 	if len(errs) == 0 {
 		t.Error("Expected test case to fail")
 	}
+
+	// TODO remove after debugging
+	t.Error(errs)
 
 	if err := d.Close(); err != nil {
 		t.Fatal(err)
