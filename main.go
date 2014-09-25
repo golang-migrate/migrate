@@ -57,9 +57,32 @@ func main() {
 		relativeN := flag.Arg(1)
 		relativeNInt, err := strconv.Atoi(relativeN)
 		if err != nil {
-			fmt.Println("Unable to parse parse param <n>.")
+			fmt.Println("Unable to parse param <n>.")
 			os.Exit(1)
 		}
+		timerStart = time.Now()
+		pipe := pipep.New()
+		go migrate.Migrate(pipe, *url, *migrationsPath, relativeNInt)
+		writePipe(pipe)
+		printTimer()
+
+	case "goto":
+		verifyMigrationsPath(*migrationsPath)
+		toVerion := flag.Arg(1)
+		toVerionInt, err := strconv.Atoi(toVerion)
+		if err != nil || toVerionInt < 0 {
+			fmt.Println("Unable to parse param <v>.")
+			os.Exit(1)
+		}
+
+		currentVersion, err := migrate.Version(*url, *migrationsPath)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+
+		relativeNInt := toVerionInt - int(currentVersion)
+
 		timerStart = time.Now()
 		pipe := pipep.New()
 		go migrate.Migrate(pipe, *url, *migrationsPath, relativeNInt)
@@ -181,6 +204,7 @@ Commands:
    redo           Roll back most recent migration, then apply it again
    version        Show current migration version
    migrate <n>    Apply migrations -n|+n
+   goto <v>       Migrate to version v
    help           Show this help
 
 '-path' defaults to current working directory.
