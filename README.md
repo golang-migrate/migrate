@@ -63,6 +63,9 @@ migrate -url driver://url -path ./migrations migrate +n
 migrate -url driver://url -path ./migrations migrate -1
 migrate -url driver://url -path ./migrations migrate -2
 migrate -url driver://url -path ./migrations migrate -n
+
+# go to specific migration
+migrate -url driver://url -path ./migrations goto v
 ```
 
 
