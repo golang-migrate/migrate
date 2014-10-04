@@ -68,9 +68,9 @@ func main() {
 
 	case "goto":
 		verifyMigrationsPath(*migrationsPath)
-		toVerion := flag.Arg(1)
-		toVerionInt, err := strconv.Atoi(toVerion)
-		if err != nil || toVerionInt < 0 {
+		toVersion := flag.Arg(1)
+		toVersionInt, err := strconv.Atoi(toVersion)
+		if err != nil || toVersionInt < 0 {
 			fmt.Println("Unable to parse param <v>.")
 			os.Exit(1)
 		}
@@ -81,7 +81,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		relativeNInt := toVerionInt - int(currentVersion)
+		relativeNInt := toVersionInt - int(currentVersion)
 
 		timerStart = time.Now()
 		pipe := pipep.New()
