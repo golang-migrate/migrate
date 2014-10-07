@@ -8,7 +8,7 @@ or run commands via the CLI.
 
 ```
 GoCode   import github.com/mattes/migrate/migrate
-CLI      go get github.com/mattes/migrate
+CLI      go get -u github.com/mattes/migrate
 ```
 
 __Features__
