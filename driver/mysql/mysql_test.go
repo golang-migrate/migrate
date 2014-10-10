@@ -19,10 +19,7 @@ func TestMigrate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := connection.Exec(`
-        DROP TABLE IF EXISTS yolo;
-        DROP TABLE IF EXISTS yolo1;
-        DROP TABLE IF EXISTS ` + tableName + `;`); err != nil {
+	if _, err := connection.Exec(`DROP TABLE IF EXISTS yolo, yolo1, ` + tableName); err != nil {
 		t.Fatal(err)
 	}
 
@@ -44,7 +41,7 @@ func TestMigrate(t *testing.T) {
         );
 
 				CREATE TABLE yolo1 (
-				  id int(11) not null primary key auto_increment
+				  id int(11) not nfull primary key auto_increment
 				);
       `),
 		},
@@ -94,9 +91,6 @@ func TestMigrate(t *testing.T) {
 	if len(errs) == 0 {
 		t.Error("Expected test case to fail")
 	}
-
-	// TODO remove after debugging
-	t.Error(errs)
 
 	if err := d.Close(); err != nil {
 		t.Fatal(err)
