@@ -25,7 +25,7 @@ func main() {
 	command := flag.Arg(0)
 
 	if *version {
-		fmt.Printf("%.2f", Version)
+		fmt.Println(Version)
 		os.Exit(0)
 	}
 

@@ -1,3 +1,3 @@
 package main
 
-const Version float64 = 1.1
+const Version string = "1.2.0"
