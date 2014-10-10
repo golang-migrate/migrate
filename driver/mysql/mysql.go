@@ -12,6 +12,7 @@ import (
 	"github.com/mattes/migrate/migrate/direction"
 	"regexp"
 	"strconv"
+	"strings"
 )
 
 type Driver struct {
@@ -21,7 +22,7 @@ type Driver struct {
 const tableName = "schema_migrations"
 
 func (driver *Driver) Initialize(url string) error {
-	db, err := sql.Open("mysql", url)
+	db, err := sql.Open("mysql", strings.TrimLeft(url, "mysql://"))
 	if err != nil {
 		return err
 	}
