@@ -12,8 +12,8 @@
 ## Usage
 
 ```bash
-migrate -url mysql://user@host:port/database -path ./db/migrations create add_field_to_table
-migrate -url mysql://user@host:port/database -path ./db/migrations up
+migrate -url mysql://user@tcp(host:port)/database -path ./db/migrations create add_field_to_table
+migrate -url mysql://user@tcp(host:port)/database -path ./db/migrations up
 migrate help # for more info
 ```
 
