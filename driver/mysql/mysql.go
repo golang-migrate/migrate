@@ -91,7 +91,7 @@ func (driver *Driver) Migrate(f file.File, pipe chan interface{}) {
 
 	// TODO this is not good! unfortunately there is no mysql driver that
 	// supports multiple statements per query.
-	sqlStmts := bytes.Split(f.Content, ";")
+	sqlStmts := bytes.Split(f.Content, []byte(";"))
 
 	for _, sqlStmt := range sqlStmts {
 		if _, err := tx.Exec(string(sqlStmt)); err != nil {
