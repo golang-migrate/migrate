@@ -22,7 +22,12 @@ type Driver struct {
 const tableName = "schema_migrations"
 
 func (driver *Driver) Initialize(url string) error {
-	db, err := sql.Open("mysql", strings.TrimLeft(url, "mysql://"))
+	urlWithoutScheme := strings.SplitN(url, "mysql://", 2)
+	if len(urlWithoutScheme) != 2 {
+		return errors.New("invalid mysql:// scheme")
+	}
+
+	db, err := sql.Open("mysql", urlWithoutScheme[1])
 	if err != nil {
 		return err
 	}
