@@ -5,6 +5,7 @@ import (
 	"github.com/mattes/migrate/file"
 	"github.com/mattes/migrate/migrate/direction"
 	pipep "github.com/mattes/migrate/pipe"
+	"strings"
 	"testing"
 )
 
@@ -14,7 +15,7 @@ func TestMigrate(t *testing.T) {
 	driverUrl := "mysql://root@tcp(127.0.0.1:3306)/migratetest"
 
 	// prepare clean database
-	connection, err := sql.Open("mysql", driverUrl)
+	connection, err := sql.Open("mysql", strings.SplitN(driverUrl, "mysql://", 2)[1])
 	if err != nil {
 		t.Fatal(err)
 	}
