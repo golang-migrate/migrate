@@ -11,7 +11,7 @@ import (
 // TestMigrate runs some additional tests on Migrate().
 // Basic testing is already done in migrate/migrate_test.go
 func TestMigrate(t *testing.T) {
-	driverUrl := "root@tcp(127.0.0.1:3306)/migratetest"
+	driverUrl := "mysql://root@tcp(127.0.0.1:3306)/migratetest"
 
 	// prepare clean database
 	connection, err := sql.Open("mysql", driverUrl)
