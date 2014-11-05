@@ -48,7 +48,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		fmt.Printf("Version %v migration files created in %v:\n", migrationFile.Version, migrationsPath)
+		fmt.Printf("Version %v migration files created in %v:\n", migrationFile.Version, *migrationsPath)
 		fmt.Println(migrationFile.UpFile.FileName)
 		fmt.Println(migrationFile.DownFile.FileName)
 
