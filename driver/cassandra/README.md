@@ -11,3 +11,4 @@ migrate help # for more info
 ## Authors
 
 * Paul Bergeron, https://github.com/dinedal
+* Johnny Bergström, https://github.com/balboah
