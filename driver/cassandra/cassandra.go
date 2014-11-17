@@ -3,6 +3,7 @@ package cassandra
 
 import (
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/gocql/gocql"
@@ -120,7 +121,16 @@ func (driver *Driver) Migrate(f file.File, pipe chan interface{}) {
 		return
 	}
 
-	err = driver.session.Query(string(f.Content)).Exec()
+	for _, query := range strings.Split(string(f.Content), ";") {
+		query = strings.TrimSpace(query)
+		if len(query) == 0 {
+			continue
+		}
+
+		if err = driver.session.Query(query).Exec(); err != nil {
+			return
+		}
+	}
 }
 
 func (driver *Driver) Version() (uint64, error) {
