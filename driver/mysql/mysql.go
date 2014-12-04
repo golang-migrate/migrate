@@ -103,7 +103,8 @@ func (driver *Driver) Migrate(f file.File, pipe chan interface{}) {
 	sqlStmts := bytes.Split(f.Content, []byte(";"))
 
 	for _, sqlStmt := range sqlStmts {
-		if len(bytes.TrimSpace(sqlStmt)) > 0 {
+		sqlStmt = bytes.TrimSpace(sqlStmt)
+		if len(sqlStmt) > 0 {
 			if _, err := tx.Exec(string(sqlStmt)); err != nil {
 				mysqlErr, isErr := err.(*mysql.MySQLError)
 
@@ -147,12 +148,13 @@ func (driver *Driver) Migrate(f file.File, pipe chan interface{}) {
 					} else {
 						pipe <- errors.New(mysqlErr.Error())
 					}
-				}
 
-				if err := tx.Rollback(); err != nil {
-					pipe <- err
+					if err := tx.Rollback(); err != nil {
+						pipe <- err
+					}
+
+					return
 				}
-				return
 			}
 		}
 	}
