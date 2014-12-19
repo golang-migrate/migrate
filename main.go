@@ -155,14 +155,14 @@ func main() {
 	}
 }
 
-func writePipe(pipe chan interface{}) bool {
-	errorFlag := false
+func writePipe(pipe chan interface{}) (ok bool) {
+	okFlag := true
 	if pipe != nil {
 		for {
 			select {
 			case item, ok := <-pipe:
 				if !ok {
-					return !errorFlag
+					return false
 				} else {
 					switch item.(type) {
 
@@ -172,7 +172,7 @@ func writePipe(pipe chan interface{}) bool {
 					case error:
 						c := color.New(color.FgRed)
 						c.Println(item.(error).Error(), "\n")
-						errorFlag = true
+						okFlag = false
 
 					case file.File:
 						f := item.(file.File)
@@ -192,7 +192,7 @@ func writePipe(pipe chan interface{}) bool {
 			}
 		}
 	}
-	return errorFlag
+	return okFlag
 }
 
 func verifyMigrationsPath(path string) {
