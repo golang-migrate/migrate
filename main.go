@@ -192,7 +192,7 @@ func writePipe(pipe chan interface{}) bool {
 			}
 		}
 	}
-	return false
+	return errorFlag
 }
 
 func verifyMigrationsPath(path string) {
