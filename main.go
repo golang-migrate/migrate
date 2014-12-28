@@ -63,8 +63,11 @@ func main() {
 		timerStart = time.Now()
 		pipe := pipep.New()
 		go migrate.Migrate(pipe, *url, *migrationsPath, relativeNInt)
-		writePipe(pipe)
+		ok := writePipe(pipe)
 		printTimer()
+		if !ok {
+			os.Exit(1)
+		}
 
 	case "goto":
 		verifyMigrationsPath(*migrationsPath)
@@ -86,40 +89,55 @@ func main() {
 		timerStart = time.Now()
 		pipe := pipep.New()
 		go migrate.Migrate(pipe, *url, *migrationsPath, relativeNInt)
-		writePipe(pipe)
+		ok := writePipe(pipe)
 		printTimer()
+		if !ok {
+			os.Exit(1)
+		}
 
 	case "up":
 		verifyMigrationsPath(*migrationsPath)
 		timerStart = time.Now()
 		pipe := pipep.New()
 		go migrate.Up(pipe, *url, *migrationsPath)
-		writePipe(pipe)
+		ok := writePipe(pipe)
 		printTimer()
+		if !ok {
+			os.Exit(1)
+		}
 
 	case "down":
 		verifyMigrationsPath(*migrationsPath)
 		timerStart = time.Now()
 		pipe := pipep.New()
 		go migrate.Down(pipe, *url, *migrationsPath)
-		writePipe(pipe)
+		ok := writePipe(pipe)
 		printTimer()
+		if !ok {
+			os.Exit(1)
+		}
 
 	case "redo":
 		verifyMigrationsPath(*migrationsPath)
 		timerStart = time.Now()
 		pipe := pipep.New()
 		go migrate.Redo(pipe, *url, *migrationsPath)
-		writePipe(pipe)
+		ok := writePipe(pipe)
 		printTimer()
+		if !ok {
+			os.Exit(1)
+		}
 
 	case "reset":
 		verifyMigrationsPath(*migrationsPath)
 		timerStart = time.Now()
 		pipe := pipep.New()
 		go migrate.Reset(pipe, *url, *migrationsPath)
-		writePipe(pipe)
+		ok := writePipe(pipe)
 		printTimer()
+		if !ok {
+			os.Exit(1)
+		}
 
 	case "version":
 		verifyMigrationsPath(*migrationsPath)
@@ -137,13 +155,14 @@ func main() {
 	}
 }
 
-func writePipe(pipe chan interface{}) {
+func writePipe(pipe chan interface{}) (ok bool) {
+	okFlag := true
 	if pipe != nil {
 		for {
 			select {
 			case item, ok := <-pipe:
 				if !ok {
-					return
+					return false
 				} else {
 					switch item.(type) {
 
@@ -153,6 +172,7 @@ func writePipe(pipe chan interface{}) {
 					case error:
 						c := color.New(color.FgRed)
 						c.Println(item.(error).Error(), "\n")
+						okFlag = false
 
 					case file.File:
 						f := item.(file.File)
@@ -172,6 +192,7 @@ func writePipe(pipe chan interface{}) {
 			}
 		}
 	}
+	return okFlag
 }
 
 func verifyMigrationsPath(path string) {
