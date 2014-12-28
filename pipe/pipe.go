@@ -3,6 +3,7 @@ package pipe
 
 import (
 	"os"
+	"os/signal"
 )
 
 // New creates a new pipe. A pipe is basically a channel.
@@ -25,6 +26,7 @@ func Close(pipe chan interface{}, err error) {
 func WaitAndRedirect(pipe, redirectPipe chan interface{}, interrupt chan os.Signal) (ok bool) {
 	errorReceived := false
 	interruptsReceived := 0
+	defer stopNotifyInterruptChannel(interrupt)
 	if pipe != nil && redirectPipe != nil {
 		for {
 			select {
@@ -74,4 +76,10 @@ func ReadErrors(pipe chan interface{}) []error {
 		}
 	}
 	return err
+}
+
+func stopNotifyInterruptChannel(interruptChannel chan os.Signal) {
+	if interruptChannel != nil {
+		signal.Stop(interruptChannel)
+	}
 }
