@@ -2,13 +2,13 @@
 package cassandra
 
 import (
-	"net/url"
-	"strings"
-	"time"
-
+	"fmt"
 	"github.com/gocql/gocql"
 	"github.com/mattes/migrate/file"
 	"github.com/mattes/migrate/migrate/direction"
+	"net/url"
+	"strings"
+	"time"
 )
 
 type Driver struct {
@@ -49,6 +49,21 @@ func (driver *Driver) Initialize(rawurl string) error {
 	cluster.Keyspace = u.Path[1:len(u.Path)]
 	cluster.Consistency = gocql.All
 	cluster.Timeout = 1 * time.Minute
+
+	// Check if url user struct is null
+	if u.User != nil {
+		password, passwordSet := u.User.Password()
+
+		if passwordSet == false {
+			return fmt.Errorf("Missing password. Please provide password")
+		}
+
+		cluster.Authenticator = gocql.PasswordAuthenticator{
+			Username: u.User.Username(),
+			Password: password,
+		}
+
+	}
 
 	driver.session, err = cluster.CreateSession()
 
