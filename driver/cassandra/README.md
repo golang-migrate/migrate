@@ -12,3 +12,4 @@ migrate help # for more info
 
 * Paul Bergeron, https://github.com/dinedal
 * Johnny Bergström, https://github.com/balboah
+* pateld982, http://github.com/pateld982
