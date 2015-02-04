@@ -55,7 +55,7 @@ func (driver *Driver) Initialize(rawurl string) error {
 		password, passwordSet := u.User.Password()
 
 		if passwordSet == false {
-			return fmt.Errorf("Missing password. Please provide password")
+			return fmt.Errorf("Missing password. Please provide password.")
 		}
 
 		cluster.Authenticator = gocql.PasswordAuthenticator{
