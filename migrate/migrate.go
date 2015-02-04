@@ -27,7 +27,7 @@ func Up(pipe chan interface{}, url, migrationsPath string) {
 
 	applyMigrationFiles, err := files.ToLastFrom(version)
 	if err != nil {
-		if err2 := d.Close(); err != nil {
+		if err2 := d.Close(); err2 != nil {
 			pipe <- err2
 		}
 		go pipep.Close(pipe, err)
@@ -42,14 +42,14 @@ func Up(pipe chan interface{}, url, migrationsPath string) {
 				break
 			}
 		}
-		if err2 := d.Close(); err != nil {
-			pipe <- err2
+		if err := d.Close(); err != nil {
+			pipe <- err
 		}
 		go pipep.Close(pipe, nil)
 		return
 	} else {
-		if err2 := d.Close(); err != nil {
-			pipe <- err2
+		if err := d.Close(); err != nil {
+			pipe <- err
 		}
 		go pipep.Close(pipe, nil)
 		return
@@ -74,7 +74,7 @@ func Down(pipe chan interface{}, url, migrationsPath string) {
 
 	applyMigrationFiles, err := files.ToFirstFrom(version)
 	if err != nil {
-		if err2 := d.Close(); err != nil {
+		if err2 := d.Close(); err2 != nil {
 			pipe <- err2
 		}
 		go pipep.Close(pipe, err)
@@ -89,13 +89,13 @@ func Down(pipe chan interface{}, url, migrationsPath string) {
 				break
 			}
 		}
-		if err2 := d.Close(); err != nil {
+		if err2 := d.Close(); err2 != nil {
 			pipe <- err2
 		}
 		go pipep.Close(pipe, nil)
 		return
 	} else {
-		if err2 := d.Close(); err != nil {
+		if err2 := d.Close(); err2 != nil {
 			pipe <- err2
 		}
 		go pipep.Close(pipe, nil)
@@ -161,7 +161,7 @@ func Migrate(pipe chan interface{}, url, migrationsPath string, relativeN int) {
 
 	applyMigrationFiles, err := files.From(version, relativeN)
 	if err != nil {
-		if err2 := d.Close(); err != nil {
+		if err2 := d.Close(); err2 != nil {
 			pipe <- err2
 		}
 		go pipep.Close(pipe, err)
@@ -176,13 +176,13 @@ func Migrate(pipe chan interface{}, url, migrationsPath string, relativeN int) {
 				break
 			}
 		}
-		if err2 := d.Close(); err != nil {
+		if err2 := d.Close(); err2 != nil {
 			pipe <- err2
 		}
 		go pipep.Close(pipe, nil)
 		return
 	}
-	if err2 := d.Close(); err != nil {
+	if err2 := d.Close(); err2 != nil {
 		pipe <- err2
 	}
 	go pipep.Close(pipe, nil)
