@@ -116,5 +116,6 @@ that the filename extension depends on the driver.
  * https://github.com/tanel/dbmigrate
  * https://github.com/BurntSushi/migration
  * https://github.com/DavidHuie/gomigrate
+ * https://github.com/rubenv/sql-migrate
 
 
