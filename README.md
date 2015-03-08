@@ -23,7 +23,7 @@ __Features__
 
  * [PostgreSQL](https://github.com/mattes/migrate/tree/master/driver/postgres)
  * [Cassandra](https://github.com/mattes/migrate/tree/master/driver/cassandra)
- * SQLite ([planned](https://github.com/mattes/migrate/issues/2))
+ * [SQLite](https://github.com/mattes/migrate/tree/master/driver/sqlite3)
  * [MySQL](https://github.com/mattes/migrate/tree/master/driver/mysql) ([experimental](https://github.com/mattes/migrate/issues/1#issuecomment-58728186))
  * Bash (planned)
 
