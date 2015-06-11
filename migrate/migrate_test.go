@@ -3,6 +3,8 @@ package migrate
 import (
 	"io/ioutil"
 	"testing"
+	// Ensure imports for each driver we wish to test
+	_ "github.com/mattes/migrate/driver/postgres"
 )
 
 // Add Driver URLs here to test basic Up, Down, .. functions.

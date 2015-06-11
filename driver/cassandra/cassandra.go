@@ -4,6 +4,7 @@ package cassandra
 import (
 	"fmt"
 	"github.com/gocql/gocql"
+	"github.com/mattes/migrate/driver/registry"
 	"github.com/mattes/migrate/file"
 	"github.com/mattes/migrate/migrate/direction"
 	"net/url"
@@ -152,4 +153,8 @@ func (driver *Driver) Version() (uint64, error) {
 	var version int64
 	err := driver.session.Query("SELECT version FROM "+tableName+" WHERE versionRow = ?", versionRow).Scan(&version)
 	return uint64(version) - 1, err
+}
+
+func init() {
+	registry.RegisterDriver("cassandra", Driver{})
 }

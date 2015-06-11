@@ -5,12 +5,9 @@ import (
 	"errors"
 	"fmt"
 	neturl "net/url" // alias to allow `url string` func signature in New
+	"reflect"
 
-	"github.com/mattes/migrate/driver/bash"
-	"github.com/mattes/migrate/driver/cassandra"
-	"github.com/mattes/migrate/driver/mysql"
-	"github.com/mattes/migrate/driver/postgres"
-	"github.com/mattes/migrate/driver/sqlite3"
+	"github.com/mattes/migrate/driver/registry"
 	"github.com/mattes/migrate/file"
 )
 
@@ -47,51 +44,26 @@ func New(url string) (Driver, error) {
 		return nil, err
 	}
 
-	switch u.Scheme {
-	case "postgres":
-		d := &postgres.Driver{}
-		verifyFilenameExtension("postgres", d)
+	driver := registry.GetDriver(u.Scheme)
+	if driver != nil {
+		blankDriver := reflect.New(reflect.TypeOf(driver)).Interface()
+		d, ok := blankDriver.(Driver)
+		if !ok {
+			err := errors.New(fmt.Sprintf("Driver '%s' does not implement the Driver interface"))
+			return nil, err
+		}
+		verifyFilenameExtension(u.Scheme, d)
 		if err := d.Initialize(url); err != nil {
 			return nil, err
 		}
-		return d, nil
 
-	case "mysql":
-		d := &mysql.Driver{}
-		verifyFilenameExtension("mysql", d)
-		if err := d.Initialize(url); err != nil {
-			return nil, err
-		}
 		return d, nil
-
-	case "bash":
-		d := &bash.Driver{}
-		verifyFilenameExtension("bash", d)
-		if err := d.Initialize(url); err != nil {
-			return nil, err
-		}
-		return d, nil
-
-	case "cassandra":
-		d := &cassandra.Driver{}
-		verifyFilenameExtension("cassanda", d)
-		if err := d.Initialize(url); err != nil {
-			return nil, err
-		}
-		return d, nil
-	case "sqlite3":
-		d := &sqlite3.Driver{}
-		verifyFilenameExtension("sqlite3", d)
-		if err := d.Initialize(url); err != nil {
-			return nil, err
-		}
-		return d, nil
-	default:
+	} else {
 		return nil, errors.New(fmt.Sprintf("Driver '%s' not found.", u.Scheme))
 	}
 }
 
-// verifyFilenameExtension panics if the drivers filename extension
+// verifyFilenameExtension panics if the driver's filename extension
 // is not correct or empty.
 func verifyFilenameExtension(driverName string, d Driver) {
 	f := d.FilenameExtension()

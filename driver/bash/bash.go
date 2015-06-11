@@ -2,6 +2,7 @@
 package bash
 
 import (
+	"github.com/mattes/migrate/driver/registry"
 	"github.com/mattes/migrate/file"
 	_ "github.com/mattes/migrate/migrate/direction"
 )
@@ -29,4 +30,8 @@ func (driver *Driver) Migrate(f file.File, pipe chan interface{}) {
 
 func (driver *Driver) Version() (uint64, error) {
 	return uint64(0), nil
+}
+
+func init() {
+	registry.RegisterDriver("bash", Driver{})
 }
