@@ -209,3 +209,41 @@ func TestFiles(t *testing.T) {
 	}
 
 }
+
+func TestDuplicateFiles(t *testing.T) {
+	dups := []string{
+		"001_migration.up.sql",
+		"001_duplicate.up.sql",
+	}
+
+	root, cleanFn, err := makeFiles("TestDuplicateFiles", dups...)
+	defer cleanFn()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = ReadMigrationFiles(root, FilenameRegex("sql"))
+	if err == nil {
+		t.Fatal("Expected duplicate migration file error")
+	}
+}
+
+func makeFiles(testname string, names ...string) (root string, cleanup func(), err error) {
+	cleanup = func() {}
+	root, err = ioutil.TempDir("/tmp", testname)
+	if err != nil {
+		return
+	}
+	cleanup = func() { os.RemoveAll(root) }
+	if err = ioutil.WriteFile(path.Join(root, "nonsense.txt"), nil, 0755); err != nil {
+		return
+	}
+
+	for _, name := range names {
+		if err = ioutil.WriteFile(path.Join(root, name), nil, 0755); err != nil {
+			return
+		}
+	}
+	return
+}
