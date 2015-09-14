@@ -229,6 +229,10 @@ func TestDuplicateFiles(t *testing.T) {
 	}
 }
 
+// makeFiles takes an identifier, and a list of file names and uses them to create a temporary
+// directory populated with files named with the names passed in.  makeFiles returns the root
+// directory name, and a func suitable for a defer cleanup to remove the temporary files after
+// the calling function exits.
 func makeFiles(testname string, names ...string) (root string, cleanup func(), err error) {
 	cleanup = func() {}
 	root, err = ioutil.TempDir("/tmp", testname)
