@@ -52,15 +52,11 @@ func New(url string) (Driver, error) {
 			err := errors.New(fmt.Sprintf("Driver '%s' does not implement the Driver interface"))
 			return nil, err
 		}
-		verifyFilenameExtension(u.Scheme, d)
-		if err := d.Initialize(url); err != nil {
-			return nil, err
-		}
-
 		return d, nil
 	} else {
 		return nil, errors.New(fmt.Sprintf("Driver '%s' not found.", u.Scheme))
 	}
+	return nil, fmt.Errorf("Driver '%s' not found.", u.Scheme)
 }
 
 // verifyFilenameExtension panics if the driver's filename extension

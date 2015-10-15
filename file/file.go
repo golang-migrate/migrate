@@ -163,9 +163,18 @@ func ReadMigrationFiles(path string, filenameRegex *regexp.Regexp) (files Migrat
 		d        direction.Direction
 	}
 	tmpFiles := make([]*tmpFile, 0)
+	tmpFileMap := map[uint64]map[direction.Direction]tmpFile{}
 	for _, file := range ioFiles {
 		version, name, d, err := parseFilenameSchema(file.Name(), filenameRegex)
 		if err == nil {
+			if _, ok := tmpFileMap[version]; !ok {
+				tmpFileMap[version] = map[direction.Direction]tmpFile{}
+			}
+			if existing, ok := tmpFileMap[version][d]; !ok {
+				tmpFileMap[version][d] = tmpFile{version: version, name: name, filename: file.Name(), d: d}
+			} else {
+				return nil, fmt.Errorf("duplicate migration file version %d : %q and %q", version, existing.filename, file.Name())
+			}
 			tmpFiles = append(tmpFiles, &tmpFile{version, name, file.Name(), d})
 		}
 	}

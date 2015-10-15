@@ -6,24 +6,28 @@ package main
 import (
 	"flag"
 	"fmt"
+	"os"
+	"strconv"
+	"time"
+
 	"github.com/fatih/color"
 	"github.com/mattes/migrate/file"
 	"github.com/mattes/migrate/migrate"
 	"github.com/mattes/migrate/migrate/direction"
 	pipep "github.com/mattes/migrate/pipe"
-	"os"
-	"strconv"
-	"time"
 )
 
-var url = flag.String("url", "", "")
+var url = flag.String("url", os.Getenv("MIGRATE_URL"), "")
 var migrationsPath = flag.String("path", "", "")
 var version = flag.Bool("version", false, "Show migrate version")
 
 func main() {
+	flag.Usage = func() {
+		helpCmd()
+	}
+
 	flag.Parse()
 	command := flag.Arg(0)
-
 	if *version {
 		fmt.Println(Version)
 		os.Exit(0)
