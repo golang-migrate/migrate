@@ -6,14 +6,14 @@ go: &go
     - ./migrations:/migrations
 go-test:
   <<: *go
-  command: go test -v ./...
+  command: sh -c 'go get -t -v ./... && go test -v ./...'
   links:
     - postgres
     - mysql
     - cassandra
 go-build:
   <<: *go
-  command: go build -ldflags '-s'
+  command: sh -c 'go get -v && go build -ldflags ''-s'' -o migrater'
   environment:
     CGO_ENABLED: 0
 postgres:

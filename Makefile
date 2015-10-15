@@ -8,11 +8,9 @@ clean:
 	rm -f migrate
 
 test:
-	go get -t -v ./...
 	$(DCR) go-test
 
 build:
-	go get -v -t
 	$(DCR) go-build
 
 release: test build docker-build docker-push
