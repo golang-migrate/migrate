@@ -1,5 +1,5 @@
 language: go
-sudo :required
+sudo: required
 
 go:
   - 1.3
