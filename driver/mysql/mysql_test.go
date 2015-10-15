@@ -2,17 +2,21 @@ package mysql
 
 import (
 	"database/sql"
+	"os"
+	"strings"
+	"testing"
+
 	"github.com/mattes/migrate/file"
 	"github.com/mattes/migrate/migrate/direction"
 	pipep "github.com/mattes/migrate/pipe"
-	"strings"
-	"testing"
 )
 
 // TestMigrate runs some additional tests on Migrate().
 // Basic testing is already done in migrate/migrate_test.go
 func TestMigrate(t *testing.T) {
-	driverUrl := "mysql://root@tcp(127.0.0.1:3306)/migratetest"
+	host := os.Getenv("MYSQL_PORT_3306_TCP_ADDR")
+	port := os.Getenv("MYSQL_PORT_3306_TCP_PORT")
+	driverUrl := "mysql://root@tcp(" + host + ":" + port + ")/migratetest"
 
 	// prepare clean database
 	connection, err := sql.Open("mysql", strings.SplitN(driverUrl, "mysql://", 2)[1])

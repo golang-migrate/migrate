@@ -5,11 +5,12 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strconv"
+
 	"github.com/lib/pq"
 	"github.com/mattes/migrate/driver/registry"
 	"github.com/mattes/migrate/file"
 	"github.com/mattes/migrate/migrate/direction"
-	"strconv"
 )
 
 type Driver struct {

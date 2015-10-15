@@ -1,6 +1,8 @@
 package driver
 
 import "testing"
+import _ "github.com/mattes/migrate/driver/bash"
+import _ "github.com/mattes/migrate/driver/sqlite3"
 
 func TestNew(t *testing.T) {
 	if _, err := New("unknown://url"); err == nil {

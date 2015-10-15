@@ -1,0 +1,27 @@
+go: &go
+  image: golang
+  working_dir: /go/src/github.com/mattes/migrate
+  volumes:
+    - $GOPATH:/go
+    - ./migrations:/migrations
+go-test:
+  <<: *go
+  command: go test -v -cover ./...
+  links:
+    - postgres
+    - mysql
+    - cassandra
+go-build:
+  <<: *go
+  command: go build -ldflags '-s'
+  environment:
+    CGO_ENABLED: 0
+postgres:
+  image: postgres
+mysql:
+  image: mysql
+  environment:
+    MYSQL_DATABASE: migratetest
+    MYSQL_ALLOW_EMPTY_PASSWORD: yes
+cassandra:
+  image: cassandra

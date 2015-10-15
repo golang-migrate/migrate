@@ -2,6 +2,7 @@ package migrate
 
 import (
 	"io/ioutil"
+	"os"
 	"testing"
 	// Ensure imports for each driver we wish to test
 	_ "github.com/mattes/migrate/driver/postgres"
@@ -9,7 +10,7 @@ import (
 
 // Add Driver URLs here to test basic Up, Down, .. functions.
 var driverUrls = []string{
-	"postgres://localhost/migratetest?sslmode=disable",
+	"postgres://postgres@" + os.Getenv("POSTGRES_PORT_5432_TCP_ADDR") + ":" + os.Getenv("POSTGRES_PORT_5432_TCP_PORT") + "/template1?sslmode=disable",
 }
 
 func TestCreate(t *testing.T) {
@@ -56,7 +57,7 @@ func TestCreate(t *testing.T) {
 func TestReset(t *testing.T) {
 	for _, driverUrl := range driverUrls {
 		t.Logf("Test driver: %s", driverUrl)
-		tmpdir, err := ioutil.TempDir("/tmp", "migrate-test")
+		tmpdir, err := ioutil.TempDir("/", "migrate-test")
 		if err != nil {
 			t.Fatal(err)
 		}
