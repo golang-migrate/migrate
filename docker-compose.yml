@@ -3,7 +3,6 @@ go: &go
   working_dir: /go/src/github.com/mattes/migrate
   volumes:
     - $GOPATH:/go
-    - ./migrations:/migrations
 go-test:
   <<: *go
   command: sh -c 'go get -t -v ./... && go test -v ./...'
