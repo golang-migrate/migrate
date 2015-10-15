@@ -6,7 +6,7 @@ go: &go
     - ./migrations:/migrations
 go-test:
   <<: *go
-  command: go test -v -cover ./...
+  command: go test -v ./...
   links:
     - postgres
     - mysql
