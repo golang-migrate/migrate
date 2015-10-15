@@ -8,7 +8,7 @@ clean:
 	rm -f migrate
 
 test:
-	go get -t -v
+	go get -t -v ./...
 	$(DCR) go-test
 
 build:
