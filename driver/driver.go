@@ -2,7 +2,6 @@
 package driver
 
 import (
-	"errors"
 	"fmt"
 	neturl "net/url" // alias to allow `url string` func signature in New
 	"reflect"
@@ -49,8 +48,7 @@ func New(url string) (Driver, error) {
 		blankDriver := reflect.New(reflect.TypeOf(driver)).Interface()
 		d, ok := blankDriver.(Driver)
 		if !ok {
-			err := errors.New(fmt.Sprintf("Driver '%s' does not implement the Driver interface"))
-			return nil, err
+			return nil, fmt.Errorf("Driver '%s' does not implement the Driver interface", u.Scheme)
 		}
 		verifyFilenameExtension(u.Scheme, d)
 		if err := d.Initialize(url); err != nil {
