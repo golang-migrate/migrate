@@ -4,9 +4,7 @@ package driver
 import (
 	"fmt"
 	neturl "net/url" // alias to allow `url string` func signature in New
-	"reflect"
 
-	"github.com/mattes/migrate/driver/registry"
 	"github.com/mattes/migrate/file"
 )
 
@@ -43,21 +41,16 @@ func New(url string) (Driver, error) {
 		return nil, err
 	}
 
-	driver := registry.GetDriver(u.Scheme)
-	if driver != nil {
-		blankDriver := reflect.New(reflect.TypeOf(driver)).Interface()
-		d, ok := blankDriver.(Driver)
-		if !ok {
-			return nil, fmt.Errorf("Driver '%s' does not implement the Driver interface", u.Scheme)
-		}
-		verifyFilenameExtension(u.Scheme, d)
-		if err := d.Initialize(url); err != nil {
-			return nil, err
-		}
-
-		return d, nil
+	d := GetDriver(u.Scheme)
+	if d == nil {
+		return nil, fmt.Errorf("Driver '%s' not found.", u.Scheme)
 	}
-	return nil, fmt.Errorf("Driver '%s' not found.", u.Scheme)
+	verifyFilenameExtension(u.Scheme, d)
+	if err := d.Initialize(url); err != nil {
+		return nil, err
+	}
+
+	return d, nil
 }
 
 // verifyFilenameExtension panics if the driver's filename extension

@@ -3,13 +3,14 @@ package cassandra
 
 import (
 	"fmt"
-	"github.com/gocql/gocql"
-	"github.com/mattes/migrate/driver/registry"
-	"github.com/mattes/migrate/file"
-	"github.com/mattes/migrate/migrate/direction"
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/gocql/gocql"
+	"github.com/mattes/migrate/driver"
+	"github.com/mattes/migrate/file"
+	"github.com/mattes/migrate/migrate/direction"
 )
 
 type Driver struct {
@@ -156,5 +157,5 @@ func (driver *Driver) Version() (uint64, error) {
 }
 
 func init() {
-	registry.RegisterDriver("cassandra", Driver{})
+	driver.RegisterDriver("cassandra", &Driver{})
 }

@@ -7,13 +7,14 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/go-sql-driver/mysql"
-	"github.com/mattes/migrate/driver/registry"
-	"github.com/mattes/migrate/file"
-	"github.com/mattes/migrate/migrate/direction"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/go-sql-driver/mysql"
+	"github.com/mattes/migrate/driver"
+	"github.com/mattes/migrate/file"
+	"github.com/mattes/migrate/migrate/direction"
 )
 
 type Driver struct {
@@ -180,5 +181,5 @@ func (driver *Driver) Version() (uint64, error) {
 }
 
 func init() {
-	registry.RegisterDriver("mysql", Driver{})
+	driver.RegisterDriver("mysql", &Driver{})
 }

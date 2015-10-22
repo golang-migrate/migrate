@@ -2,9 +2,8 @@
 package bash
 
 import (
-	"github.com/mattes/migrate/driver/registry"
+	"github.com/mattes/migrate/driver"
 	"github.com/mattes/migrate/file"
-	_ "github.com/mattes/migrate/migrate/direction"
 )
 
 type Driver struct {
@@ -33,5 +32,5 @@ func (driver *Driver) Version() (uint64, error) {
 }
 
 func init() {
-	registry.RegisterDriver("bash", Driver{})
+	driver.RegisterDriver("bash", &Driver{})
 }
