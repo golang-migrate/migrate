@@ -2,8 +2,8 @@
 package bash
 
 import (
+	"github.com/mattes/migrate/driver"
 	"github.com/mattes/migrate/file"
-	_ "github.com/mattes/migrate/migrate/direction"
 )
 
 type Driver struct {
@@ -29,4 +29,8 @@ func (driver *Driver) Migrate(f file.File, pipe chan interface{}) {
 
 func (driver *Driver) Version() (uint64, error) {
 	return uint64(0), nil
+}
+
+func init() {
+	driver.RegisterDriver("bash", &Driver{})
 }

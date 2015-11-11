@@ -5,21 +5,8 @@ import (
 	"fmt"
 	neturl "net/url" // alias to allow `url string` func signature in New
 
-	"github.com/mattes/migrate/driver/bash"
-	"github.com/mattes/migrate/driver/cassandra"
-	"github.com/mattes/migrate/driver/mysql"
-	"github.com/mattes/migrate/driver/postgres"
-	"github.com/mattes/migrate/driver/sqlite3"
 	"github.com/mattes/migrate/file"
 )
-
-var driverMap = map[string]Driver{
-	"postgres":  &postgres.Driver{},
-	"mysql":     &mysql.Driver{},
-	"bash":      &bash.Driver{},
-	"cassandra": &cassandra.Driver{},
-	"sqlite3":   &sqlite3.Driver{},
-}
 
 // Driver is the interface type that needs to implemented by all drivers.
 type Driver interface {
@@ -54,17 +41,19 @@ func New(url string) (Driver, error) {
 		return nil, err
 	}
 
-	if d, found := driverMap[u.Scheme]; found {
-		verifyFilenameExtension(u.Scheme, d)
-		if err := d.Initialize(url); err != nil {
-			return nil, err
-		}
-		return d, nil
+	d := GetDriver(u.Scheme)
+	if d == nil {
+		return nil, fmt.Errorf("Driver '%s' not found.", u.Scheme)
 	}
-	return nil, fmt.Errorf("Driver '%s' not found.", u.Scheme)
+	verifyFilenameExtension(u.Scheme, d)
+	if err := d.Initialize(url); err != nil {
+		return nil, err
+	}
+
+	return d, nil
 }
 
-// verifyFilenameExtension panics if the drivers filename extension
+// verifyFilenameExtension panics if the driver's filename extension
 // is not correct or empty.
 func verifyFilenameExtension(driverName string, d Driver) {
 	f := d.FilenameExtension()

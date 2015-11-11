@@ -5,10 +5,12 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
+
+	"github.com/mattes/migrate/driver"
 	"github.com/mattes/migrate/file"
 	"github.com/mattes/migrate/migrate/direction"
 	"github.com/mattn/go-sqlite3"
-	"strings"
 )
 
 type Driver struct {
@@ -122,4 +124,8 @@ func (driver *Driver) Version() (uint64, error) {
 	default:
 		return version, nil
 	}
+}
+
+func init() {
+	driver.RegisterDriver("sqlite3", &Driver{})
 }

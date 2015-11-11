@@ -2,6 +2,7 @@ package cassandra
 
 import (
 	"net/url"
+	"os"
 	"testing"
 	"time"
 
@@ -13,7 +14,10 @@ import (
 
 func TestMigrate(t *testing.T) {
 	var session *gocql.Session
-	driverUrl := "cassandra://localhost/migratetest"
+
+	host := os.Getenv("CASSANDRA_PORT_9042_TCP_ADDR")
+	port := os.Getenv("CASSANDRA_PORT_9042_TCP_PORT")
+	driverUrl := "cassandra://" + host + ":" + port + "/system"
 
 	// prepare a clean test database
 	u, err := url.Parse(driverUrl)
@@ -32,12 +36,12 @@ func TestMigrate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := session.Query(`DROP TABLE IF EXISTS yolo`).Exec(); err != nil {
+	if err := session.Query(`CREATE KEYSPACE IF NOT EXISTS migrate WITH REPLICATION = {'class': 'SimpleStrategy', 'replication_factor': 1};`).Exec(); err != nil {
 		t.Fatal(err)
 	}
-	if err := session.Query(`DROP TABLE IF EXISTS ` + tableName).Exec(); err != nil {
-		t.Fatal(err)
-	}
+	cluster.Keyspace = "migrate"
+	session, err = cluster.CreateSession()
+	driverUrl = "cassandra://" + host + ":" + port + "/migrate"
 
 	d := &Driver{}
 	if err := d.Initialize(driverUrl); err != nil {
