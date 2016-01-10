@@ -14,7 +14,7 @@ go-build:
   <<: *go
   command: sh -c 'go get -v && go build -ldflags ''-s'' -o migrater'
   environment:
-    CGO_ENABLED: 0
+    CGO_ENABLED: 1
 postgres:
   image: postgres
 mysql:
