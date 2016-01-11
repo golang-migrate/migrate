@@ -23,4 +23,4 @@ mysql:
     MYSQL_DATABASE: migratetest
     MYSQL_ALLOW_EMPTY_PASSWORD: yes
 cassandra:
-  image: cassandra
+  image: cassandra:2.2
