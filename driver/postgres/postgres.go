@@ -87,20 +87,28 @@ func (driver *Driver) Migrate(f file.File, pipe chan interface{}) {
 	}
 
 	if _, err := tx.Exec(string(f.Content)); err != nil {
-		pqErr := err.(*pq.Error)
-		offset, err := strconv.Atoi(pqErr.Position)
-		if err == nil && offset >= 0 {
-			lineNo, columnNo := file.LineColumnFromOffset(f.Content, offset-1)
-			errorPart := file.LinesBeforeAndAfter(f.Content, lineNo, 5, 5, true)
-			pipe <- errors.New(fmt.Sprintf("%s %v: %s in line %v, column %v:\n\n%s", pqErr.Severity, pqErr.Code, pqErr.Message, lineNo, columnNo, string(errorPart)))
-		} else {
-			pipe <- errors.New(fmt.Sprintf("%s %v: %s", pqErr.Severity, pqErr.Code, pqErr.Message))
-		}
+		switch pqErr := err.(type) {
+		case *pq.Error:
+			offset, err := strconv.Atoi(pqErr.Position)
+			if err == nil && offset >= 0 {
+				lineNo, columnNo := file.LineColumnFromOffset(f.Content, offset-1)
+				errorPart := file.LinesBeforeAndAfter(f.Content, lineNo, 5, 5, true)
+				pipe <- errors.New(fmt.Sprintf("%s %v: %s in line %v, column %v:\n\n%s", pqErr.Severity, pqErr.Code, pqErr.Message, lineNo, columnNo, string(errorPart)))
+			} else {
+				pipe <- errors.New(fmt.Sprintf("%s %v: %s", pqErr.Severity, pqErr.Code, pqErr.Message))
+			}
 
-		if err := tx.Rollback(); err != nil {
+			if err := tx.Rollback(); err != nil {
+				pipe <- err
+			}
+			return
+		default:
 			pipe <- err
+			if err := tx.Rollback(); err != nil {
+				pipe <- err
+			}
+			return
 		}
-		return
 	}
 
 	if err := tx.Commit(); err != nil {
