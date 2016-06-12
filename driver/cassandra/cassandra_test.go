@@ -112,5 +112,35 @@ func TestMigrate(t *testing.T) {
 	if err := d.Close(); err != nil {
 		t.Fatal(err)
 	}
+}
 
+func TestInitializeReturnsErrorsForBadUrls(t *testing.T) {
+	var session *gocql.Session
+
+	host := os.Getenv("CASSANDRA_PORT_9042_TCP_ADDR")
+	port := os.Getenv("CASSANDRA_PORT_9042_TCP_PORT")
+
+	cluster := gocql.NewCluster(host)
+	cluster.Consistency = gocql.All
+	cluster.Timeout = 1 * time.Minute
+
+	session, err := cluster.CreateSession()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer session.Close()
+	if err := session.Query(`CREATE KEYSPACE IF NOT EXISTS migrate WITH REPLICATION = {'class': 'SimpleStrategy', 'replication_factor': 1};`).Exec(); err != nil {
+		t.Fatal(err)
+	}
+
+	d := &Driver{}
+	invalidURL := "sdf://asdf://as?df?a"
+	if err := d.Initialize(invalidURL); err == nil {
+		t.Errorf("expected an error to be returned if url could not be parsed")
+	}
+
+	noKeyspace := "cassandra://" + host + ":" + port
+	if err := d.Initialize(noKeyspace); err == nil {
+		t.Errorf("expected an error to be returned if no keyspace provided")
+	}
 }

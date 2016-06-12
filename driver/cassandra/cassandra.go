@@ -47,6 +47,13 @@ const (
 // cassandra://localhost/SpaceOfKeys?protocol=4
 func (driver *Driver) Initialize(rawurl string) error {
 	u, err := url.Parse(rawurl)
+	if err != nil {
+		return fmt.Errorf("failed to parse connectil url: %v", err)
+	}
+
+	if u.Path == "" {
+		return fmt.Errorf("no keyspace provided in connection url")
+	}
 
 	cluster := gocql.NewCluster(u.Host)
 	cluster.Keyspace = u.Path[1:len(u.Path)]
