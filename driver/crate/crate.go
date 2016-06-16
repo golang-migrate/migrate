@@ -72,16 +72,12 @@ func (driver *Driver) Migrate(f file.File, pipe chan interface{}) {
 		return
 	}
 
-	lines := strings.Split(string(f.Content), ";")
+	lines := splitContent(string(f.Content))
 	for _, line := range lines {
-		query := strings.TrimSpace(line)
-		query = strings.Replace(query, ";", "", -1)
-		if query != "" {
-			_, err := driver.db.Exec(query)
-			if err != nil {
-				pipe <- err
-				return
-			}
+		_, err := driver.db.Exec(line)
+		if err != nil {
+			pipe <- err
+			return
 		}
 	}
 
@@ -96,6 +92,19 @@ func (driver *Driver) Migrate(f file.File, pipe chan interface{}) {
 			return
 		}
 	}
+}
+
+func splitContent(content string) []string {
+	lines := strings.Split(content, ";")
+	resultLines := make([]string, 0, len(lines))
+	for i, line := range lines {
+		line = strings.Replace(lines[i], ";", "", -1)
+		line = strings.TrimSpace(line)
+		if line != "" {
+			resultLines = append(resultLines, line)
+		}
+	}
+	return resultLines
 }
 
 func (driver *Driver) ensureVersionTableExists() error {
