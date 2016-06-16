@@ -14,7 +14,7 @@ func TestMigrate(t *testing.T) {
 	host := os.Getenv("CRATE_PORT_4200_TCP_ADDR")
 	port := os.Getenv("CRATE_PORT_4200_TCP_PORT")
 
-	url := fmt.Sprintf("http://%s:%s", host, port)
+	url := fmt.Sprintf("crate://%s:%s", host, port)
 
 	driver := &Driver{}
 

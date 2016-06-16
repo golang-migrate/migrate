@@ -23,6 +23,7 @@ type Driver struct {
 const tableName = "schema_migrations"
 
 func (driver *Driver) Initialize(url string) error {
+	url = strings.Replace(url, "crate", "http", 1)
 	db, err := sql.Open("crate", url)
 	if err != nil {
 		return err
