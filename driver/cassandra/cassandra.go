@@ -204,5 +204,5 @@ func readConsistency(consistency string) (gocql.Consistency, error) {
 		return gocql.Any, nil
 	}
 
-	return gocql.Consistency(-1), errors.New("Invalid consistency \"" + consistency + "\" specified")
+	return gocql.Consistency(0), errors.New("Invalid consistency \"" + consistency + "\" specified")
 }
