@@ -2,6 +2,7 @@
 package cassandra
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -41,10 +42,12 @@ const (
 )
 
 // Cassandra Driver URL format:
-// cassandra://host:port/keyspace?protocol=version
+// cassandra://host:port/keyspace?protocol=version&consistency=level
 //
-// Example:
+// Examples:
 // cassandra://localhost/SpaceOfKeys?protocol=4
+// cassandra://localhost/SpaceOfKeys?protocol=4&consistency=all
+// cassandra://localhost/SpaceOfKeys?consistency=quorum
 func (driver *Driver) Initialize(rawurl string) error {
 	u, err := url.Parse(rawurl)
 
@@ -52,6 +55,15 @@ func (driver *Driver) Initialize(rawurl string) error {
 	cluster.Keyspace = u.Path[1:len(u.Path)]
 	cluster.Consistency = gocql.All
 	cluster.Timeout = 1 * time.Minute
+
+	if len(u.Query().Get("consistency")) > 0 {
+		consistency, err := readConsistency(u.Query().Get("consistency"))
+		if err != nil {
+			return err
+		}
+
+		cluster.Consistency = consistency
+	}
 
 	if len(u.Query().Get("protocol")) > 0 {
 		protoversion, err := strconv.Atoi(u.Query().Get("protocol"))
@@ -168,4 +180,29 @@ func (driver *Driver) Version() (uint64, error) {
 
 func init() {
 	driver.RegisterDriver("cassandra", &Driver{})
+}
+
+func readConsistency(consistency string) (gocql.Consistency, error) {
+	switch strings.ToLower(consistency) {
+	case "all":
+		return gocql.All, nil
+	case "each_quorum":
+		return gocql.EachQuorum, nil
+	case "quorum":
+		return gocql.Quorum, nil
+	case "local_quorum":
+		return gocql.LocalQuorum, nil
+	case "one":
+		return gocql.One, nil
+	case "two":
+		return gocql.Two, nil
+	case "three":
+		return gocql.Three, nil
+	case "local_one":
+		return gocql.LocalOne, nil
+	case "any":
+		return gocql.Any, nil
+	}
+
+	return gocql.Consistency(-1), errors.New("Invalid consistency \"" + consistency + "\" specified")
 }
