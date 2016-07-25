@@ -2,7 +2,6 @@
 package cassandra
 
 import (
-	"errors"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -57,7 +56,7 @@ func (driver *Driver) Initialize(rawurl string) error {
 	cluster.Timeout = 1 * time.Minute
 
 	if len(u.Query().Get("consistency")) > 0 {
-		consistency, err := readConsistency(u.Query().Get("consistency"))
+		consistency, err := parseConsistency(u.Query().Get("consistency"))
 		if err != nil {
 			return err
 		}
@@ -182,27 +181,19 @@ func init() {
 	driver.RegisterDriver("cassandra", &Driver{})
 }
 
-func readConsistency(consistency string) (gocql.Consistency, error) {
-	switch strings.ToLower(consistency) {
-	case "all":
-		return gocql.All, nil
-	case "each_quorum":
-		return gocql.EachQuorum, nil
-	case "quorum":
-		return gocql.Quorum, nil
-	case "local_quorum":
-		return gocql.LocalQuorum, nil
-	case "one":
-		return gocql.One, nil
-	case "two":
-		return gocql.Two, nil
-	case "three":
-		return gocql.Three, nil
-	case "local_one":
-		return gocql.LocalOne, nil
-	case "any":
-		return gocql.Any, nil
-	}
+// ParseConsistency wraps gocql.ParseConsistency to return an error
+// instead of a panicing.
+func parseConsistency(consistencyStr string) (consistency gocql.Consistency, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			var ok bool
+			err, ok = r.(error)
+			if !ok {
+				err = fmt.Errorf("Failed to parse consistency \"%s\": %v", s, r)
+			}
+		}
+	}()
+	consistency = gocql.ParseConsistency(consistencyStr)
 
-	return gocql.Consistency(0), errors.New("Invalid consistency \"" + consistency + "\" specified")
+	return consistency, nil
 }
