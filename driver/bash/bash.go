@@ -2,8 +2,8 @@
 package bash
 
 import (
-	"github.com/mattes/migrate/driver"
-	"github.com/mattes/migrate/file"
+	"github.com/dimag-jfrog/migrate/driver"
+	"github.com/dimag-jfrog/migrate/file"
 )
 
 type Driver struct {
