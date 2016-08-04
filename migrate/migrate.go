@@ -12,10 +12,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mattes/migrate/driver"
-	"github.com/mattes/migrate/file"
-	"github.com/mattes/migrate/migrate/direction"
-	pipep "github.com/mattes/migrate/pipe"
+	"github.com/dimag-jfrog/migrate/driver"
+	"github.com/dimag-jfrog/migrate/file"
+	"github.com/dimag-jfrog/migrate/migrate/direction"
+	pipep "github.com/dimag-jfrog/migrate/pipe"
 )
 
 // Up applies all available migrations
