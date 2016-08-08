@@ -10,7 +10,6 @@ import (
 	"bufio"
 	"github.com/dimag-jfrog/migrate/driver"
 	"github.com/dimag-jfrog/migrate/file"
-	"github.com/dimag-jfrog/migrate/migrate/direction"
 )
 
 
@@ -32,7 +31,7 @@ func (e *MethodInvocationFailedError) Error() string {
 
 
 type Migrator struct {
-	Driver driver.DriverWithFilenameParser
+	Driver driver.Driver
 	RollbackOnFailure bool
 }
 
@@ -55,6 +54,10 @@ func (m *Migrator) Migrate(f file.File, pipe chan interface{}) error {
 			// on failure, try to rollback methods in this migration
 			for j := i-1; j >= 0; j-- {
 				rollbackToMethodName := getRollbackToMethod(methods[j])
+				if rollbackToMethodName == "" || !m.IsValid(rollbackToMethodName) {
+					continue
+				}
+
 				pipe <- rollbackToMethodName
 				err = m.Invoke(rollbackToMethodName)
 				if err != nil {
@@ -106,8 +109,10 @@ func reverseInPlace(a []string) {
 func getRollbackToMethod(methodName string) string {
 	if strings.HasSuffix(methodName, "_up") {
 		return strings.TrimSuffix(methodName, "_up") + "_down"
-	} else {
+	} else if strings.HasSuffix(methodName, "_down") {
 		return strings.TrimSuffix(methodName, "_down") + "_up"
+	} else {
+		return ""
 	}
 }
 
@@ -143,34 +148,20 @@ func (m *Migrator) getMigrationMethods(f file.File) ([]string, error) {
 	}
 
 	for _, line := range lines {
-		operationName := strings.TrimSpace(line)
+		methodName := strings.TrimSpace(line)
 
-		if operationName == "" || strings.HasPrefix(operationName, "--") {
+		if methodName == "" || strings.HasPrefix(methodName, "--") {
 			// an empty line or a comment, ignore
 			continue
 		}
 
-		upMethodName := operationName + "_up"
-		downMethodName := operationName + "_down"
-
-		if !m.IsValid(upMethodName) {
-			return nil, MissingMethodError(upMethodName)
-		}
-		if !m.IsValid(downMethodName) {
-			return nil, MissingMethodError(downMethodName)
+		if !m.IsValid(methodName) {
+			return nil, MissingMethodError(methodName)
 		}
 
-		if f.Direction == direction.Up {
-			methods = append(methods, upMethodName)
-		} else {
-			methods = append(methods, downMethodName)
-		}
+		methods = append(methods, methodName)
 	}
 
-	_,_,fileType,_ := m.Driver.FilenameParser().Parse(f.FileName)
-	if fileType == direction.Both && f.Direction == direction.Down {
-		reverseInPlace(methods)
-	}
 	return methods, nil
 
 }

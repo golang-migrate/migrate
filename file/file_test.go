@@ -8,6 +8,52 @@ import (
 	"testing"
 )
 
+func TestParseFilenameSchema(t *testing.T) {
+	var tests = []struct {
+		filename          string
+		filenameExtension string
+		expectVersion     uint64
+		expectName        string
+		expectDirection   direction.Direction
+		expectErr         bool
+	}{
+		{"001_test_file.up.sql", "sql", 1, "test_file", direction.Up, false},
+		{"001_test_file.down.sql", "sql", 1, "test_file", direction.Down, false},
+		{"10034_test_file.down.sql", "sql", 10034, "test_file", direction.Down, false},
+		{"-1_test_file.down.sql", "sql", 0, "", direction.Up, true},
+		{"test_file.down.sql", "sql", 0, "", direction.Up, true},
+		{"100_test_file.down", "sql", 0, "", direction.Up, true},
+		{"100_test_file.sql", "sql", 0, "", direction.Up, true},
+		{"100_test_file", "sql", 0, "", direction.Up, true},
+		{"test_file", "sql", 0, "", direction.Up, true},
+		{"100", "sql", 0, "", direction.Up, true},
+		{".sql", "sql", 0, "", direction.Up, true},
+		{"up.sql", "sql", 0, "", direction.Up, true},
+		{"down.sql", "sql", 0, "", direction.Up, true},
+	}
+
+	for _, test := range tests {
+		version, name, migrate, err := parseFilenameSchema(test.filename, FilenameRegex(test.filenameExtension))
+		if test.expectErr && err == nil {
+			t.Fatal("Expected error, but got none.", test)
+		}
+		if !test.expectErr && err != nil {
+			t.Fatal("Did not expect error, but got one:", err, test)
+		}
+		if err == nil {
+			if version != test.expectVersion {
+				t.Error("Wrong version number", test)
+			}
+			if name != test.expectName {
+				t.Error("wrong name", test)
+			}
+			if migrate != test.expectDirection {
+				t.Error("wrong migrate", test)
+			}
+		}
+	}
+}
+
 func TestFiles(t *testing.T) {
 	tmpdir, err := ioutil.TempDir("/tmp", "TestLookForMigrationFilesInSearchPath")
 	if err != nil {
@@ -31,7 +77,7 @@ func TestFiles(t *testing.T) {
 
 	ioutil.WriteFile(path.Join(tmpdir, "401_migrationfile.down.sql"), []byte("test"), 0755)
 
-	files, err := ReadMigrationFiles(tmpdir, "sql")
+	files, err := ReadMigrationFiles(tmpdir, FilenameRegex("sql"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -177,7 +223,7 @@ func TestDuplicateFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = ReadMigrationFiles(root, "sql")
+	_, err = ReadMigrationFiles(root, FilenameRegex("sql"))
 	if err == nil {
 		t.Fatal("Expected duplicate migration file error")
 	}
