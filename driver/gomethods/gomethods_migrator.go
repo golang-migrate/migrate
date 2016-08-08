@@ -8,7 +8,6 @@ import (
 	"os"
 	"path"
 	"bufio"
-	"github.com/dimag-jfrog/migrate/driver"
 	"github.com/dimag-jfrog/migrate/file"
 )
 
@@ -31,7 +30,7 @@ func (e *MethodInvocationFailedError) Error() string {
 
 
 type Migrator struct {
-	Driver driver.Driver
+	MigrationMethodsReceiver interface{}
 	RollbackOnFailure bool
 }
 
@@ -73,12 +72,12 @@ func (m *Migrator) Migrate(f file.File, pipe chan interface{}) error {
 }
 
 func (m *Migrator) IsValid(methodName string) bool {
-	return reflect.ValueOf(m.Driver).MethodByName(methodName).IsValid()
+	return reflect.ValueOf(m.MigrationMethodsReceiver).MethodByName(methodName).IsValid()
 }
 
 func (m *Migrator) Invoke(methodName string) error {
 	name := methodName
-	migrateMethod := reflect.ValueOf(m.Driver).MethodByName(name)
+	migrateMethod := reflect.ValueOf(m.MigrationMethodsReceiver).MethodByName(name)
 	if !migrateMethod.IsValid() {
 		return MissingMethodError(methodName)
 	}

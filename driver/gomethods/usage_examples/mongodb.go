@@ -16,7 +16,7 @@ type GoMethodsMongoDbDriver struct {
 }
 
 func (d *GoMethodsMongoDbDriver) Initialize(url string) error {
-	return d.DriverTemplate.Initialize(url, DB_NAME, gomethods.Migrator{Driver: d})
+	return d.DriverTemplate.Initialize(url, DB_NAME, gomethods.Migrator{MigrationMethodsReceiver: d})
 }
 
 func init() {
