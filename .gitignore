@@ -1,2 +1,11 @@
 .DS_Store
 test.db
+*.iml
+.DS_Store
+.idea
+*.zip
+*.tar.*
+*.nuget
+*.jar
+*.war
+

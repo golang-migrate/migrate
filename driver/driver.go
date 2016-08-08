@@ -34,6 +34,15 @@ type Driver interface {
 	Version() (uint64, error)
 }
 
+// Driver that has some custom migration file format
+// and wants to use a different parsing strategy.
+type DriverWithFilenameParser interface {
+
+	Driver
+
+	FilenameParser() file.FilenameParser
+}
+
 // New returns Driver and calls Initialize on it
 func New(url string) (Driver, error) {
 	u, err := neturl.Parse(url)
