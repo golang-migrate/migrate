@@ -68,6 +68,7 @@ func RunMigrationAndAssertResult(
 	if !reflect.DeepEqual(expected.Errors, errs) {
 		t.Fatalf("Migration '%s': FAILED\nexpected errors %v\nbut got %v", title, expected.Errors, errs)
 	}
+	t.Logf("Migration '%s': PASSED", title)
 }
 
 

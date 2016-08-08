@@ -232,7 +232,7 @@ func TestMigrate(t *testing.T) {
 	for _, c := range cases {
 		migrator := Migrator{}
 		d := &FakeGoMethodsDriver{Migrator: migrator, InvokedMethods:[]string{}}
-		migrator.Driver = d
+		migrator.MigrationMethodsReceiver = d
 		migrator.RollbackOnFailure = c.expectRollback
 
 		pipe := pipep.New()
