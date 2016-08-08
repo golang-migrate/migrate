@@ -212,7 +212,7 @@ func Create(url, migrationsPath, name string) (*file.MigrationFile, error) {
 	if err != nil {
 		return nil, err
 	}
-	files, err := file.ReadMigrationFiles(migrationsPath, file.FilenameRegex(d.FilenameExtension()))
+	files, err := file.ReadMigrationFiles(migrationsPath, d.FilenameExtension())
 	if err != nil {
 		return nil, err
 	}
@@ -268,7 +268,15 @@ func initDriverAndReadMigrationFilesAndGetVersion(url, migrationsPath string) (d
 	if err != nil {
 		return nil, nil, 0, err
 	}
-	files, err := file.ReadMigrationFiles(migrationsPath, file.FilenameRegex(d.FilenameExtension()))
+
+	var files file.MigrationFiles
+
+	if d1, ok := d.(driver.DriverWithFilenameParser); ok {
+		files, err = file.ReadMigrationFilesWithFilenameParser(migrationsPath, d1.FilenameParser())
+	} else {
+		files, err = file.ReadMigrationFiles(migrationsPath, d.FilenameExtension())
+	}
+
 	if err != nil {
 		d.Close() // TODO what happens with errors from this func?
 		return nil, nil, 0, err
