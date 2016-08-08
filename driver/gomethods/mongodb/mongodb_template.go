@@ -55,10 +55,6 @@ func (driver *DriverTemplate) Close() error {
 	return nil
 }
 
-func (driver *DriverTemplate) FilenameParser() file.FilenameParser {
-	return file.UpDownAndBothFilenameParser{FilenameExtension: driver.FilenameExtension()}
-}
-
 func (driver *DriverTemplate) FilenameExtension() string {
 	return "mgo"
 }

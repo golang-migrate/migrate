@@ -39,9 +39,28 @@ type Organization struct {
 	DateFounded       time.Time              `bson:"date_founded"`
 }
 
+type Organization_v2 struct {
+	Id                bson.ObjectId          `bson:"_id,omitempty"`
+	Name              string                 `bson:"name"`
+	Headquarters      string                 `bson:"headquarters"`
+	DateFounded       time.Time              `bson:"date_founded"`
+}
+
 type User struct {
 	Id          bson.ObjectId          `bson:"_id"`
 	Name        string                 `bson:"name"`
+}
+
+var OrganizationIds []bson.ObjectId = []bson.ObjectId{
+	bson.NewObjectId(),
+	bson.NewObjectId(),
+	bson.NewObjectId(),
+}
+
+var UserIds []bson.ObjectId = []bson.ObjectId{
+	bson.NewObjectId(),
+	bson.NewObjectId(),
+	bson.NewObjectId(),
 }
 
 func (m *GoMethodsMongoDbDriver) V001_init_organizations_up() error {
@@ -50,9 +69,9 @@ func (m *GoMethodsMongoDbDriver) V001_init_organizations_up() error {
 	date3, _ := time.Parse(SHORT_DATE_LAYOUT, "2008-Apr-28")
 
 	orgs := []Organization{
-		{Id: bson.NewObjectId(), Name: "Amazon", Location:"Seattle", DateFounded: date1},
-		{Id: bson.NewObjectId(), Name: "Google", Location:"Mountain View", DateFounded: date2},
-		{Id: bson.NewObjectId(), Name: "JFrog", Location:"Santa Clara", DateFounded: date3},
+		{Id: OrganizationIds[0], Name: "Amazon", Location:"Seattle", DateFounded: date1},
+		{Id: OrganizationIds[1], Name: "Google", Location:"Mountain View", DateFounded: date2},
+		{Id: OrganizationIds[2], Name: "JFrog", Location:"Santa Clara", DateFounded: date3},
 	}
 
 	for _, org := range orgs {
@@ -70,9 +89,9 @@ func (m *GoMethodsMongoDbDriver) V001_init_organizations_down() error {
 
 func (m *GoMethodsMongoDbDriver) V001_init_users_up() error {
 	users := []User{
-		{Id: bson.NewObjectId(), Name: "Alex"},
-		{Id: bson.NewObjectId(), Name: "Beatrice"},
-		{Id: bson.NewObjectId(), Name: "Cleo"},
+		{Id: UserIds[0], Name: "Alex"},
+		{Id: UserIds[1], Name: "Beatrice"},
+		{Id: UserIds[2], Name: "Cleo"},
 	}
 
 	for _, user := range users {

@@ -6,5 +6,4 @@ type Direction int
 const (
 	Up   Direction = +1
 	Down           = -1
-	Both           = 0
 )

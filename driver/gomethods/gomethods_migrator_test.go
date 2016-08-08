@@ -23,10 +23,6 @@ func (driver *FakeGoMethodsDriver) Close() error {
 	return nil
 }
 
-func (driver *FakeGoMethodsDriver) FilenameParser() file.FilenameParser {
-	return file.UpDownAndBothFilenameParser{ FilenameExtension: driver.FilenameExtension() }
-}
-
 func (driver *FakeGoMethodsDriver) FilenameExtension() string {
 	return "gm"
 }
@@ -84,39 +80,7 @@ func TestMigrate(t *testing.T) {
 		expectRollback bool
 	}{
 		{
-			name: "up migration, both directions-file: invokes up methods in order",
-			file: file.File {
-				Path:      "/foobar",
-				FileName:  "001_foobar.gm",
-				Version:   1,
-				Name:      "foobar",
-				Direction: direction.Up,
-				Content: []byte(`
-						V001_init_organizations
-						V001_init_users
-					`),
-			},
-			expectedInvokedMethods: []string{"V001_init_organizations_up", "V001_init_users_up"},
-			expectedErrors: []error{},
-		},
-		{
-			name: "down migration, both-directions-file: reverts direction of invoked down methods",
-			file: file.File {
-				Path:      "/foobar",
-				FileName:  "001_foobar.gm",
-				Version:   1,
-				Name:      "foobar",
-				Direction: direction.Down,
-				Content: []byte(`
-						V001_init_organizations
-						V001_init_users
-					`),
-			},
-			expectedInvokedMethods: []string{"V001_init_users_down", "V001_init_organizations_down"},
-			expectedErrors: []error{},
-		},
-		{
-			name: "up migration, up direction-file: invokes up methods in order",
+			name: "up migration invokes up methods",
 			file: file.File {
 				Path:      "/foobar",
 				FileName:  "001_foobar.up.gm",
@@ -124,15 +88,15 @@ func TestMigrate(t *testing.T) {
 				Name:      "foobar",
 				Direction: direction.Up,
 				Content: []byte(`
-						V001_init_organizations
-						V001_init_users
+						V001_init_organizations_up
+						V001_init_users_up
 					`),
 			},
 			expectedInvokedMethods: []string{"V001_init_organizations_up", "V001_init_users_up"},
 			expectedErrors: []error{},
 		},
 		{
-			name: "down migration, down directions-file: keeps order of invoked down methods",
+			name: "down migration invoked down methods",
 			file: file.File {
 				Path:      "/foobar",
 				FileName:  "001_foobar.down.gm",
@@ -140,25 +104,25 @@ func TestMigrate(t *testing.T) {
 				Name:      "foobar",
 				Direction: direction.Down,
 				Content: []byte(`
-						V001_init_organizations
-						V001_init_users
+						V001_init_users_down
+						V001_init_organizations_down
 					`),
 			},
-			expectedInvokedMethods: []string{"V001_init_organizations_down", "V001_init_users_down"},
+			expectedInvokedMethods: []string{"V001_init_users_down", "V001_init_organizations_down"},
 			expectedErrors: []error{},
 		},
 		{
 			name: "up migration: non-existing method causes migration not to execute",
 			file: file.File {
 				Path:      "/foobar",
-				FileName:  "001_foobar.gm",
+				FileName:  "001_foobar.up.gm",
 				Version:   1,
 				Name:      "foobar",
 				Direction: direction.Up,
 				Content: []byte(`
-						V001_init_organizations
-						V001_init_users
-						V001_some_non_existing_method
+						V001_init_organizations_up
+						V001_init_users_up
+						V001_some_non_existing_method_up
 					`),
 			},
 			expectedInvokedMethods: []string{},
@@ -168,14 +132,14 @@ func TestMigrate(t *testing.T) {
 			name: "up migration: failing method stops execution",
 			file: file.File {
 				Path:      "/foobar",
-				FileName:  "001_foobar.gm",
+				FileName:  "001_foobar.up.gm",
 				Version:   1,
 				Name:      "foobar",
 				Direction: direction.Up,
 				Content: []byte(`
-						V001_init_organizations
-						V001_some_failing_method
-						V001_init_users
+						V001_init_organizations_up
+						V001_some_failing_method_up
+						V001_init_users_up
 					`),
 			},
 			expectedInvokedMethods: []string{
@@ -188,17 +152,17 @@ func TestMigrate(t *testing.T) {
 			}},
 		},
 		{
-			name: "down migration, both-directions-file: failing method stops migration",
+			name: "down migration: failing method stops migration",
 			file: file.File {
 				Path:      "/foobar",
-				FileName:  "001_foobar.gm",
+				FileName:  "001_foobar.down.gm",
 				Version:   1,
 				Name:      "foobar",
 				Direction: direction.Down,
 				Content: []byte(`
-						V001_init_organizations
-						V001_some_failing_method
-						V001_init_users
+						V001_init_users_down
+						V001_some_failing_method_down
+						V001_init_organizations_down
 					`),
 			},
 			expectedInvokedMethods: []string{
@@ -215,14 +179,14 @@ func TestMigrate(t *testing.T) {
 			expectRollback: true,
 			file: file.File {
 				Path:      "/foobar",
-				FileName:  "001_foobar.gm",
+				FileName:  "001_foobar.up.gm",
 				Version:   1,
 				Name:      "foobar",
 				Direction: direction.Up,
 				Content: []byte(`
-						V001_init_organizations
-						V001_init_users
-						V001_some_failing_method
+						V001_init_organizations_up
+						V001_init_users_up
+						V001_some_failing_method_up
 					`),
 			},
 			expectedInvokedMethods: []string{
@@ -238,18 +202,18 @@ func TestMigrate(t *testing.T) {
 			}},
 		},
 		{
-			name: "down migration, both-directions-file: failing method causes rollback in rollback mode",
+			name: "down migration: failing method causes rollback in rollback mode",
 			expectRollback: true,
 			file: file.File {
 				Path:      "/foobar",
-				FileName:  "001_foobar.gm",
+				FileName:  "001_foobar.down.gm",
 				Version:   1,
 				Name:      "foobar",
 				Direction: direction.Down,
 				Content: []byte(`
-						V001_init_organizations
-						V001_some_failing_method
-						V001_init_users
+						V001_init_users_down
+						V001_some_failing_method_down
+						V001_init_organizations_down
 					`),
 			},
 			expectedInvokedMethods: []string{
@@ -306,6 +270,7 @@ func TestGetRollbackToMethod(t *testing.T) {
 		{"up_down_up", "up_down_down"},
 		{"down_up", "down_down"},
 		{"down_down", "down_up"},
+		{"some_method", ""},
 	}
 
 	for _, c := range cases {

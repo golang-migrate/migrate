@@ -9,10 +9,19 @@ import (
 	"go/token"
 	"io/ioutil"
 	"path"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 )
+
+var filenameRegex = `^([0-9]+)_(.*)\.(up|down)\.%s$`
+
+// FilenameRegex builds regular expression stmt with given
+// filename extension from driver.
+func FilenameRegex(filenameExtension string) *regexp.Regexp {
+	return regexp.MustCompile(fmt.Sprintf(filenameRegex, filenameExtension))
+}
 
 // File represents one file on disk.
 // Example: 001_initial_plan_to_do_sth.up.sql
@@ -140,17 +149,8 @@ func (mf *MigrationFiles) From(version uint64, relativeN int) (Files, error) {
 	return files, nil
 }
 
-
-func ReadMigrationFiles(path, filenameExtension string) (MigrationFiles, error){
-	return doReadMigrationFiles(path, DefaultFilenameParser{FilenameExtension: filenameExtension})
-}
-
-func ReadMigrationFilesWithFilenameParser(path string, filenameParser FilenameParser) (MigrationFiles, error){
-	return doReadMigrationFiles(path, filenameParser)
-}
-
 // ReadMigrationFiles reads all migration files from a given path
-func doReadMigrationFiles(path string, filenameParser FilenameParser) (files MigrationFiles, err error) {
+func ReadMigrationFiles(path string, filenameRegex *regexp.Regexp) (files MigrationFiles, err error) {
 	// find all migration files in path
 	ioFiles, err := ioutil.ReadDir(path)
 	if err != nil {
@@ -165,7 +165,7 @@ func doReadMigrationFiles(path string, filenameParser FilenameParser) (files Mig
 	tmpFiles := make([]*tmpFile, 0)
 	tmpFileMap := map[uint64]map[direction.Direction]tmpFile{}
 	for _, file := range ioFiles {
-		version, name, d, err := filenameParser.Parse(file.Name())
+		version, name, d, err := parseFilenameSchema(file.Name(), filenameRegex)
 		if err == nil {
 			if _, ok := tmpFileMap[version]; !ok {
 				tmpFileMap[version] = map[direction.Direction]tmpFile{}
@@ -210,56 +210,33 @@ func doReadMigrationFiles(path string, filenameParser FilenameParser) (files Mig
 					Direction: direction.Down,
 				}
 				lookFordirection = direction.Up
-			case direction.Both:
-				migrationFile.UpFile = &File{
-					Path:      path,
-					FileName:  file.filename,
-					Version:   file.version,
-					Name:      file.name,
-					Content:   nil,
-					Direction: direction.Up,
-				}
-				migrationFile.DownFile = &File{
-					Path:      path,
-					FileName:  file.filename,
-					Version:   file.version,
-					Name:      file.name,
-					Content:   nil,
-					Direction: direction.Down,
-				}
 			default:
 				return nil, errors.New("Unsupported direction.Direction Type")
 			}
 
 			for _, file2 := range tmpFiles {
-				if file2.version == file.version {
-					if file.d == direction.Both {
-						if file.d != file2.d {
-							return nil, errors.New("Incompatible direction.Direction types")
+				if file2.version == file.version && file2.d == lookFordirection {
+					switch lookFordirection {
+					case direction.Up:
+						migrationFile.UpFile = &File{
+							Path:      path,
+							FileName:  file2.filename,
+							Version:   file.version,
+							Name:      file2.name,
+							Content:   nil,
+							Direction: direction.Up,
 						}
-					} else if file2.d == lookFordirection {
-						switch lookFordirection {
-						case direction.Up:
-							migrationFile.UpFile = &File{
-								Path:      path,
-								FileName:  file2.filename,
-								Version:   file.version,
-								Name:      file2.name,
-								Content:   nil,
-								Direction: direction.Up,
-							}
-						case direction.Down:
-							migrationFile.DownFile = &File{
-								Path:      path,
-								FileName:  file2.filename,
-								Version:   file.version,
-								Name:      file2.name,
-								Content:   nil,
-								Direction: direction.Down,
-							}
+					case direction.Down:
+						migrationFile.DownFile = &File{
+							Path:      path,
+							FileName:  file2.filename,
+							Version:   file.version,
+							Name:      file2.name,
+							Content:   nil,
+							Direction: direction.Down,
 						}
-						break
 					}
+					break
 				}
 			}
 
@@ -270,6 +247,29 @@ func doReadMigrationFiles(path string, filenameParser FilenameParser) (files Mig
 
 	sort.Sort(newFiles)
 	return newFiles, nil
+}
+
+// parseFilenameSchema parses the filename
+func parseFilenameSchema(filename string, filenameRegex *regexp.Regexp) (version uint64, name string, d direction.Direction, err error) {
+	matches := filenameRegex.FindStringSubmatch(filename)
+	if len(matches) != 4 {
+		return 0, "", 0, errors.New("Unable to parse filename schema")
+	}
+
+	version, err = strconv.ParseUint(matches[1], 10, 0)
+	if err != nil {
+		return 0, "", 0, errors.New(fmt.Sprintf("Unable to parse version '%v' in filename schema", matches[0]))
+	}
+
+	if matches[3] == "up" {
+		d = direction.Up
+	} else if matches[3] == "down" {
+		d = direction.Down
+	} else {
+		return 0, "", 0, errors.New(fmt.Sprintf("Unable to parse up|down '%v' in filename schema", matches[3]))
+	}
+
+	return version, matches[2], d, nil
 }
 
 // Len is the number of elements in the collection.
