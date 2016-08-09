@@ -2,40 +2,57 @@ package gomethods
 
 import (
 	//"bytes"
-	"reflect"
+	"bufio"
+	"database/sql/driver"
 	"fmt"
-	"strings"
+	"github.com/dimag-jfrog/migrate/file"
 	"os"
 	"path"
-	"bufio"
-	"github.com/dimag-jfrog/migrate/file"
+	"strings"
 )
 
+type UnregisteredMethodsReceiverError string
+
+func (e UnregisteredMethodsReceiverError) Error() string {
+	return "Unregistered methods receiver: " + string(e)
+}
 
 type MissingMethodError string
-func (e MissingMethodError) Error() string   { return "Non existing migrate method: " + string(e) }
 
+func (e MissingMethodError) Error() string { return "Non existing migrate method: " + string(e) }
 
 type WrongMethodSignatureError string
-func (e WrongMethodSignatureError) Error() string   { return fmt.Sprintf("Method %s has wrong signature", e) }
+
+func (e WrongMethodSignatureError) Error() string {
+	return fmt.Sprintf("Method %s has wrong signature", e)
+}
 
 type MethodInvocationFailedError struct {
 	MethodName string
-	Err error
+	Err        error
 }
 
 func (e *MethodInvocationFailedError) Error() string {
 	return fmt.Sprintf("Method %s returned an error: %v", e.MethodName, e.Error)
 }
 
+type MigrationMethodInvoker interface {
+	IsValid(methodName string, methodReceiver interface{}) bool
+	Invoke(methodName string, methodReceiver interface{}) error
+}
+
+type GoMethodsDriver interface {
+	driver.Driver
+	MigrationMethodInvoker
+}
 
 type Migrator struct {
-	MigrationMethodsReceiver interface{}
 	RollbackOnFailure bool
+	MethodInvoker     MigrationMethodInvoker
 }
 
 func (m *Migrator) Migrate(f file.File, pipe chan interface{}) error {
-	methods, err := m.getMigrationMethods(f)
+	methods, methodsReceiver, err := m.getMigrationMethods(f)
 	if err != nil {
 		pipe <- err
 		return err
@@ -43,7 +60,7 @@ func (m *Migrator) Migrate(f file.File, pipe chan interface{}) error {
 
 	for i, methodName := range methods {
 		pipe <- methodName
-		err := m.Invoke(methodName)
+		err := m.MethodInvoker.Invoke(methodName, methodsReceiver)
 		if err != nil {
 			pipe <- err
 			if !m.RollbackOnFailure {
@@ -51,14 +68,15 @@ func (m *Migrator) Migrate(f file.File, pipe chan interface{}) error {
 			}
 
 			// on failure, try to rollback methods in this migration
-			for j := i-1; j >= 0; j-- {
+			for j := i - 1; j >= 0; j-- {
 				rollbackToMethodName := getRollbackToMethod(methods[j])
-				if rollbackToMethodName == "" || !m.IsValid(rollbackToMethodName) {
+				if rollbackToMethodName == "" ||
+					!m.MethodInvoker.IsValid(rollbackToMethodName, methodsReceiver) {
 					continue
 				}
 
 				pipe <- rollbackToMethodName
-				err = m.Invoke(rollbackToMethodName)
+				err = m.MethodInvoker.Invoke(rollbackToMethodName, methodsReceiver)
 				if err != nil {
 					pipe <- err
 					break
@@ -66,33 +84,6 @@ func (m *Migrator) Migrate(f file.File, pipe chan interface{}) error {
 			}
 			return err
 		}
-	}
-
-	return nil
-}
-
-func (m *Migrator) IsValid(methodName string) bool {
-	return reflect.ValueOf(m.MigrationMethodsReceiver).MethodByName(methodName).IsValid()
-}
-
-func (m *Migrator) Invoke(methodName string) error {
-	name := methodName
-	migrateMethod := reflect.ValueOf(m.MigrationMethodsReceiver).MethodByName(name)
-	if !migrateMethod.IsValid() {
-		return MissingMethodError(methodName)
-	}
-
-	retValues := migrateMethod.Call([]reflect.Value{})
-	if len(retValues) != 1 {
-		return WrongMethodSignatureError(name)
-	}
-
-	if !retValues[0].IsNil() {
-		err, ok := retValues[0].Interface().(error)
-		if !ok {
-			return WrongMethodSignatureError(name)
-		}
-		return &MethodInvocationFailedError{ MethodName:name, Err:err}
 	}
 
 	return nil
@@ -139,28 +130,40 @@ func getFileLines(file file.File) ([]string, error) {
 	}
 }
 
-func (m *Migrator) getMigrationMethods(f file.File) ([]string, error) {
-	var lines, methods []string
-	lines, err := getFileLines(f)
+func (m *Migrator) getMigrationMethods(f file.File) (methods []string, methodsReceiver interface{}, err error) {
+	var lines []string
+
+	lines, err = getFileLines(f)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	for _, line := range lines {
-		methodName := strings.TrimSpace(line)
+		line := strings.TrimSpace(line)
 
-		if methodName == "" || strings.HasPrefix(methodName, "--") {
+		if line == "" || strings.HasPrefix(line, "--") {
 			// an empty line or a comment, ignore
 			continue
 		}
 
-		if !m.IsValid(methodName) {
-			return nil, MissingMethodError(methodName)
-		}
+		if methodsReceiver == nil {
+			receiverName := line
+			methodsReceiver = GetMethodsReceiver(receiverName)
+			if methodsReceiver == nil {
+				return nil, nil, UnregisteredMethodsReceiverError(receiverName)
+			}
+			continue
 
-		methods = append(methods, methodName)
+		} else {
+			methodName := line
+			if !m.MethodInvoker.IsValid(methodName, methodsReceiver) {
+				return nil, nil, MissingMethodError(methodName)
+			}
+
+			methods = append(methods, methodName)
+		}
 	}
 
-	return methods, nil
+	return methods, methodsReceiver, nil
 
 }
