@@ -6,6 +6,7 @@ import (
 	"github.com/dimag-jfrog/migrate/file"
 	"github.com/dimag-jfrog/migrate/migrate/direction"
 
+	"github.com/dimag-jfrog/migrate/driver"
 	"github.com/dimag-jfrog/migrate/driver/gomethods"
 	"github.com/dimag-jfrog/migrate/driver/gomethods/mongodb"
 	pipep "github.com/dimag-jfrog/migrate/pipe"
@@ -73,20 +74,30 @@ func RunMigrationAndAssertResult(
 }
 
 func TestMigrate(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("Test failed on panic: %v", r)
+		}
+	}()
+
 	//host := os.Getenv("MONGODB_PORT_27017_TCP_ADDR")
 	//port := os.Getenv("MONGODB_PORT_27017_TCP_PORT")
 	host := "127.0.0.1"
 	port := "27017"
 	driverUrl := "mongodb://" + host + ":" + port
 
-	//gomethods.RegisterMethodsReceiver("MyMgoMethodsReceiver", &MyMgoMethodsReceiver{})
-	d := &mongodb.MongoDbGoMethodsDriver{}
+	d0 := driver.GetDriver("mongodb")
+	d, ok := d0.(*mongodb.MongoDbGoMethodsDriver)
+	if !ok {
+		t.Fatal("MongoDbGoMethodsDriver has not registered")
+	}
 
 	if err := d.Initialize(driverUrl); err != nil {
 		t.Fatal(err)
 	}
 
 	// Reset DB
+	d.Session.DB(DB_NAME).C(mongodb.MIGRATE_C).DropCollection()
 	d.Session.DB(DB_NAME).C(ORGANIZATIONS_C).DropCollection()
 	d.Session.DB(DB_NAME).C(USERS_C).DropCollection()
 
@@ -108,7 +119,6 @@ func TestMigrate(t *testing.T) {
 				Name:      "foobar",
 				Direction: direction.Up,
 				Content: []byte(`
-						MyMgoMethodsReceiver
 						V001_init_organizations_up
 						V001_init_users_up
 					`),
@@ -137,7 +147,6 @@ func TestMigrate(t *testing.T) {
 				Name:      "foobar",
 				Direction: direction.Up,
 				Content: []byte(`
-						MyMgoMethodsReceiver
 						V002_organizations_rename_location_field_to_headquarters_up
 						V002_change_user_cleo_to_cleopatra_up
 					`),
@@ -166,7 +175,6 @@ func TestMigrate(t *testing.T) {
 				Name:      "foobar",
 				Direction: direction.Down,
 				Content: []byte(`
-						MyMgoMethodsReceiver
 						V002_change_user_cleo_to_cleopatra_down
 						V002_organizations_rename_location_field_to_headquarters_down
 					`),
@@ -195,7 +203,6 @@ func TestMigrate(t *testing.T) {
 				Name:      "foobar",
 				Direction: direction.Down,
 				Content: []byte(`
-						MyMgoMethodsReceiver
 						V001_init_users_down
 						V001_init_organizations_down
 					`),
@@ -216,7 +223,6 @@ func TestMigrate(t *testing.T) {
 				Name:      "foobar",
 				Direction: direction.Up,
 				Content: []byte(`
-						MyMgoMethodsReceiver
 						V001_init_organizations_up
 						V001_init_users_up
 						v001_non_existing_method_up
@@ -227,26 +233,6 @@ func TestMigrate(t *testing.T) {
 				Organizations_v2: []Organization_v2{},
 				Users:            []User{},
 				Errors:           []error{gomethods.MissingMethodError("v001_non_existing_method_up")},
-			},
-		},
-		{
-			name: "v0 -> v1: not defined message receiver",
-			file: file.File{
-				Path:      "/foobar",
-				FileName:  "001_foobar.up.gm",
-				Version:   1,
-				Name:      "foobar",
-				Direction: direction.Up,
-				Content: []byte(`
-						V001_init_organizations_up
-						V001_init_users_up
-					`),
-			},
-			expectedResult: ExpectedMigrationResult{
-				Organizations:    []Organization{},
-				Organizations_v2: []Organization_v2{},
-				Users:            []User{},
-				Errors:           []error{gomethods.UnregisteredMethodsReceiverError("V001_init_organizations_up")},
 			},
 		},
 	}
