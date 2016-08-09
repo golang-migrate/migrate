@@ -10,133 +10,105 @@ import (
 	pipep "github.com/dimag-jfrog/migrate/pipe"
 )
 
-type FakeGoMethodsDriver struct {
+type FakeGoMethodsInvoker struct {
 	InvokedMethods []string
-	Migrator Migrator
 }
 
-func (driver *FakeGoMethodsDriver) Initialize(url string) error {
-	return nil
+func (invoker *FakeGoMethodsInvoker) IsValid(methodName string, methodReceiver interface{}) bool {
+	if methodName == "V001_some_non_existing_method_up" {
+		return false
+	}
+
+	return true
 }
 
-func (driver *FakeGoMethodsDriver) Close() error {
-	return nil
-}
+func (invoker *FakeGoMethodsInvoker) Invoke(methodName string, methodReceiver interface{}) error {
+	invoker.InvokedMethods = append(invoker.InvokedMethods, methodName)
 
-func (driver *FakeGoMethodsDriver) FilenameExtension() string {
-	return "gm"
-}
-
-func (driver *FakeGoMethodsDriver) Version() (uint64, error) {
-	return uint64(0), nil
-}
-
-func (driver *FakeGoMethodsDriver) Migrate(f file.File, pipe chan interface{}) {
-	defer close(pipe)
-	pipe <- f
-	return
-}
-
-func (driver *FakeGoMethodsDriver) V001_init_organizations_up() error {
-	driver.InvokedMethods = append(driver.InvokedMethods, "V001_init_organizations_up")
-	return nil
-}
-
-func (driver *FakeGoMethodsDriver) V001_init_organizations_down() error {
-	driver.InvokedMethods = append(driver.InvokedMethods, "V001_init_organizations_down")
-	return nil
-
-}
-
-func (driver *FakeGoMethodsDriver) V001_init_users_up() error {
-	driver.InvokedMethods = append(driver.InvokedMethods, "V001_init_users_up")
-	return nil
-}
-
-func (driver *FakeGoMethodsDriver) V001_init_users_down() error {
-	driver.InvokedMethods = append(driver.InvokedMethods, "V001_init_users_down")
-	return nil
+	if methodName == "V001_some_failing_method_up" || methodName == "V001_some_failing_method_down" {
+		return &MethodInvocationFailedError{
+			MethodName: methodName,
+			Err:        SomeError{},
+		}
+	} else {
+		return nil
+	}
 }
 
 type SomeError struct{}
-func (e SomeError) Error() string   { return "Some error happened" }
 
-func (driver *FakeGoMethodsDriver) V001_some_failing_method_up() error {
-	driver.InvokedMethods = append(driver.InvokedMethods, "V001_some_failing_method_up")
-	return SomeError{}
-}
-
-func (driver *FakeGoMethodsDriver) V001_some_failing_method_down() error {
-	driver.InvokedMethods = append(driver.InvokedMethods, "V001_some_failing_method_down")
-	return SomeError{}
-}
+func (e SomeError) Error() string { return "Some error happened" }
 
 func TestMigrate(t *testing.T) {
 	cases := []struct {
-		name string
-		file file.File
+		name                   string
+		file                   file.File
 		expectedInvokedMethods []string
-		expectedErrors []error
-		expectRollback bool
+		expectedErrors         []error
+		expectRollback         bool
 	}{
 		{
 			name: "up migration invokes up methods",
-			file: file.File {
+			file: file.File{
 				Path:      "/foobar",
 				FileName:  "001_foobar.up.gm",
 				Version:   1,
 				Name:      "foobar",
 				Direction: direction.Up,
 				Content: []byte(`
+				                FakeMethodsReceiver
 						V001_init_organizations_up
 						V001_init_users_up
 					`),
 			},
 			expectedInvokedMethods: []string{"V001_init_organizations_up", "V001_init_users_up"},
-			expectedErrors: []error{},
+			expectedErrors:         []error{},
 		},
 		{
 			name: "down migration invoked down methods",
-			file: file.File {
+			file: file.File{
 				Path:      "/foobar",
 				FileName:  "001_foobar.down.gm",
 				Version:   1,
 				Name:      "foobar",
 				Direction: direction.Down,
 				Content: []byte(`
+						FakeMethodsReceiver
 						V001_init_users_down
 						V001_init_organizations_down
 					`),
 			},
 			expectedInvokedMethods: []string{"V001_init_users_down", "V001_init_organizations_down"},
-			expectedErrors: []error{},
+			expectedErrors:         []error{},
 		},
 		{
 			name: "up migration: non-existing method causes migration not to execute",
-			file: file.File {
+			file: file.File{
 				Path:      "/foobar",
 				FileName:  "001_foobar.up.gm",
 				Version:   1,
 				Name:      "foobar",
 				Direction: direction.Up,
 				Content: []byte(`
+						FakeMethodsReceiver
 						V001_init_organizations_up
 						V001_init_users_up
 						V001_some_non_existing_method_up
 					`),
 			},
 			expectedInvokedMethods: []string{},
-			expectedErrors: []error{ MissingMethodError("V001_some_non_existing_method_up") },
+			expectedErrors:         []error{MissingMethodError("V001_some_non_existing_method_up")},
 		},
 		{
 			name: "up migration: failing method stops execution",
-			file: file.File {
+			file: file.File{
 				Path:      "/foobar",
 				FileName:  "001_foobar.up.gm",
 				Version:   1,
 				Name:      "foobar",
 				Direction: direction.Up,
 				Content: []byte(`
+						FakeMethodsReceiver
 						V001_init_organizations_up
 						V001_some_failing_method_up
 						V001_init_users_up
@@ -146,20 +118,21 @@ func TestMigrate(t *testing.T) {
 				"V001_init_organizations_up",
 				"V001_some_failing_method_up",
 			},
-			expectedErrors: []error{ &MethodInvocationFailedError{
+			expectedErrors: []error{&MethodInvocationFailedError{
 				MethodName: "V001_some_failing_method_up",
-				Err: SomeError{},
+				Err:        SomeError{},
 			}},
 		},
 		{
 			name: "down migration: failing method stops migration",
-			file: file.File {
+			file: file.File{
 				Path:      "/foobar",
 				FileName:  "001_foobar.down.gm",
 				Version:   1,
 				Name:      "foobar",
 				Direction: direction.Down,
 				Content: []byte(`
+						FakeMethodsReceiver
 						V001_init_users_down
 						V001_some_failing_method_down
 						V001_init_organizations_down
@@ -169,21 +142,22 @@ func TestMigrate(t *testing.T) {
 				"V001_init_users_down",
 				"V001_some_failing_method_down",
 			},
-			expectedErrors: []error{ &MethodInvocationFailedError{
+			expectedErrors: []error{&MethodInvocationFailedError{
 				MethodName: "V001_some_failing_method_down",
-				Err: SomeError{},
+				Err:        SomeError{},
 			}},
 		},
 		{
-			name: "up migration: failing method causes rollback in rollback mode",
+			name:           "up migration: failing method causes rollback in rollback mode",
 			expectRollback: true,
-			file: file.File {
+			file: file.File{
 				Path:      "/foobar",
 				FileName:  "001_foobar.up.gm",
 				Version:   1,
 				Name:      "foobar",
 				Direction: direction.Up,
 				Content: []byte(`
+						FakeMethodsReceiver
 						V001_init_organizations_up
 						V001_init_users_up
 						V001_some_failing_method_up
@@ -196,21 +170,22 @@ func TestMigrate(t *testing.T) {
 				"V001_init_users_down",
 				"V001_init_organizations_down",
 			},
-			expectedErrors: []error{ &MethodInvocationFailedError{
+			expectedErrors: []error{&MethodInvocationFailedError{
 				MethodName: "V001_some_failing_method_up",
-				Err: SomeError{},
+				Err:        SomeError{},
 			}},
 		},
 		{
-			name: "down migration: failing method causes rollback in rollback mode",
+			name:           "down migration: failing method causes rollback in rollback mode",
 			expectRollback: true,
-			file: file.File {
+			file: file.File{
 				Path:      "/foobar",
 				FileName:  "001_foobar.down.gm",
 				Version:   1,
 				Name:      "foobar",
 				Direction: direction.Down,
 				Content: []byte(`
+						FakeMethodsReceiver
 						V001_init_users_down
 						V001_some_failing_method_down
 						V001_init_organizations_down
@@ -221,18 +196,20 @@ func TestMigrate(t *testing.T) {
 				"V001_some_failing_method_down",
 				"V001_init_users_up",
 			},
-			expectedErrors: []error{ &MethodInvocationFailedError{
+			expectedErrors: []error{&MethodInvocationFailedError{
 				MethodName: "V001_some_failing_method_down",
-				Err: SomeError{},
+				Err:        SomeError{},
 			}},
 		},
-
 	}
+
+	RegisterMethodsReceiver("FakeMethodsReceiver", "")
 
 	for _, c := range cases {
 		migrator := Migrator{}
-		d := &FakeGoMethodsDriver{Migrator: migrator, InvokedMethods:[]string{}}
-		migrator.MigrationMethodsReceiver = d
+		fakeInvoker := &FakeGoMethodsInvoker{InvokedMethods: []string{}}
+
+		migrator.MethodInvoker = fakeInvoker
 		migrator.RollbackOnFailure = c.expectRollback
 
 		pipe := pipep.New()
@@ -243,9 +220,9 @@ func TestMigrate(t *testing.T) {
 		errs := pipep.ReadErrors(pipe)
 
 		var failed bool
-		if !reflect.DeepEqual(d.InvokedMethods, c.expectedInvokedMethods) {
+		if !reflect.DeepEqual(fakeInvoker.InvokedMethods, c.expectedInvokedMethods) {
 			failed = true
-			t.Errorf("case '%s': FAILED\nexpected invoked methods %v\nbut got %v", c.name, c.expectedInvokedMethods, d.InvokedMethods)
+			t.Errorf("case '%s': FAILED\nexpected invoked methods %v\nbut got %v", c.name, c.expectedInvokedMethods, fakeInvoker.InvokedMethods)
 		}
 		if !reflect.DeepEqual(errs, c.expectedErrors) {
 			failed = true
@@ -258,11 +235,9 @@ func TestMigrate(t *testing.T) {
 	}
 }
 
-
-
 func TestGetRollbackToMethod(t *testing.T) {
 	cases := []struct {
-		method string
+		method                 string
 		expectedRollbackMethod string
 	}{
 		{"some_method_up", "some_method_down"},
@@ -282,7 +257,7 @@ func TestGetRollbackToMethod(t *testing.T) {
 }
 
 func TestReverseInPlace(t *testing.T) {
-	methods := []string {
+	methods := []string{
 		"method1_down",
 		"method2_down",
 		"method3_down",
@@ -290,7 +265,7 @@ func TestReverseInPlace(t *testing.T) {
 		"method5_down",
 	}
 
-	expectedReversedMethods := []string {
+	expectedReversedMethods := []string{
 		"method5_down",
 		"method4_down",
 		"method3_down",
@@ -304,4 +279,3 @@ func TestReverseInPlace(t *testing.T) {
 		t.Errorf("Expected reverse methods %v but got %v", expectedReversedMethods, methods)
 	}
 }
-

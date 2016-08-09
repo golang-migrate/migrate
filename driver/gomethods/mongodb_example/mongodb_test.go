@@ -1,4 +1,4 @@
-package usage_examples
+package mongodb_example
 
 import (
 	"testing"
@@ -6,24 +6,24 @@ import (
 	"github.com/dimag-jfrog/migrate/file"
 	"github.com/dimag-jfrog/migrate/migrate/direction"
 
+	"github.com/dimag-jfrog/migrate/driver/gomethods"
+	"github.com/dimag-jfrog/migrate/driver/gomethods/mongodb"
 	pipep "github.com/dimag-jfrog/migrate/pipe"
 	"reflect"
 	"time"
-	"github.com/dimag-jfrog/migrate/driver/gomethods"
 )
 
-
 type ExpectedMigrationResult struct {
-	Organizations []Organization
+	Organizations    []Organization
 	Organizations_v2 []Organization_v2
-	Users []User
-	Errors []error
+	Users            []User
+	Errors           []error
 }
 
 func RunMigrationAndAssertResult(
 	t *testing.T,
 	title string,
-	d *GoMethodsMongoDbDriver,
+	d *mongodb.MongoDbGoMethodsDriver,
 	file file.File,
 	expected *ExpectedMigrationResult) {
 
@@ -53,6 +53,10 @@ func RunMigrationAndAssertResult(
 		t.Fatal("Failed to query Users collection")
 	}
 
+	if !reflect.DeepEqual(expected.Errors, errs) {
+		t.Fatalf("Migration '%s': FAILED\nexpected errors %v\nbut got %v", title, expected.Errors, errs)
+	}
+
 	if !reflect.DeepEqual(expected.Organizations, actualOrganizations) {
 		t.Fatalf("Migration '%s': FAILED\nexpected organizations %v\nbut got %v", title, expected.Organizations, actualOrganizations)
 	}
@@ -65,12 +69,8 @@ func RunMigrationAndAssertResult(
 		t.Fatalf("Migration '%s': FAILED\nexpected users %v\nbut got %v", title, expected.Users, actualUsers)
 
 	}
-	if !reflect.DeepEqual(expected.Errors, errs) {
-		t.Fatalf("Migration '%s': FAILED\nexpected errors %v\nbut got %v", title, expected.Errors, errs)
-	}
 	t.Logf("Migration '%s': PASSED", title)
 }
-
 
 func TestMigrate(t *testing.T) {
 	//host := os.Getenv("MONGODB_PORT_27017_TCP_ADDR")
@@ -79,7 +79,9 @@ func TestMigrate(t *testing.T) {
 	port := "27017"
 	driverUrl := "mongodb://" + host + ":" + port
 
-	d := &GoMethodsMongoDbDriver{}
+	//gomethods.RegisterMethodsReceiver("MyMgoMethodsReceiver", &MyMgoMethodsReceiver{})
+	d := &mongodb.MongoDbGoMethodsDriver{}
+
 	if err := d.Initialize(driverUrl); err != nil {
 		t.Fatal(err)
 	}
@@ -93,8 +95,8 @@ func TestMigrate(t *testing.T) {
 	date3, _ := time.Parse(SHORT_DATE_LAYOUT, "2008-Apr-28")
 
 	migrations := []struct {
-		name string
-		file file.File
+		name           string
+		file           file.File
 		expectedResult ExpectedMigrationResult
 	}{
 		{
@@ -106,15 +108,16 @@ func TestMigrate(t *testing.T) {
 				Name:      "foobar",
 				Direction: direction.Up,
 				Content: []byte(`
+						MyMgoMethodsReceiver
 						V001_init_organizations_up
 						V001_init_users_up
 					`),
 			},
 			expectedResult: ExpectedMigrationResult{
 				Organizations: []Organization{
-					{Id: OrganizationIds[0], Name: "Amazon", Location:"Seattle", DateFounded: date1},
-					{Id: OrganizationIds[1], Name: "Google", Location:"Mountain View", DateFounded: date2},
-					{Id: OrganizationIds[2], Name: "JFrog", Location:"Santa Clara", DateFounded: date3},
+					{Id: OrganizationIds[0], Name: "Amazon", Location: "Seattle", DateFounded: date1},
+					{Id: OrganizationIds[1], Name: "Google", Location: "Mountain View", DateFounded: date2},
+					{Id: OrganizationIds[2], Name: "JFrog", Location: "Santa Clara", DateFounded: date3},
 				},
 				Organizations_v2: []Organization_v2{},
 				Users: []User{
@@ -134,6 +137,7 @@ func TestMigrate(t *testing.T) {
 				Name:      "foobar",
 				Direction: direction.Up,
 				Content: []byte(`
+						MyMgoMethodsReceiver
 						V002_organizations_rename_location_field_to_headquarters_up
 						V002_change_user_cleo_to_cleopatra_up
 					`),
@@ -141,9 +145,9 @@ func TestMigrate(t *testing.T) {
 			expectedResult: ExpectedMigrationResult{
 				Organizations: []Organization{},
 				Organizations_v2: []Organization_v2{
-					{Id: OrganizationIds[0], Name: "Amazon", Headquarters:"Seattle", DateFounded: date1},
-					{Id: OrganizationIds[1], Name: "Google", Headquarters:"Mountain View", DateFounded: date2},
-					{Id: OrganizationIds[2], Name: "JFrog", Headquarters:"Santa Clara", DateFounded: date3},
+					{Id: OrganizationIds[0], Name: "Amazon", Headquarters: "Seattle", DateFounded: date1},
+					{Id: OrganizationIds[1], Name: "Google", Headquarters: "Mountain View", DateFounded: date2},
+					{Id: OrganizationIds[2], Name: "JFrog", Headquarters: "Santa Clara", DateFounded: date3},
 				},
 				Users: []User{
 					{Id: UserIds[0], Name: "Alex"},
@@ -162,15 +166,16 @@ func TestMigrate(t *testing.T) {
 				Name:      "foobar",
 				Direction: direction.Down,
 				Content: []byte(`
+						MyMgoMethodsReceiver
 						V002_change_user_cleo_to_cleopatra_down
 						V002_organizations_rename_location_field_to_headquarters_down
 					`),
 			},
 			expectedResult: ExpectedMigrationResult{
 				Organizations: []Organization{
-					{Id: OrganizationIds[0], Name: "Amazon", Location:"Seattle", DateFounded: date1},
-					{Id: OrganizationIds[1], Name: "Google", Location:"Mountain View", DateFounded: date2},
-					{Id: OrganizationIds[2], Name: "JFrog", Location:"Santa Clara", DateFounded: date3},
+					{Id: OrganizationIds[0], Name: "Amazon", Location: "Seattle", DateFounded: date1},
+					{Id: OrganizationIds[1], Name: "Google", Location: "Mountain View", DateFounded: date2},
+					{Id: OrganizationIds[2], Name: "JFrog", Location: "Santa Clara", DateFounded: date3},
 				},
 				Organizations_v2: []Organization_v2{},
 				Users: []User{
@@ -190,15 +195,16 @@ func TestMigrate(t *testing.T) {
 				Name:      "foobar",
 				Direction: direction.Down,
 				Content: []byte(`
+						MyMgoMethodsReceiver
 						V001_init_users_down
 						V001_init_organizations_down
 					`),
 			},
 			expectedResult: ExpectedMigrationResult{
-				Organizations: []Organization{},
+				Organizations:    []Organization{},
 				Organizations_v2: []Organization_v2{},
-				Users: []User{},
-				Errors: []error{},
+				Users:            []User{},
+				Errors:           []error{},
 			},
 		},
 		{
@@ -210,16 +216,37 @@ func TestMigrate(t *testing.T) {
 				Name:      "foobar",
 				Direction: direction.Up,
 				Content: []byte(`
+						MyMgoMethodsReceiver
 						V001_init_organizations_up
 						V001_init_users_up
 						v001_non_existing_method_up
 					`),
 			},
 			expectedResult: ExpectedMigrationResult{
-				Organizations: []Organization{},
+				Organizations:    []Organization{},
 				Organizations_v2: []Organization_v2{},
-				Users: []User{},
-				Errors: []error{ gomethods.MissingMethodError("v001_non_existing_method_up") },
+				Users:            []User{},
+				Errors:           []error{gomethods.MissingMethodError("v001_non_existing_method_up")},
+			},
+		},
+		{
+			name: "v0 -> v1: not defined message receiver",
+			file: file.File{
+				Path:      "/foobar",
+				FileName:  "001_foobar.up.gm",
+				Version:   1,
+				Name:      "foobar",
+				Direction: direction.Up,
+				Content: []byte(`
+						V001_init_organizations_up
+						V001_init_users_up
+					`),
+			},
+			expectedResult: ExpectedMigrationResult{
+				Organizations:    []Organization{},
+				Organizations_v2: []Organization_v2{},
+				Users:            []User{},
+				Errors:           []error{gomethods.UnregisteredMethodsReceiverError("V001_init_organizations_up")},
 			},
 		},
 	}
