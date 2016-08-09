@@ -14,7 +14,7 @@ type FakeGoMethodsInvoker struct {
 	InvokedMethods []string
 }
 
-func (invoker *FakeGoMethodsInvoker) IsValid(methodName string, methodReceiver interface{}) bool {
+func (invoker *FakeGoMethodsInvoker) IsValid(methodName string) bool {
 	if methodName == "V001_some_non_existing_method_up" {
 		return false
 	}
@@ -22,7 +22,7 @@ func (invoker *FakeGoMethodsInvoker) IsValid(methodName string, methodReceiver i
 	return true
 }
 
-func (invoker *FakeGoMethodsInvoker) Invoke(methodName string, methodReceiver interface{}) error {
+func (invoker *FakeGoMethodsInvoker) Invoke(methodName string) error {
 	invoker.InvokedMethods = append(invoker.InvokedMethods, methodName)
 
 	if methodName == "V001_some_failing_method_up" || methodName == "V001_some_failing_method_down" {
@@ -56,7 +56,6 @@ func TestMigrate(t *testing.T) {
 				Name:      "foobar",
 				Direction: direction.Up,
 				Content: []byte(`
-				                FakeMethodsReceiver
 						V001_init_organizations_up
 						V001_init_users_up
 					`),
@@ -73,7 +72,6 @@ func TestMigrate(t *testing.T) {
 				Name:      "foobar",
 				Direction: direction.Down,
 				Content: []byte(`
-						FakeMethodsReceiver
 						V001_init_users_down
 						V001_init_organizations_down
 					`),
@@ -90,7 +88,6 @@ func TestMigrate(t *testing.T) {
 				Name:      "foobar",
 				Direction: direction.Up,
 				Content: []byte(`
-						FakeMethodsReceiver
 						V001_init_organizations_up
 						V001_init_users_up
 						V001_some_non_existing_method_up
@@ -108,7 +105,6 @@ func TestMigrate(t *testing.T) {
 				Name:      "foobar",
 				Direction: direction.Up,
 				Content: []byte(`
-						FakeMethodsReceiver
 						V001_init_organizations_up
 						V001_some_failing_method_up
 						V001_init_users_up
@@ -132,7 +128,6 @@ func TestMigrate(t *testing.T) {
 				Name:      "foobar",
 				Direction: direction.Down,
 				Content: []byte(`
-						FakeMethodsReceiver
 						V001_init_users_down
 						V001_some_failing_method_down
 						V001_init_organizations_down
@@ -157,7 +152,6 @@ func TestMigrate(t *testing.T) {
 				Name:      "foobar",
 				Direction: direction.Up,
 				Content: []byte(`
-						FakeMethodsReceiver
 						V001_init_organizations_up
 						V001_init_users_up
 						V001_some_failing_method_up
@@ -185,7 +179,6 @@ func TestMigrate(t *testing.T) {
 				Name:      "foobar",
 				Direction: direction.Down,
 				Content: []byte(`
-						FakeMethodsReceiver
 						V001_init_users_down
 						V001_some_failing_method_down
 						V001_init_organizations_down
@@ -202,8 +195,6 @@ func TestMigrate(t *testing.T) {
 			}},
 		},
 	}
-
-	RegisterMethodsReceiver("FakeMethodsReceiver", "")
 
 	for _, c := range cases {
 		migrator := Migrator{}

@@ -12,14 +12,46 @@ import (
 	"strings"
 )
 
-const MIGRATE_DB = "db_migrations"
+type UnregisteredMethodsReceiverError string
+
+func (e UnregisteredMethodsReceiverError) Error() string {
+	return "Unregistered methods receiver for driver: " + string(e)
+}
+
+type WrongMethodsReceiverTypeError string
+
+func (e WrongMethodsReceiverTypeError) Error() string {
+	return "Wrong methods receiver type for driver: " + string(e)
+}
+
 const MIGRATE_C = "db_migrations"
+const DRIVER_NAME = "gomethods.mongodb"
 
 type MongoDbGoMethodsDriver struct {
 	Session *mgo.Session
-	DbName  string
 
-	migrator gomethods.Migrator
+	methodsReceiver MethodsReceiver
+	migrator        gomethods.Migrator
+}
+
+var _ gomethods.GoMethodsDriver = (*MongoDbGoMethodsDriver)(nil)
+
+type MethodsReceiver interface {
+	DbName() string
+}
+
+func (d *MongoDbGoMethodsDriver) MethodsReceiver() interface{} {
+	return d.methodsReceiver
+}
+
+func (d *MongoDbGoMethodsDriver) SetMethodsReceiver(r interface{}) error {
+	r1, ok := r.(MethodsReceiver)
+	if !ok {
+		return WrongMethodsReceiverTypeError(DRIVER_NAME)
+	}
+
+	d.methodsReceiver = r1
+	return nil
 }
 
 func init() {
@@ -32,6 +64,10 @@ type DbMigration struct {
 }
 
 func (driver *MongoDbGoMethodsDriver) Initialize(url string) error {
+	if driver.methodsReceiver == nil {
+		return UnregisteredMethodsReceiverError(DRIVER_NAME)
+	}
+
 	urlWithoutScheme := strings.SplitN(url, "mongodb://", 2)
 	if len(urlWithoutScheme) != 2 {
 		return errors.New("invalid mongodb:// scheme")
@@ -44,7 +80,6 @@ func (driver *MongoDbGoMethodsDriver) Initialize(url string) error {
 	session.SetMode(mgo.Monotonic, true)
 
 	driver.Session = session
-	driver.DbName = MIGRATE_DB
 	driver.migrator = gomethods.Migrator{MethodInvoker: driver}
 
 	return nil
@@ -63,7 +98,7 @@ func (driver *MongoDbGoMethodsDriver) FilenameExtension() string {
 
 func (driver *MongoDbGoMethodsDriver) Version() (uint64, error) {
 	var latestMigration DbMigration
-	c := driver.Session.DB(driver.DbName).C(MIGRATE_C)
+	c := driver.Session.DB(driver.methodsReceiver.DbName()).C(MIGRATE_C)
 
 	err := c.Find(bson.M{}).Sort("-version").One(&latestMigration)
 
@@ -85,7 +120,7 @@ func (driver *MongoDbGoMethodsDriver) Migrate(f file.File, pipe chan interface{}
 		return
 	}
 
-	migrate_c := driver.Session.DB(driver.DbName).C(MIGRATE_C)
+	migrate_c := driver.Session.DB(driver.methodsReceiver.DbName()).C(MIGRATE_C)
 
 	if f.Direction == direction.Up {
 		id := bson.NewObjectId()
@@ -106,13 +141,13 @@ func (driver *MongoDbGoMethodsDriver) Migrate(f file.File, pipe chan interface{}
 	}
 }
 
-func (driver *MongoDbGoMethodsDriver) IsValid(methodName string, methodsReceiver interface{}) bool {
-	return reflect.ValueOf(methodsReceiver).MethodByName(methodName).IsValid()
+func (driver *MongoDbGoMethodsDriver) IsValid(methodName string) bool {
+	return reflect.ValueOf(driver.methodsReceiver).MethodByName(methodName).IsValid()
 }
 
-func (driver *MongoDbGoMethodsDriver) Invoke(methodName string, methodsReceiver interface{}) error {
+func (driver *MongoDbGoMethodsDriver) Invoke(methodName string) error {
 	name := methodName
-	migrateMethod := reflect.ValueOf(methodsReceiver).MethodByName(name)
+	migrateMethod := reflect.ValueOf(driver.methodsReceiver).MethodByName(name)
 	if !migrateMethod.IsValid() {
 		return gomethods.MissingMethodError(methodName)
 	}

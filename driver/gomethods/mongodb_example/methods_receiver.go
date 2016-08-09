@@ -2,6 +2,8 @@ package mongodb_example
 
 import (
 	"github.com/dimag-jfrog/migrate/driver/gomethods"
+	_ "github.com/dimag-jfrog/migrate/driver/gomethods"
+	"github.com/dimag-jfrog/migrate/driver/gomethods/mongodb"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"time"
@@ -10,16 +12,24 @@ import (
 type MyMgoMethodsReceiver struct {
 }
 
+func (r *MyMgoMethodsReceiver) DbName() string {
+	return DB_NAME
+}
+
+var _ mongodb.MethodsReceiver = (*MyMgoMethodsReceiver)(nil)
+
 func init() {
-	gomethods.RegisterMethodsReceiver("MyMgoMethodsReceiver", &MyMgoMethodsReceiver{})
+	gomethods.RegisterMethodsReceiverForDriver("mongodb", &MyMgoMethodsReceiver{})
 }
 
 // Here goes the specific mongodb golang methods driver logic
 
-const DB_NAME = "test"
-const SHORT_DATE_LAYOUT = "2000-Jan-01"
-const USERS_C = "users"
-const ORGANIZATIONS_C = "organizations"
+const (
+	DB_NAME           = "test"
+	SHORT_DATE_LAYOUT = "2000-Jan-01"
+	USERS_C           = "users"
+	ORGANIZATIONS_C   = "organizations"
+)
 
 type Organization struct {
 	Id          bson.ObjectId `bson:"_id,omitempty"`

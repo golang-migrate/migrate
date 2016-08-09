@@ -1,21 +1,14 @@
 package gomethods
 
 import (
-	//"bytes"
 	"bufio"
-	"database/sql/driver"
 	"fmt"
+	"github.com/dimag-jfrog/migrate/driver"
 	"github.com/dimag-jfrog/migrate/file"
 	"os"
 	"path"
 	"strings"
 )
-
-type UnregisteredMethodsReceiverError string
-
-func (e UnregisteredMethodsReceiverError) Error() string {
-	return "Unregistered methods receiver: " + string(e)
-}
 
 type MissingMethodError string
 
@@ -37,13 +30,16 @@ func (e *MethodInvocationFailedError) Error() string {
 }
 
 type MigrationMethodInvoker interface {
-	IsValid(methodName string, methodReceiver interface{}) bool
-	Invoke(methodName string, methodReceiver interface{}) error
+	IsValid(methodName string) bool
+	Invoke(methodName string) error
 }
 
 type GoMethodsDriver interface {
 	driver.Driver
+
 	MigrationMethodInvoker
+	MethodsReceiver() interface{}
+	SetMethodsReceiver(r interface{}) error
 }
 
 type Migrator struct {
@@ -52,7 +48,7 @@ type Migrator struct {
 }
 
 func (m *Migrator) Migrate(f file.File, pipe chan interface{}) error {
-	methods, methodsReceiver, err := m.getMigrationMethods(f)
+	methods, err := m.getMigrationMethods(f)
 	if err != nil {
 		pipe <- err
 		return err
@@ -60,7 +56,7 @@ func (m *Migrator) Migrate(f file.File, pipe chan interface{}) error {
 
 	for i, methodName := range methods {
 		pipe <- methodName
-		err := m.MethodInvoker.Invoke(methodName, methodsReceiver)
+		err := m.MethodInvoker.Invoke(methodName)
 		if err != nil {
 			pipe <- err
 			if !m.RollbackOnFailure {
@@ -71,12 +67,12 @@ func (m *Migrator) Migrate(f file.File, pipe chan interface{}) error {
 			for j := i - 1; j >= 0; j-- {
 				rollbackToMethodName := getRollbackToMethod(methods[j])
 				if rollbackToMethodName == "" ||
-					!m.MethodInvoker.IsValid(rollbackToMethodName, methodsReceiver) {
+					!m.MethodInvoker.IsValid(rollbackToMethodName) {
 					continue
 				}
 
 				pipe <- rollbackToMethodName
-				err = m.MethodInvoker.Invoke(rollbackToMethodName, methodsReceiver)
+				err = m.MethodInvoker.Invoke(rollbackToMethodName)
 				if err != nil {
 					pipe <- err
 					break
@@ -122,20 +118,17 @@ func getFileLines(file file.File) ([]string, error) {
 		}
 		return lines, nil
 	} else {
-		//n := bytes.IndexByte(file.Content, 0)
-		//n := bytes.Index(file.Content, []byte{0})
-		//s := string(file.Content[:n])
 		s := string(file.Content)
 		return strings.Split(s, "\n"), nil
 	}
 }
 
-func (m *Migrator) getMigrationMethods(f file.File) (methods []string, methodsReceiver interface{}, err error) {
+func (m *Migrator) getMigrationMethods(f file.File) (methods []string, err error) {
 	var lines []string
 
 	lines, err = getFileLines(f)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	for _, line := range lines {
@@ -146,24 +139,14 @@ func (m *Migrator) getMigrationMethods(f file.File) (methods []string, methodsRe
 			continue
 		}
 
-		if methodsReceiver == nil {
-			receiverName := line
-			methodsReceiver = GetMethodsReceiver(receiverName)
-			if methodsReceiver == nil {
-				return nil, nil, UnregisteredMethodsReceiverError(receiverName)
-			}
-			continue
-
-		} else {
-			methodName := line
-			if !m.MethodInvoker.IsValid(methodName, methodsReceiver) {
-				return nil, nil, MissingMethodError(methodName)
-			}
-
-			methods = append(methods, methodName)
+		methodName := line
+		if !m.MethodInvoker.IsValid(methodName) {
+			return nil, MissingMethodError(methodName)
 		}
+
+		methods = append(methods, methodName)
 	}
 
-	return methods, methodsReceiver, nil
+	return methods, nil
 
 }
