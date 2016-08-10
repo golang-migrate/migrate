@@ -141,8 +141,19 @@ func (driver *MongoDbGoMethodsDriver) Migrate(f file.File, pipe chan interface{}
 	}
 }
 
-func (driver *MongoDbGoMethodsDriver) IsValid(methodName string) bool {
-	return reflect.ValueOf(driver.methodsReceiver).MethodByName(methodName).IsValid()
+func (driver *MongoDbGoMethodsDriver) Validate(methodName string) error {
+	method := reflect.ValueOf(driver.methodsReceiver).MethodByName(methodName)
+	if !method.IsValid() {
+		return gomethods.MissingMethodError(methodName)
+	}
+
+	methodTemplate := func(*mgo.Session) error { return nil }
+
+	if method.Type() != reflect.TypeOf(methodTemplate) {
+		return gomethods.WrongMethodSignatureError(methodName)
+	}
+
+	return nil
 }
 
 func (driver *MongoDbGoMethodsDriver) Invoke(methodName string) error {

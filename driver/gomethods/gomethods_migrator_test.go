@@ -14,12 +14,12 @@ type FakeGoMethodsInvoker struct {
 	InvokedMethods []string
 }
 
-func (invoker *FakeGoMethodsInvoker) IsValid(methodName string) bool {
+func (invoker *FakeGoMethodsInvoker) Validate(methodName string) error {
 	if methodName == "V001_some_non_existing_method_up" {
-		return false
+		return MissingMethodError(methodName)
 	}
 
-	return true
+	return nil
 }
 
 func (invoker *FakeGoMethodsInvoker) Invoke(methodName string) error {
@@ -30,9 +30,8 @@ func (invoker *FakeGoMethodsInvoker) Invoke(methodName string) error {
 			MethodName: methodName,
 			Err:        SomeError{},
 		}
-	} else {
-		return nil
 	}
+	return nil
 }
 
 type SomeError struct{}

@@ -215,7 +215,7 @@ func TestMigrate(t *testing.T) {
 			},
 		},
 		{
-			name: "v0 -> v1: with error",
+			name: "v0 -> v1: missing method aborts migration",
 			file: file.File{
 				Path:      "/foobar",
 				FileName:  "001_foobar.up.gm",
@@ -233,6 +233,48 @@ func TestMigrate(t *testing.T) {
 				Organizations_v2: []Organization_v2{},
 				Users:            []User{},
 				Errors:           []error{gomethods.MissingMethodError("v001_non_existing_method_up")},
+			},
+		},
+		{
+			name: "v0 -> v1: wrong signature method aborts migration",
+			file: file.File{
+				Path:      "/foobar",
+				FileName:  "001_foobar.up.gm",
+				Version:   1,
+				Name:      "foobar",
+				Direction: direction.Up,
+				Content: []byte(`
+						V001_init_organizations_up
+						V001_method_with_wrong_signature_up
+						V001_init_users_up
+					`),
+			},
+			expectedResult: ExpectedMigrationResult{
+				Organizations:    []Organization{},
+				Organizations_v2: []Organization_v2{},
+				Users:            []User{},
+				Errors:           []error{gomethods.WrongMethodSignatureError("V001_method_with_wrong_signature_up")},
+			},
+		},
+		{
+			name: "v1 -> v0: wrong signature method aborts migration",
+			file: file.File{
+				Path:      "/foobar",
+				FileName:  "001_foobar.down.gm",
+				Version:   1,
+				Name:      "foobar",
+				Direction: direction.Down,
+				Content: []byte(`
+						V001_init_users_down
+						V001_method_with_wrong_signature_down
+						V001_init_organizations_down
+					`),
+			},
+			expectedResult: ExpectedMigrationResult{
+				Organizations:    []Organization{},
+				Organizations_v2: []Organization_v2{},
+				Users:            []User{},
+				Errors:           []error{gomethods.WrongMethodSignatureError("V001_method_with_wrong_signature_down")},
 			},
 		},
 	}
