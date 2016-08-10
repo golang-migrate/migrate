@@ -137,3 +137,12 @@ func (r *MyMgoMethodsReceiver) V002_change_user_cleo_to_cleopatra_down(session *
 
 	return c.Update(colQuerier, change)
 }
+
+// Wrong signature methods for testing
+func (r *MyMgoMethodsReceiver) V001_method_with_wrong_signature_up(s string) error {
+	return nil
+}
+
+func (r *MyMgoMethodsReceiver) V001_method_with_wrong_signature_down(session *mgo.Session) (bool, error) {
+	return true, nil
+}

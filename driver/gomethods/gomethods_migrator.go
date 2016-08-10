@@ -17,7 +17,7 @@ func (e MissingMethodError) Error() string { return "Non existing migrate method
 type WrongMethodSignatureError string
 
 func (e WrongMethodSignatureError) Error() string {
-	return fmt.Sprintf("Method %s has wrong signature", e)
+	return fmt.Sprintf("Method %s has wrong signature", string(e))
 }
 
 type MethodInvocationFailedError struct {
@@ -30,7 +30,7 @@ func (e *MethodInvocationFailedError) Error() string {
 }
 
 type MigrationMethodInvoker interface {
-	IsValid(methodName string) bool
+	Validate(methodName string) error
 	Invoke(methodName string) error
 }
 
@@ -66,8 +66,10 @@ func (m *Migrator) Migrate(f file.File, pipe chan interface{}) error {
 			// on failure, try to rollback methods in this migration
 			for j := i - 1; j >= 0; j-- {
 				rollbackToMethodName := getRollbackToMethod(methods[j])
-				if rollbackToMethodName == "" ||
-					!m.MethodInvoker.IsValid(rollbackToMethodName) {
+				if rollbackToMethodName == "" {
+					continue
+				}
+				if err := m.MethodInvoker.Validate(rollbackToMethodName); err != nil {
 					continue
 				}
 
@@ -140,8 +142,8 @@ func (m *Migrator) getMigrationMethods(f file.File) (methods []string, err error
 		}
 
 		methodName := line
-		if !m.MethodInvoker.IsValid(methodName) {
-			return nil, MissingMethodError(methodName)
+		if err := m.MethodInvoker.Validate(methodName); err != nil {
+			return nil, err
 		}
 
 		methods = append(methods, methodName)
