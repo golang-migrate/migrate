@@ -26,4 +26,4 @@ mysql:
 cassandra:
   image: cassandra:2.2
 mongo:
-  image: mongo
+  image: mongo:3.2.6
