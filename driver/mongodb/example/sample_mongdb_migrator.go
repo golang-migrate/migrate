@@ -23,7 +23,7 @@ func init() {
 	gomethods.RegisterMethodsReceiverForDriver("mongodb", &SampleMongoDbMigrator{})
 }
 
-// Here goes the specific mongodb golang methods driver logic
+// Here goes the specific mongodb golang methods migration logic
 
 const (
 	DB_NAME           = "test"
