@@ -220,7 +220,7 @@ func TestMigrate(t *testing.T) {
 
 		}
 		if !failed {
-			t.Logf("case '%s': PASSED", c.name)
+			//t.Logf("case '%s': PASSED", c.name)
 		}
 	}
 }
@@ -243,29 +243,5 @@ func TestGetRollbackToMethod(t *testing.T) {
 		if actualRollbackMethod != c.expectedRollbackMethod {
 			t.Errorf("Expected rollback method to be %s but got %s", c.expectedRollbackMethod, actualRollbackMethod)
 		}
-	}
-}
-
-func TestReverseInPlace(t *testing.T) {
-	methods := []string{
-		"method1_down",
-		"method2_down",
-		"method3_down",
-		"method4_down",
-		"method5_down",
-	}
-
-	expectedReversedMethods := []string{
-		"method5_down",
-		"method4_down",
-		"method3_down",
-		"method2_down",
-		"method1_down",
-	}
-
-	reverseInPlace(methods)
-
-	if !reflect.DeepEqual(methods, expectedReversedMethods) {
-		t.Errorf("Expected reverse methods %v but got %v", expectedReversedMethods, methods)
 	}
 }

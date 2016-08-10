@@ -87,13 +87,6 @@ func (m *Migrator) Migrate(f file.File, pipe chan interface{}) error {
 	return nil
 }
 
-func reverseInPlace(a []string) {
-	for i := 0; i < len(a)/2; i++ {
-		j := len(a) - i - 1
-		a[i], a[j] = a[j], a[i]
-	}
-}
-
 func getRollbackToMethod(methodName string) string {
 	if strings.HasSuffix(methodName, "_up") {
 		return strings.TrimSuffix(methodName, "_up") + "_down"

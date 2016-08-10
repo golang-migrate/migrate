@@ -1,4 +1,4 @@
-package mongodb_example
+package example
 
 import (
 	"testing"
@@ -7,9 +7,10 @@ import (
 	"github.com/dimag-jfrog/migrate/migrate/direction"
 
 	"github.com/dimag-jfrog/migrate/driver"
-	"github.com/dimag-jfrog/migrate/driver/gomethods"
-	"github.com/dimag-jfrog/migrate/driver/gomethods/mongodb"
+	"github.com/dimag-jfrog/migrate/driver/mongodb"
+	"github.com/dimag-jfrog/migrate/driver/mongodb/gomethods"
 	pipep "github.com/dimag-jfrog/migrate/pipe"
+	"os"
 	"reflect"
 	"time"
 )
@@ -24,7 +25,7 @@ type ExpectedMigrationResult struct {
 func RunMigrationAndAssertResult(
 	t *testing.T,
 	title string,
-	d *mongodb.MongoDbGoMethodsDriver,
+	d *mongodb.Driver,
 	file file.File,
 	expected *ExpectedMigrationResult) {
 
@@ -70,7 +71,7 @@ func RunMigrationAndAssertResult(
 		t.Fatalf("Migration '%s': FAILED\nexpected users %v\nbut got %v", title, expected.Users, actualUsers)
 
 	}
-	t.Logf("Migration '%s': PASSED", title)
+	// t.Logf("Migration '%s': PASSED", title)
 }
 
 func TestMigrate(t *testing.T) {
@@ -80,14 +81,13 @@ func TestMigrate(t *testing.T) {
 		}
 	}()
 
-	//host := os.Getenv("MONGODB_PORT_27017_TCP_ADDR")
-	//port := os.Getenv("MONGODB_PORT_27017_TCP_PORT")
-	host := "127.0.0.1"
-	port := "27017"
+	host := os.Getenv("MONGO_PORT_27017_TCP_ADDR")
+	port := os.Getenv("MONGO_PORT_27017_TCP_PORT")
+
 	driverUrl := "mongodb://" + host + ":" + port
 
 	d0 := driver.GetDriver("mongodb")
-	d, ok := d0.(*mongodb.MongoDbGoMethodsDriver)
+	d, ok := d0.(*mongodb.Driver)
 	if !ok {
 		t.Fatal("MongoDbGoMethodsDriver has not registered")
 	}
