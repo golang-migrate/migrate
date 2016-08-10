@@ -236,6 +236,27 @@ func TestMigrate(t *testing.T) {
 			},
 		},
 		{
+			name: "v0 -> v1: not exported method aborts migration",
+			file: file.File{
+				Path:      "/foobar",
+				FileName:  "001_foobar.up.gm",
+				Version:   1,
+				Name:      "foobar",
+				Direction: direction.Up,
+				Content: []byte(`
+						V001_init_organizations_up
+						v001_not_exported_method_up
+						V001_init_users_up
+					`),
+			},
+			expectedResult: ExpectedMigrationResult{
+				Organizations:    []Organization{},
+				Organizations_v2: []Organization_v2{},
+				Users:            []User{},
+				Errors:           []error{gomethods.MethodNotExportedError("v001_not_exported_method_up")},
+			},
+		},
+		{
 			name: "v0 -> v1: wrong signature method aborts migration",
 			file: file.File{
 				Path:      "/foobar",

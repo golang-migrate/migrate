@@ -20,6 +20,12 @@ func (e WrongMethodSignatureError) Error() string {
 	return fmt.Sprintf("Method %s has wrong signature", string(e))
 }
 
+type MethodNotExportedError string
+
+func (e MethodNotExportedError) Error() string {
+	return fmt.Sprintf("Method %s is not exported", string(e))
+}
+
 type MethodInvocationFailedError struct {
 	MethodName string
 	Err        error

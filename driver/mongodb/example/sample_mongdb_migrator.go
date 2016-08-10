@@ -140,6 +140,10 @@ func (r *SampleMongoDbMigrator) V002_change_user_cleo_to_cleopatra_down(session 
 }
 
 // Wrong signature methods for testing
+func (r *SampleMongoDbMigrator) v001_not_exported_method_up(session *mgo.Session) error {
+	return nil
+}
+
 func (r *SampleMongoDbMigrator) V001_method_with_wrong_signature_up(s string) error {
 	return nil
 }

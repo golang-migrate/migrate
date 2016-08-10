@@ -142,14 +142,18 @@ func (driver *Driver) Migrate(f file.File, pipe chan interface{}) {
 }
 
 func (driver *Driver) Validate(methodName string) error {
-	method := reflect.ValueOf(driver.methodsReceiver).MethodByName(methodName)
-	if !method.IsValid() {
+	methodWithReceiver, ok := reflect.TypeOf(driver.methodsReceiver).MethodByName(methodName)
+	if !ok {
 		return gomethods.MissingMethodError(methodName)
 	}
+	if methodWithReceiver.PkgPath != "" {
+		return gomethods.MethodNotExportedError(methodName)
+	}
 
+	methodFunc := reflect.ValueOf(driver.methodsReceiver).MethodByName(methodName)
 	methodTemplate := func(*mgo.Session) error { return nil }
 
-	if method.Type() != reflect.TypeOf(methodTemplate) {
+	if methodFunc.Type() != reflect.TypeOf(methodTemplate) {
 		return gomethods.WrongMethodSignatureError(methodName)
 	}
 
