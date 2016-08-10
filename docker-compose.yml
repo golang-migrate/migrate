@@ -1,6 +1,6 @@
 go: &go
   image: golang
-  working_dir: /go/src/github.com/mattes/migrate
+  working_dir: /go/src/github.com/dimag-jfrog/migrate
   volumes:
     - $GOPATH:/go
 go-test:
@@ -11,6 +11,7 @@ go-test:
     - mysql
     - cassandra
     - crate
+    - mongo
 go-build:
   <<: *go
   command: sh -c 'go get -v && go build -ldflags ''-s'' -o migrater'
@@ -27,3 +28,6 @@ cassandra:
   image: cassandra:2.2
 crate:
   image: crate
+mongo:
+  image: mongo
+

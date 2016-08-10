@@ -1,25 +1,26 @@
-package mongodb_example
+package example
 
 import (
-	"github.com/dimag-jfrog/migrate/driver/gomethods"
-	_ "github.com/dimag-jfrog/migrate/driver/gomethods"
-	"github.com/dimag-jfrog/migrate/driver/gomethods/mongodb"
+	"github.com/dimag-jfrog/migrate/driver/mongodb/gomethods"
+	_ "github.com/dimag-jfrog/migrate/driver/mongodb/gomethods"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"time"
+
+	"github.com/dimag-jfrog/migrate/driver/mongodb"
 )
 
-type MyMgoMethodsReceiver struct {
+type SampleMongoDbMigrator struct {
 }
 
-func (r *MyMgoMethodsReceiver) DbName() string {
+func (r *SampleMongoDbMigrator) DbName() string {
 	return DB_NAME
 }
 
-var _ mongodb.MethodsReceiver = (*MyMgoMethodsReceiver)(nil)
+var _ mongodb.MethodsReceiver = (*SampleMongoDbMigrator)(nil)
 
 func init() {
-	gomethods.RegisterMethodsReceiverForDriver("mongodb", &MyMgoMethodsReceiver{})
+	gomethods.RegisterMethodsReceiverForDriver("mongodb", &SampleMongoDbMigrator{})
 }
 
 // Here goes the specific mongodb golang methods driver logic
@@ -62,7 +63,7 @@ var UserIds []bson.ObjectId = []bson.ObjectId{
 	bson.NewObjectId(),
 }
 
-func (r *MyMgoMethodsReceiver) V001_init_organizations_up(session *mgo.Session) error {
+func (r *SampleMongoDbMigrator) V001_init_organizations_up(session *mgo.Session) error {
 	date1, _ := time.Parse(SHORT_DATE_LAYOUT, "1994-Jul-05")
 	date2, _ := time.Parse(SHORT_DATE_LAYOUT, "1998-Sep-04")
 	date3, _ := time.Parse(SHORT_DATE_LAYOUT, "2008-Apr-28")
@@ -82,11 +83,11 @@ func (r *MyMgoMethodsReceiver) V001_init_organizations_up(session *mgo.Session) 
 	return nil
 }
 
-func (r *MyMgoMethodsReceiver) V001_init_organizations_down(session *mgo.Session) error {
+func (r *SampleMongoDbMigrator) V001_init_organizations_down(session *mgo.Session) error {
 	return session.DB(DB_NAME).C(ORGANIZATIONS_C).DropCollection()
 }
 
-func (r *MyMgoMethodsReceiver) V001_init_users_up(session *mgo.Session) error {
+func (r *SampleMongoDbMigrator) V001_init_users_up(session *mgo.Session) error {
 	users := []User{
 		{Id: UserIds[0], Name: "Alex"},
 		{Id: UserIds[1], Name: "Beatrice"},
@@ -102,25 +103,25 @@ func (r *MyMgoMethodsReceiver) V001_init_users_up(session *mgo.Session) error {
 	return nil
 }
 
-func (r *MyMgoMethodsReceiver) V001_init_users_down(session *mgo.Session) error {
+func (r *SampleMongoDbMigrator) V001_init_users_down(session *mgo.Session) error {
 	return session.DB(DB_NAME).C(USERS_C).DropCollection()
 }
 
-func (r *MyMgoMethodsReceiver) V002_organizations_rename_location_field_to_headquarters_up(session *mgo.Session) error {
+func (r *SampleMongoDbMigrator) V002_organizations_rename_location_field_to_headquarters_up(session *mgo.Session) error {
 	c := session.DB(DB_NAME).C(ORGANIZATIONS_C)
 
 	_, err := c.UpdateAll(nil, bson.M{"$rename": bson.M{"location": "headquarters"}})
 	return err
 }
 
-func (r *MyMgoMethodsReceiver) V002_organizations_rename_location_field_to_headquarters_down(session *mgo.Session) error {
+func (r *SampleMongoDbMigrator) V002_organizations_rename_location_field_to_headquarters_down(session *mgo.Session) error {
 	c := session.DB(DB_NAME).C(ORGANIZATIONS_C)
 
 	_, err := c.UpdateAll(nil, bson.M{"$rename": bson.M{"headquarters": "location"}})
 	return err
 }
 
-func (r *MyMgoMethodsReceiver) V002_change_user_cleo_to_cleopatra_up(session *mgo.Session) error {
+func (r *SampleMongoDbMigrator) V002_change_user_cleo_to_cleopatra_up(session *mgo.Session) error {
 	c := session.DB(DB_NAME).C(USERS_C)
 
 	colQuerier := bson.M{"name": "Cleo"}
@@ -129,7 +130,7 @@ func (r *MyMgoMethodsReceiver) V002_change_user_cleo_to_cleopatra_up(session *mg
 	return c.Update(colQuerier, change)
 }
 
-func (r *MyMgoMethodsReceiver) V002_change_user_cleo_to_cleopatra_down(session *mgo.Session) error {
+func (r *SampleMongoDbMigrator) V002_change_user_cleo_to_cleopatra_down(session *mgo.Session) error {
 	c := session.DB(DB_NAME).C(USERS_C)
 
 	colQuerier := bson.M{"name": "Cleopatra"}
@@ -139,10 +140,10 @@ func (r *MyMgoMethodsReceiver) V002_change_user_cleo_to_cleopatra_down(session *
 }
 
 // Wrong signature methods for testing
-func (r *MyMgoMethodsReceiver) V001_method_with_wrong_signature_up(s string) error {
+func (r *SampleMongoDbMigrator) V001_method_with_wrong_signature_up(s string) error {
 	return nil
 }
 
-func (r *MyMgoMethodsReceiver) V001_method_with_wrong_signature_down(session *mgo.Session) (bool, error) {
+func (r *SampleMongoDbMigrator) V001_method_with_wrong_signature_down(session *mgo.Session) (bool, error) {
 	return true, nil
 }

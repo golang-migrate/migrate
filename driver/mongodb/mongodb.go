@@ -3,7 +3,7 @@ package mongodb
 import (
 	"errors"
 	"github.com/dimag-jfrog/migrate/driver"
-	"github.com/dimag-jfrog/migrate/driver/gomethods"
+	"github.com/dimag-jfrog/migrate/driver/mongodb/gomethods"
 	"github.com/dimag-jfrog/migrate/file"
 	"github.com/dimag-jfrog/migrate/migrate/direction"
 	"gopkg.in/mgo.v2"
@@ -27,24 +27,24 @@ func (e WrongMethodsReceiverTypeError) Error() string {
 const MIGRATE_C = "db_migrations"
 const DRIVER_NAME = "gomethods.mongodb"
 
-type MongoDbGoMethodsDriver struct {
+type Driver struct {
 	Session *mgo.Session
 
 	methodsReceiver MethodsReceiver
 	migrator        gomethods.Migrator
 }
 
-var _ gomethods.GoMethodsDriver = (*MongoDbGoMethodsDriver)(nil)
+var _ gomethods.GoMethodsDriver = (*Driver)(nil)
 
 type MethodsReceiver interface {
 	DbName() string
 }
 
-func (d *MongoDbGoMethodsDriver) MethodsReceiver() interface{} {
+func (d *Driver) MethodsReceiver() interface{} {
 	return d.methodsReceiver
 }
 
-func (d *MongoDbGoMethodsDriver) SetMethodsReceiver(r interface{}) error {
+func (d *Driver) SetMethodsReceiver(r interface{}) error {
 	r1, ok := r.(MethodsReceiver)
 	if !ok {
 		return WrongMethodsReceiverTypeError(DRIVER_NAME)
@@ -55,7 +55,7 @@ func (d *MongoDbGoMethodsDriver) SetMethodsReceiver(r interface{}) error {
 }
 
 func init() {
-	driver.RegisterDriver("mongodb", &MongoDbGoMethodsDriver{})
+	driver.RegisterDriver("mongodb", &Driver{})
 }
 
 type DbMigration struct {
@@ -63,7 +63,7 @@ type DbMigration struct {
 	Version uint64        `bson:"version"`
 }
 
-func (driver *MongoDbGoMethodsDriver) Initialize(url string) error {
+func (driver *Driver) Initialize(url string) error {
 	if driver.methodsReceiver == nil {
 		return UnregisteredMethodsReceiverError(DRIVER_NAME)
 	}
@@ -85,18 +85,18 @@ func (driver *MongoDbGoMethodsDriver) Initialize(url string) error {
 	return nil
 }
 
-func (driver *MongoDbGoMethodsDriver) Close() error {
+func (driver *Driver) Close() error {
 	if driver.Session != nil {
 		driver.Session.Close()
 	}
 	return nil
 }
 
-func (driver *MongoDbGoMethodsDriver) FilenameExtension() string {
+func (driver *Driver) FilenameExtension() string {
 	return "mgo"
 }
 
-func (driver *MongoDbGoMethodsDriver) Version() (uint64, error) {
+func (driver *Driver) Version() (uint64, error) {
 	var latestMigration DbMigration
 	c := driver.Session.DB(driver.methodsReceiver.DbName()).C(MIGRATE_C)
 
@@ -111,7 +111,7 @@ func (driver *MongoDbGoMethodsDriver) Version() (uint64, error) {
 		return latestMigration.Version, nil
 	}
 }
-func (driver *MongoDbGoMethodsDriver) Migrate(f file.File, pipe chan interface{}) {
+func (driver *Driver) Migrate(f file.File, pipe chan interface{}) {
 	defer close(pipe)
 	pipe <- f
 
@@ -141,7 +141,7 @@ func (driver *MongoDbGoMethodsDriver) Migrate(f file.File, pipe chan interface{}
 	}
 }
 
-func (driver *MongoDbGoMethodsDriver) Validate(methodName string) error {
+func (driver *Driver) Validate(methodName string) error {
 	method := reflect.ValueOf(driver.methodsReceiver).MethodByName(methodName)
 	if !method.IsValid() {
 		return gomethods.MissingMethodError(methodName)
@@ -156,7 +156,7 @@ func (driver *MongoDbGoMethodsDriver) Validate(methodName string) error {
 	return nil
 }
 
-func (driver *MongoDbGoMethodsDriver) Invoke(methodName string) error {
+func (driver *Driver) Invoke(methodName string) error {
 	name := methodName
 	migrateMethod := reflect.ValueOf(driver.methodsReceiver).MethodByName(name)
 	if !migrateMethod.IsValid() {
