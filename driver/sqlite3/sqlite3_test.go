@@ -12,6 +12,10 @@ import (
 // TestMigrate runs some additional tests on Migrate()
 // Basic testing is already done in migrate/migrate_test.go
 func TestMigrate(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
 	driverFile := ":memory:"
 	driverUrl := "sqlite3://" + driverFile
 

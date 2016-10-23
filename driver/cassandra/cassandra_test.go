@@ -13,6 +13,10 @@ import (
 )
 
 func TestMigrate(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
 	var session *gocql.Session
 
 	host := os.Getenv("CASSANDRA_PORT_9042_TCP_ADDR")

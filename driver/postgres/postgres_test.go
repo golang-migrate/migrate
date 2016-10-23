@@ -13,6 +13,10 @@ import (
 // TestMigrate runs some additional tests on Migrate().
 // Basic testing is already done in migrate/migrate_test.go
 func TestMigrate(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
 	host := os.Getenv("POSTGRES_PORT_5432_TCP_ADDR")
 	port := os.Getenv("POSTGRES_PORT_5432_TCP_PORT")
 	driverUrl := "postgres://postgres@" + host + ":" + port + "/template1?sslmode=disable"

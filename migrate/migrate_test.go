@@ -16,6 +16,9 @@ var driverUrls = []string{
 }
 
 func TestCreate(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
 	for _, driverUrl := range driverUrls {
 		t.Logf("Test driver: %s", driverUrl)
 		tmpdir, err := ioutil.TempDir("/tmp", "migrate-test")
@@ -57,6 +60,9 @@ func TestCreate(t *testing.T) {
 }
 
 func TestReset(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
 	for _, driverUrl := range driverUrls {
 		t.Logf("Test driver: %s", driverUrl)
 		tmpdir, err := ioutil.TempDir("/", "migrate-test")
@@ -82,6 +88,9 @@ func TestReset(t *testing.T) {
 }
 
 func TestDown(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
 	for _, driverUrl := range driverUrls {
 		t.Logf("Test driver: %s", driverUrl)
 		tmpdir, err := ioutil.TempDir("/tmp", "migrate-test")
@@ -119,6 +128,9 @@ func TestDown(t *testing.T) {
 }
 
 func TestUp(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
 	for _, driverUrl := range driverUrls {
 		t.Logf("Test driver: %s", driverUrl)
 		tmpdir, err := ioutil.TempDir("/tmp", "migrate-test")
@@ -156,6 +168,9 @@ func TestUp(t *testing.T) {
 }
 
 func TestRedo(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
 	for _, driverUrl := range driverUrls {
 		t.Logf("Test driver: %s", driverUrl)
 		tmpdir, err := ioutil.TempDir("/tmp", "migrate-test")
@@ -193,6 +208,9 @@ func TestRedo(t *testing.T) {
 }
 
 func TestMigrate(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
 	for _, driverUrl := range driverUrls {
 		t.Logf("Test driver: %s", driverUrl)
 		tmpdir, err := ioutil.TempDir("/tmp", "migrate-test")
