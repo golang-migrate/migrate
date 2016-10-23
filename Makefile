@@ -13,7 +13,7 @@ fmt:
 	@gofmt -s -w `go list -f {{.Dir}} ./... | grep -v "/vendor/"`
 
 test: fmt
-	$(DCR) $(GOTEST)
+	$(DCR) go-test
 
 go-test: fmt
 	@$(GOTEST)
