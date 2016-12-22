@@ -9,7 +9,7 @@ var driversMu sync.Mutex
 var drivers = make(map[string]Driver)
 
 // Registers a driver so it can be created from its name. Drivers should
-// call this from an init() function so that they registers themselvse on
+// call this from an init() function so that they registers themselves on
 // import
 func RegisterDriver(name string, driver Driver) {
 	driversMu.Lock()
