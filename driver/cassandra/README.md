@@ -8,6 +8,11 @@ migrate -url cassandra://host:port/keyspace -path ./db/migrations up
 migrate help # for more info
 ```
 
+Url format
+- Authentication: `cassandra://username:password@host:port/keyspace`
+- Cassandra v3.x: `cassandra://host:port/keyspace?protocol=4`
+
+
 ## Authors
 
 * Paul Bergeron, https://github.com/dinedal
