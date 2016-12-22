@@ -34,11 +34,14 @@ func Up(pipe chan interface{}, url, migrationsPath string) {
 		return
 	}
 
+	signals := handleInterrupts()
+	defer signal.Stop(signals)
+
 	if len(applyMigrationFiles) > 0 {
 		for _, f := range applyMigrationFiles {
 			pipe1 := pipep.New()
 			go d.Migrate(f, pipe1)
-			if ok := pipep.WaitAndRedirect(pipe1, pipe, handleInterrupts()); !ok {
+			if ok := pipep.WaitAndRedirect(pipe1, pipe, signals); !ok {
 				break
 			}
 		}
@@ -81,11 +84,14 @@ func Down(pipe chan interface{}, url, migrationsPath string) {
 		return
 	}
 
+	signals := handleInterrupts()
+	defer signal.Stop(signals)
+
 	if len(applyMigrationFiles) > 0 {
 		for _, f := range applyMigrationFiles {
 			pipe1 := pipep.New()
 			go d.Migrate(f, pipe1)
-			if ok := pipep.WaitAndRedirect(pipe1, pipe, handleInterrupts()); !ok {
+			if ok := pipep.WaitAndRedirect(pipe1, pipe, signals); !ok {
 				break
 			}
 		}
@@ -115,7 +121,11 @@ func DownSync(url, migrationsPath string) (err []error, ok bool) {
 func Redo(pipe chan interface{}, url, migrationsPath string) {
 	pipe1 := pipep.New()
 	go Migrate(pipe1, url, migrationsPath, -1)
-	if ok := pipep.WaitAndRedirect(pipe1, pipe, handleInterrupts()); !ok {
+
+	signals := handleInterrupts()
+	defer signal.Stop(signals)
+
+	if ok := pipep.WaitAndRedirect(pipe1, pipe, signals); !ok {
 		go pipep.Close(pipe, nil)
 		return
 	} else {
@@ -135,7 +145,11 @@ func RedoSync(url, migrationsPath string) (err []error, ok bool) {
 func Reset(pipe chan interface{}, url, migrationsPath string) {
 	pipe1 := pipep.New()
 	go Down(pipe1, url, migrationsPath)
-	if ok := pipep.WaitAndRedirect(pipe1, pipe, handleInterrupts()); !ok {
+
+	signals := handleInterrupts()
+	defer signal.Stop(signals)
+
+	if ok := pipep.WaitAndRedirect(pipe1, pipe, signals); !ok {
 		go pipep.Close(pipe, nil)
 		return
 	} else {
@@ -168,11 +182,14 @@ func Migrate(pipe chan interface{}, url, migrationsPath string, relativeN int) {
 		return
 	}
 
+	signals := handleInterrupts()
+	defer signal.Stop(signals)
+
 	if len(applyMigrationFiles) > 0 && relativeN != 0 {
 		for _, f := range applyMigrationFiles {
 			pipe1 := pipep.New()
 			go d.Migrate(f, pipe1)
-			if ok := pipep.WaitAndRedirect(pipe1, pipe, handleInterrupts()); !ok {
+			if ok := pipep.WaitAndRedirect(pipe1, pipe, signals); !ok {
 				break
 			}
 		}
