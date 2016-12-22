@@ -100,15 +100,15 @@ go migrate.Up(pipe, "driver://url", "./path")
 The format of migration files looks like this:
 
 ```
-001_initial_plan_to_do_sth.up.sql     # up migration instructions
-001_initial_plan_to_do_sth.down.sql   # down migration instructions
-002_xxx.up.sql
-002_xxx.down.sql
+1481574547_initial_plan_to_do_sth.up.sql     # up migration instructions
+1481574547_initial_plan_to_do_sth.down.sql   # down migration instructions
+1482438365_xxx.up.sql
+1482438365_xxx.down.sql
 ...
 ```
 
 Why two files? This way you could still do sth like 
-``psql -f ./db/migrations/001_initial_plan_to_do_sth.up.sql`` and there is no
+``psql -f ./db/migrations/1481574547_initial_plan_to_do_sth.up.sql`` and there is no
 need for any custom markup language to divide up and down migrations. Please note
 that the filename extension depends on the driver.
 
