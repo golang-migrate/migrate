@@ -41,10 +41,12 @@ const (
 )
 
 // Cassandra Driver URL format:
-// cassandra://host:port/keyspace?protocol=version
+// cassandra://host:port/keyspace?protocol=version&consistency=level
 //
-// Example:
+// Examples:
 // cassandra://localhost/SpaceOfKeys?protocol=4
+// cassandra://localhost/SpaceOfKeys?protocol=4&consistency=all
+// cassandra://localhost/SpaceOfKeys?consistency=quorum
 func (driver *Driver) Initialize(rawurl string) error {
 	u, err := url.Parse(rawurl)
 
@@ -52,6 +54,15 @@ func (driver *Driver) Initialize(rawurl string) error {
 	cluster.Keyspace = u.Path[1:len(u.Path)]
 	cluster.Consistency = gocql.All
 	cluster.Timeout = 1 * time.Minute
+
+	if len(u.Query().Get("consistency")) > 0 {
+		consistency, err := parseConsistency(u.Query().Get("consistency"))
+		if err != nil {
+			return err
+		}
+
+		cluster.Consistency = consistency
+	}
 
 	if len(u.Query().Get("protocol")) > 0 {
 		protoversion, err := strconv.Atoi(u.Query().Get("protocol"))
@@ -168,4 +179,21 @@ func (driver *Driver) Version() (uint64, error) {
 
 func init() {
 	driver.RegisterDriver("cassandra", &Driver{})
+}
+
+// ParseConsistency wraps gocql.ParseConsistency to return an error
+// instead of a panicing.
+func parseConsistency(consistencyStr string) (consistency gocql.Consistency, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			var ok bool
+			err, ok = r.(error)
+			if !ok {
+				err = fmt.Errorf("Failed to parse consistency \"%s\": %v", consistencyStr, r)
+			}
+		}
+	}()
+	consistency = gocql.ParseConsistency(consistencyStr)
+
+	return consistency, nil
 }
