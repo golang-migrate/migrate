@@ -10,6 +10,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mattes/migrate/driver"
 	"github.com/mattes/migrate/file"
@@ -229,20 +230,23 @@ func Create(url, migrationsPath, name string) (*file.MigrationFile, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	files, err := file.ReadMigrationFiles(migrationsPath, file.FilenameRegex(d.FilenameExtension()))
 	if err != nil {
 		return nil, err
 	}
 
-	version := uint64(0)
-	if len(files) > 0 {
-		lastFile := files[len(files)-1]
-		version = lastFile.Version
+	version := uint64(time.Now().Unix())
+
+	for _, f := range files {
+		if f.Version == version {
+			version++
+		}
 	}
-	version += 1
+
 	versionStr := strconv.FormatUint(version, 10)
 
-	length := 4 // TODO(mattes) check existing files and try to guess length
+	length := 10
 	if len(versionStr)%length != 0 {
 		versionStr = strings.Repeat("0", length-len(versionStr)%length) + versionStr
 	}
