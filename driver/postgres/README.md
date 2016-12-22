@@ -15,7 +15,9 @@ migrate -url postgres://user@host:port/database -path ./db/migrations up
 migrate help # for more info
 
 # TODO(mattes): thinking about adding some custom flag to allow migration within schemas:
--url="postgres://user@host:port/database?schema=name" 
+-url="postgres://user@host:port/database?schema=name"
+
+# see more docs: https://godoc.org/github.com/lib/pq#hdr-Connection_String_Parameters
 ```
 
 ## Authors
