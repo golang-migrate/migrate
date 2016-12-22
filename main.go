@@ -13,6 +13,7 @@ import (
 	"github.com/fatih/color"
 	_ "github.com/mattes/migrate/driver/bash"
 	_ "github.com/mattes/migrate/driver/cassandra"
+	_ "github.com/mattes/migrate/driver/crate"
 	_ "github.com/mattes/migrate/driver/mysql"
 	_ "github.com/mattes/migrate/driver/postgres"
 	_ "github.com/mattes/migrate/driver/sqlite3"
