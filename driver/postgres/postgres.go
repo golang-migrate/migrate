@@ -43,6 +43,14 @@ func (driver *Driver) Close() error {
 }
 
 func (driver *Driver) ensureVersionTableExists() error {
+	r := driver.db.QueryRow("SELECT count(*) FROM information_schema.tables WHERE table_name = $1;", tableName)
+	c := 0
+	if err := r.Scan(&c); err != nil {
+		return err
+	}
+	if c > 0 {
+		return nil
+	}
 	if _, err := driver.db.Exec("CREATE TABLE IF NOT EXISTS " + tableName + " (version int not null primary key);"); err != nil {
 		return err
 	}
