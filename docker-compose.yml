@@ -22,7 +22,7 @@ mysql:
   image: mysql
   environment:
     MYSQL_DATABASE: migratetest
-    MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
+    MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
 cassandra:
   image: cassandra:2.2
 mongo:
