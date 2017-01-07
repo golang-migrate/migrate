@@ -59,7 +59,7 @@ func init() {
 }
 
 type DbMigration struct {
-	Id      bson.ObjectId `bson:"_id,omitempty"`
+	Id      bson.ObjectId `bson:"_id"`
 	Version uint64        `bson:"version"`
 }
 
@@ -78,6 +78,15 @@ func (driver *Driver) Initialize(url string) error {
 		return err
 	}
 	session.SetMode(mgo.Monotonic, true)
+
+	c := session.DB(driver.methodsReceiver.DbName()).C(MIGRATE_C)
+	err = c.EnsureIndex(mgo.Index{
+		Key:    []string{"version"},
+		Unique: true,
+	})
+	if err != nil {
+		return err
+	}
 
 	driver.Session = session
 	driver.migrator = gomethods.Migrator{MethodInvoker: driver}
@@ -144,10 +153,10 @@ func (driver *Driver) Migrate(f file.File, pipe chan interface{}) {
 func (driver *Driver) Validate(methodName string) error {
 	methodWithReceiver, ok := reflect.TypeOf(driver.methodsReceiver).MethodByName(methodName)
 	if !ok {
-		return gomethods.MissingMethodError(methodName)
+		return gomethods.MethodNotFoundError(methodName)
 	}
 	if methodWithReceiver.PkgPath != "" {
-		return gomethods.MethodNotExportedError(methodName)
+		return gomethods.MethodNotFoundError(methodName)
 	}
 
 	methodFunc := reflect.ValueOf(driver.methodsReceiver).MethodByName(methodName)
@@ -164,7 +173,7 @@ func (driver *Driver) Invoke(methodName string) error {
 	name := methodName
 	migrateMethod := reflect.ValueOf(driver.methodsReceiver).MethodByName(name)
 	if !migrateMethod.IsValid() {
-		return gomethods.MissingMethodError(methodName)
+		return gomethods.MethodNotFoundError(methodName)
 	}
 
 	retValues := migrateMethod.Call([]reflect.Value{reflect.ValueOf(driver.Session)})

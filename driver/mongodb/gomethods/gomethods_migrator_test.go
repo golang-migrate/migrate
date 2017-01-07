@@ -16,7 +16,7 @@ type FakeGoMethodsInvoker struct {
 
 func (invoker *FakeGoMethodsInvoker) Validate(methodName string) error {
 	if methodName == "V001_some_non_existing_method_up" {
-		return MissingMethodError(methodName)
+		return MethodNotFoundError(methodName)
 	}
 
 	return nil
@@ -93,7 +93,7 @@ func TestMigrate(t *testing.T) {
 					`),
 			},
 			expectedInvokedMethods: []string{},
-			expectedErrors:         []error{MissingMethodError("V001_some_non_existing_method_up")},
+			expectedErrors:         []error{MethodNotFoundError("V001_some_non_existing_method_up")},
 		},
 		{
 			name: "up migration: failing method stops execution",
