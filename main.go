@@ -1,6 +1,6 @@
 // Package main is the CLI.
 // You can use the CLI via Terminal.
-// import "github.com/dimag-jfrog/migrate/migrate" for usage within Go.
+// import "github.com/mattes/migrate/migrate" for usage within Go.
 package main
 
 import (
@@ -11,15 +11,15 @@ import (
 	"time"
 
 	"github.com/fatih/color"
-	_ "github.com/dimag-jfrog/migrate/driver/bash"
-	_ "github.com/dimag-jfrog/migrate/driver/cassandra"
-	_ "github.com/dimag-jfrog/migrate/driver/mysql"
-	_ "github.com/dimag-jfrog/migrate/driver/postgres"
-	_ "github.com/dimag-jfrog/migrate/driver/sqlite3"
-	"github.com/dimag-jfrog/migrate/file"
-	"github.com/dimag-jfrog/migrate/migrate"
-	"github.com/dimag-jfrog/migrate/migrate/direction"
-	pipep "github.com/dimag-jfrog/migrate/pipe"
+	_ "github.com/mattes/migrate/driver/bash"
+	_ "github.com/mattes/migrate/driver/cassandra"
+	_ "github.com/mattes/migrate/driver/mysql"
+	_ "github.com/mattes/migrate/driver/postgres"
+	_ "github.com/mattes/migrate/driver/sqlite3"
+	"github.com/mattes/migrate/file"
+	"github.com/mattes/migrate/migrate"
+	"github.com/mattes/migrate/migrate/direction"
+	pipep "github.com/mattes/migrate/pipe"
 )
 
 var url = flag.String("url", os.Getenv("MIGRATE_URL"), "")

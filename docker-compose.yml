@@ -1,6 +1,6 @@
 go: &go
   image: golang
-  working_dir: /go/src/github.com/dimag-jfrog/migrate
+  working_dir: /go/src/github.com/mattes/migrate
   volumes:
     - $GOPATH:/go
 go-test:

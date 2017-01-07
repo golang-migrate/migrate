@@ -3,13 +3,13 @@ package example
 import (
 	"testing"
 
-	"github.com/dimag-jfrog/migrate/file"
-	"github.com/dimag-jfrog/migrate/migrate/direction"
+	"github.com/mattes/migrate/file"
+	"github.com/mattes/migrate/migrate/direction"
 
-	"github.com/dimag-jfrog/migrate/driver"
-	"github.com/dimag-jfrog/migrate/driver/mongodb"
-	"github.com/dimag-jfrog/migrate/driver/mongodb/gomethods"
-	pipep "github.com/dimag-jfrog/migrate/pipe"
+	"github.com/mattes/migrate/driver"
+	"github.com/mattes/migrate/driver/mongodb"
+	"github.com/mattes/migrate/driver/mongodb/gomethods"
+	pipep "github.com/mattes/migrate/pipe"
 	"os"
 	"reflect"
 	"time"

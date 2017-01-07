@@ -3,8 +3,8 @@ package gomethods
 import (
 	"bufio"
 	"fmt"
-	"github.com/dimag-jfrog/migrate/driver"
-	"github.com/dimag-jfrog/migrate/file"
+	"github.com/mattes/migrate/driver"
+	"github.com/mattes/migrate/file"
 	"os"
 	"path"
 	"strings"
