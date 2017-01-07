@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/gocql/gocql"
-	"github.com/dimag-jfrog/migrate/driver"
-	"github.com/dimag-jfrog/migrate/file"
-	"github.com/dimag-jfrog/migrate/migrate/direction"
+	"github.com/mattes/migrate/driver"
+	"github.com/mattes/migrate/file"
+	"github.com/mattes/migrate/migrate/direction"
 )
 
 type Driver struct {

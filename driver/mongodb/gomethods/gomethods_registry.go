@@ -2,7 +2,7 @@ package gomethods
 
 import (
 	"fmt"
-	"github.com/dimag-jfrog/migrate/driver"
+	"github.com/mattes/migrate/driver"
 	"sync"
 )
 

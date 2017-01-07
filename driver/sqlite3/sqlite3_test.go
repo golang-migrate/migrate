@@ -4,9 +4,9 @@ import (
 	"database/sql"
 	"testing"
 
-	"github.com/dimag-jfrog/migrate/file"
-	"github.com/dimag-jfrog/migrate/migrate/direction"
-	pipep "github.com/dimag-jfrog/migrate/pipe"
+	"github.com/mattes/migrate/file"
+	"github.com/mattes/migrate/migrate/direction"
+	pipep "github.com/mattes/migrate/pipe"
 )
 
 // TestMigrate runs some additional tests on Migrate()

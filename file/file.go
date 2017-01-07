@@ -5,7 +5,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/dimag-jfrog/migrate/migrate/direction"
+	"github.com/mattes/migrate/migrate/direction"
 	"go/token"
 	"io/ioutil"
 	"path"

@@ -1,7 +1,7 @@
 package file
 
 import (
-	"github.com/dimag-jfrog/migrate/migrate/direction"
+	"github.com/mattes/migrate/migrate/direction"
 	"io/ioutil"
 	"os"
 	"path"

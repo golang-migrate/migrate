@@ -4,10 +4,10 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/dimag-jfrog/migrate/file"
-	"github.com/dimag-jfrog/migrate/migrate/direction"
+	"github.com/mattes/migrate/file"
+	"github.com/mattes/migrate/migrate/direction"
 
-	pipep "github.com/dimag-jfrog/migrate/pipe"
+	pipep "github.com/mattes/migrate/pipe"
 )
 
 type FakeGoMethodsInvoker struct {
