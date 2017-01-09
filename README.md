@@ -21,12 +21,12 @@ __Features__
 
 ## Available Drivers
 
- * [PostgreSQL](https://github.com/mattes/migrate/tree/master/driver/postgres)
- * [Cassandra](https://github.com/mattes/migrate/tree/master/driver/cassandra)
- * [SQLite](https://github.com/mattes/migrate/tree/master/driver/sqlite3)
- * [MySQL](https://github.com/mattes/migrate/tree/master/driver/mysql) ([experimental](https://github.com/mattes/migrate/issues/1#issuecomment-58728186))
- * [Ql](https://github.com/mattes/migrate/tree/master/driver/ql)
- * Bash (planned)
+ * [PostgreSQL](driver/postgres)
+ * [Cassandra](driver/cassandra)
+ * [SQLite](driver/sqlite3)
+ * [MySQL](driver/mysql) ([experimental](https://github.com/mattes/migrate/issues/1#issuecomment-58728186))
+ * [Ql](driver/ql)
+ * [MongoDB](driver/mongodb)
 
 Need another driver? Just implement the [Driver interface](http://godoc.org/github.com/mattes/migrate/driver#Driver) and open a PR.
 
