@@ -11,6 +11,7 @@ go-test:
     - mysql
     - cassandra
     - crate
+    - mongo
 go-build:
   <<: *go
   command: sh -c 'go get -v && go build -ldflags ''-s'' -o migrater'
@@ -27,3 +28,5 @@ cassandra:
   image: cassandra:2.2
 crate:
   image: crate
+mongo:
+  image: mongo:3.2.6
