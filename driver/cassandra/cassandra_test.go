@@ -40,6 +40,9 @@ func TestMigrate(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if err := session.Query(`DROP KEYSPACE IF EXISTS migrate;`).Exec(); err != nil {
+		t.Fatal(err)
+	}
 	if err := session.Query(`CREATE KEYSPACE IF NOT EXISTS migrate WITH REPLICATION = {'class': 'SimpleStrategy', 'replication_factor': 1};`).Exec(); err != nil {
 		t.Fatal(err)
 	}
@@ -65,7 +68,6 @@ func TestMigrate(t *testing.T) {
                     msg text
                 );
 
-				CREATE INDEX ON yolo (msg);
             `),
 		},
 		{

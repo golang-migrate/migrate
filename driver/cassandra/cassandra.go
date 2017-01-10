@@ -25,14 +25,19 @@ const (
 
 type counterStmt bool
 
-func (c counterStmt) String() string {
-	sign := ""
-	if bool(c) {
-		sign = "+"
-	} else {
-		sign = "-"
+func (c counterStmt) Exec(session *gocql.Session) error {
+	var version int64
+	if err := session.Query("SELECT version FROM "+tableName+" WHERE versionRow = ?", versionRow).Scan(&version); err != nil {
+		return err
 	}
-	return "UPDATE " + tableName + " SET version = version " + sign + " 1 where versionRow = ?"
+
+	if bool(c) {
+		version++
+	} else {
+		version--
+	}
+
+	return session.Query("UPDATE "+tableName+" SET version = ? WHERE versionRow = ?", version, versionRow).Exec()
 }
 
 const (
@@ -113,14 +118,17 @@ func (driver *Driver) Close() error {
 }
 
 func (driver *Driver) ensureVersionTableExists() error {
-	err := driver.session.Query("CREATE TABLE IF NOT EXISTS " + tableName + " (version counter, versionRow bigint primary key);").Exec()
+	err := driver.session.Query("CREATE TABLE IF NOT EXISTS " + tableName + " (version int, versionRow bigint primary key);").Exec()
 	if err != nil {
 		return err
 	}
 
 	_, err = driver.Version()
 	if err != nil {
-		driver.session.Query(up.String(), versionRow).Exec()
+		if err.Error() == "not found" {
+			return driver.session.Query("UPDATE "+tableName+" SET version = ? WHERE versionRow = ?", 1, versionRow).Exec()
+		}
+		return err
 	}
 
 	return nil
@@ -141,7 +149,7 @@ func (driver *Driver) version(d direction.Direction, invert bool) error {
 	if invert {
 		stmt = !stmt
 	}
-	return driver.session.Query(stmt.String(), versionRow).Exec()
+	return stmt.Exec(driver.session)
 }
 
 func (driver *Driver) Migrate(f file.File, pipe chan interface{}) {
