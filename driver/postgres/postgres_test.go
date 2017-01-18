@@ -77,6 +77,28 @@ func TestMigrate(t *testing.T) {
 				)
 			`),
 		},
+		{
+			Path:      "/foobar",
+			FileName:  "20170118205923_demo.up.sql",
+			Version:   20170118205923,
+			Name:      "demo",
+			Direction: direction.Up,
+			Content: []byte(`
+				CREATE TABLE demo (
+					id serial not null primary key
+				)
+			`),
+		},
+		{
+			Path:      "/foobar",
+			FileName:  "20170118205923_demo.down.sql",
+			Version:   20170118205923,
+			Name:      "demo",
+			Direction: direction.Down,
+			Content: []byte(`
+				DROP TABLE demo
+			`),
+		},
 	}
 
 	pipe := pipep.New()
@@ -98,6 +120,20 @@ func TestMigrate(t *testing.T) {
 	errs = pipep.ReadErrors(pipe)
 	if len(errs) == 0 {
 		t.Error("Expected test case to fail")
+	}
+
+	pipe = pipep.New()
+	go d.Migrate(files[3], pipe)
+	errs = pipep.ReadErrors(pipe)
+	if len(errs) > 0 {
+		t.Fatal(errs)
+	}
+
+	pipe = pipep.New()
+	go d.Migrate(files[4], pipe)
+	errs = pipep.ReadErrors(pipe)
+	if len(errs) > 0 {
+		t.Fatal(errs)
 	}
 
 	if err := d.Close(); err != nil {
