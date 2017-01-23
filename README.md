@@ -25,8 +25,10 @@ __Features__
  * [Cassandra](driver/cassandra)
  * [SQLite](driver/sqlite3)
  * [MySQL](driver/mysql) ([experimental](https://github.com/mattes/migrate/issues/1#issuecomment-58728186))
+ * [Neo4j](driver/neo4j)
  * [Ql](driver/ql)
  * [MongoDB](driver/mongodb)
+ * [CrateDB](driver/crate)
 
 Need another driver? Just implement the [Driver interface](http://godoc.org/github.com/mattes/migrate/driver#Driver) and open a PR.
 
