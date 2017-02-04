@@ -43,7 +43,7 @@ func (driver *Driver) Close() error {
 }
 
 func (driver *Driver) ensureVersionTableExists() error {
-	r := driver.db.QueryRow("SELECT count(*) FROM information_schema.tables WHERE table_name = $1;", tableName)
+	r := driver.db.QueryRow("SELECT count(*) FROM information_schema.tables WHERE table_name = $1 AND table_schema = (SELECT current_schema());", tableName)
 	c := 0
 	if err := r.Scan(&c); err != nil {
 		return err
