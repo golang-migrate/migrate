@@ -18,6 +18,10 @@ func init() {
 }
 
 func Test(t *testing.T) {
+	if len(GithubTestSecret) == 0 {
+		t.Skip("test requires .github_test_secrets")
+	}
+
 	g := &Github{}
 	d, err := g.Open("github://" + GithubTestSecret + "@mattes/migrate_test_tmp/test")
 	if err != nil {

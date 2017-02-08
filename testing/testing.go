@@ -1,6 +1,8 @@
 package testing
 
 import (
+	"os"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -46,8 +48,14 @@ func ParallelTest(t *testing.T, versions []string, readyFn IsReadyFunc, testFn T
 					}
 				}
 
+				delay, err := strconv.Atoi(os.Getenv("MIGRATE_TEST_CONTAINER_BOOT_DELAY"))
+				if err == nil {
+					time.Sleep(time.Duration(int64(delay)) * time.Second)
+				} else {
+					time.Sleep(2 * time.Second)
+				}
+
 				// we can now run the tests
-				time.Sleep(2 * time.Second) // addded grace period
 				testFn(t, container)
 			})
 		}

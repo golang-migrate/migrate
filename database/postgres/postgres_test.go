@@ -46,9 +46,10 @@ func Test(t *testing.T) {
 	mt.ParallelTest(t, versions, isReady,
 		func(t *testing.T, i mt.Instance) {
 			p := &Postgres{}
-			d, err := p.Open(fmt.Sprintf("postgres://postgres@%v:%v/postgres?sslmode=disable", i.Host(), i.Port()))
+			addr := fmt.Sprintf("postgres://postgres@%v:%v/postgres?sslmode=disable", i.Host(), i.Port())
+			d, err := p.Open(addr)
 			if err != nil {
-				t.Fatalf("%#v", err)
+				t.Fatalf("%v", err)
 			}
 			dt.Test(t, d, []byte("SELECT 1"))
 		})
@@ -58,9 +59,10 @@ func TestWithSchema(t *testing.T) {
 	mt.ParallelTest(t, versions, isReady,
 		func(t *testing.T, i mt.Instance) {
 			p := &Postgres{}
-			d, err := p.Open(fmt.Sprintf("postgres://postgres@%v:%v/postgres?sslmode=disable", i.Host(), i.Port()))
+			addr := fmt.Sprintf("postgres://postgres@%v:%v/postgres?sslmode=disable", i.Host(), i.Port())
+			d, err := p.Open(addr)
 			if err != nil {
-				t.Fatalf("%#v", err)
+				t.Fatalf("%v", err)
 			}
 
 			// create foobar schema
@@ -71,7 +73,7 @@ func TestWithSchema(t *testing.T) {
 			// re-connect using that schema
 			d2, err := p.Open(fmt.Sprintf("postgres://postgres@%v:%v/postgres?sslmode=disable&search_path=foobar", i.Host(), i.Port()))
 			if err != nil {
-				t.Fatalf("%#v", err)
+				t.Fatalf("%v", err)
 			}
 
 			version, err := d2.Version()

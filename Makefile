@@ -3,16 +3,11 @@ DATABASE?=postgres
 VERSION?=$(shell git describe --tags 2>/dev/null)
 TEST_FLAGS?=
 
-# define comma and space
-, := ,
-space :=  
-space +=  
-
 build-cli: clean
 	-mkdir ./cli/build
-	cd ./cli && GOOS=linux GOARCH=amd64 go build -a -o build/migrate.$(VERSION).linux-amd64 -ldflags="-X main.Version=$(VERSION)" -tags '$(DATABASE) $(SOURCE)' . 
-	cd ./cli && GOOS=darwin GOARCH=amd64 go build -a -o build/migrate.$(VERSION).darwin-amd64 -ldflags="-X main.Version=$(VERSION)" -tags '$(DATABASE) $(SOURCE)' . 
-	cd ./cli && GOOS=windows GOARCH=amd64 go build -a -o build/migrate.$(VERSION).windows-amd64.exe -ldflags="-X main.Version=$(VERSION)" -tags '$(DATABASE) $(SOURCE)' . 
+	cd ./cli && GOOS=linux GOARCH=amd64 go build -a -o build/migrate.linux-amd64 -ldflags="-X main.Version=$(VERSION)" -tags '$(DATABASE) $(SOURCE)' . 
+	cd ./cli && GOOS=darwin GOARCH=amd64 go build -a -o build/migrate.darwin-amd64 -ldflags="-X main.Version=$(VERSION)" -tags '$(DATABASE) $(SOURCE)' . 
+	cd ./cli && GOOS=windows GOARCH=amd64 go build -a -o build/migrate.windows-amd64.exe -ldflags="-X main.Version=$(VERSION)" -tags '$(DATABASE) $(SOURCE)' . 
 	cd ./cli/build && find . -name 'migrate*' | xargs -I{} tar czf {}.tar.gz {}
 	cd ./cli/build && shasum -a 256 * > sha256sum.txt
 	cat ./cli/build/sha256sum.txt
@@ -47,6 +42,15 @@ test-with-flags:
 	# deprecated v1compat:
 	@go test $(TEST_FLAGS) ./migrate/...
 
+deps:
+	-go get -v -u ./... 
+	-go test -v -i ./...
 
-.PHONY: build-cli clean test-short test coverage test-with-flags
+.PHONY: build-cli clean test-short test coverage test-with-flags deps
+SHELL=/bin/bash
+
+# define comma and space
+, := ,
+space :=  
+space +=  
 
