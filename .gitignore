@@ -1,2 +1,4 @@
 .DS_Store
-test.db
+cli/build
+cli/cli
+cli/migrate

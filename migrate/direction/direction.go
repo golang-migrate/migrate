@@ -1,4 +1,3 @@
-// Package direction just holds convenience constants for Up and Down migrations.
 package direction
 
 type Direction int
