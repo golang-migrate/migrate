@@ -4,16 +4,11 @@
 ## Usage
 
 
-First create `bindata.go` 
-
 ```
 go get -u github.com/jteeuwen/go-bindata/...
 cd examples/migrations && go-bindata -pkg migrations .
 ```
 
-Then use it in CLI:
-
-// 
 
 ```
 // TODO
@@ -23,7 +18,6 @@ Then use it in CLI:
 migrate -source go-bindata://examples/migrations/bindata.go 
 ```
 
-or with library:
 
 ```
 import (
@@ -39,7 +33,7 @@ func main() {
       return migrations.Asset(name)
     })
 
-  m, err := migrate.NewWithSourceInstance("go-bindata", resource, "database://foobar")
+  m, err := migrate.NewWithSourceInstance("go-bindata", s, "database://foobar")
   m.Up() // run your migrations and handle the errors above of course
 }
 ```
