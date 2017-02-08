@@ -1,120 +1,118 @@
 # migrate
 
-[![Build Status](https://travis-ci.org/mattes/migrate.svg?branch=master)](https://travis-ci.org/mattes/migrate)
+[![Build Status](https://travis-ci.org/mattes/migrate.svg?branch=v3.0-prev)](https://travis-ci.org/mattes/migrate)
 [![GoDoc](https://godoc.org/github.com/mattes/migrate?status.svg)](https://godoc.org/github.com/mattes/migrate)
 
-A migration helper written in Go. Use it in your existing Golang code 
-or run commands via the CLI. 
+Database migrations written in Go. Use as CLI or import as library.
+
 
 ```
-GoCode   import github.com/mattes/migrate/migrate
-CLI      go get -u github.com/mattes/migrate
+go get -u -tags 'postgres' -o migrate github.com/mattes/migrate/cli
+
+import (
+  "github.com/mattes/migrate"
+  _ "github.com/mattes/migrate/database/postgres"
+)
 ```
 
-__Features__
+## Databases 
 
-* Super easy to implement [Driver interface](http://godoc.org/github.com/mattes/migrate/driver#Driver).
-* Gracefully quit running migrations on ``^C``.
-* No magic search paths routines, no hard-coded config files.
-* CLI is build on top of the ``migrate package``.
+Database drivers are responsible for applying migrations to databases.
+Implementing a new database driver is easy. Just implement [database/driver interface](database/driver.go)
 
-
-## Available Drivers
-
- * [PostgreSQL](driver/postgres)
- * [Cassandra](driver/cassandra)
- * [SQLite](driver/sqlite3)
- * [MySQL](driver/mysql) ([experimental](https://github.com/mattes/migrate/issues/1#issuecomment-58728186))
- * [Neo4j](driver/neo4j)
- * [Ql](driver/ql)
- * [MongoDB](driver/mongodb)
- * [CrateDB](driver/crate)
-
-Need another driver? Just implement the [Driver interface](http://godoc.org/github.com/mattes/migrate/driver#Driver) and open a PR.
+  * [PostgreSQL](database/postgres)
+  * [Cassandra](database/cassandra)
+  * [SQLite](database/sqlite)
+  * [MySQL/ MariaDB](database/mysql)
+  * [Neo4j](database/neo4j)
+  * [Ql](database/ql)
+  * [MongoDB](database/mongodb)
+  * [CrateDB](database/crate)
+  * [Shell](database/shell)
 
 
-## Usage from Terminal
+## Migration Sources
+
+Source Drivers read migrations from various locations. Implementing a new source driver
+is easy. Just implement the [source/driver interface](source/driver.go).
+
+  * [Filesystem](source/file) - read from fileystem (always included)
+  * [Go-Bindata](source/go-bindata) - read from embedded binary data ([jteeuwen/go-bindata](https://github.com/jteeuwen/go-bindata))
+  * [Github](source/github) - read from remote Github repositories
+  * [AWS S3](source/aws-s3) - read from Amazon Web Services S3
+  * [Google Cloud Storage](source/google-cloud-storage) - read from Google Cloud Platform Storage
+
+
+## CLI usage 
 
 ```bash
-# install
-go get github.com/mattes/migrate
+# dowload, build and install the CLI tool
+# -tags takes database and source drivers and will only build those
+$ go get -u -tags 'postgres' -o migrate github.com/mattes/migrate/cli
 
-# create new migration file in path
-migrate -url driver://url -path ./migrations create migration_file_xyz
+$ migrate -help
+Usage: migrate OPTIONS COMMAND [arg...]
+       migrate [ -version | -help ]
 
-# apply all available migrations
-migrate -url driver://url -path ./migrations up
+Options:
+  -source      Location of the migrations (driver://url)
+  -path        Shorthand for -source=file://path
+  -database    Run migrations against this database (driver://url)
+  -prefetch N  Number of migrations to load in advance before executing (default 10)
+  -verbose     Print verbose logging
+  -version     Print version
+  -help        Print usage
 
-# roll back all migrations
-migrate -url driver://url -path ./migrations down
+Commands:
+  goto V       Migrate to version V
+  up [N]       Apply all or N up migrations
+  down [N]     Apply all or N down migrations
+  drop         Drop everyting inside database
+  version      Print current migration version
 
-# roll back the most recently applied migration, then run it again.
-migrate -url driver://url -path ./migrations redo
 
-# run down and then up command
-migrate -url driver://url -path ./migrations reset
+# so let's say you want to run the first two migrations
+migrate -database postgres://localhost:5432/database up 2
 
-# show the current migration version
-migrate -url driver://url -path ./migrations version
-
-# apply the next n migrations
-migrate -url driver://url -path ./migrations migrate +1
-migrate -url driver://url -path ./migrations migrate +2
-migrate -url driver://url -path ./migrations migrate +n
-
-# roll back the previous n migrations
-migrate -url driver://url -path ./migrations migrate -1
-migrate -url driver://url -path ./migrations migrate -2
-migrate -url driver://url -path ./migrations migrate -n
-
-# go to specific migration
-migrate -url driver://url -path ./migrations goto 1
-migrate -url driver://url -path ./migrations goto 10
-migrate -url driver://url -path ./migrations goto v
+# if your migrations are hosted on github
+migrate -source github://mattes:personal-access-token@mattes/migrate_test \
+  -database postgres://localhost:5432/database down 2
 ```
 
 
-## Usage in Go
-
-See GoDoc here: http://godoc.org/github.com/mattes/migrate/migrate
+## Use in your Go project 
 
 ```go
-import "github.com/mattes/migrate/migrate"
+import (
+  "github.com/mattes/migrate/migrate"
+  _ "github.com/mattes/migrate/database/postgres"
+  _ "github.com/mattes/migrate/source/github"
+)
 
-// Import any required drivers so that they are registered and available
-import _ "github.com/mattes/migrate/driver/mysql"
-
-// use synchronous versions of migration functions ...
-allErrors, ok := migrate.UpSync("driver://url", "./path")
-if !ok {
-  fmt.Println("Oh no ...")
-  // do sth with allErrors slice
+func main() {
+  m, err := migrate.New("github://mattes:personal-access-token@mattes/migrate_test",
+    "postgres://localhost:5432/database?sslmode=enable")
+  m.Steps(2)
 }
-
-// use the asynchronous version of migration functions ...
-pipe := migrate.NewPipe()
-go migrate.Up(pipe, "driver://url", "./path")
-// pipe is basically just a channel
-// write your own channel listener. see writePipe() in main.go as an example.
 ```
 
 ## Migration files
 
-The format of migration files looks like this:
+Each migration version has an up and down migration.
 
 ```
-1481574547_initial_plan_to_do_sth.up.sql     # up migration instructions
-1481574547_initial_plan_to_do_sth.down.sql   # down migration instructions
-1482438365_xxx.up.sql
-1482438365_xxx.down.sql
-...
+1481574547_create_users_table.up.sql
+1481574547_create_users_table.down.sql
 ```
 
-Why two files? This way you could still do sth like 
-``psql -f ./db/migrations/1481574547_initial_plan_to_do_sth.up.sql`` and there is no
-need for any custom markup language to divide up and down migrations. Please note
-that the filename extension depends on the driver.
+## Development and Testing
 
+Tests require Docker (for database driver testing).
+
+```
+make test-short DATABASE='postgres'
+make test
+```
 
 ## Alternatives
 
