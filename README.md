@@ -45,7 +45,7 @@ is easy. Just implement the [source/driver interface](source/driver.go).
 
 ## CLI usage 
 
-```bash
+```
 # dowload, build and install the CLI tool
 # -tags takes database and source drivers and will only build those
 $ go get -u -tags 'postgres' -o migrate github.com/mattes/migrate/cli

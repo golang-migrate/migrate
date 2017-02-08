@@ -33,8 +33,8 @@ import (
 )
 
 func main() {
-  // Wrap assets into Resource
-  resource := bindata.Resource(migrations.AssetNames(),
+	// wrap assets into Resource
+  s := bindata.Resource(migrations.AssetNames(),
     func(name string) ([]byte, error) {
       return migrations.Asset(name)
     })

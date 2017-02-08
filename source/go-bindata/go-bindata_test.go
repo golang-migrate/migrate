@@ -22,7 +22,7 @@ func Test(t *testing.T) {
 }
 
 func TestWithInstance(t *testing.T) {
-	// wrap assets into Resource first
+	// wrap assets into Resource
 	s := Resource(testdata.AssetNames(),
 		func(name string) ([]byte, error) {
 			return testdata.Asset(name)
