@@ -113,8 +113,8 @@ endef
 
 
 .PHONY: build-cli clean test-short test test-with-flags deps html-coverage \
-        restore-import-paths rewrite-import-paths list-external-deps release
-				docs kill-docs open-docs
+        restore-import-paths rewrite-import-paths list-external-deps release \
+        docs kill-docs open-docs
 
 SHELL = /bin/bash
 RAND = $(shell echo $$RANDOM)
