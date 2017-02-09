@@ -59,7 +59,17 @@ deps:
 	-go test -v -i ./...
 
 
-.PHONY: build-cli clean test-short test test-with-flags deps html-coverage
+restore-import-paths:
+	find . -name '*.go' -type f -execdir sed -i '' s#\"github.com/$(shell cd .. && basename "$$(pwd)")/migrate#\"github.com/mattes/migrate#g '{}' \;
+
+
+rewrite-import-paths:
+	find . -name '*.go' -type f -execdir sed -i '' s#\"github.com/mattes/migrate#\"github.com/$(shell cd .. && basename "$$(pwd)")/migrate#g '{}' \;
+
+
+.PHONY: build-cli clean test-short test test-with-flags deps html-coverage \
+				restore-import-paths rewrite-import-paths
+
 SHELL = /bin/bash
 RAND = $(shell echo $$RANDOM)
 
