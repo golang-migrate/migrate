@@ -2,3 +2,4 @@
 cli/build
 cli/cli
 cli/migrate
+.coverage

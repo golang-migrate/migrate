@@ -16,9 +16,13 @@ install:
   - make deps
   - (cd $GOPATH/src/github.com/docker/docker && git fetch --all --tags --prune && git checkout v1.13.0)
   - sudo apt-get update && sudo apt-get install docker-engine=1.13.0*
+  - go get github.com/mattn/goveralls 
 
 script:
   - make test
+
+after_success:
+  - goveralls -service=travis-ci -coverprofile .coverage/combined.txt
 
 before_deploy:
   - make build-cli
