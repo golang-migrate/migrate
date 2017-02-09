@@ -82,7 +82,24 @@ rewrite-import-paths:
 	find . -name '*.go' -type f -execdir sed -i '' s%\"github.com/mattes/migrate%\"github.com/$(REPO_OWNER)/migrate%g '{}' \;
 
 
-# make release V=0.0.0
+# example: fswatch -0 --exclude .godoc.pid --event Updated . | xargs -0 -n1 -I{} make docs
+docs:
+	-make kill-docs
+	nohup godoc -play -http=127.0.0.1:6064 </dev/null >/dev/null 2>&1 & echo $$! > .godoc.pid
+	cat .godoc.pid  
+
+
+kill-docs:
+	@cat .godoc.pid
+	kill -9 $$(cat .godoc.pid)
+	rm .godoc.pid
+
+
+open-docs:
+	open http://localhost:6064/pkg/github.com/$(REPO_OWNER)/migrate
+
+
+# example: make release V=0.0.0
 release:
 	git tag v$(V)
 	@read -p "Press enter to confirm and push to origin ..." && git push origin v$(V)
@@ -97,6 +114,7 @@ endef
 
 .PHONY: build-cli clean test-short test test-with-flags deps html-coverage \
         restore-import-paths rewrite-import-paths list-external-deps release
+				docs kill-docs open-docs
 
 SHELL = /bin/bash
 RAND = $(shell echo $$RANDOM)

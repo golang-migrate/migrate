@@ -126,6 +126,8 @@ Some more notes:
   * Missing imports? `make deps`
   * `make build-cli` builds the CLI in directory `cli/build/`.
   * `make list-external-deps` lists all external dependencies for each package
+  * `make docs && make open-docs` opens godoc in your browser, `make kill-docs` kills the godoc server.  
+    Repeatedly call `make docs` to refresh the server.  
 
 ## Alternatives
 
