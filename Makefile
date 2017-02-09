@@ -2,6 +2,7 @@ SOURCE ?= file go-bindata github
 DATABASE ?= postgres
 VERSION ?= $(shell git describe --tags 2>/dev/null)
 TEST_FLAGS ?=
+REPO_OWNER ?= $(shell cd .. && basename "$$(pwd)")
 
 
 build-cli: clean
@@ -39,12 +40,12 @@ test-with-flags:
 	@go test $(TEST_FLAGS) ./testing/...
 
 	@echo -n '$(SOURCE)' | tr -s ' ' '\n' | xargs -I{} go test $(TEST_FLAGS) ./source/{}
-	@go test $(TEST_FLAGS) ./source/testing
-	@go test $(TEST_FLAGS) ./source/stub
+	@go test $(TEST_FLAGS) ./source/testing/...
+	@go test $(TEST_FLAGS) ./source/stub/...
 
 	@echo -n '$(DATABASE)' | tr -s ' ' '\n' | xargs -I{} go test $(TEST_FLAGS) ./database/{}
-	@go test $(TEST_FLAGS) ./database/testing 
-	@go test $(TEST_FLAGS) ./database/stub 
+	@go test $(TEST_FLAGS) ./database/testing/...
+	@go test $(TEST_FLAGS) ./database/stub/...
 	
 	# deprecated v1compat:
 	@go test ./migrate/...
@@ -59,16 +60,37 @@ deps:
 	-go test -v -i ./...
 
 
+list-external-deps:
+	$(call external_deps,'.')
+	$(call external_deps,'./cli/...')
+	$(call external_deps,'./testing/...')
+
+	$(foreach v, $(SOURCE), $(call external_deps,'./source/$(v)/...'))
+	$(call external_deps,'./source/testing/...')
+	$(call external_deps,'./source/stub/...')
+
+	$(foreach v, $(DATABASE), $(call external_deps,'./database/$(v)/...'))
+	$(call external_deps,'./database/testing/...')
+	$(call external_deps,'./database/stub/...')
+
+
 restore-import-paths:
-	find . -name '*.go' -type f -execdir sed -i '' s#\"github.com/$(shell cd .. && basename "$$(pwd)")/migrate#\"github.com/mattes/migrate#g '{}' \;
+	find . -name '*.go' -type f -execdir sed -i '' s%\"github.com/$(REPO_OWNER)/migrate%\"github.com/mattes/migrate%g '{}' \;
 
 
 rewrite-import-paths:
-	find . -name '*.go' -type f -execdir sed -i '' s#\"github.com/mattes/migrate#\"github.com/$(shell cd .. && basename "$$(pwd)")/migrate#g '{}' \;
+	find . -name '*.go' -type f -execdir sed -i '' s%\"github.com/mattes/migrate%\"github.com/$(REPO_OWNER)/migrate%g '{}' \;
+
+
+define external_deps
+	@echo -- $(1)
+	@go list -f '{{join .Deps "\n"}}' $(1) | grep -v github.com/$(REPO_OWNER)/migrate | xargs go list -f '{{if not .Standard}}{{.ImportPath}}{{end}}'
+  @#\n 
+endef
 
 
 .PHONY: build-cli clean test-short test test-with-flags deps html-coverage \
-				restore-import-paths rewrite-import-paths
+				restore-import-paths rewrite-import-paths list-external-deps
 
 SHELL = /bin/bash
 RAND = $(shell echo $$RANDOM)
