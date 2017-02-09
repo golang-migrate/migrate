@@ -125,6 +125,7 @@ Some more notes:
   * After `make test`, run `make html-coverage` which opens a shiny test coverage overview.  
   * Missing imports? `make deps`
   * `make build-cli` builds the CLI in directory `cli/build/`.
+  * `make list-external-deps` lists all external dependencies for each package
 
 ## Alternatives
 

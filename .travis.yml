@@ -25,6 +25,7 @@ after_success:
   - goveralls -service=travis-ci -coverprofile .coverage/combined.txt
 
 before_deploy:
+  - make list-external-deps > dependency_tree.txt && cat dependency_tree.txt
   - make build-cli
 
 deploy:
@@ -40,4 +41,5 @@ deploy:
     - cli/build/migrate.darwin-amd64.tar.gz
     - cli/build/migrate.windows-amd64.exe.tar.gz
     - cli/build/sha256sum.txt
+    - dependency_tree.txt
 
