@@ -82,6 +82,12 @@ rewrite-import-paths:
 	find . -name '*.go' -type f -execdir sed -i '' s%\"github.com/mattes/migrate%\"github.com/$(REPO_OWNER)/migrate%g '{}' \;
 
 
+# make release V=0.0.0
+release:
+	git tag v$(V)
+	@read -p "Press enter to confirm and push to origin ..." && git push origin v$(V)
+
+
 define external_deps
 	@echo -- $(1)
 	@go list -f '{{join .Deps "\n"}}' $(1) | grep -v github.com/$(REPO_OWNER)/migrate | xargs go list -f '{{if not .Standard}}{{.ImportPath}}{{end}}'
@@ -90,7 +96,7 @@ endef
 
 
 .PHONY: build-cli clean test-short test test-with-flags deps html-coverage \
-				restore-import-paths rewrite-import-paths list-external-deps
+				restore-import-paths rewrite-import-paths list-external-deps release
 
 SHELL = /bin/bash
 RAND = $(shell echo $$RANDOM)

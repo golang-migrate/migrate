@@ -23,9 +23,9 @@ script:
 
 after_success:
   - goveralls -service=travis-ci -coverprofile .coverage/combined.txt
+  - make list-external-deps > dependency_tree.txt && cat dependency_tree.txt
 
 before_deploy:
-  - make list-external-deps > dependency_tree.txt && cat dependency_tree.txt
   - make build-cli
 
 deploy:
