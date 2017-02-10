@@ -4,17 +4,8 @@
 [![GoDoc](https://godoc.org/github.com/mattes/migrate?status.svg)](https://godoc.org/github.com/mattes/migrate)
 [![Coverage Status](https://coveralls.io/repos/github/mattes/migrate/badge.svg?branch=v3.0-prev)](https://coveralls.io/github/mattes/migrate?branch=v3.0-prev)
 
-Database migrations written in Go. Use as CLI or import as library.
+__Database migrations written in Go. Use as CLI or import as library.__
 
-
-```
-go get -u -tags 'postgres' -o migrate github.com/mattes/migrate/cli
-
-import (
-  "github.com/mattes/migrate"
-  _ "github.com/mattes/migrate/database/postgres"
-)
-```
 
 ## Databases 
 
@@ -52,6 +43,8 @@ __[CLI Documentation](cli/README.md)__
 Example:
 
 ```
+go get -u -tags 'postgres' -o migrate github.com/mattes/migrate/cli
+
 migrate -database postgres://localhost:5432/database up 2
 ```
 
