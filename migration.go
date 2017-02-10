@@ -7,25 +7,65 @@ import (
 	"time"
 )
 
+// DefaultBufferSize sets the in memory buffer size (in Bytes) for every
+// pre-read migration (see DefaultPrefetchMigrations).
 var DefaultBufferSize = uint(100000)
 
+// Migration holds information about a migration.
+// It is initially created from data coming from the source and then
+// used when run against the database.
 type Migration struct {
-	Identifier    string
-	Version       uint
+	// Identifier can be any string to help identifying
+	// the migration in the source.
+	Identifier string
+
+	// Version is the version of this migration.
+	Version uint
+
+	// TargetVersion is the migration version after this migration
+	// has been applied to the database.
 	TargetVersion int
 
-	Body         io.ReadCloser
+	// Body holds an io.ReadCloser to the source.
+	Body io.ReadCloser
+
+	// BufferedBody holds an buffered io.Reader to the underlying Body.
 	BufferedBody io.Reader
-	BufferSize   uint
+
+	// BufferSize defaults to DefaultBufferSize
+	BufferSize uint
+
+	// bufferWriter holds an io.WriteCloser and pipes to BufferBody.
+	// It's an *Closer for flow control.
 	bufferWriter io.WriteCloser
 
-	Scheduled         time.Time
-	StartedBuffering  time.Time
+	// Scheduled is the time when the migration was scheduled/ queued.
+	Scheduled time.Time
+
+	// StartedBuffering is the time when buffering of the migration source started.
+	StartedBuffering time.Time
+
+	// FinishedBuffering is the time when buffering of the migration source finished.
 	FinishedBuffering time.Time
-	FinishedReading   time.Time
-	BytesRead         int64
+
+	// FinishedReading is the time when the migration source is fully read.
+	FinishedReading time.Time
+
+	// BytesRead holds the number of Bytes read from the migration source.
+	BytesRead int64
 }
 
+// NewMigration returns a new Migration and sets the body, identifier,
+// version and targetVersion. Body can be nil, which turns this migration
+// into a "NilMigration". If no identifier is provided, it will default to "<empty>".
+//
+// What is a NilMigration?
+// Usually each migration version coming from source is expected to have an
+// Up and Down migration. This is not a hard requirement though, leading to
+// a situation where only the Up or Down migration is present. So let's say
+// the user wants to migrate up to a version that doesn't have the actual Up
+// migration, in that case we still want to apply the version, but with an empty
+// body. We are calling that a NilMigration, a migration with an empty body.
 func NewMigration(body io.ReadCloser, identifier string, version uint, targetVersion int) (*Migration, error) {
 	tnow := time.Now()
 	m := &Migration{
@@ -54,10 +94,13 @@ func NewMigration(body io.ReadCloser, identifier string, version uint, targetVer
 	return m, nil
 }
 
+// String implements string.Stringer and is used in tests.
 func (m *Migration) String() string {
 	return fmt.Sprintf("%v [%v=>%v]", m.Identifier, m.Version, m.TargetVersion)
 }
 
+// StringLong returns a string describing this migration to humans.
+// TODO: rename to LogString()
 func (m *Migration) StringLong() string {
 	directionStr := "u"
 	if m.TargetVersion < int(m.Version) {
@@ -66,7 +109,8 @@ func (m *Migration) StringLong() string {
 	return fmt.Sprintf("%v/%v %v", m.Version, directionStr, m.Identifier)
 }
 
-// Buffer buffers up to BufferSize (blocking, call with goroutine)
+// Buffer buffers Body up to BufferSize.
+// Calling this function blocks. Call with goroutine.
 func (m *Migration) Buffer() error {
 	if m.Body == nil {
 		return nil

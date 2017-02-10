@@ -36,6 +36,9 @@ type Github struct {
 	migrations *source.Migrations
 }
 
+type Config struct {
+}
+
 func (g *Github) Open(url string) (source.Driver, error) {
 	u, err := nurl.Parse(url)
 	if err != nil {
@@ -80,7 +83,7 @@ func (g *Github) Open(url string) (source.Driver, error) {
 	return gn, nil
 }
 
-func WithInstance(client *github.Client) (source.Driver, error) {
+func WithInstance(client *github.Client, config *Config) (source.Driver, error) {
 	gn := &Github{
 		client:     client,
 		migrations: source.NewMigrations(),

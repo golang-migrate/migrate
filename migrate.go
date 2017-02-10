@@ -1,3 +1,7 @@
+// Package migrate reads migrations from sources and runs them against databases.
+// Sources are defined by the `source.Driver` and databases by the `database.Driver`
+// interface. The driver interfaces are kept "dump", all migration logic is kept
+// in this package.
 package migrate
 
 import (
@@ -10,6 +14,11 @@ import (
 	"github.com/mattes/migrate/source"
 )
 
+// DefaultPrefetchMigrations sets the number of migrations to pre-read
+// from the source. This is helpful if the source is remote, but has little
+// effect for a local source (i.e. file system).
+// Please note that this setting has a major impact on the memory usage,
+// since each pre-read migration is buffered in memory. See DefaultBufferSize.
 var DefaultPrefetchMigrations = uint(10)
 
 var (
@@ -18,10 +27,13 @@ var (
 	ErrLocked     = fmt.Errorf("database locked")
 )
 
+// ErrShortLimit is an error returned when not enough migrations
+// can be returned by a source for a given limit.
 type ErrShortLimit struct {
 	Short uint
 }
 
+// Error implements the error interface.
 func (e ErrShortLimit) Error() string {
 	return fmt.Sprintf("limit %v short", e.Short)
 }
@@ -32,17 +44,25 @@ type Migrate struct {
 	databaseName string
 	databaseDrv  database.Driver
 
+	// Log accepts a Logger interface
 	Log Logger
 
+	// GracefulStop accepts `true` and will stop executing migrations
+	// as soon as possible at a safe break point, so that the database
+	// is not corrpupted.
 	GracefulStop   chan bool
 	isGracefulStop bool
 
 	isLockedMu *sync.Mutex
 	isLocked   bool
 
+	// PrefetchMigrations defaults to DefaultPrefetchMigrations,
+	// but can be set per Migrate instance.
 	PrefetchMigrations uint
 }
 
+// New returns a new Migrate instance from a source URL and a database URL.
+// The URL scheme is defined by each driver.
 func New(sourceUrl, databaseUrl string) (*Migrate, error) {
 	m := newCommon()
 
@@ -73,6 +93,10 @@ func New(sourceUrl, databaseUrl string) (*Migrate, error) {
 	return m, nil
 }
 
+// NewWithDatabaseInstance returns a new Migrate instance from a source URL
+// and an existing database instance. The source URL scheme is defined by each driver.
+// Use any string that can serve as an identifier during logging as databaseName.
+// You are responsible for closing the underlying database client if necessary.
 func NewWithDatabaseInstance(sourceUrl string, databaseName string, databaseInstance database.Driver) (*Migrate, error) {
 	m := newCommon()
 
@@ -95,6 +119,10 @@ func NewWithDatabaseInstance(sourceUrl string, databaseName string, databaseInst
 	return m, nil
 }
 
+// NewWithSourceInstance returns a new Migrate instance from an existing source instance
+// and a database URL. The database URL scheme is defined by each driver.
+// Use any string that can serve as an identifier during logging as sourceName.
+// You are responsible for closing the underlying source client if necessary.
 func NewWithSourceInstance(sourceName string, sourceInstance source.Driver, databaseUrl string) (*Migrate, error) {
 	m := newCommon()
 
@@ -117,6 +145,10 @@ func NewWithSourceInstance(sourceName string, sourceInstance source.Driver, data
 	return m, nil
 }
 
+// NewWithInstance returns a new Migrate instance from an existing source and
+// database instance. Use any string that can serve as an identifier during logging
+// as sourceName and databaseName. You are responsible for closing down
+// the underlying source and database client if necessary.
 func NewWithInstance(sourceName string, sourceInstance source.Driver, databaseName string, databaseInstance database.Driver) (*Migrate, error) {
 	m := newCommon()
 
@@ -137,6 +169,7 @@ func newCommon() *Migrate {
 	}
 }
 
+// Close closes the the source and the database.
 func (m *Migrate) Close() (sourceErr error, databaseErr error) {
 	databaseSrvClose := make(chan error)
 	sourceSrvClose := make(chan error)
@@ -152,6 +185,8 @@ func (m *Migrate) Close() (sourceErr error, databaseErr error) {
 	return <-sourceSrvClose, <-databaseSrvClose
 }
 
+// Migrate looks at the currently active migration version,
+// then migrates either up or down to the specified version.
 func (m *Migrate) Migrate(version uint) error {
 	if err := m.lock(); err != nil {
 		return err
@@ -168,6 +203,8 @@ func (m *Migrate) Migrate(version uint) error {
 	return m.unlockErr(m.runMigrations(ret))
 }
 
+// Steps looks at the currently active migration version.
+// It will migrate up if n > 0, and down if n < 0.
 func (m *Migrate) Steps(n int) error {
 	if n == 0 {
 		return ErrNoChange
@@ -193,6 +230,8 @@ func (m *Migrate) Steps(n int) error {
 	return m.unlockErr(m.runMigrations(ret))
 }
 
+// Up looks at the currently active migration version
+// and will migrate all the way up (applying all up migrations).
 func (m *Migrate) Up() error {
 	if err := m.lock(); err != nil {
 		return err
@@ -209,6 +248,8 @@ func (m *Migrate) Up() error {
 	return m.unlockErr(m.runMigrations(ret))
 }
 
+// Down looks at the currently active migration version
+// and will migrate all the way down (applying all down migrations).
 func (m *Migrate) Down() error {
 	if err := m.lock(); err != nil {
 		return err
@@ -224,6 +265,7 @@ func (m *Migrate) Down() error {
 	return m.unlockErr(m.runMigrations(ret))
 }
 
+// Drop deletes everyting in the database.
 func (m *Migrate) Drop() error {
 	if err := m.lock(); err != nil {
 		return err
@@ -234,6 +276,8 @@ func (m *Migrate) Drop() error {
 	return m.unlock()
 }
 
+// Version returns the currently active migration version.
+// If no migration has been applied, yet, it will return ErrNilVersion.
 func (m *Migrate) Version() (uint, error) {
 	v, err := m.databaseDrv.Version()
 	if err != nil {
@@ -247,6 +291,10 @@ func (m *Migrate) Version() (uint, error) {
 	return suint(v), nil
 }
 
+// read reads either up or down migrations from source `from` to `to`.
+// Each migration is then written to the ret channel.
+// If an error occurs during reading, that error is written to the ret channel, too.
+// Once read is done reading it will close the ret channel.
 func (m *Migrate) read(from int, to int, ret chan<- interface{}) {
 	defer close(ret)
 
@@ -354,6 +402,11 @@ func (m *Migrate) read(from int, to int, ret chan<- interface{}) {
 	}
 }
 
+// readUp reads up migrations from `from` limitted by `limit`.
+// limit can be -1, implying no limit and reading until there are no more migrations.
+// Each migration is then written to the ret channel.
+// If an error occurs during reading, that error is written to the ret channel, too.
+// Once readUp is done reading it will close the ret channel.
 func (m *Migrate) readUp(from int, limit int, ret chan<- interface{}) {
 	defer close(ret)
 
@@ -441,6 +494,11 @@ func (m *Migrate) readUp(from int, limit int, ret chan<- interface{}) {
 	}
 }
 
+// readDown reads down migrations from `from` limitted by `limit`.
+// limit can be -1, implying no limit and reading until there are no more migrations.
+// Each migration is then written to the ret channel.
+// If an error occurs during reading, that error is written to the ret channel, too.
+// Once readDown is done reading it will close the ret channel.
 func (m *Migrate) readDown(from int, limit int, ret chan<- interface{}) {
 	defer close(ret)
 
@@ -518,7 +576,12 @@ func (m *Migrate) readDown(from int, limit int, ret chan<- interface{}) {
 	}
 }
 
-// ret chan expects *Migration or error
+// runMigrations reads *Migration and error from a channel. Any other type
+// sent on this channel will result in a panic. Each migration is then
+// proxied to the database driver and run against the database.
+// Before running a newly received migration it will check if it's supposed
+// to stop execution because it might have received a stop signal on the
+// GracefulStop channel.
 func (m *Migrate) runMigrations(ret <-chan interface{}) error {
 	for r := range ret {
 
@@ -566,6 +629,8 @@ func (m *Migrate) runMigrations(ret <-chan interface{}) error {
 	return nil
 }
 
+// versionExists checks the source if either the up or down migration for
+// the specified migration version exists.
 func (m *Migrate) versionExists(version uint) error {
 	// try up migration first
 	up, _, err := m.sourceDrv.ReadUp(version)
@@ -592,6 +657,9 @@ func (m *Migrate) versionExists(version uint) error {
 	return os.ErrNotExist
 }
 
+// stop returns true if no more migrations should be run against the database
+// because a stop signal was received on the GracefulStop channel.
+// Calls are cheap and this function is not blocking.
 func (m *Migrate) stop() bool {
 	if m.isGracefulStop {
 		return true
@@ -607,6 +675,8 @@ func (m *Migrate) stop() bool {
 	}
 }
 
+// newMigration is a helper func that returns a *Migration for the
+// specified version and targetVersion.
 func (m *Migrate) newMigration(version uint, targetVersion int) (*Migration, error) {
 	var migr *Migration
 
@@ -660,6 +730,8 @@ func (m *Migrate) newMigration(version uint, targetVersion int) (*Migration, err
 	return migr, nil
 }
 
+// lock is a thread safe helper function to lock the database.
+// It should be called as late as possible when running migrations.
 func (m *Migrate) lock() error {
 	m.isLockedMu.Lock()
 	defer m.isLockedMu.Unlock()
@@ -675,13 +747,15 @@ func (m *Migrate) lock() error {
 	return ErrLocked
 }
 
+// unlock is a thread safe helper function to unlock the database.
+// It should be called as early as possible when no more migrations are
+// expected to be executed.
 func (m *Migrate) unlock() error {
 	m.isLockedMu.Lock()
 	defer m.isLockedMu.Unlock()
 
 	if err := m.databaseDrv.Unlock(); err != nil {
-		// can potentially create deadlock when never succeeds
-		// TODO: add timeout
+		// BUG: Can potentially create a deadlock. Add a timeout.
 		return err
 	}
 
@@ -689,18 +763,23 @@ func (m *Migrate) unlock() error {
 	return nil
 }
 
+// unlockErr calls unlock and returns a combined error
+// if a prevErr is not nil.
 func (m *Migrate) unlockErr(prevErr error) error {
 	if err := m.unlock(); err != nil {
 		return NewMultiError(prevErr, err)
 	}
 	return prevErr
 }
+
+// logPrintf writes to m.Log if not nil
 func (m *Migrate) logPrintf(format string, v ...interface{}) {
 	if m.Log != nil {
 		m.Log.Printf(format, v...)
 	}
 }
 
+// logVerbosePrintf writes to m.Log if not nil. Use for verbose logging output.
 func (m *Migrate) logVerbosePrintf(format string, v ...interface{}) {
 	if m.Log != nil && m.Log.Verbose() {
 		m.Log.Printf(format, v...)

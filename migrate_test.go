@@ -2,8 +2,10 @@ package migrate
 
 import (
 	"bytes"
+	"database/sql"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"testing"
 
@@ -15,7 +17,6 @@ import (
 // u = up migration, d = down migration, n = version
 //  |  1  |  -  |  3  |  4  |  5  |  -  |  7  |
 //  | u d |  -  | u   | u d |   d |  -  | u d |
-// var sourceStubMigrations  = source.NewMigrations()
 
 var sourceStubMigrations *source.Migrations
 
@@ -54,6 +55,19 @@ func TestNew(t *testing.T) {
 	}
 }
 
+func ExampleNew() {
+	// Read migrations from /home/mattes/migrations and connect to a local postgres database.
+	m, err := New("file:///home/mattes/migrations", "postgres://mattes:secret@localhost:5432/database?sslmode=disable")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Migrate all the way up ...
+	if err := m.Up(); err != nil {
+		log.Fatal(err)
+	}
+}
+
 func TestNewWithDatabaseInstance(t *testing.T) {
 	dummyDb := &DummyInstance{"database"}
 	dbInst, err := dStub.WithInstance(dummyDb, &dStub.Config{})
@@ -81,6 +95,34 @@ func TestNewWithDatabaseInstance(t *testing.T) {
 	}
 }
 
+func ExampleNewWithDatabaseInstance() {
+	// Create and use an existing database instance.
+	db, err := sql.Open("postgres", "postgres://mattes:secret@localhost:5432/database?sslmode=disable")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	// Create driver instance from db.
+	// Check each driver if it supports the WithInstance function.
+	// `import "github.com/mattes/migrate/database/postgres"`
+	instance, err := dStub.WithInstance(db, &dStub.Config{})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Read migrations from /home/mattes/migrations and connect to a local postgres database.
+	m, err := NewWithDatabaseInstance("file:///home/mattes/migrations", "postgres", instance)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Migrate all the way up ...
+	if err := m.Up(); err != nil {
+		log.Fatal(err)
+	}
+}
+
 func TestNewWithSourceInstance(t *testing.T) {
 	dummySource := &DummyInstance{"source"}
 	sInst, err := sStub.WithInstance(dummySource, &sStub.Config{})
@@ -105,6 +147,29 @@ func TestNewWithSourceInstance(t *testing.T) {
 	}
 	if m.databaseDrv == nil {
 		t.Error("expected databaseDrv not to be nil")
+	}
+}
+
+func ExampleNewWithSourceInstance() {
+	di := &DummyInstance{"think any client required for a source here"}
+
+	// Create driver instance from DummyInstance di.
+	// Check each driver if it support the WithInstance function.
+	// `import "github.com/mattes/migrate/source/stub"`
+	instance, err := sStub.WithInstance(di, &sStub.Config{})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Read migrations from Stub and connect to a local postgres database.
+	m, err := NewWithSourceInstance("stub", instance, "postgres://mattes:secret@localhost:5432/database?sslmode=disable")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Migrate all the way up ...
+	if err := m.Up(); err != nil {
+		log.Fatal(err)
 	}
 }
 
@@ -139,6 +204,10 @@ func TestNewWithInstance(t *testing.T) {
 	if m.databaseDrv == nil {
 		t.Error("expected databaseDrv not to be nil")
 	}
+}
+
+func ExampleNewWithInstance() {
+	// See NewWithDatabaseInstance and NewWithSourceInstance for an example.
 }
 
 func TestClose(t *testing.T) {

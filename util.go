@@ -9,10 +9,12 @@ import (
 	"time"
 )
 
+// MultiError holds multiple errors.
 type MultiError struct {
 	Errs []error
 }
 
+// NewMultiError returns an error type holding multiple errors.
 func NewMultiError(errs ...error) MultiError {
 	compactErrs := make([]error, 0)
 	for _, e := range errs {
@@ -23,6 +25,7 @@ func NewMultiError(errs ...error) MultiError {
 	return MultiError{compactErrs}
 }
 
+// Error implements error. Mulitple errors are concatenated with 'and's.
 func (m MultiError) Error() string {
 	var strs = make([]string, 0)
 	for _, e := range m.Errs {
@@ -72,7 +75,7 @@ func (b *slowReader) Close() error {
 	return b.rx.Close()
 }
 
-var ErrNoName = fmt.Errorf("no name")
+var errNoName = fmt.Errorf("no name")
 
 func nameFromUrl(url string) (string, error) {
 	u, err := nurl.Parse(url)
@@ -81,7 +84,7 @@ func nameFromUrl(url string) (string, error) {
 	}
 
 	if len(u.Scheme) == 0 {
-		return "", ErrNoName
+		return "", errNoName
 	}
 
 	return u.Scheme, nil

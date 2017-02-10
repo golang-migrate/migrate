@@ -1,3 +1,5 @@
+// Deprecated: package file is deprecated.
+// Will be removed soon.
 package file
 
 import (

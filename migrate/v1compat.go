@@ -1,4 +1,5 @@
-// Deprecated: package migrate is here to make sure v2 is downwards compatible with v1
+// Deprecated: package migrate makes this version backwards compatible.
+// Expect this to be removed very soon.
 package migrate
 
 import (

@@ -1,3 +1,5 @@
+// Deprecated: package direction is deprecated.
+// Will be removed soon.
 package direction
 
 type Direction int
