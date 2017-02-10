@@ -37,3 +37,20 @@ func ExampleNewMigration_nilMigration() {
 	// Output:
 	// 1486686016/u <empty>
 }
+
+func ExampleNewMigration_nilVersion() {
+	// Create a dummy migration body, this is coming from the source usually.
+	body := ioutil.NopCloser(strings.NewReader("dumy migration that deletes users table"))
+
+	// Create a new Migration that represents version 1486686016.
+	// This is the last available down migration, so the migration version
+	// will be -1, meaning NilVersion once this migration ran.
+	migr, err := NewMigration(body, "drop_users_table", 1486686016, -1)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Print(migr.StringLong())
+	// Output:
+	// 1486686016/d drop_users_table
+}

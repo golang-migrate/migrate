@@ -424,6 +424,28 @@ func TestVersion(t *testing.T) {
 	}
 }
 
+func TestRun(t *testing.T) {
+	m, _ := New("stub://", "stub://")
+
+	mx, err := NewMigration(nil, "", 1, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := m.Run(mx); err != nil {
+		t.Fatal(err)
+	}
+
+	v, err := m.Version()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if v != 2 {
+		t.Errorf("expected version 2, got %v", v)
+	}
+}
+
 func TestRead(t *testing.T) {
 	m, _ := New("stub://", "stub://")
 	m.sourceDrv.(*sStub.Stub).Migrations = sourceStubMigrations

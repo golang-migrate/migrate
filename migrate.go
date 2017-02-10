@@ -170,7 +170,7 @@ func newCommon() *Migrate {
 }
 
 // Close closes the the source and the database.
-func (m *Migrate) Close() (sourceErr error, databaseErr error) {
+func (m *Migrate) Close() (source error, database error) {
 	databaseSrvClose := make(chan error)
 	sourceSrvClose := make(chan error)
 
@@ -274,6 +274,38 @@ func (m *Migrate) Drop() error {
 		return m.unlockErr(err)
 	}
 	return m.unlock()
+}
+
+// Run runs any migration provided by you against the database.
+// It does not check any currently active version in database.
+// Usually you don't need this function at all. Use Migrate,
+// Steps, Up or Down instead.
+func (m *Migrate) Run(migration ...*Migration) error {
+	if len(migration) == 0 {
+		return ErrNoChange
+	}
+
+	if err := m.lock(); err != nil {
+		return err
+	}
+
+	ret := make(chan interface{}, m.PrefetchMigrations)
+
+	go func() {
+		defer close(ret)
+		for _, migr := range migration {
+			if m.PrefetchMigrations > 0 && migr.Body != nil {
+				m.logVerbosePrintf("Start buffering %v\n", migr.StringLong())
+			} else {
+				m.logVerbosePrintf("Scheduled %v\n", migr.StringLong())
+			}
+
+			ret <- migr
+			go migr.Buffer()
+		}
+	}()
+
+	return m.unlockErr(m.runMigrations(ret))
 }
 
 // Version returns the currently active migration version.

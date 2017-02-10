@@ -24,6 +24,7 @@ type Migration struct {
 
 	// TargetVersion is the migration version after this migration
 	// has been applied to the database.
+	// Can be -1, implying that this is a NilVersion.
 	TargetVersion int
 
 	// Body holds an io.ReadCloser to the source.
@@ -58,6 +59,7 @@ type Migration struct {
 // NewMigration returns a new Migration and sets the body, identifier,
 // version and targetVersion. Body can be nil, which turns this migration
 // into a "NilMigration". If no identifier is provided, it will default to "<empty>".
+// targetVersion can be -1, implying it is a NilVersion.
 //
 // What is a NilMigration?
 // Usually each migration version coming from source is expected to have an
@@ -66,7 +68,13 @@ type Migration struct {
 // the user wants to migrate up to a version that doesn't have the actual Up
 // migration, in that case we still want to apply the version, but with an empty
 // body. We are calling that a NilMigration, a migration with an empty body.
-func NewMigration(body io.ReadCloser, identifier string, version uint, targetVersion int) (*Migration, error) {
+//
+// What is a NilVersion?
+// NilVersion is a const(-1). When running down migrations and we are at the
+// last down migration, there is no next down migration, the targetVersion should
+// be nil. Nil in this case is represented by -1 (because type int).
+func NewMigration(body io.ReadCloser, identifier string,
+	version uint, targetVersion int) (*Migration, error) {
 	tnow := time.Now()
 	m := &Migration{
 		Identifier:    identifier,
