@@ -14,10 +14,10 @@ import (
 	sStub "github.com/mattes/migrate/source/stub"
 )
 
+// sourceStubMigrations hold the following migrations:
 // u = up migration, d = down migration, n = version
 //  |  1  |  -  |  3  |  4  |  5  |  -  |  7  |
 //  | u d |  -  | u   | u d |   d |  -  | u d |
-
 var sourceStubMigrations *source.Migrations
 
 func init() {
