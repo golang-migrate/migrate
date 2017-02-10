@@ -107,7 +107,7 @@ func (m *Migration) String() string {
 	return fmt.Sprintf("%v [%v=>%v]", m.Identifier, m.Version, m.TargetVersion)
 }
 
-// StringLong returns a string describing this migration to humans.
+// LogString returns a string describing this migration to humans.
 func (m *Migration) LogString() string {
 	directionStr := "u"
 	if m.TargetVersion < int(m.Version) {
