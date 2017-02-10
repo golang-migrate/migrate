@@ -46,8 +46,8 @@ func suint(n int) uint {
 	return uint(n)
 }
 
-// newSlowReader turns an io.Reader into a slow io.Reader
-// use to simulate a slow internet connection
+// newSlowReader turns an io.ReadCloser into a slow io.ReadCloser.
+// Use this to simulate a slow internet connection.
 func newSlowReader(r io.ReadCloser) io.ReadCloser {
 	return &slowReader{
 		rx:     r,
@@ -75,16 +75,17 @@ func (b *slowReader) Close() error {
 	return b.rx.Close()
 }
 
-var errNoName = fmt.Errorf("no name")
+var errNoScheme = fmt.Errorf("no scheme")
 
-func nameFromUrl(url string) (string, error) {
+// schemeFromUrl returns the scheme from a URL string
+func schemeFromUrl(url string) (string, error) {
 	u, err := nurl.Parse(url)
 	if err != nil {
 		return "", err
 	}
 
 	if len(u.Scheme) == 0 {
-		return "", errNoName
+		return "", errNoScheme
 	}
 
 	return u.Scheme, nil
