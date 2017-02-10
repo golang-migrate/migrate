@@ -108,8 +108,7 @@ func (m *Migration) String() string {
 }
 
 // StringLong returns a string describing this migration to humans.
-// TODO: rename to LogString()
-func (m *Migration) StringLong() string {
+func (m *Migration) LogString() string {
 	directionStr := "u"
 	if m.TargetVersion < int(m.Version) {
 		directionStr = "d"

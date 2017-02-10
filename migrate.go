@@ -295,9 +295,9 @@ func (m *Migrate) Run(migration ...*Migration) error {
 		defer close(ret)
 		for _, migr := range migration {
 			if m.PrefetchMigrations > 0 && migr.Body != nil {
-				m.logVerbosePrintf("Start buffering %v\n", migr.StringLong())
+				m.logVerbosePrintf("Start buffering %v\n", migr.LogString())
 			} else {
-				m.logVerbosePrintf("Scheduled %v\n", migr.StringLong())
+				m.logVerbosePrintf("Scheduled %v\n", migr.LogString())
 			}
 
 			ret <- migr
@@ -629,13 +629,13 @@ func (m *Migrate) runMigrations(ret <-chan interface{}) error {
 			migr := r.(*Migration)
 
 			if migr.Body == nil {
-				m.logVerbosePrintf("Execute %v\n", migr.StringLong())
+				m.logVerbosePrintf("Execute %v\n", migr.LogString())
 				if err := m.databaseDrv.Run(migr.TargetVersion, nil); err != nil {
 					return err
 				}
 
 			} else {
-				m.logVerbosePrintf("Read and execute %v\n", migr.StringLong())
+				m.logVerbosePrintf("Read and execute %v\n", migr.LogString())
 				if err := m.databaseDrv.Run(migr.TargetVersion, migr.BufferedBody); err != nil {
 					return err
 				}
@@ -648,9 +648,9 @@ func (m *Migrate) runMigrations(ret <-chan interface{}) error {
 			// log either verbose or normal
 			if m.Log != nil {
 				if m.Log.Verbose() {
-					m.logPrintf("Finished %v (read %v, ran %v)\n", migr.StringLong(), readTime, runTime)
+					m.logPrintf("Finished %v (read %v, ran %v)\n", migr.LogString(), readTime, runTime)
 				} else {
-					m.logPrintf("%v (%v)\n", migr.StringLong(), readTime+runTime)
+					m.logPrintf("%v (%v)\n", migr.LogString(), readTime+runTime)
 				}
 			}
 
@@ -754,9 +754,9 @@ func (m *Migrate) newMigration(version uint, targetVersion int) (*Migration, err
 	}
 
 	if m.PrefetchMigrations > 0 && migr.Body != nil {
-		m.logVerbosePrintf("Start buffering %v\n", migr.StringLong())
+		m.logVerbosePrintf("Start buffering %v\n", migr.LogString())
 	} else {
-		m.logVerbosePrintf("Scheduled %v\n", migr.StringLong())
+		m.logVerbosePrintf("Scheduled %v\n", migr.LogString())
 	}
 
 	return migr, nil

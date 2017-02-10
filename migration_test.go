@@ -19,7 +19,7 @@ func ExampleNewMigration() {
 		log.Fatal(err)
 	}
 
-	fmt.Print(migr.StringLong())
+	fmt.Print(migr.LogString())
 	// Output:
 	// 1486686016/u create_users_table
 }
@@ -33,7 +33,7 @@ func ExampleNewMigration_nilMigration() {
 		log.Fatal(err)
 	}
 
-	fmt.Print(migr.StringLong())
+	fmt.Print(migr.LogString())
 	// Output:
 	// 1486686016/u <empty>
 }
@@ -50,7 +50,7 @@ func ExampleNewMigration_nilVersion() {
 		log.Fatal(err)
 	}
 
-	fmt.Print(migr.StringLong())
+	fmt.Print(migr.LogString())
 	// Output:
 	// 1486686016/d drop_users_table
 }
