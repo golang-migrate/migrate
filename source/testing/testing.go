@@ -1,3 +1,6 @@
+// Package testing has the source tests.
+// All source drivers must pass the Test function.
+// This lives in it's own package so it stays a test dependency.
 package testing
 
 import (
@@ -7,13 +10,14 @@ import (
 	"github.com/mattes/migrate/source"
 )
 
-// Test tests a driver implementation
-// It assumes the following migration "files"
+// Test runs tests against source implementations.
+// It assumes that the driver tests has access to the following migrations:
 //
-// u = up file, d = down file, n = version
-//
+// u = up migration, d = down migration, n = version
 //  |  1  |  -  |  3  |  4  |  5  |  -  |  7  |
 //  | u d |  -  | u   | u d |   d |  -  | u d |
+//
+// See source/stub/stub_test.go or source/file/file_test.go for an example.
 func Test(t *testing.T, d source.Driver) {
 	TestFirst(t, d)
 	TestPrev(t, d)

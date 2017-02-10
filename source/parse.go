@@ -6,16 +6,21 @@ import (
 	"strconv"
 )
 
-var ErrParse = fmt.Errorf("no match")
+var (
+	ErrParse = fmt.Errorf("no match")
+)
 
-var DefaultParse = Parse
+var (
+	DefaultParse = Parse
+	DefaultRegex = Regex
+)
 
-var DefaultRegex = Regex
-
-// filename example: `123_name.up.ext`
-// filename example: `123_name.down.ext`
+// Regex matches the following pattern:
+//  123_name.up.ext
+//  123_name.down.ext
 var Regex = regexp.MustCompile(`^([0-9]+)_(.*)\.(` + string(Down) + `|` + string(Up) + `)\.(.*)$`)
 
+// Parse returns Migration for matching Regex pattern.
 func Parse(raw string) (*Migration, error) {
 	m := Regex.FindStringSubmatch(raw)
 	if len(m) == 5 {

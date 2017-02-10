@@ -1,3 +1,6 @@
+// Package testing has the database tests.
+// All database drivers must pass the Test function.
+// This lives in it's own package so it stays a test dependency.
 package testing
 
 import (
@@ -8,6 +11,7 @@ import (
 	"github.com/mattes/migrate/database"
 )
 
+// Test runs tests against database implementations.
 func Test(t *testing.T, d database.Driver, migration []byte) {
 	if migration == nil {
 		panic("test must provide migration reader")

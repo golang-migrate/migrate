@@ -4,6 +4,7 @@ import (
 	"sort"
 )
 
+// Direction is either up or down.
 type Direction string
 
 const (
@@ -11,13 +12,27 @@ const (
 	Up             = "up"
 )
 
+// Migration is a helper struct for source drivers that need to
+// build the full directory tree in memory.
+// Migration is fully independent from migrate.Migration.
 type Migration struct {
-	Version    uint
+	// Version is the version of this migration.
+	Version uint
+
+	// Identifier can be any string that helps identifying
+	// this migration in the source.
 	Identifier string
-	Direction  Direction
-	Raw        string
+
+	// Direction is either Up or Down.
+	Direction Direction
+
+	// Raw holds the raw location path to this migration in source.
+	// ReadUp and ReadDown will use this.
+	Raw string
 }
 
+// Migrations wraps Migration and has an internal index
+// to keep track of Migration order.
 type Migrations struct {
 	index      uintSlice
 	migrations map[uint]map[Direction]*Migration
