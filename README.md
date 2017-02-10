@@ -1,3 +1,7 @@
+__[v3.0 in the making](https://github.com/mattes/migrate/tree/v3.0-prev)__
+
+---
+
 # migrate
 
 [![Build Status](https://travis-ci.org/mattes/migrate.svg?branch=master)](https://travis-ci.org/mattes/migrate)
