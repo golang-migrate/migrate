@@ -10,7 +10,7 @@
   7. `make restore-import-paths` to restore import paths
   8. Push code and open Pull Request
  
-Some more notes:
+Some more helpful commands:
 
   * You can specify which database/ source tests to run:  
     `make test-short SOURCE='file go-bindata' DATABASE='postgres cassandra'`

@@ -20,13 +20,24 @@ const NilVersion int = -1
 var driversMu sync.RWMutex
 var drivers = make(map[string]Driver)
 
-// Driver is an interface every driver must implement.
-// The driver implementation must pass the `Test` in database/testing.
-// Optionally provide a `WithInstance` function, so users can bypass `Open`
-// and use an existing database instance.
+// Driver is the interface every database driver must implement.
 //
-// Implementations must not assume things nor try to correct user input.
-// If in doubt, return an error.
+// How to implement a database driver?
+//   1. Implement this interface.
+//   2. Optionally, add a function named `WithInstance`.
+//      This function should accept an existing DB instance and a Config{} struct
+//      and return a driver instance.
+//   3. Add a test that calls database/testing.go:Test()
+//   4. Add own tests for Open(), WithInstance() (when provided) and Close().
+//      All other functions are tested by tests in database/testing.
+//      Saves you some time and makes sure all database drivers behave the same way.
+//   5. Call Register in init().
+//
+// Guidelines:
+//   * Don't try to correct user input. Don't assume things.
+//     When in doubt, return an error and explain the situation to the user.
+//   * All configuration input must come from the URL string in func Open()
+//     or the Config{} struct in WithInstance. Don't os.Getenv().
 type Driver interface {
 	// Open returns a new driver instance configured with parameters
 	// coming from the URL string. Migrate will call this function

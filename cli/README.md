@@ -1,12 +1,35 @@
-# CLI
+# migrate CLI
 
 ## Installation
 
+#### With Go toolchain
+
 ```
-# dowload, build and install the CLI tool
-# -tags takes database and source drivers and will only build those
 $ go get -u -tags 'postgres' -o migrate github.com/mattes/migrate/cli
 ```
+
+#### MacOS
+
+```
+$ brew install migrate --with-postgres
+```
+
+#### Linux (with deb package)
+
+```
+# TODO: add key and repo
+$ apt-get update
+$ apt-get install migrate
+```
+
+#### Download pre-build binary (Windows, MacOS, or Linux)
+
+[Release Downloads](https://github.com/mattes/migrate/releases)
+
+```
+$ curl -L https://github.com/mattes/migrate/releases/download/$version/migrate.$platform-amd64.tar.gz | tar xvz
+```
+
 
 
 ## Usage
@@ -31,13 +54,49 @@ Commands:
   down [N]     Apply all or N down migrations
   drop         Drop everyting inside database
   version      Print current migration version
-
-
-# so let's say you want to run the first two migrations
-migrate -database postgres://localhost:5432/database up 2
-
-# if your migrations are hosted on github
-migrate -source github://mattes:personal-access-token@mattes/migrate_test \
-  -database postgres://localhost:5432/database down 2
 ```
+
+
+So let's say you want to run the first two migrations
+
+```
+$ migrate -database postgres://localhost:5432/database up 2
+```
+
+If your migrations are hosted on github
+
+```
+$ migrate -source github://mattes:personal-access-token@mattes/migrate_test \
+    -database postgres://localhost:5432/database down 2
+```
+
+The CLI will gracefully stop at a safe point when SIGINT (ctrl+c) is received.
+Send SIGKILL for immediate halt.
+
+
+
+## Reading CLI arguments from somewhere else
+
+##### ENV variables
+
+```
+$ migrate -database "$MY_MIGRATE_DATABASE"
+```
+
+##### JSON files
+
+Check out https://stedolan.github.io/jq/
+
+```
+$ migrate -database "$(cat config.json | jq '.database')"
+```
+
+##### YAML files
+
+````
+$ migrate -database "$(cat config/database.yml | ruby -ryaml -e "print YAML.load(STDIN.read)['database']")"
+$ migrate -database "$(cat config/database.yml | python -c 'import yaml,sys;print yaml.safe_load(sys.stdin)["database"]')"
+```
+
+
 
