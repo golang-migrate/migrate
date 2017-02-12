@@ -51,6 +51,10 @@ test-with-flags:
 	@go test ./migrate/...
 
 
+kill-orphaned-docker-containers:
+	docker rm -f $(shell docker ps -aq --filter label=migrate_test)
+
+
 html-coverage:
 	go tool cover -html=.coverage/combined.txt
 
@@ -113,7 +117,7 @@ endef
 
 .PHONY: build-cli clean test-short test test-with-flags deps html-coverage \
         restore-import-paths rewrite-import-paths list-external-deps release \
-        docs kill-docs open-docs
+        docs kill-docs open-docs kill-orphaned-docker-containers
 
 SHELL = /bin/bash
 RAND = $(shell echo $$RANDOM)

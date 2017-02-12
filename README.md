@@ -66,7 +66,7 @@ $ migrate -database postgres://localhost:5432/database up 2
  * To help prevent database corruptions, it supports graceful stops via `GracefulStop chan bool`.
  * Bring your own logger.
  * Uses `io.Reader` streams internally for low memory overhead.
- * Thread-safe.
+ * Thread-safe and no goroutine leaks.
 
 __[Go Documentation](https://godoc.org/github.com/mattes/migrate)__
 

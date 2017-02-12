@@ -5,8 +5,10 @@ package testing
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"testing"
+	"time"
 
 	"github.com/mattes/migrate/database"
 )
@@ -35,7 +37,25 @@ func TestNilVersion(t *testing.T, d database.Driver) {
 }
 
 func TestLockAndUnlock(t *testing.T, d database.Driver) {
-	// TODO: add timeouts, in case something goes wrong
+	// add a timeout, in case there is a deadlock
+	done := make(chan bool, 1)
+	go func() {
+		timeout := time.After(15 * time.Second)
+		for {
+			select {
+			case <-done:
+				return
+			case <-timeout:
+				panic(fmt.Sprintf("Timeout after 15 seconds. Looks like a deadlock in Lock/UnLock.\n%#v", d))
+			}
+		}
+	}()
+	defer func() {
+		done <- true
+	}()
+
+	// run the locking test ...
+
 	if err := d.Lock(); err != nil {
 		t.Fatal(err)
 	}

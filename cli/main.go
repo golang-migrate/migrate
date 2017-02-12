@@ -20,6 +20,7 @@ func main() {
 	versionPtr := flag.Bool("version", false, "")
 	verbosePtr := flag.Bool("verbose", false, "")
 	prefetchPtr := flag.Uint("prefetch", 10, "")
+	lockTimeoutPtr := flag.Uint("lock-timeout", 15, "")
 	pathPtr := flag.String("path", "", "")
 	databasePtr := flag.String("database", "", "")
 	sourcePtr := flag.String("source", "", "")
@@ -30,13 +31,14 @@ func main() {
        migrate [ -version | -help ]
 
 Options:
-  -source      Location of the migrations (driver://url)
-  -path        Shorthand for -source=file://path 
-  -database    Run migrations against this database (driver://url)
-  -prefetch N  Number of migrations to load in advance before executing (default 10)
-  -verbose     Print verbose logging
-  -version     Print version
-  -help        Print usage
+  -source          Location of the migrations (driver://url)
+  -path            Shorthand for -source=file://path 
+  -database        Run migrations against this database (driver://url)
+  -prefetch N      Number of migrations to load in advance before executing (default 10)
+  -lock-timeout N  Allow N seconds to acquire database lock (default 15)
+  -verbose         Print verbose logging
+  -version         Print version
+  -help            Print usage
 
 Commands:
   goto V       Migrate to version V
@@ -81,6 +83,7 @@ Commands:
 	if migraterErr == nil {
 		migrater.Log = log
 		migrater.PrefetchMigrations = *prefetchPtr
+		migrater.LockTimeout = time.Duration(int64(*lockTimeoutPtr)) * time.Second
 
 		// handle Ctrl+c
 		signals := make(chan os.Signal, 1)

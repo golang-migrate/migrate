@@ -16,27 +16,44 @@ func init() {
 	database.Register("postgres", &Postgres{})
 }
 
+var (
+	ErrNilConfig      = fmt.Errorf("no config")
+	ErrNoDatabaseName = fmt.Errorf("no database name")
+)
+
 type Config struct {
+	// DatbaseName is the name of the database
+	DatabaseName string
 }
 
 func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
-	return &Postgres{
+	if config == nil {
+		return nil, ErrNilConfig
+	}
+
+	if len(config.DatabaseName) == 0 {
+		return nil, ErrNoDatabaseName
+	}
+
+	px := &Postgres{
 		db:     instance,
 		config: config,
-	}, nil
+	}
+
+	if err := px.ensureVersionTable(); err != nil {
+		return nil, err
+	}
+
+	return px, nil
 }
 
 type Postgres struct {
 	db       *sql.DB
-	url      *nurl.URL
 	isLocked bool
-	config   *Config
-}
 
-var (
-	ErrNoSqlInstance  = fmt.Errorf("expected *sql.DB")
-	ErrNoDatabaseName = fmt.Errorf("no database name")
-)
+	// Open and WithInstance need to garantuee that config is never nil
+	config *Config
+}
 
 const tableName = "schema_migrations"
 
@@ -51,15 +68,14 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 		return nil, err
 	}
 
-	if err := db.Ping(); err != nil {
+	px, err := WithInstance(db, &Config{
+		DatabaseName: purl.Path,
+	})
+	if err != nil {
 		return nil, err
 	}
 
-	px := &Postgres{
-		db:  db,
-		url: purl,
-	}
-	if err := px.ensureVersionTable(); err != nil {
+	if err := db.Ping(); err != nil {
 		return nil, err
 	}
 
@@ -211,14 +227,7 @@ const AdvisoryLockIdSalt uint = 1486364155
 
 // inspired by rails migrations, see https://goo.gl/8o9bCT
 func (p *Postgres) generateAdvisoryLockId() (string, error) {
-	if p.url == nil {
-		return "", ErrNoDatabaseName
-	}
-	dbname := p.url.Path
-	if len(dbname) == 0 {
-		return "", ErrNoDatabaseName
-	}
-	sum := crc32.ChecksumIEEE([]byte(dbname))
+	sum := crc32.ChecksumIEEE([]byte(p.config.DatabaseName))
 	sum = sum * uint32(AdvisoryLockIdSalt)
 	return fmt.Sprintf("%v", sum), nil
 }

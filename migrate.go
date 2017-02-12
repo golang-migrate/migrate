@@ -21,10 +21,14 @@ import (
 // since each pre-read migration is buffered in memory. See DefaultBufferSize.
 var DefaultPrefetchMigrations = uint(10)
 
+// DefaultLockTimeout sets the max time a database driver has to acquire a lock.
+var DefaultLockTimeout = 15 * time.Second
+
 var (
-	ErrNoChange   = fmt.Errorf("no change")
-	ErrNilVersion = fmt.Errorf("no migration")
-	ErrLocked     = fmt.Errorf("database locked")
+	ErrNoChange    = fmt.Errorf("no change")
+	ErrNilVersion  = fmt.Errorf("no migration")
+	ErrLocked      = fmt.Errorf("database locked")
+	ErrLockTimeout = fmt.Errorf("timeout: can't acquire database lock")
 )
 
 // ErrShortLimit is an error returned when not enough migrations
@@ -59,6 +63,10 @@ type Migrate struct {
 	// PrefetchMigrations defaults to DefaultPrefetchMigrations,
 	// but can be set per Migrate instance.
 	PrefetchMigrations uint
+
+	// LockTimeout defaults to DefaultLockTimeout,
+	// but can be set per Migrate instance.
+	LockTimeout time.Duration
 }
 
 // New returns a new Migrate instance from a source URL and a database URL.
@@ -165,6 +173,7 @@ func newCommon() *Migrate {
 	return &Migrate{
 		GracefulStop:       make(chan bool, 1),
 		PrefetchMigrations: DefaultPrefetchMigrations,
+		LockTimeout:        DefaultLockTimeout,
 		isLockedMu:         &sync.Mutex{},
 	}
 }
@@ -173,6 +182,8 @@ func newCommon() *Migrate {
 func (m *Migrate) Close() (source error, database error) {
 	databaseSrvClose := make(chan error)
 	sourceSrvClose := make(chan error)
+
+	m.logVerbosePrintf("Closing source and database\n")
 
 	go func() {
 		databaseSrvClose <- m.databaseDrv.Close()
@@ -768,15 +779,49 @@ func (m *Migrate) lock() error {
 	m.isLockedMu.Lock()
 	defer m.isLockedMu.Unlock()
 
-	if !m.isLocked {
-		if err := m.databaseDrv.Lock(); err != nil {
-			return err
-		}
-		m.isLocked = true
-		return nil
+	if m.isLocked {
+		return ErrLocked
 	}
 
-	return ErrLocked
+	// create done channel, used in the timeout goroutine
+	done := make(chan bool, 1)
+	defer func() {
+		done <- true
+	}()
+
+	// use errchan to signal error back to this context
+	errchan := make(chan error, 2)
+
+	// start timeout goroutine
+	timeout := time.After(m.LockTimeout)
+	go func() {
+		for {
+			select {
+			case <-done:
+				return
+			case <-timeout:
+				errchan <- ErrLockTimeout
+				return
+			}
+		}
+	}()
+
+	// now try to acquire the lock
+	go func() {
+		if err := m.databaseDrv.Lock(); err != nil {
+			errchan <- err
+		} else {
+			errchan <- nil
+		}
+		return
+	}()
+
+	// wait until we either recieve ErrLockTimeout or error from Lock operation
+	err := <-errchan
+	if err == nil {
+		m.isLocked = true
+	}
+	return err
 }
 
 // unlock is a thread safe helper function to unlock the database.

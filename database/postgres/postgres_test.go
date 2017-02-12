@@ -7,7 +7,6 @@ import (
 	"database/sql"
 	"fmt"
 	"io"
-	nurl "net/url"
 	"testing"
 
 	"github.com/lib/pq"
@@ -113,12 +112,7 @@ func TestWithInstance(t *testing.T) {
 
 func TestGenerateAdvisoryLockId(t *testing.T) {
 	p := &Postgres{}
-
-	if _, err := p.generateAdvisoryLockId(); err == nil {
-		t.Errorf("expected err not to be nil")
-	}
-
-	p.url = &nurl.URL{Path: "database_name"}
+	p.config = &Config{DatabaseName: "database_name"}
 	id, err := p.generateAdvisoryLockId()
 	if err != nil {
 		t.Errorf("expected err to be nil, got %v", err)
