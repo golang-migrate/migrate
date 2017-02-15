@@ -51,6 +51,7 @@ type Driver interface {
 	// Lock should acquire a database lock so that only one migration process
 	// can run at a time. Migrate will call this function before Run is called.
 	// If the implementation can't provide this functionality, return nil.
+	// Return database.ErrLocked if database is already locked.
 	Lock() error
 
 	// Unlock should release the lock. Migrate will call this function after
