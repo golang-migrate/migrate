@@ -85,6 +85,26 @@ func main() {
 }
 ```
 
+Want to use an existing database client?
+
+```go
+import (
+    "database/sql"
+    _ "github.com/lib/pq"
+    "github.com/mattes/migrate/migrate"
+    "github.com/mattes/migrate/database/postgres"
+)
+
+func main() {
+    db, err := sql.Open("postgres", "postgres://localhost:5432/database?sslmode=enable")
+    driver, err := postgres.WithInstance(db, &postgres.Config{})
+    m, err := migrate.NewWithDatabaseInstance(
+        "file:///migrations",
+        "postgres", driver)
+    m.Steps(2)
+}
+```
+
 ## Migration files
 
 Each migration has an up and down migration. [Why?](FAQ.md#why-two-separate-files-up-and-down-for-a-migration)
