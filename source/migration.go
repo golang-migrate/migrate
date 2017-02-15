@@ -116,10 +116,9 @@ func (i *Migrations) Down(version uint) (m *Migration, ok bool) {
 
 func (i *Migrations) findPos(version uint) int {
 	if len(i.index) > 0 {
-		for i, v := range i.index {
-			if v == version {
-				return i
-			}
+		ix := i.index.Search(version)
+		if ix < len(i.index) && i.index[ix] == version {
+			return ix
 		}
 	}
 	return -1
@@ -137,4 +136,8 @@ func (s uintSlice) Swap(i, j int) {
 
 func (s uintSlice) Less(i, j int) bool {
 	return s[i] < s[j]
+}
+
+func (s uintSlice) Search(x uint) int {
+	return sort.Search(len(s), func(i int) bool { return s[i] >= x })
 }
