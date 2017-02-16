@@ -1,3 +1,4 @@
+// Package testing is used in driver tests.
 package testing
 
 import (
