@@ -38,8 +38,8 @@ Source drivers read migrations from local or remote sources. [Add a new source?]
   * [Filesystem](source/file) - read from fileystem (always included)
   * [Go-Bindata](source/go-bindata) - read from embedded binary data ([jteeuwen/go-bindata](https://github.com/jteeuwen/go-bindata))
   * [Github](source/github) - read from remote Github repositories
-  * [AWS S3](source/aws-s3) - read from Amazon Web Services S3
-  * [Google Cloud Storage](source/google-cloud-storage) - read from Google Cloud Platform Storage
+  * [AWS S3](source/aws-s3) - read from Amazon Web Services S3 ([todo: #162](https://github.com/mattes/migrate/issues/162))
+  * [Google Cloud Storage](source/google-cloud-storage) - read from Google Cloud Platform Storage ([todo: #163](https://github.com/mattes/migrate/issues/163))
 
 
 
