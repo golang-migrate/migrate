@@ -10,6 +10,8 @@ $ go get -u -tags 'postgres' -o migrate github.com/mattes/migrate/cli
 
 #### MacOS
 
+([todo #156](https://github.com/mattes/migrate/issues/156))
+
 ```
 $ brew install migrate --with-postgres
 ```
