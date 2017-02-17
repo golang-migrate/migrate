@@ -68,7 +68,8 @@ func (driver *Driver) Initialize(rawurl string) error {
 	cluster.Timeout = 1 * time.Minute
 
 	if len(u.Query().Get("consistency")) > 0 {
-		consistency, err := parseConsistency(u.Query().Get("consistency"))
+		var consistency gocql.Consistency
+		consistency, err = parseConsistency(u.Query().Get("consistency"))
 		if err != nil {
 			return err
 		}
@@ -77,7 +78,8 @@ func (driver *Driver) Initialize(rawurl string) error {
 	}
 
 	if len(u.Query().Get("protocol")) > 0 {
-		protoversion, err := strconv.Atoi(u.Query().Get("protocol"))
+		var protoversion int
+		protoversion, err = strconv.Atoi(u.Query().Get("protocol"))
 		if err != nil {
 			return err
 		}
@@ -90,7 +92,7 @@ func (driver *Driver) Initialize(rawurl string) error {
 		password, passwordSet := u.User.Password()
 
 		if passwordSet == false {
-			return fmt.Errorf("Missing password. Please provide password.")
+			return fmt.Errorf("Missing password. Please provide password")
 		}
 
 		cluster.Authenticator = gocql.PasswordAuthenticator{

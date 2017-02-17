@@ -51,13 +51,12 @@ func Up(pipe chan interface{}, url, migrationsPath string) {
 		}
 		go pipep.Close(pipe, nil)
 		return
-	} else {
-		if err := d.Close(); err != nil {
-			pipe <- err
-		}
-		go pipep.Close(pipe, nil)
-		return
 	}
+	if err := d.Close(); err != nil {
+		pipe <- err
+	}
+	go pipep.Close(pipe, nil)
+	return
 }
 
 // UpSync is synchronous version of Up
@@ -101,13 +100,12 @@ func Down(pipe chan interface{}, url, migrationsPath string) {
 		}
 		go pipep.Close(pipe, nil)
 		return
-	} else {
-		if err2 := d.Close(); err2 != nil {
-			pipe <- err2
-		}
-		go pipep.Close(pipe, nil)
-		return
 	}
+	if err2 := d.Close(); err2 != nil {
+		pipe <- err2
+	}
+	go pipep.Close(pipe, nil)
+	return
 }
 
 // DownSync is synchronous version of Down
@@ -129,9 +127,8 @@ func Redo(pipe chan interface{}, url, migrationsPath string) {
 	if ok := pipep.WaitAndRedirect(pipe1, pipe, signals); !ok {
 		go pipep.Close(pipe, nil)
 		return
-	} else {
-		go Migrate(pipe, url, migrationsPath, +1)
 	}
+	go Migrate(pipe, url, migrationsPath, +1)
 }
 
 // RedoSync is synchronous version of Redo
@@ -153,9 +150,8 @@ func Reset(pipe chan interface{}, url, migrationsPath string) {
 	if ok := pipep.WaitAndRedirect(pipe1, pipe, signals); !ok {
 		go pipep.Close(pipe, nil)
 		return
-	} else {
-		go Up(pipe, url, migrationsPath)
 	}
+	go Up(pipe, url, migrationsPath)
 }
 
 // ResetSync is synchronous version of Reset

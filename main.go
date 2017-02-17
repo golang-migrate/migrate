@@ -176,32 +176,31 @@ func writePipe(pipe chan interface{}) (ok bool) {
 			case item, more := <-pipe:
 				if !more {
 					return okFlag
-				} else {
-					switch item.(type) {
+				}
+				switch item.(type) {
 
-					case string:
-						fmt.Println(item.(string))
+				case string:
+					fmt.Println(item.(string))
 
-					case error:
+				case error:
+					c := color.New(color.FgRed)
+					c.Printf("%s\n\n", item.(error).Error())
+					okFlag = false
+
+				case file.File:
+					f := item.(file.File)
+					if f.Direction == direction.Up {
+						c := color.New(color.FgGreen)
+						c.Print(">")
+					} else if f.Direction == direction.Down {
 						c := color.New(color.FgRed)
-						c.Println(item.(error).Error(), "\n")
-						okFlag = false
-
-					case file.File:
-						f := item.(file.File)
-						if f.Direction == direction.Up {
-							c := color.New(color.FgGreen)
-							c.Print(">")
-						} else if f.Direction == direction.Down {
-							c := color.New(color.FgRed)
-							c.Print("<")
-						}
-						fmt.Printf(" %s\n", f.FileName)
-
-					default:
-						text := fmt.Sprint(item)
-						fmt.Println(text)
+						c.Print("<")
 					}
+					fmt.Printf(" %s\n", f.FileName)
+
+				default:
+					text := fmt.Sprint(item)
+					fmt.Println(text)
 				}
 			}
 		}

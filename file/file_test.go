@@ -1,11 +1,12 @@
 package file
 
 import (
-	"github.com/mattes/migrate/migrate/direction"
 	"io/ioutil"
 	"os"
 	"path"
 	"testing"
+
+	"github.com/mattes/migrate/migrate/direction"
 )
 
 func TestParseFilenameSchema(t *testing.T) {
@@ -61,7 +62,7 @@ func TestFiles(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpdir)
 
-	if err := ioutil.WriteFile(path.Join(tmpdir, "nonsense.txt"), nil, 0755); err != nil {
+	if err = ioutil.WriteFile(path.Join(tmpdir, "nonsense.txt"), nil, 0755); err != nil {
 		t.Fatal("Unable to write files in tmpdir", err)
 	}
 	ioutil.WriteFile(path.Join(tmpdir, "002_migrationfile.up.sql"), nil, 0755)
@@ -133,7 +134,7 @@ func TestFiles(t *testing.T) {
 	}
 
 	// test read
-	if err := files[4].DownFile.ReadContent(); err != nil {
+	if err = files[4].DownFile.ReadContent(); err != nil {
 		t.Error("Unable to read file", err)
 	}
 	if files[4].DownFile.Content == nil {
@@ -169,7 +170,8 @@ func TestFiles(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		rangeFiles, err := files.From(test.from, test.relative)
+		var rangeFiles Files
+		rangeFiles, err = files.From(test.from, test.relative)
 		if err != nil {
 			t.Error("Unable to fetch range:", err)
 		}

@@ -2,8 +2,9 @@ package gomethods
 
 import (
 	"fmt"
-	"github.com/mattes/migrate/driver"
 	"sync"
+
+	"github.com/mattes/migrate/driver"
 )
 
 var methodsReceiversMu sync.Mutex

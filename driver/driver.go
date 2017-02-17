@@ -43,7 +43,7 @@ func New(url string) (Driver, error) {
 
 	d := GetDriver(u.Scheme)
 	if d == nil {
-		return nil, fmt.Errorf("Driver '%s' not found.", u.Scheme)
+		return nil, fmt.Errorf("Driver '%s' not found", u.Scheme)
 	}
 	verifyFilenameExtension(u.Scheme, d)
 	if err := d.Initialize(url); err != nil {

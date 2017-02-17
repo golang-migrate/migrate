@@ -17,7 +17,7 @@ func TestMigrate(t *testing.T) {
 	}
 
 	driverFile := ":memory:"
-	driverUrl := "sqlite3://" + driverFile
+	driverURL := "sqlite3://" + driverFile
 
 	// prepare clean database
 	connection, err := sql.Open("sqlite3", driverFile)
@@ -31,7 +31,7 @@ func TestMigrate(t *testing.T) {
 	}
 
 	d := &Driver{}
-	if err := d.Initialize(driverUrl); err != nil {
+	if err := d.Initialize(driverURL); err != nil {
 		t.Fatal(err)
 	}
 
