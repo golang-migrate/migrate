@@ -54,6 +54,30 @@ func Test(t *testing.T) {
 		})
 }
 
+func TestMultiStatement(t *testing.T) {
+	mt.ParallelTest(t, versions, isReady,
+		func(t *testing.T, i mt.Instance) {
+			p := &Postgres{}
+			addr := fmt.Sprintf("postgres://postgres@%v:%v/postgres?sslmode=disable", i.Host(), i.Port())
+			d, err := p.Open(addr)
+			if err != nil {
+				t.Fatalf("%v", err)
+			}
+			if err := d.Run(100, bytes.NewReader([]byte("CREATE TABLE foo (foo text); CREATE TABLE bar (bar text);"))); err != nil {
+				t.Fatalf("expected err to be nil, got %v", err)
+			}
+
+			// make sure second table exists
+			var exists bool
+			if err := d.(*Postgres).db.QueryRow("SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'bar' AND table_schema = (SELECT current_schema()))").Scan(&exists); err != nil {
+				t.Fatal(err)
+			}
+			if !exists {
+				t.Fatalf("expected table bar to exist")
+			}
+		})
+}
+
 func TestWithSchema(t *testing.T) {
 	mt.ParallelTest(t, versions, isReady,
 		func(t *testing.T, i mt.Instance) {
