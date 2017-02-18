@@ -78,6 +78,18 @@ func TestMultiStatement(t *testing.T) {
 		})
 }
 
+func TestFilterCustomQuery(t *testing.T) {
+	mt.ParallelTest(t, versions, isReady,
+		func(t *testing.T, i mt.Instance) {
+			p := &Postgres{}
+			addr := fmt.Sprintf("postgres://postgres@%v:%v/postgres?sslmode=disable&x-custom=foobar", i.Host(), i.Port())
+			_, err := p.Open(addr)
+			if err != nil {
+				t.Fatalf("%v", err)
+			}
+		})
+}
+
 func TestWithSchema(t *testing.T) {
 	mt.ParallelTest(t, versions, isReady,
 		func(t *testing.T, i mt.Instance) {

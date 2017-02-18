@@ -9,6 +9,7 @@ import (
 	nurl "net/url"
 
 	"github.com/lib/pq"
+	"github.com/mattes/migrate"
 	"github.com/mattes/migrate/database"
 )
 
@@ -28,6 +29,14 @@ var (
 type Config struct {
 	MigrationsTable string
 	DatabaseName    string
+}
+
+type Postgres struct {
+	db       *sql.DB
+	isLocked bool
+
+	// Open and WithInstance need to garantuee that config is never nil
+	config *Config
 }
 
 func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
@@ -63,21 +72,13 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	return px, nil
 }
 
-type Postgres struct {
-	db       *sql.DB
-	isLocked bool
-
-	// Open and WithInstance need to garantuee that config is never nil
-	config *Config
-}
-
 func (p *Postgres) Open(url string) (database.Driver, error) {
 	purl, err := nurl.Parse(url)
 	if err != nil {
 		return nil, err
 	}
 
-	db, err := sql.Open("postgres", url)
+	db, err := sql.Open("postgres", migrate.FilterCustomQuery(purl).String())
 	if err != nil {
 		return nil, err
 	}
@@ -155,7 +156,7 @@ func (p *Postgres) Run(version int, migration io.Reader) error {
 	if dirty, err := p.isDirty(); err != nil {
 		return err
 	} else if dirty {
-		return ErrDatabaseDirty
+		return ErrDatabaseDirty // TODO: add more verbose error
 	}
 
 	if migration == nil {
