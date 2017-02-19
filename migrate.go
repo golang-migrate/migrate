@@ -29,7 +29,6 @@ var (
 	ErrNilVersion  = fmt.Errorf("no migration")
 	ErrLocked      = fmt.Errorf("database locked")
 	ErrLockTimeout = fmt.Errorf("timeout: can't acquire database lock")
-	ErrDirty       = fmt.Errorf("dirty database")
 )
 
 // ErrShortLimit is an error returned when not enough migrations
@@ -41,6 +40,14 @@ type ErrShortLimit struct {
 // Error implements the error interface.
 func (e ErrShortLimit) Error() string {
 	return fmt.Sprintf("limit %v short", e.Short)
+}
+
+type ErrDirty struct {
+	Version int
+}
+
+func (e ErrDirty) Error() string {
+	return fmt.Sprintf("Dirty database version %v. Fix and force version.", e.Version)
 }
 
 type Migrate struct {
@@ -210,7 +217,7 @@ func (m *Migrate) Migrate(version uint) error {
 	}
 
 	if dirty {
-		return m.unlockErr(ErrDirty)
+		return m.unlockErr(ErrDirty{curVersion})
 	}
 
 	ret := make(chan interface{}, m.PrefetchMigrations)
@@ -236,7 +243,7 @@ func (m *Migrate) Steps(n int) error {
 	}
 
 	if dirty {
-		return m.unlockErr(ErrDirty)
+		return m.unlockErr(ErrDirty{curVersion})
 	}
 
 	ret := make(chan interface{}, m.PrefetchMigrations)
@@ -263,7 +270,7 @@ func (m *Migrate) Up() error {
 	}
 
 	if dirty {
-		return m.unlockErr(ErrDirty)
+		return m.unlockErr(ErrDirty{curVersion})
 	}
 
 	ret := make(chan interface{}, m.PrefetchMigrations)
@@ -285,7 +292,7 @@ func (m *Migrate) Down() error {
 	}
 
 	if dirty {
-		return m.unlockErr(ErrDirty)
+		return m.unlockErr(ErrDirty{curVersion})
 	}
 
 	ret := make(chan interface{}, m.PrefetchMigrations)
@@ -317,13 +324,13 @@ func (m *Migrate) Run(migration ...*Migration) error {
 		return err
 	}
 
-	_, dirty, err := m.databaseDrv.Version()
+	curVersion, dirty, err := m.databaseDrv.Version()
 	if err != nil {
 		return m.unlockErr(err)
 	}
 
 	if dirty {
-		return m.unlockErr(ErrDirty)
+		return m.unlockErr(ErrDirty{curVersion})
 	}
 
 	ret := make(chan interface{}, m.PrefetchMigrations)

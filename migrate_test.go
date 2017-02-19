@@ -289,7 +289,7 @@ func TestMigrateDirty(t *testing.T) {
 	}
 
 	err := m.Migrate(1)
-	if err != ErrDirty {
+	if _, ok := err.(ErrDirty); !ok {
 		t.Fatalf("expected ErrDirty, got %v", err)
 	}
 }
@@ -370,7 +370,7 @@ func TestStepsDirty(t *testing.T) {
 	}
 
 	err := m.Steps(1)
-	if err != ErrDirty {
+	if _, ok := err.(ErrDirty); !ok {
 		t.Fatalf("expected ErrDirty, got %v", err)
 	}
 }
@@ -420,7 +420,7 @@ func TestUpDirty(t *testing.T) {
 	}
 
 	err := m.Up()
-	if err != ErrDirty {
+	if _, ok := err.(ErrDirty); !ok {
 		t.Fatalf("expected ErrDirty, got %v", err)
 	}
 }
@@ -433,7 +433,7 @@ func TestDownDirty(t *testing.T) {
 	}
 
 	err := m.Down()
-	if err != ErrDirty {
+	if _, ok := err.(ErrDirty); !ok {
 		t.Fatalf("expected ErrDirty, got %v", err)
 	}
 }
@@ -514,7 +514,7 @@ func TestRunDirty(t *testing.T) {
 	}
 
 	err = m.Run(migr)
-	if err != ErrDirty {
+	if _, ok := err.(ErrDirty); !ok {
 		t.Fatalf("expected ErrDirty, got %v", err)
 	}
 }
