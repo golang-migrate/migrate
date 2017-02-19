@@ -58,3 +58,10 @@
 
 #### Can I mix multiple sources during a batch of migrations?
   No.
+
+#### What does "dirty" database mean?
+  Before a migration runs, each database sets a dirty flag. Execution stops if a migration fails and the dirty state persists,
+  which prevents attempts to run more migrations on top of a failed migration. You need to manually fix the error
+  and then "force" the expected version.
+
+  
