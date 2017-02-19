@@ -63,7 +63,7 @@ func TestMultiStatement(t *testing.T) {
 			if err != nil {
 				t.Fatalf("%v", err)
 			}
-			if err := d.Run(100, bytes.NewReader([]byte("CREATE TABLE foo (foo text); CREATE TABLE bar (bar text);"))); err != nil {
+			if err := d.Run(bytes.NewReader([]byte("CREATE TABLE foo (foo text); CREATE TABLE bar (bar text);"))); err != nil {
 				t.Fatalf("expected err to be nil, got %v", err)
 			}
 
@@ -101,7 +101,10 @@ func TestWithSchema(t *testing.T) {
 			}
 
 			// create foobar schema
-			if err := d.Run(100, bytes.NewReader([]byte("CREATE SCHEMA foobar AUTHORIZATION postgres"))); err != nil {
+			if err := d.Run(bytes.NewReader([]byte("CREATE SCHEMA foobar AUTHORIZATION postgres"))); err != nil {
+				t.Fatal(err)
+			}
+			if err := d.SetVersion(1, false); err != nil {
 				t.Fatal(err)
 			}
 
@@ -111,7 +114,7 @@ func TestWithSchema(t *testing.T) {
 				t.Fatalf("%v", err)
 			}
 
-			version, err := d2.Version()
+			version, _, err := d2.Version()
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -120,10 +123,10 @@ func TestWithSchema(t *testing.T) {
 			}
 
 			// now update version and compare
-			if err := d2.Run(2, nil); err != nil {
+			if err := d2.SetVersion(2, false); err != nil {
 				t.Fatal(err)
 			}
-			version, err = d2.Version()
+			version, _, err = d2.Version()
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -132,11 +135,11 @@ func TestWithSchema(t *testing.T) {
 			}
 
 			// meanwhile, the public schema still has the other version
-			version, err = d.Version()
+			version, _, err = d.Version()
 			if err != nil {
 				t.Fatal(err)
 			}
-			if version != 100 {
+			if version != 1 {
 				t.Fatal("expected version 2")
 			}
 		})

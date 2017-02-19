@@ -18,6 +18,7 @@ type Stub struct {
 	CurrentVersion    int
 	MigrationSequence []string
 	LastRunMigration  []byte // todo: make []string
+	IsDirty           bool
 	IsLocked          bool
 
 	Config *Config
@@ -60,26 +61,24 @@ func (s *Stub) Unlock() error {
 	return nil
 }
 
-func (s *Stub) Run(version int, migration io.Reader) error {
-	s.CurrentVersion = version
-
-	if migration != nil {
-		m, err := ioutil.ReadAll(migration)
-		if err != nil {
-			return err
-		}
-		s.LastRunMigration = m
-		s.MigrationSequence = append(s.MigrationSequence, string(m[:]))
+func (s *Stub) Run(migration io.Reader) error {
+	m, err := ioutil.ReadAll(migration)
+	if err != nil {
+		return err
 	}
-
+	s.LastRunMigration = m
+	s.MigrationSequence = append(s.MigrationSequence, string(m[:]))
 	return nil
 }
 
-func (s *Stub) Version() (int, error) {
-	if s.CurrentVersion < 0 {
-		return database.NilVersion, nil
-	}
-	return s.CurrentVersion, nil
+func (s *Stub) SetVersion(version int, state bool) error {
+	s.CurrentVersion = version
+	s.IsDirty = state
+	return nil
+}
+
+func (s *Stub) Version() (version int, dirty bool, err error) {
+	return s.CurrentVersion, s.IsDirty, nil
 }
 
 const DROP = "DROP"

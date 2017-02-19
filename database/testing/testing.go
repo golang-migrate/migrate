@@ -21,13 +21,13 @@ func Test(t *testing.T, d database.Driver, migration []byte) {
 
 	TestNilVersion(t, d) // test first
 	TestLockAndUnlock(t, d)
-	TestRun(t, d, bytes.NewReader(migration)) // also tests Drop()
-	TestRunWithNilVersion(t, d, bytes.NewReader(migration))
-	TestRunWithNilMigration(t, d)
+	TestRun(t, d, bytes.NewReader(migration))
+	TestDrop(t, d)
+	TestSetVersion(t, d) // also tests Version()
 }
 
 func TestNilVersion(t *testing.T, d database.Driver) {
-	v, err := d.Version()
+	v, _, err := d.Version()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,70 +80,59 @@ func TestLockAndUnlock(t *testing.T, d database.Driver) {
 }
 
 func TestRun(t *testing.T, d database.Driver, migration io.Reader) {
-	// Run migration
-	err := d.Run(1485475009, migration)
-	if err != nil {
-		t.Fatal(err)
+	if migration == nil {
+		panic("migration can't be nil")
 	}
 
-	// Check version
-	version, err := d.Version()
-	if err != nil {
+	if err := d.Run(migration); err != nil {
 		t.Fatal(err)
 	}
-	if version != 1485475009 {
-		t.Fatalf("Version: expected 1485475009, got %v", version)
-	}
+}
 
-	// Drop everything
+func TestDrop(t *testing.T, d database.Driver) {
 	if err := d.Drop(); err != nil {
 		t.Fatal(err)
 	}
-
-	// Check version again
-	if v, err := d.Version(); err != nil {
-		t.Fatal(err)
-	} else if v != database.NilVersion {
-		t.Fatalf("Version: expected version to be NilVersion (-1), got %v", v)
-	}
 }
 
-func TestRunWithNilVersion(t *testing.T, d database.Driver, migration io.Reader) {
-	// Run migration
-	err := d.Run(database.NilVersion, migration)
-	if err != nil {
+func TestSetVersion(t *testing.T, d database.Driver) {
+	if err := d.SetVersion(1, true); err != nil {
 		t.Fatal(err)
 	}
 
-	// Check version
-	version, err := d.Version()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if version != database.NilVersion {
-		t.Fatalf("Version: expected database.NilVersion (-1), got %v", version)
-	}
-}
-
-func TestRunWithNilMigration(t *testing.T, d database.Driver) {
-	defer func() {
-		if r := recover(); r != nil {
-			t.Fatal("got panic, make sure to handle nil migration io.Reader")
-		}
-	}()
-
-	// Run with nil migration
-	err := d.Run(1486242612, nil)
-	if err != nil {
+	// call again
+	if err := d.SetVersion(1, true); err != nil {
 		t.Fatal(err)
 	}
 
-	// Check version
-	version, err := d.Version()
+	v, dirty, err := d.Version()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if version != 1486242612 {
-		t.Fatalf("TestRunWithNilMigration: expected version 1486242612, got %v", version)
+	if !dirty {
+		t.Fatal("expected dirty")
+	}
+	if v != 1 {
+		t.Fatal("expected version to be 1")
+	}
+
+	if err := d.SetVersion(2, false); err != nil {
+		t.Fatal(err)
+	}
+
+	// call again
+	if err := d.SetVersion(2, false); err != nil {
+		t.Fatal(err)
+	}
+
+	v, dirty, err = d.Version()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dirty {
+		t.Fatal("expected not dirty")
+	}
+	if v != 2 {
+		t.Fatal("expected version to be 2")
 	}
 }

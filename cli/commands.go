@@ -42,10 +42,20 @@ func dropCmd(m *migrate.Migrate) {
 	}
 }
 
+func forceCmd(m *migrate.Migrate, v uint) {
+	if err := m.Force(v); err != nil {
+		log.fatalErr(err)
+	}
+}
+
 func versionCmd(m *migrate.Migrate) {
-	v, err := m.Version()
+	v, dirty, err := m.Version()
 	if err != nil {
 		log.fatalErr(err)
 	}
-	log.Println(v)
+	if dirty {
+		log.Printf("%v (dirty)\n", v)
+	} else {
+		log.Println(v)
+	}
 }

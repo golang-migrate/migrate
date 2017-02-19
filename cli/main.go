@@ -46,6 +46,7 @@ Commands:
   up [N]       Apply all or N up migrations
   down [N]     Apply all or N down migrations
   drop         Drop everyting inside database
+  force V      Set version V but don't run migration (ignores dirty state)
   version      Print current migration version
 `)
 	}
@@ -167,6 +168,26 @@ Commands:
 		}
 
 		dropCmd(migrater)
+
+		if log.verbose {
+			log.Println("Finished after", time.Now().Sub(startTime))
+		}
+
+	case "force":
+		if migraterErr != nil {
+			log.fatalErr(migraterErr)
+		}
+
+		if flag.Arg(1) == "" {
+			log.fatal("error: please specify version argument V")
+		}
+
+		v, err := strconv.ParseUint(flag.Arg(1), 10, 64)
+		if err != nil {
+			log.fatal("error: can't read version argument V")
+		}
+
+		forceCmd(migrater, uint(v))
 
 		if log.verbose {
 			log.Println("Finished after", time.Now().Sub(startTime))

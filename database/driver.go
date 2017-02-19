@@ -58,15 +58,17 @@ type Driver interface {
 	// all migrations have been run.
 	Unlock() error
 
-	// Run applies a migration to the database. Run the migration and store
-	// the version. migration can be nil. In that case, just store the version.
-	// When version -1 is given, the state should be as if no migration had been run.
-	Run(version int, migration io.Reader) error
+	// Run applies a migration to the database. migration is garantueed to be not nil.
+	Run(migration io.Reader) error
 
-	// Version returns the currently active version.
-	// When no migration has been run yet, it must return -1.
-	// If the returned version is < -1 it will panic (in the test).
-	Version() (int, error)
+	// SetVersion saves version and dirty state.
+	// Migrate will call this function before and after each call to Run.
+	SetVersion(version int, dirty bool) error
+
+	// Version returns the currently active version and if the database is dirty.
+	// When no migration has been applied, it must return version -1.
+	// Dirty means, a previous migration failed and user interaction is required.
+	Version() (version int, dirty bool, err error)
 
 	// Drop deletes everyting in the database.
 	Drop() error

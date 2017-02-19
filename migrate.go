@@ -29,6 +29,7 @@ var (
 	ErrNilVersion  = fmt.Errorf("no migration")
 	ErrLocked      = fmt.Errorf("database locked")
 	ErrLockTimeout = fmt.Errorf("timeout: can't acquire database lock")
+	ErrDirty       = fmt.Errorf("dirty database")
 )
 
 // ErrShortLimit is an error returned when not enough migrations
@@ -203,9 +204,13 @@ func (m *Migrate) Migrate(version uint) error {
 		return err
 	}
 
-	curVersion, err := m.databaseDrv.Version()
+	curVersion, dirty, err := m.databaseDrv.Version()
 	if err != nil {
 		return m.unlockErr(err)
+	}
+
+	if dirty {
+		return m.unlockErr(ErrDirty)
 	}
 
 	ret := make(chan interface{}, m.PrefetchMigrations)
@@ -225,9 +230,13 @@ func (m *Migrate) Steps(n int) error {
 		return err
 	}
 
-	curVersion, err := m.databaseDrv.Version()
+	curVersion, dirty, err := m.databaseDrv.Version()
 	if err != nil {
 		return m.unlockErr(err)
+	}
+
+	if dirty {
+		return m.unlockErr(ErrDirty)
 	}
 
 	ret := make(chan interface{}, m.PrefetchMigrations)
@@ -248,9 +257,13 @@ func (m *Migrate) Up() error {
 		return err
 	}
 
-	curVersion, err := m.databaseDrv.Version()
+	curVersion, dirty, err := m.databaseDrv.Version()
 	if err != nil {
 		return m.unlockErr(err)
+	}
+
+	if dirty {
+		return m.unlockErr(ErrDirty)
 	}
 
 	ret := make(chan interface{}, m.PrefetchMigrations)
@@ -266,9 +279,13 @@ func (m *Migrate) Down() error {
 		return err
 	}
 
-	curVersion, err := m.databaseDrv.Version()
+	curVersion, dirty, err := m.databaseDrv.Version()
 	if err != nil {
 		return m.unlockErr(err)
+	}
+
+	if dirty {
+		return m.unlockErr(ErrDirty)
 	}
 
 	ret := make(chan interface{}, m.PrefetchMigrations)
@@ -300,6 +317,15 @@ func (m *Migrate) Run(migration ...*Migration) error {
 		return err
 	}
 
+	_, dirty, err := m.databaseDrv.Version()
+	if err != nil {
+		return m.unlockErr(err)
+	}
+
+	if dirty {
+		return m.unlockErr(ErrDirty)
+	}
+
 	ret := make(chan interface{}, m.PrefetchMigrations)
 
 	go func() {
@@ -319,19 +345,34 @@ func (m *Migrate) Run(migration ...*Migration) error {
 	return m.unlockErr(m.runMigrations(ret))
 }
 
+// Force sets a migration version.
+// It does not check any currently active version in database.
+// It does not check if the database is dirty.
+func (m *Migrate) Force(version uint) error {
+	if err := m.lock(); err != nil {
+		return err
+	}
+
+	if err := m.databaseDrv.SetVersion(int(version), false); err != nil {
+		return m.unlockErr(err)
+	}
+
+	return m.unlock()
+}
+
 // Version returns the currently active migration version.
 // If no migration has been applied, yet, it will return ErrNilVersion.
-func (m *Migrate) Version() (uint, error) {
-	v, err := m.databaseDrv.Version()
+func (m *Migrate) Version() (version uint, dirty bool, err error) {
+	v, d, err := m.databaseDrv.Version()
 	if err != nil {
-		return 0, err
+		return 0, false, err
 	}
 
 	if v == database.NilVersion {
-		return 0, ErrNilVersion
+		return 0, false, ErrNilVersion
 	}
 
-	return suint(v), nil
+	return suint(v), d, nil
 }
 
 // read reads either up or down migrations from source `from` to `to`.
@@ -639,17 +680,21 @@ func (m *Migrate) runMigrations(ret <-chan interface{}) error {
 		case *Migration:
 			migr := r.(*Migration)
 
-			if migr.Body == nil {
-				m.logVerbosePrintf("Execute %v\n", migr.LogString())
-				if err := m.databaseDrv.Run(migr.TargetVersion, nil); err != nil {
-					return err
-				}
+			// set version with dirty state
+			if err := m.databaseDrv.SetVersion(migr.TargetVersion, true); err != nil {
+				return err
+			}
 
-			} else {
+			if migr.Body != nil {
 				m.logVerbosePrintf("Read and execute %v\n", migr.LogString())
-				if err := m.databaseDrv.Run(migr.TargetVersion, migr.BufferedBody); err != nil {
+				if err := m.databaseDrv.Run(migr.BufferedBody); err != nil {
 					return err
 				}
+			}
+
+			// set clean state
+			if err := m.databaseDrv.SetVersion(migr.TargetVersion, false); err != nil {
+				return err
 			}
 
 			endTime := time.Now()

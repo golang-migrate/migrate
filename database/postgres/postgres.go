@@ -152,25 +152,9 @@ func (p *Postgres) Unlock() error {
 	return nil
 }
 
-func (p *Postgres) Run(version int, migration io.Reader) error {
-	if dirty, err := p.isDirty(); err != nil {
-		return err
-	} else if dirty {
-		return ErrDatabaseDirty // TODO: add more verbose error
-	}
-
-	if migration == nil {
-		// just apply version
-		return p.saveVersion(version, false)
-	}
-
+func (p *Postgres) Run(migration io.Reader) error {
 	migr, err := ioutil.ReadAll(migration)
 	if err != nil {
-		return err
-	}
-
-	// set dirty flag and set version
-	if err := p.saveVersion(version, true); err != nil {
 		return err
 	}
 
@@ -181,11 +165,10 @@ func (p *Postgres) Run(version int, migration io.Reader) error {
 		return database.Error{OrigErr: err, Err: "migration failed", Query: migr}
 	}
 
-	// remove dirty flag
-	return p.saveVersion(version, false)
+	return nil
 }
 
-func (p *Postgres) saveVersion(version int, dirty bool) error {
+func (p *Postgres) SetVersion(version int, dirty bool) error {
 	tx, err := p.db.Begin()
 	if err != nil {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
@@ -212,45 +195,23 @@ func (p *Postgres) saveVersion(version int, dirty bool) error {
 	return nil
 }
 
-func (p *Postgres) isDirty() (bool, error) {
-	query := `SELECT dirty FROM "` + p.config.MigrationsTable + `" LIMIT 1`
-	var dirty bool
-	err := p.db.QueryRow(query).Scan(&dirty)
+func (p *Postgres) Version() (version int, dirty bool, err error) {
+	query := `SELECT version, dirty FROM "` + p.config.MigrationsTable + `" LIMIT 1`
+	err = p.db.QueryRow(query).Scan(&version, &dirty)
 	switch {
 	case err == sql.ErrNoRows:
-		return false, nil
+		return database.NilVersion, false, nil
 
 	case err != nil:
 		if e, ok := err.(*pq.Error); ok {
 			if e.Code.Name() == "undefined_table" {
-				return false, nil
+				return database.NilVersion, false, nil
 			}
 		}
-		return false, &database.Error{OrigErr: err, Query: []byte(query)}
+		return 0, false, &database.Error{OrigErr: err, Query: []byte(query)}
 
 	default:
-		return dirty, nil
-	}
-}
-
-func (p *Postgres) Version() (int, error) {
-	query := `SELECT version FROM "` + p.config.MigrationsTable + `" LIMIT 1`
-	var version uint64
-	err := p.db.QueryRow(query).Scan(&version)
-	switch {
-	case err == sql.ErrNoRows:
-		return database.NilVersion, nil
-
-	case err != nil:
-		if e, ok := err.(*pq.Error); ok {
-			if e.Code.Name() == "undefined_table" {
-				return database.NilVersion, nil
-			}
-		}
-		return 0, &database.Error{OrigErr: err, Query: []byte(query)}
-
-	default:
-		return int(version), nil
+		return version, dirty, nil
 	}
 }
 
@@ -310,11 +271,11 @@ func (p *Postgres) ensureVersionTable() error {
 	return nil
 }
 
-const AdvisoryLockIdSalt uint = 1486364155
+const advisoryLockIdSalt uint = 1486364155
 
 // inspired by rails migrations, see https://goo.gl/8o9bCT
 func (p *Postgres) generateAdvisoryLockId() (string, error) {
 	sum := crc32.ChecksumIEEE([]byte(p.config.DatabaseName))
-	sum = sum * uint32(AdvisoryLockIdSalt)
+	sum = sum * uint32(advisoryLockIdSalt)
 	return fmt.Sprintf("%v", sum), nil
 }

@@ -3,7 +3,6 @@ package migrate
 import (
 	"bytes"
 	"database/sql"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -270,7 +269,7 @@ func TestMigrate(t *testing.T) {
 			t.Errorf("expected err %v, got %v, in %v", v.expectErr, err, i)
 
 		} else if err == nil {
-			version, err := m.Version()
+			version, _, err := m.Version()
 			if err != nil {
 				t.Error(err)
 			}
@@ -279,6 +278,19 @@ func TestMigrate(t *testing.T) {
 			}
 			equalDbSeq(t, i, v.expectSeq, dbDrv)
 		}
+	}
+}
+
+func TestMigrateDirty(t *testing.T) {
+	m, _ := New("stub://", "stub://")
+	dbDrv := m.databaseDrv.(*dStub.Stub)
+	if err := dbDrv.SetVersion(0, true); err != nil {
+		t.Fatal(err)
+	}
+
+	err := m.Migrate(1)
+	if err != ErrDirty {
+		t.Fatalf("expected ErrDirty, got %v", err)
 	}
 }
 
@@ -335,7 +347,7 @@ func TestSteps(t *testing.T) {
 			t.Errorf("expected err %v, got %v, in %v", v.expectErr, err, i)
 
 		} else if err == nil {
-			version, err := m.Version()
+			version, _, err := m.Version()
 			if err != ErrNilVersion && err != nil {
 				t.Error(err)
 			}
@@ -347,6 +359,19 @@ func TestSteps(t *testing.T) {
 			}
 			equalDbSeq(t, i, v.expectSeq, dbDrv)
 		}
+	}
+}
+
+func TestStepsDirty(t *testing.T) {
+	m, _ := New("stub://", "stub://")
+	dbDrv := m.databaseDrv.(*dStub.Stub)
+	if err := dbDrv.SetVersion(0, true); err != nil {
+		t.Fatal(err)
+	}
+
+	err := m.Steps(1)
+	if err != ErrDirty {
+		t.Fatalf("expected ErrDirty, got %v", err)
 	}
 }
 
@@ -387,6 +412,32 @@ func TestUpAndDown(t *testing.T) {
 	equalDbSeq(t, 0, seq.add(M(7, 5), M(5, 4), M(4, 3), M(3, 1), M(1, -1)), dbDrv)
 }
 
+func TestUpDirty(t *testing.T) {
+	m, _ := New("stub://", "stub://")
+	dbDrv := m.databaseDrv.(*dStub.Stub)
+	if err := dbDrv.SetVersion(0, true); err != nil {
+		t.Fatal(err)
+	}
+
+	err := m.Up()
+	if err != ErrDirty {
+		t.Fatalf("expected ErrDirty, got %v", err)
+	}
+}
+
+func TestDownDirty(t *testing.T) {
+	m, _ := New("stub://", "stub://")
+	dbDrv := m.databaseDrv.(*dStub.Stub)
+	if err := dbDrv.SetVersion(0, true); err != nil {
+		t.Fatal(err)
+	}
+
+	err := m.Down()
+	if err != ErrDirty {
+		t.Fatalf("expected ErrDirty, got %v", err)
+	}
+}
+
 func TestDrop(t *testing.T) {
 	m, _ := New("stub://", "stub://")
 	m.sourceDrv.(*sStub.Stub).Migrations = sourceStubMigrations
@@ -405,16 +456,20 @@ func TestVersion(t *testing.T) {
 	m, _ := New("stub://", "stub://")
 	dbDrv := m.databaseDrv.(*dStub.Stub)
 
-	_, err := m.Version()
+	_, _, err := m.Version()
 	if err != ErrNilVersion {
 		t.Fatalf("expected ErrNilVersion, got %v", err)
 	}
 
-	if err := dbDrv.Run(1, bytes.NewBufferString("1_up")); err != nil {
+	if err := dbDrv.Run(bytes.NewBufferString("1_up")); err != nil {
 		t.Fatal(err)
 	}
 
-	v, err := m.Version()
+	if err := dbDrv.SetVersion(1, false); err != nil {
+		t.Fatal(err)
+	}
+
+	v, _, err := m.Version()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -436,13 +491,63 @@ func TestRun(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	v, err := m.Version()
+	v, _, err := m.Version()
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	if v != 2 {
 		t.Errorf("expected version 2, got %v", v)
+	}
+}
+
+func TestRunDirty(t *testing.T) {
+	m, _ := New("stub://", "stub://")
+	dbDrv := m.databaseDrv.(*dStub.Stub)
+	if err := dbDrv.SetVersion(0, true); err != nil {
+		t.Fatal(err)
+	}
+
+	migr, err := NewMigration(nil, "", 1, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = m.Run(migr)
+	if err != ErrDirty {
+		t.Fatalf("expected ErrDirty, got %v", err)
+	}
+}
+
+func TestForce(t *testing.T) {
+	m, _ := New("stub://", "stub://")
+	m.sourceDrv.(*sStub.Stub).Migrations = sourceStubMigrations
+
+	if err := m.Force(7); err != nil {
+		t.Fatal(err)
+	}
+
+	v, dirty, err := m.Version()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dirty {
+		t.Errorf("expected dirty to be false")
+	}
+	if v != 7 {
+		t.Errorf("expected version to be 7")
+	}
+}
+
+func TestForceDirty(t *testing.T) {
+	m, _ := New("stub://", "stub://")
+	dbDrv := m.databaseDrv.(*dStub.Stub)
+	if err := dbDrv.SetVersion(0, true); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := m.Force(1); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -797,7 +902,6 @@ func M(version uint, targetVersion ...int) *Migration {
 	if len(targetVersion) > 1 {
 		panic("only one targetVersion allowed")
 	}
-	_ = fmt.Sprintf("")
 	ts := int(version)
 	if len(targetVersion) == 1 {
 		ts = targetVersion[0]
