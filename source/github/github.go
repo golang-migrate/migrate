@@ -151,11 +151,11 @@ func (g *Github) ReadUp(version uint) (r io.ReadCloser, identifier string, err e
 			return nil, "", err
 		}
 		if file != nil {
-			r, err := file.Decode()
+			r, err := file.GetContent()
 			if err != nil {
 				return nil, "", err
 			}
-			return ioutil.NopCloser(bytes.NewReader(r)), m.Identifier, nil
+			return ioutil.NopCloser(bytes.NewReader([]byte(r))), m.Identifier, nil
 		}
 	}
 	return nil, "", &os.PathError{fmt.Sprintf("read version %v", version), g.path, os.ErrNotExist}
@@ -168,11 +168,11 @@ func (g *Github) ReadDown(version uint) (r io.ReadCloser, identifier string, err
 			return nil, "", err
 		}
 		if file != nil {
-			r, err := file.Decode()
+			r, err := file.GetContent()
 			if err != nil {
 				return nil, "", err
 			}
-			return ioutil.NopCloser(bytes.NewReader(r)), m.Identifier, nil
+			return ioutil.NopCloser(bytes.NewReader([]byte(r))), m.Identifier, nil
 		}
 	}
 	return nil, "", &os.PathError{fmt.Sprintf("read version %v", version), g.path, os.ErrNotExist}
