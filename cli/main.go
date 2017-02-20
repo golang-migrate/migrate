@@ -182,12 +182,16 @@ Commands:
 			log.fatal("error: please specify version argument V")
 		}
 
-		v, err := strconv.ParseUint(flag.Arg(1), 10, 64)
+		v, err := strconv.ParseInt(flag.Arg(1), 10, 64)
 		if err != nil {
 			log.fatal("error: can't read version argument V")
 		}
 
-		forceCmd(migrater, uint(v))
+		if v < -1 {
+			log.fatal("error: argument V must be >= -1")
+		}
+
+		forceCmd(migrater, int(v))
 
 		if log.verbose {
 			log.Println("Finished after", time.Now().Sub(startTime))

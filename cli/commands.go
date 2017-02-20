@@ -42,7 +42,7 @@ func dropCmd(m *migrate.Migrate) {
 	}
 }
 
-func forceCmd(m *migrate.Migrate, v uint) {
+func forceCmd(m *migrate.Migrate, v int) {
 	if err := m.Force(v); err != nil {
 		log.fatalErr(err)
 	}

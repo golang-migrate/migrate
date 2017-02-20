@@ -63,6 +63,7 @@ type Driver interface {
 
 	// SetVersion saves version and dirty state.
 	// Migrate will call this function before and after each call to Run.
+	// version must be >= -1. -1 means NilVersion.
 	SetVersion(version int, dirty bool) error
 
 	// Version returns the currently active version and if the database is dirty.
