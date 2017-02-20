@@ -354,7 +354,7 @@ func (m *Migrate) Run(migration ...*Migration) error {
 
 // Force sets a migration version.
 // It does not check any currently active version in database.
-// It does not check if the database is dirty.
+// It resets the dirty state to false.
 func (m *Migrate) Force(version int) error {
 	if version < -1 {
 		panic("version must be >= -1")
