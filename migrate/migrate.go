@@ -222,12 +222,12 @@ func Version(url, migrationsPath string) (version uint64, err error) {
 
 // Create creates new migration files on disk
 func Create(url, migrationsPath, name string) (*file.MigrationFile, error) {
-	d, err := driver.New(url)
+	ext, err := driver.FilenameExtensionFromURL(url)
 	if err != nil {
 		return nil, err
 	}
 
-	files, err := file.ReadMigrationFiles(migrationsPath, file.FilenameRegex(d.FilenameExtension()))
+	files, err := file.ReadMigrationFiles(migrationsPath, file.FilenameRegex(ext))
 	if err != nil {
 		return nil, err
 	}
@@ -254,14 +254,14 @@ func Create(url, migrationsPath, name string) (*file.MigrationFile, error) {
 		Version: version,
 		UpFile: &file.File{
 			Path:      migrationsPath,
-			FileName:  fmt.Sprintf(filenamef, versionStr, name, "up", d.FilenameExtension()),
+			FileName:  fmt.Sprintf(filenamef, versionStr, name, "up", ext),
 			Name:      name,
 			Content:   []byte(""),
 			Direction: direction.Up,
 		},
 		DownFile: &file.File{
 			Path:      migrationsPath,
-			FileName:  fmt.Sprintf(filenamef, versionStr, name, "down", d.FilenameExtension()),
+			FileName:  fmt.Sprintf(filenamef, versionStr, name, "down", ext),
 			Name:      name,
 			Content:   []byte(""),
 			Direction: direction.Down,
