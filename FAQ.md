@@ -13,7 +13,7 @@
   it might be expensive to do a full directory scan in order to get the last element.
 
 #### What is a NilMigration? NilVersion?
-  @TODO
+  NilMigration defines a migration without a body. NilVersion is defined as const -1.
 
 #### What is the difference between uint(version) and int(targetVersion)?
   version refers to an existing migration version coming from a source and therefor can never be negative. 
