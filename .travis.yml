@@ -28,8 +28,6 @@ after_success:
 
 before_deploy:
   - make build-cli
-  - sudo apt-get update
-  - sudo apt-get install ruby ruby-dev rubygems gcc make 
   - gem install --no-ri --no-rdoc fpm 
   - fpm -s dir -t deb -n migrate -v "$(git describe --tags 2>/dev/null)" \
     --license MIT -m matthias.kadenbach@gmail.com \
