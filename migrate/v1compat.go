@@ -9,7 +9,7 @@ import (
 	"github.com/mattes/migrate/migrate/file"
 )
 
-var deprecatedMessage = "You are using a deprecated version of migrate, update at https://github.com/mattes/migrate"
+var deprecatedMessage = ""
 
 func Up(pipe chan interface{}, url, migrationsPath string) {
 	m, err := migrate.New("file://"+migrationsPath, url)
@@ -23,49 +23,144 @@ func Up(pipe chan interface{}, url, migrationsPath string) {
 	}
 }
 
-func UpSync(url, migrationsPath string) (err []error, ok bool) {
-	return nil, false
+func UpSync(url, migrationsPath string) (errs []error, ok bool) {
+	m, err := migrate.New("file://"+migrationsPath, url)
+	if err != nil {
+		return []error{err}, false
+	}
+	if err := m.Up(); err != nil {
+		return []error{err}, false
+	}
+	return nil, true
 }
 
 func Down(pipe chan interface{}, url, migrationsPath string) {
+	m, err := migrate.New("file://"+migrationsPath, url)
+	if err != nil {
+		pipe <- err
+		return
+	}
+
+	if err := m.Down(); err != nil {
+		pipe <- err
+	}
 }
 
-func DownSync(url, migrationsPath string) (err []error, ok bool) {
-	return nil, false
+func DownSync(url, migrationsPath string) (errs []error, ok bool) {
+	m, err := migrate.New("file://"+migrationsPath, url)
+	if err != nil {
+		return []error{err}, false
+	}
+	if err := m.Down(); err != nil {
+		return []error{err}, false
+	}
+	return nil, true
 }
 
 func Redo(pipe chan interface{}, url, migrationsPath string) {
+	m, err := migrate.New("file://"+migrationsPath, url)
+	if err != nil {
+		pipe <- err
+		return
+	}
+
+	if err := m.Steps(-1); err != nil {
+		pipe <- err
+		return
+	}
+
+	if err := m.Steps(1); err != nil {
+		pipe <- err
+	}
 }
 
-func RedoSync(url, migrationsPath string) (err []error, ok bool) {
-	return nil, false
+func RedoSync(url, migrationsPath string) (errs []error, ok bool) {
+	m, err := migrate.New("file://"+migrationsPath, url)
+	if err != nil {
+		return []error{err}, false
+	}
+	if err := m.Steps(-1); err != nil {
+		return []error{err}, false
+	}
+	if err := m.Steps(1); err != nil {
+		return []error{err}, false
+	}
+	return nil, true
 }
 
 func Reset(pipe chan interface{}, url, migrationsPath string) {
+	m, err := migrate.New("file://"+migrationsPath, url)
+	if err != nil {
+		pipe <- err
+		return
+	}
+
+	if err := m.Drop(); err != nil {
+		pipe <- err
+		return
+	}
+
+	if err := m.Up(); err != nil {
+		pipe <- err
+	}
 }
 
-func ResetSync(url, migrationsPath string) (err []error, ok bool) {
-	return nil, false
+func ResetSync(url, migrationsPath string) (errs []error, ok bool) {
+	m, err := migrate.New("file://"+migrationsPath, url)
+	if err != nil {
+		return []error{err}, false
+	}
+	if err := m.Drop(); err != nil {
+		return []error{err}, false
+	}
+	if err := m.Up(); err != nil {
+		return []error{err}, false
+	}
+	return nil, true
 }
 
 func Migrate(pipe chan interface{}, url, migrationsPath string, relativeN int) {
+	m, err := migrate.New("file://"+migrationsPath, url)
+	if err != nil {
+		pipe <- err
+		return
+	}
 
+	if err := m.Steps(relativeN); err != nil {
+		pipe <- err
+	}
 }
 
-func MigrateSync(url, migrationsPath string, relativeN int) (err []error, ok bool) {
-	return nil, false
+func MigrateSync(url, migrationsPath string, relativeN int) (errs []error, ok bool) {
+	m, err := migrate.New("file://"+migrationsPath, url)
+	if err != nil {
+		return []error{err}, false
+	}
+	if err := m.Steps(relativeN); err != nil {
+		return []error{err}, false
+	}
+	return nil, true
 }
 
 func Version(url, migrationsPath string) (version uint64, err error) {
-	return 0, nil
+	m, err := migrate.New("file://"+migrationsPath, url)
+	if err != nil {
+		return 0, err
+	}
+
+	v, _, err := m.Version()
+	if err != nil {
+		return 0, err
+	}
+	return uint64(v), nil
 }
 
 func Create(url, migrationsPath, name string) (*file.MigrationFile, error) {
-	return nil, fmt.Errorf(deprecatedMessage)
+	return nil, fmt.Errorf("You are using a deprecated version of migrate, update at https://github.com/mattes/migrate")
 }
 
 func NewPipe() chan interface{} {
-	return nil
+	return make(chan interface{}, 0)
 }
 
 func Graceful() {}
