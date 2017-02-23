@@ -2,6 +2,7 @@ package github
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -95,7 +96,7 @@ func WithInstance(client *github.Client, config *Config) (source.Driver, error) 
 }
 
 func (g *Github) readDirectory() error {
-	fileContent, dirContents, _, err := g.client.Repositories.GetContents(g.pathOwner, g.pathRepo, g.path, &github.RepositoryContentGetOptions{})
+	fileContent, dirContents, _, err := g.client.Repositories.GetContents(context.Background(), g.pathOwner, g.pathRepo, g.path, &github.RepositoryContentGetOptions{})
 	if err != nil {
 		return err
 	}
@@ -146,7 +147,7 @@ func (g *Github) Next(version uint) (nextVersion uint, err error) {
 
 func (g *Github) ReadUp(version uint) (r io.ReadCloser, identifier string, err error) {
 	if m, ok := g.migrations.Up(version); ok {
-		file, _, _, err := g.client.Repositories.GetContents(g.pathOwner, g.pathRepo, path.Join(g.path, m.Raw), &github.RepositoryContentGetOptions{})
+		file, _, _, err := g.client.Repositories.GetContents(context.Background(), g.pathOwner, g.pathRepo, path.Join(g.path, m.Raw), &github.RepositoryContentGetOptions{})
 		if err != nil {
 			return nil, "", err
 		}
@@ -163,7 +164,7 @@ func (g *Github) ReadUp(version uint) (r io.ReadCloser, identifier string, err e
 
 func (g *Github) ReadDown(version uint) (r io.ReadCloser, identifier string, err error) {
 	if m, ok := g.migrations.Down(version); ok {
-		file, _, _, err := g.client.Repositories.GetContents(g.pathOwner, g.pathRepo, path.Join(g.path, m.Raw), &github.RepositoryContentGetOptions{})
+		file, _, _, err := g.client.Repositories.GetContents(context.Background(), g.pathOwner, g.pathRepo, path.Join(g.path, m.Raw), &github.RepositoryContentGetOptions{})
 		if err != nil {
 			return nil, "", err
 		}
