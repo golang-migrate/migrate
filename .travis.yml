@@ -29,7 +29,7 @@ after_success:
 before_deploy:
   - make build-cli
   - gem install --no-ri --no-rdoc fpm 
-  - fpm -s dir -t deb -n migrate -v "$(git describe --tags 2>/dev/null)" --license MIT -m matthias.kadenbach@gmail.com --url https://github.com/mattes/migrate --description='Database migrations' -a amd64 -p migrate.$(git describe --tags 2>/dev/null).deb --deb-no-default-config-files -f -C build/cli migrate.linux-amd64=/usr/bin/migrate
+  - fpm -s dir -t deb -n migrate -v "$(git describe --tags 2>/dev/null)" --license MIT -m matthias.kadenbach@gmail.com --url https://github.com/mattes/migrate --description='Database migrations' -a amd64 -p migrate.$(git describe --tags 2>/dev/null).deb --deb-no-default-config-files -f -C cli/build migrate.linux-amd64=/usr/bin/migrate
 
 deploy:
   - provider: releases
