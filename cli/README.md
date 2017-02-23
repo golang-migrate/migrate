@@ -16,12 +16,13 @@ $ go get -u -tags 'postgres' -o migrate github.com/mattes/migrate/cli
 $ brew install migrate --with-postgres
 ```
 
-#### Linux (with deb package)
+#### Linux (*.deb package)
 
 ```
-# TODO: add key and repo
+$ curl -L https://packagecloud.io/mattes/migrate/gpgkey | apt-key add -
+$ echo "deb https://packagecloud.io/mattes/migrate/ubuntu/ xenial main" > /etc/apt/sources.list.d/migrate.list
 $ apt-get update
-$ apt-get install migrate
+$ apt-get install -y migrate
 ```
 
 #### Download pre-build binary (Windows, MacOS, or Linux)
@@ -101,6 +102,3 @@ $ migrate -database "$(cat config.json | jq '.database')"
 $ migrate -database "$(cat config/database.yml | ruby -ryaml -e "print YAML.load(STDIN.read)['database']")"
 $ migrate -database "$(cat config/database.yml | python -c 'import yaml,sys;print yaml.safe_load(sys.stdin)["database"]')"
 ```
-
-
-
