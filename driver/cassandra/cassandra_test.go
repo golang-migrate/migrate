@@ -21,10 +21,10 @@ func TestMigrate(t *testing.T) {
 
 	host := os.Getenv("CASSANDRA_PORT_9042_TCP_ADDR")
 	port := os.Getenv("CASSANDRA_PORT_9042_TCP_PORT")
-	driverUrl := "cassandra://" + host + ":" + port + "/system"
+	driverURL := "cassandra://" + host + ":" + port + "/system"
 
 	// prepare a clean test database
-	u, err := url.Parse(driverUrl)
+	u, err := url.Parse(driverURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,23 +35,25 @@ func TestMigrate(t *testing.T) {
 	cluster.Timeout = 1 * time.Minute
 
 	session, err = cluster.CreateSession()
-
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := session.Query(`DROP KEYSPACE IF EXISTS migrate;`).Exec(); err != nil {
+	if err = session.Query(`DROP KEYSPACE IF EXISTS migrate;`).Exec(); err != nil {
 		t.Fatal(err)
 	}
-	if err := session.Query(`CREATE KEYSPACE IF NOT EXISTS migrate WITH REPLICATION = {'class': 'SimpleStrategy', 'replication_factor': 1};`).Exec(); err != nil {
+	if err = session.Query(`CREATE KEYSPACE IF NOT EXISTS migrate WITH REPLICATION = {'class': 'SimpleStrategy', 'replication_factor': 1};`).Exec(); err != nil {
 		t.Fatal(err)
 	}
 	cluster.Keyspace = "migrate"
 	session, err = cluster.CreateSession()
-	driverUrl = "cassandra://" + host + ":" + port + "/migrate"
+	if err != nil {
+		t.Fatal(err)
+	}
+	driverURL = "cassandra://" + host + ":" + port + "/migrate"
 
 	d := &Driver{}
-	if err := d.Initialize(driverUrl); err != nil {
+	if err := d.Initialize(driverURL); err != nil {
 		t.Fatal(err)
 	}
 

@@ -97,8 +97,8 @@ func (driver *Driver) Migrate(f file.File, pipe chan interface{}) {
 func splitContent(content string) []string {
 	lines := strings.Split(content, ";")
 	resultLines := make([]string, 0, len(lines))
-	for i, line := range lines {
-		line = strings.Replace(lines[i], ";", "", -1)
+	for i := range lines {
+		line := strings.Replace(lines[i], ";", "", -1)
 		line = strings.TrimSpace(line)
 		if line != "" {
 			resultLines = append(resultLines, line)

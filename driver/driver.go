@@ -43,7 +43,7 @@ func New(url string) (Driver, error) {
 
 	d := GetDriver(u.Scheme)
 	if d == nil {
-		return nil, fmt.Errorf("Driver '%s' not found.", u.Scheme)
+		return nil, fmt.Errorf("Driver '%s' not found", u.Scheme)
 	}
 	verifyFilenameExtension(u.Scheme, d)
 	if err := d.Initialize(url); err != nil {
@@ -51,6 +51,22 @@ func New(url string) (Driver, error) {
 	}
 
 	return d, nil
+}
+
+// FilenameExtensionFromURL return extension for migration files. Used for create migrations
+func FilenameExtensionFromURL(url string) (string, error) {
+	u, err := neturl.Parse(url)
+	if err != nil {
+		return "", err
+	}
+
+	d := GetDriver(u.Scheme)
+	if d == nil {
+		return "", fmt.Errorf("Driver '%s' not found", u.Scheme)
+	}
+	verifyFilenameExtension(u.Scheme, d)
+
+	return d.FilenameExtension(), nil
 }
 
 // verifyFilenameExtension panics if the driver's filename extension

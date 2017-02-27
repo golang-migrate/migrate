@@ -9,18 +9,18 @@ import (
 	// Ensure imports for each driver we wish to test
 
 	_ "github.com/mattes/migrate/driver/postgres"
-	_ "github.com/mattes/migrate/driver/sqlite3"
 	_ "github.com/mattes/migrate/driver/ql"
+	_ "github.com/mattes/migrate/driver/sqlite3"
 )
 
 // Add Driver URLs here to test basic Up, Down, .. functions.
-var driverUrls = []string{
+var driverURLs = []string{
 	"postgres://postgres@" + os.Getenv("POSTGRES_PORT_5432_TCP_ADDR") + ":" + os.Getenv("POSTGRES_PORT_5432_TCP_PORT") + "/template1?sslmode=disable",
 	"ql+file://./test.db",
 }
 
-func tearDown(driverUrl, tmpdir string) {
-	DownSync(driverUrl, tmpdir)
+func tearDown(driverURL, tmpdir string) {
+	DownSync(driverURL, tmpdir)
 	os.RemoveAll(tmpdir)
 }
 
@@ -28,18 +28,18 @@ func TestCreate(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping test in short mode.")
 	}
-	for _, driverUrl := range driverUrls {
-		t.Logf("Test driver: %s", driverUrl)
+	for _, driverURL := range driverURLs {
+		t.Logf("Test driver: %s", driverURL)
 		tmpdir, err := ioutil.TempDir("/tmp", "migrate-test")
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer tearDown(driverUrl, tmpdir)
+		defer tearDown(driverURL, tmpdir)
 
-		if _, err := Create(driverUrl, tmpdir, "test_migration"); err != nil {
+		if _, err = Create(driverURL, tmpdir, "test_migration"); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := Create(driverUrl, tmpdir, "another migration"); err != nil {
+		if _, err = Create(driverURL, tmpdir, "another migration"); err != nil {
 			t.Fatal(err)
 		}
 
@@ -83,25 +83,25 @@ func TestReset(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping test in short mode.")
 	}
-	for _, driverUrl := range driverUrls {
-		t.Logf("Test driver: %s", driverUrl)
+	for _, driverURL := range driverURLs {
+		t.Logf("Test driver: %s", driverURL)
 		tmpdir, err := ioutil.TempDir("/tmp", "migrate-test")
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer tearDown(driverUrl, tmpdir)
+		defer tearDown(driverURL, tmpdir)
 
-		Create(driverUrl, tmpdir, "migration1")
-		f, err := Create(driverUrl, tmpdir, "migration2")
+		Create(driverURL, tmpdir, "migration1")
+		f, err := Create(driverURL, tmpdir, "migration2")
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		if err, ok := ResetSync(driverUrl, tmpdir); !ok {
+		if err, ok := ResetSync(driverURL, tmpdir); !ok {
 			t.Fatal(err)
 		}
 
-		if version, err := Version(driverUrl, tmpdir); err != nil {
+		if version, err := Version(driverURL, tmpdir); err != nil {
 			t.Fatal(err)
 		} else if version != f.Version {
 			t.Fatalf("Expected version %v, got %v", version, f.Version)
@@ -113,36 +113,36 @@ func TestDown(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping test in short mode.")
 	}
-	for _, driverUrl := range driverUrls {
-		t.Logf("Test driver: %s", driverUrl)
+	for _, driverURL := range driverURLs {
+		t.Logf("Test driver: %s", driverURL)
 		tmpdir, err := ioutil.TempDir("/tmp", "migrate-test")
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer tearDown(driverUrl, tmpdir)
+		defer tearDown(driverURL, tmpdir)
 
-		initVersion, _ := Version(driverUrl, tmpdir)
+		initVersion, _ := Version(driverURL, tmpdir)
 
-		firstMigration, _ := Create(driverUrl, tmpdir, "migration1")
-		secondMigration, _ := Create(driverUrl, tmpdir, "migration2")
+		firstMigration, _ := Create(driverURL, tmpdir, "migration1")
+		secondMigration, _ := Create(driverURL, tmpdir, "migration2")
 
 		t.Logf("init %v first %v second %v", initVersion, firstMigration.Version, secondMigration.Version)
 
-		if err, ok := ResetSync(driverUrl, tmpdir); !ok {
+		if err, ok := ResetSync(driverURL, tmpdir); !ok {
 			t.Fatal(err)
 		}
 
-		if version, err := Version(driverUrl, tmpdir); err != nil {
+		if version, err := Version(driverURL, tmpdir); err != nil {
 			t.Fatal(err)
 		} else if version != secondMigration.Version {
 			t.Fatalf("Expected version %v, got %v", version, secondMigration.Version)
 		}
 
-		if err, ok := DownSync(driverUrl, tmpdir); !ok {
+		if err, ok := DownSync(driverURL, tmpdir); !ok {
 			t.Fatal(err)
 		}
 
-		if version, err := Version(driverUrl, tmpdir); err != nil {
+		if version, err := Version(driverURL, tmpdir); err != nil {
 			t.Fatal(err)
 		} else if version != 0 {
 			t.Fatalf("Expected 0, got %v", version)
@@ -154,36 +154,36 @@ func TestUp(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping test in short mode.")
 	}
-	for _, driverUrl := range driverUrls {
-		t.Logf("Test driver: %s", driverUrl)
+	for _, driverURL := range driverURLs {
+		t.Logf("Test driver: %s", driverURL)
 		tmpdir, err := ioutil.TempDir("/tmp", "migrate-test")
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer tearDown(driverUrl, tmpdir)
+		defer tearDown(driverURL, tmpdir)
 
-		initVersion, _ := Version(driverUrl, tmpdir)
+		initVersion, _ := Version(driverURL, tmpdir)
 
-		firstMigration, _ := Create(driverUrl, tmpdir, "migration1")
-		secondMigration, _ := Create(driverUrl, tmpdir, "migration2")
+		firstMigration, _ := Create(driverURL, tmpdir, "migration1")
+		secondMigration, _ := Create(driverURL, tmpdir, "migration2")
 
 		t.Logf("init %v first %v second %v", initVersion, firstMigration.Version, secondMigration.Version)
 
-		if err, ok := DownSync(driverUrl, tmpdir); !ok {
+		if err, ok := DownSync(driverURL, tmpdir); !ok {
 			t.Fatal(err)
 		}
 
-		if version, err := Version(driverUrl, tmpdir); err != nil {
+		if version, err := Version(driverURL, tmpdir); err != nil {
 			t.Fatal(err)
 		} else if version != initVersion {
 			t.Fatalf("Expected initial version %v, got %v", initVersion, version)
 		}
 
-		if err, ok := UpSync(driverUrl, tmpdir); !ok {
+		if err, ok := UpSync(driverURL, tmpdir); !ok {
 			t.Fatal(err)
 		}
 
-		if version, err := Version(driverUrl, tmpdir); err != nil {
+		if version, err := Version(driverURL, tmpdir); err != nil {
 			t.Fatal(err)
 		} else if version != secondMigration.Version {
 			t.Fatalf("Expected migrated version %v, got %v", secondMigration.Version, version)
@@ -195,36 +195,36 @@ func TestRedo(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping test in short mode.")
 	}
-	for _, driverUrl := range driverUrls {
-		t.Logf("Test driver: %s", driverUrl)
+	for _, driverURL := range driverURLs {
+		t.Logf("Test driver: %s", driverURL)
 		tmpdir, err := ioutil.TempDir("/tmp", "migrate-test")
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer tearDown(driverUrl, tmpdir)
+		defer tearDown(driverURL, tmpdir)
 
-		initVersion, _ := Version(driverUrl, tmpdir)
+		initVersion, _ := Version(driverURL, tmpdir)
 
-		firstMigration, _ := Create(driverUrl, tmpdir, "migration1")
-		secondMigration, _ := Create(driverUrl, tmpdir, "migration2")
+		firstMigration, _ := Create(driverURL, tmpdir, "migration1")
+		secondMigration, _ := Create(driverURL, tmpdir, "migration2")
 
 		t.Logf("init %v first %v second %v", initVersion, firstMigration.Version, secondMigration.Version)
 
-		if err, ok := ResetSync(driverUrl, tmpdir); !ok {
+		if err, ok := ResetSync(driverURL, tmpdir); !ok {
 			t.Fatal(err)
 		}
 
-		if version, err := Version(driverUrl, tmpdir); err != nil {
+		if version, err := Version(driverURL, tmpdir); err != nil {
 			t.Fatal(err)
 		} else if version != secondMigration.Version {
 			t.Fatalf("Expected migrated version %v, got %v", secondMigration.Version, version)
 		}
 
-		if err, ok := RedoSync(driverUrl, tmpdir); !ok {
+		if err, ok := RedoSync(driverURL, tmpdir); !ok {
 			t.Fatal(err)
 		}
 
-		if version, err := Version(driverUrl, tmpdir); err != nil {
+		if version, err := Version(driverURL, tmpdir); err != nil {
 			t.Fatal(err)
 		} else if version != secondMigration.Version {
 			t.Fatalf("Expected migrated version %v, got %v", secondMigration.Version, version)
@@ -236,46 +236,46 @@ func TestMigrate(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping test in short mode.")
 	}
-	for _, driverUrl := range driverUrls {
-		t.Logf("Test driver: %s", driverUrl)
+	for _, driverURL := range driverURLs {
+		t.Logf("Test driver: %s", driverURL)
 		tmpdir, err := ioutil.TempDir("/tmp", "migrate-test")
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer tearDown(driverUrl, tmpdir)
+		defer tearDown(driverURL, tmpdir)
 
-		initVersion, _ := Version(driverUrl, tmpdir)
+		initVersion, _ := Version(driverURL, tmpdir)
 
-		firstMigration, _ := Create(driverUrl, tmpdir, "migration1")
-		secondMigration, _ := Create(driverUrl, tmpdir, "migration2")
+		firstMigration, _ := Create(driverURL, tmpdir, "migration1")
+		secondMigration, _ := Create(driverURL, tmpdir, "migration2")
 
 		t.Logf("init %v first %v second %v", initVersion, firstMigration.Version, secondMigration.Version)
 
-		if err, ok := ResetSync(driverUrl, tmpdir); !ok {
+		if err, ok := ResetSync(driverURL, tmpdir); !ok {
 			t.Fatal(err)
 		}
 
-		if version, err := Version(driverUrl, tmpdir); err != nil {
+		if version, err := Version(driverURL, tmpdir); err != nil {
 			t.Fatal(err)
 		} else if version != secondMigration.Version {
 			t.Fatalf("Expected migrated version %v, got %v", secondMigration.Version, version)
 		}
 
-		if err, ok := MigrateSync(driverUrl, tmpdir, -2); !ok {
+		if err, ok := MigrateSync(driverURL, tmpdir, -2); !ok {
 			t.Fatal(err)
 		}
 
-		if version, err := Version(driverUrl, tmpdir); err != nil {
+		if version, err := Version(driverURL, tmpdir); err != nil {
 			t.Fatal(err)
 		} else if version != 0 {
 			t.Fatalf("Expected 0, got %v", version)
 		}
 
-		if err, ok := MigrateSync(driverUrl, tmpdir, +1); !ok {
+		if err, ok := MigrateSync(driverURL, tmpdir, +1); !ok {
 			t.Fatal(err)
 		}
 
-		if version, err := Version(driverUrl, tmpdir); err != nil {
+		if version, err := Version(driverURL, tmpdir); err != nil {
 			t.Fatal(err)
 		} else if version != firstMigration.Version {
 			t.Fatalf("Expected first version %v, got %v", firstMigration.Version, version)

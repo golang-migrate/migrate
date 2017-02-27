@@ -6,13 +6,14 @@ import (
 	"github.com/mattes/migrate/file"
 	"github.com/mattes/migrate/migrate/direction"
 
+	"os"
+	"reflect"
+	"time"
+
 	"github.com/mattes/migrate/driver"
 	"github.com/mattes/migrate/driver/mongodb"
 	"github.com/mattes/migrate/driver/mongodb/gomethods"
 	pipep "github.com/mattes/migrate/pipe"
-	"os"
-	"reflect"
-	"time"
 )
 
 type ExpectedMigrationResult struct {

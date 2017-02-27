@@ -3,11 +3,12 @@ package gomethods
 import (
 	"bufio"
 	"fmt"
-	"github.com/mattes/migrate/driver"
-	"github.com/mattes/migrate/file"
 	"os"
 	"path"
 	"strings"
+
+	"github.com/mattes/migrate/driver"
+	"github.com/mattes/migrate/file"
 )
 
 type MethodNotFoundError string

@@ -8,7 +8,7 @@ import (
 var driversMu sync.Mutex
 var drivers = make(map[string]Driver)
 
-// Registers a driver so it can be created from its name. Drivers should
+// RegisterDriver register a driver so it can be created from its name. Drivers should
 // call this from an init() function so that they registers themselves on
 // import
 func RegisterDriver(name string, driver Driver) {
@@ -23,7 +23,7 @@ func RegisterDriver(name string, driver Driver) {
 	drivers[name] = driver
 }
 
-// Retrieves a registered driver by name
+// GetDriver retrieves a registered driver by name
 func GetDriver(name string) Driver {
 	driversMu.Lock()
 	defer driversMu.Unlock()

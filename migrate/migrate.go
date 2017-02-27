@@ -51,13 +51,12 @@ func Up(pipe chan interface{}, url, migrationsPath string) {
 		}
 		go pipep.Close(pipe, nil)
 		return
-	} else {
-		if err := d.Close(); err != nil {
-			pipe <- err
-		}
-		go pipep.Close(pipe, nil)
-		return
 	}
+	if err := d.Close(); err != nil {
+		pipe <- err
+	}
+	go pipep.Close(pipe, nil)
+	return
 }
 
 // UpSync is synchronous version of Up
@@ -101,13 +100,12 @@ func Down(pipe chan interface{}, url, migrationsPath string) {
 		}
 		go pipep.Close(pipe, nil)
 		return
-	} else {
-		if err2 := d.Close(); err2 != nil {
-			pipe <- err2
-		}
-		go pipep.Close(pipe, nil)
-		return
 	}
+	if err2 := d.Close(); err2 != nil {
+		pipe <- err2
+	}
+	go pipep.Close(pipe, nil)
+	return
 }
 
 // DownSync is synchronous version of Down
@@ -129,9 +127,8 @@ func Redo(pipe chan interface{}, url, migrationsPath string) {
 	if ok := pipep.WaitAndRedirect(pipe1, pipe, signals); !ok {
 		go pipep.Close(pipe, nil)
 		return
-	} else {
-		go Migrate(pipe, url, migrationsPath, +1)
 	}
+	go Migrate(pipe, url, migrationsPath, +1)
 }
 
 // RedoSync is synchronous version of Redo
@@ -153,9 +150,8 @@ func Reset(pipe chan interface{}, url, migrationsPath string) {
 	if ok := pipep.WaitAndRedirect(pipe1, pipe, signals); !ok {
 		go pipep.Close(pipe, nil)
 		return
-	} else {
-		go Up(pipe, url, migrationsPath)
 	}
+	go Up(pipe, url, migrationsPath)
 }
 
 // ResetSync is synchronous version of Reset
@@ -226,12 +222,12 @@ func Version(url, migrationsPath string) (version uint64, err error) {
 
 // Create creates new migration files on disk
 func Create(url, migrationsPath, name string) (*file.MigrationFile, error) {
-	d, err := driver.New(url)
+	ext, err := driver.FilenameExtensionFromURL(url)
 	if err != nil {
 		return nil, err
 	}
 
-	files, err := file.ReadMigrationFiles(migrationsPath, file.FilenameRegex(d.FilenameExtension()))
+	files, err := file.ReadMigrationFiles(migrationsPath, file.FilenameRegex(ext))
 	if err != nil {
 		return nil, err
 	}
@@ -258,14 +254,14 @@ func Create(url, migrationsPath, name string) (*file.MigrationFile, error) {
 		Version: version,
 		UpFile: &file.File{
 			Path:      migrationsPath,
-			FileName:  fmt.Sprintf(filenamef, versionStr, name, "up", d.FilenameExtension()),
+			FileName:  fmt.Sprintf(filenamef, versionStr, name, "up", ext),
 			Name:      name,
 			Content:   []byte(""),
 			Direction: direction.Up,
 		},
 		DownFile: &file.File{
 			Path:      migrationsPath,
-			FileName:  fmt.Sprintf(filenamef, versionStr, name, "down", d.FilenameExtension()),
+			FileName:  fmt.Sprintf(filenamef, versionStr, name, "down", ext),
 			Name:      name,
 			Content:   []byte(""),
 			Direction: direction.Down,
