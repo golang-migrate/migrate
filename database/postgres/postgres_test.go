@@ -14,12 +14,12 @@ import (
 	mt "github.com/mattes/migrate/testing"
 )
 
-var versions = []string{
-	"postgres:9.6",
-	"postgres:9.5",
-	"postgres:9.4",
-	"postgres:9.3",
-	"postgres:9.2",
+var versions = []mt.Version{
+	{Image: "postgres:9.6"},
+	{Image: "postgres:9.5"},
+	{Image: "postgres:9.4"},
+	{Image: "postgres:9.3"},
+	{Image: "postgres:9.2"},
 }
 
 func isReady(i mt.Instance) bool {
@@ -147,17 +147,4 @@ func TestWithSchema(t *testing.T) {
 
 func TestWithInstance(t *testing.T) {
 
-}
-
-func TestGenerateAdvisoryLockId(t *testing.T) {
-	p := &Postgres{}
-	p.config = &Config{DatabaseName: "database_name"}
-	id, err := p.generateAdvisoryLockId()
-	if err != nil {
-		t.Errorf("expected err to be nil, got %v", err)
-	}
-	if len(id) == 0 {
-		t.Errorf("expected generated id not to be empty")
-	}
-	t.Logf("generated id: %v", id)
 }

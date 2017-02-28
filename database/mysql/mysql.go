@@ -1,4 +1,4 @@
-package postgres
+package mysql
 
 import (
 	"database/sql"
@@ -6,23 +6,23 @@ import (
 	"io"
 	"io/ioutil"
 	nurl "net/url"
+	"strings"
 
-	"github.com/lib/pq"
+	"github.com/go-sql-driver/mysql"
 	"github.com/mattes/migrate"
 	"github.com/mattes/migrate/database"
 )
 
 func init() {
-	database.Register("postgres", &Postgres{})
+	database.Register("mysql", &Mysql{})
 }
 
 var DefaultMigrationsTable = "schema_migrations"
 
 var (
+	ErrDatabaseDirty  = fmt.Errorf("database is dirty")
 	ErrNilConfig      = fmt.Errorf("no config")
 	ErrNoDatabaseName = fmt.Errorf("no database name")
-	ErrNoSchema       = fmt.Errorf("no schema")
-	ErrDatabaseDirty  = fmt.Errorf("database is dirty")
 )
 
 type Config struct {
@@ -30,14 +30,14 @@ type Config struct {
 	DatabaseName    string
 }
 
-type Postgres struct {
+type Mysql struct {
 	db       *sql.DB
 	isLocked bool
 
-	// Open and WithInstance need to garantuee that config is never nil
 	config *Config
 }
 
+// instance must have `multiStatements` set to true
 func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	if config == nil {
 		return nil, ErrNilConfig
@@ -47,41 +47,44 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		return nil, err
 	}
 
-	query := `SELECT CURRENT_DATABASE()`
-	var databaseName string
+	query := `SELECT DATABASE()`
+	var databaseName sql.NullString
 	if err := instance.QueryRow(query).Scan(&databaseName); err != nil {
 		return nil, &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 
-	if len(databaseName) == 0 {
+	if len(databaseName.String) == 0 {
 		return nil, ErrNoDatabaseName
 	}
 
-	config.DatabaseName = databaseName
+	config.DatabaseName = databaseName.String
 
 	if len(config.MigrationsTable) == 0 {
 		config.MigrationsTable = DefaultMigrationsTable
 	}
 
-	px := &Postgres{
+	mx := &Mysql{
 		db:     instance,
 		config: config,
 	}
 
-	if err := px.ensureVersionTable(); err != nil {
+	if err := mx.ensureVersionTable(); err != nil {
 		return nil, err
 	}
 
-	return px, nil
+	return mx, nil
 }
 
-func (p *Postgres) Open(url string) (database.Driver, error) {
+func (m *Mysql) Open(url string) (database.Driver, error) {
 	purl, err := nurl.Parse(url)
 	if err != nil {
 		return nil, err
 	}
 
-	db, err := sql.Open("postgres", migrate.FilterCustomQuery(purl).String())
+	purl.Query().Set("multiStatements", "true")
+
+	db, err := sql.Open("mysql", strings.Replace(
+		migrate.FilterCustomQuery(purl).String(), "mysql://", "", 1))
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +94,7 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 		migrationsTable = DefaultMigrationsTable
 	}
 
-	px, err := WithInstance(db, &Config{
+	mx, err := WithInstance(db, &Config{
 		DatabaseName:    purl.Path,
 		MigrationsTable: migrationsTable,
 	})
@@ -99,89 +102,84 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 		return nil, err
 	}
 
-	return px, nil
+	return mx, nil
 }
 
-func (p *Postgres) Close() error {
-	return p.db.Close()
+func (m *Mysql) Close() error {
+	return m.db.Close()
 }
 
-// https://www.postgresql.org/docs/9.6/static/explicit-locking.html#ADVISORY-LOCKS
-func (p *Postgres) Lock() error {
-	if p.isLocked {
+func (m *Mysql) Lock() error {
+	if m.isLocked {
 		return database.ErrLocked
 	}
 
-	aid, err := database.GenerateAdvisoryLockId(p.config.DatabaseName)
+	aid, err := database.GenerateAdvisoryLockId(m.config.DatabaseName)
 	if err != nil {
 		return err
 	}
 
-	// This will either obtain the lock immediately and return true,
-	// or return false if the lock cannot be acquired immediately.
-	query := `SELECT pg_try_advisory_lock($1)`
+	query := "SELECT GET_LOCK(?, 1)"
 	var success bool
-	if err := p.db.QueryRow(query, aid).Scan(&success); err != nil {
+	if err := m.db.QueryRow(query, aid).Scan(&success); err != nil {
 		return &database.Error{OrigErr: err, Err: "try lock failed", Query: []byte(query)}
 	}
 
 	if success {
-		p.isLocked = true
+		m.isLocked = true
 		return nil
 	}
 
 	return database.ErrLocked
 }
 
-func (p *Postgres) Unlock() error {
-	if !p.isLocked {
+func (m *Mysql) Unlock() error {
+	if !m.isLocked {
 		return nil
 	}
 
-	aid, err := database.GenerateAdvisoryLockId(p.config.DatabaseName)
+	aid, err := database.GenerateAdvisoryLockId(m.config.DatabaseName)
 	if err != nil {
 		return err
 	}
 
-	query := `SELECT pg_advisory_unlock($1)`
-	if _, err := p.db.Exec(query, aid); err != nil {
+	query := `SELECT RELEASE_LOCK(?)`
+	if _, err := m.db.Exec(query, aid); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
-	p.isLocked = false
+
+	m.isLocked = false
 	return nil
 }
 
-func (p *Postgres) Run(migration io.Reader) error {
+func (m *Mysql) Run(migration io.Reader) error {
 	migr, err := ioutil.ReadAll(migration)
 	if err != nil {
 		return err
 	}
 
-	// run migration
 	query := string(migr[:])
-	if _, err := p.db.Exec(query); err != nil {
-		// TODO: cast to postgress error and get line number
+	if _, err := m.db.Exec(query); err != nil {
 		return database.Error{OrigErr: err, Err: "migration failed", Query: migr}
 	}
 
 	return nil
 }
 
-func (p *Postgres) SetVersion(version int, dirty bool) error {
-	tx, err := p.db.Begin()
+func (m *Mysql) SetVersion(version int, dirty bool) error {
+	tx, err := m.db.Begin()
 	if err != nil {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
 	}
 
-	query := `TRUNCATE "` + p.config.MigrationsTable + `"`
-	if _, err := p.db.Exec(query); err != nil {
-		tx.Rollback()
+	query := "TRUNCATE `" + m.config.MigrationsTable + "`"
+	if _, err := m.db.Exec(query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 
 	if version >= 0 {
-		query = `INSERT INTO "` + p.config.MigrationsTable + `" (version, dirty) VALUES ($1, $2)`
-		if _, err := p.db.Exec(query, version, dirty); err != nil {
+		query := "INSERT INTO `" + m.config.MigrationsTable + "` (version, dirty) VALUES (?, ?)"
+		if _, err := m.db.Exec(query, version, dirty); err != nil {
 			tx.Rollback()
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
@@ -194,16 +192,16 @@ func (p *Postgres) SetVersion(version int, dirty bool) error {
 	return nil
 }
 
-func (p *Postgres) Version() (version int, dirty bool, err error) {
-	query := `SELECT version, dirty FROM "` + p.config.MigrationsTable + `" LIMIT 1`
-	err = p.db.QueryRow(query).Scan(&version, &dirty)
+func (m *Mysql) Version() (version int, dirty bool, err error) {
+	query := "SELECT version, dirty FROM `" + m.config.MigrationsTable + "` LIMIT 1"
+	err = m.db.QueryRow(query).Scan(&version, &dirty)
 	switch {
 	case err == sql.ErrNoRows:
 		return database.NilVersion, false, nil
 
 	case err != nil:
-		if e, ok := err.(*pq.Error); ok {
-			if e.Code.Name() == "undefined_table" {
+		if e, ok := err.(*mysql.MySQLError); ok {
+			if e.Number == 0 {
 				return database.NilVersion, false, nil
 			}
 		}
@@ -214,10 +212,10 @@ func (p *Postgres) Version() (version int, dirty bool, err error) {
 	}
 }
 
-func (p *Postgres) Drop() error {
-	// select all tables in current schema
-	query := `SELECT table_name FROM information_schema.tables WHERE table_schema=(SELECT current_schema())`
-	tables, err := p.db.Query(query)
+func (m *Mysql) Drop() error {
+	// select all tables
+	query := `SHOW TABLES LIKE '%'`
+	tables, err := m.db.Query(query)
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
@@ -238,12 +236,12 @@ func (p *Postgres) Drop() error {
 	if len(tableNames) > 0 {
 		// delete one by one ...
 		for _, t := range tableNames {
-			query = `DROP TABLE IF EXISTS ` + t + ` CASCADE`
-			if _, err := p.db.Exec(query); err != nil {
+			query = "DROP TABLE IF EXISTS `" + t + "` CASCADE"
+			if _, err := m.db.Exec(query); err != nil {
 				return &database.Error{OrigErr: err, Query: []byte(query)}
 			}
 		}
-		if err := p.ensureVersionTable(); err != nil {
+		if err := m.ensureVersionTable(); err != nil {
 			return err
 		}
 	}
@@ -251,20 +249,23 @@ func (p *Postgres) Drop() error {
 	return nil
 }
 
-func (p *Postgres) ensureVersionTable() error {
+func (m *Mysql) ensureVersionTable() error {
 	// check if migration table exists
 	var count int
-	query := `SELECT COUNT(1) FROM information_schema.tables WHERE table_name = $1 AND table_schema = (SELECT current_schema()) LIMIT 1`
-	if err := p.db.QueryRow(query, p.config.MigrationsTable).Scan(&count); err != nil {
-		return &database.Error{OrigErr: err, Query: []byte(query)}
+	query := `SHOW TABLES WHERE ?`
+	if err := m.db.QueryRow(query, m.config.MigrationsTable).Scan(&count); err != nil {
+		if err != sql.ErrNoRows {
+			return &database.Error{OrigErr: err, Query: []byte(query)}
+		}
 	}
+
 	if count == 1 {
 		return nil
 	}
 
 	// if not, create the empty migration table
-	query = `CREATE TABLE "` + p.config.MigrationsTable + `" (version bigint not null primary key, dirty boolean not null)`
-	if _, err := p.db.Exec(query); err != nil {
+	query = "CREATE TABLE `" + m.config.MigrationsTable + "` (version bigint not null primary key, dirty boolean not null)"
+	if _, err := m.db.Exec(query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 	return nil

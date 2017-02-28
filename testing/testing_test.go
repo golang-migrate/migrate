@@ -12,7 +12,7 @@ func ExampleParallelTest(t *testing.T) {
 	}
 
 	// t is *testing.T coming from parent Test(t *testing.T)
-	ParallelTest(t, []string{"docker_image:9.6"}, isReady,
+	ParallelTest(t, []Version{{Image: "docker_image:9.6"}}, isReady,
 		func(t *testing.T, i Instance) {
 			// Run your test/s ...
 			t.Fatal("...")

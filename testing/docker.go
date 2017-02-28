@@ -6,6 +6,7 @@ import (
 	"context" // TODO: is issue with go < 1.7?
 	"encoding/json"
 	"fmt"
+	"io"
 	"math/rand"
 	"strconv"
 	"strings"
@@ -18,7 +19,7 @@ import (
 	dockerclient "github.com/docker/docker/client"
 )
 
-func NewDockerContainer(t testing.TB, image string) (*DockerContainer, error) {
+func NewDockerContainer(t testing.TB, image string, env []string) (*DockerContainer, error) {
 	c, err := dockerclient.NewEnvClient()
 	if err != nil {
 		return nil, err
@@ -28,6 +29,7 @@ func NewDockerContainer(t testing.TB, image string) (*DockerContainer, error) {
 		t:         t,
 		client:    c,
 		ImageName: image,
+		ENV:       env,
 	}
 
 	if err := contr.PullImage(); err != nil {
@@ -46,6 +48,7 @@ type DockerContainer struct {
 	t                  testing.TB
 	client             *dockerclient.Client
 	ImageName          string
+	ENV                []string
 	ContainerId        string
 	ContainerName      string
 	ContainerJSON      dockertypes.ContainerJSON
@@ -83,9 +86,9 @@ func (d *DockerContainer) Start() error {
 		&dockercontainer.Config{
 			Image:  d.ImageName,
 			Labels: map[string]string{"migrate_test": "true"},
+			Env:    d.ENV,
 		},
 		&dockercontainer.HostConfig{
-			AutoRemove:      true,
 			PublishAllPorts: true,
 		},
 		&dockernetwork.NetworkingConfig{},
@@ -144,6 +147,17 @@ func (d *DockerContainer) Inspect() error {
 	d.ContainerJSON = resp
 	d.containerInspected = true
 	return nil
+}
+
+func (d *DockerContainer) Logs() (io.ReadCloser, error) {
+	if len(d.ContainerId) == 0 {
+		return nil, fmt.Errorf("missing containerId")
+	}
+
+	return d.client.ContainerLogs(context.Background(), d.ContainerId, dockertypes.ContainerLogsOptions{
+		ShowStdout: true,
+		ShowStderr: true,
+	})
 }
 
 func (d *DockerContainer) firstPortMapping() (containerPort uint, hostIP string, hostPort uint, err error) {
