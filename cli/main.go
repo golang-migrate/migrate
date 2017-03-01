@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"strconv"
 	"syscall"
 	"time"
@@ -70,7 +69,7 @@ Commands:
 
 	// translate -path into -source if given
 	if *sourcePtr == "" && *pathPtr != "" {
-		*sourcePtr = fmt.Sprintf("file://%v", filepath.Clean(*pathPtr))
+		*sourcePtr = fmt.Sprintf("file://%v", *pathPtr)
 	}
 
 	// initialize migrate

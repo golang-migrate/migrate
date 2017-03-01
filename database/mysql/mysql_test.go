@@ -47,5 +47,14 @@ func Test(t *testing.T) {
 				t.Fatalf("%v", err)
 			}
 			dt.Test(t, d, []byte("SELECT 1"))
+
+			// check ensureVersionTable
+			if err := d.(*Mysql).ensureVersionTable(); err != nil {
+				t.Fatal(err)
+			}
+			// check again
+			if err := d.(*Mysql).ensureVersionTable(); err != nil {
+				t.Fatal(err)
+			}
 		})
 }

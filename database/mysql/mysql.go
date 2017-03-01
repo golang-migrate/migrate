@@ -291,15 +291,13 @@ func (m *Mysql) Drop() error {
 
 func (m *Mysql) ensureVersionTable() error {
 	// check if migration table exists
-	var count int
-	query := `SHOW TABLES WHERE ?`
-	if err := m.db.QueryRow(query, m.config.MigrationsTable).Scan(&count); err != nil {
+	var result string
+	query := `SHOW TABLES LIKE "` + m.config.MigrationsTable + `"`
+	if err := m.db.QueryRow(query).Scan(&result); err != nil {
 		if err != sql.ErrNoRows {
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
-	}
-
-	if count == 1 {
+	} else {
 		return nil
 	}
 
