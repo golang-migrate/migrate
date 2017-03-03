@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 	"testing"
 
 	st "github.com/mattes/migrate/source/testing"
@@ -50,10 +51,60 @@ func TestOpen(t *testing.T) {
 	mustWriteFile(t, tmpDir, "1_foobar.up.sql", "")
 	mustWriteFile(t, tmpDir, "1_foobar.down.sql", "")
 
+	if !filepath.IsAbs(tmpDir) {
+		t.Fatal("expected tmpDir to be absolute path")
+	}
+
 	f := &File{}
-	_, err = f.Open("file://" + tmpDir)
+	_, err = f.Open("file://" + tmpDir) // absolute path
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestOpenWithRelativePath(t *testing.T) {
+	tmpDir, err := ioutil.TempDir("", "TestOpen")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chdir(wd) // rescue working dir after we are done
+
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.Mkdir(filepath.Join(tmpDir, "foo"), os.ModePerm); err != nil {
+		t.Fatal(err)
+	}
+
+	mustWriteFile(t, filepath.Join(tmpDir, "foo"), "1_foobar.up.sql", "")
+
+	f := &File{}
+
+	// dir: foo
+	d, err := f.Open("file://foo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = d.First()
+	if err != nil {
+		t.Fatalf("expected first file in working dir %v for foo", tmpDir)
+	}
+
+	// dir: ./foo
+	d, err = f.Open("file://./foo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = d.First()
+	if err != nil {
+		t.Fatalf("expected first file in working dir %v for ./foo", tmpDir)
 	}
 }
 

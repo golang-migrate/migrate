@@ -7,6 +7,7 @@ import (
 	nurl "net/url"
 	"os"
 	"path"
+	"path/filepath"
 
 	"github.com/mattes/migrate/source"
 )
@@ -27,24 +28,36 @@ func (f *File) Open(url string) (source.Driver, error) {
 		return nil, err
 	}
 
-	// default to current directory if empty
-	if u.Path == "" {
+	// concat host and path to restore full path
+	// host might be `.`
+	p := u.Host + u.Path
+
+	if len(p) == 0 {
+		// default to current directory if no path
 		wd, err := os.Getwd()
 		if err != nil {
 			return nil, err
 		}
-		u.Path = wd
+		p = wd
+
+	} else if p[0:1] == "." || p[0:1] != "/" {
+		// make path absolute if relative
+		abs, err := filepath.Abs(p)
+		if err != nil {
+			return nil, err
+		}
+		p = abs
 	}
 
 	// scan directory
-	files, err := ioutil.ReadDir(u.Path)
+	files, err := ioutil.ReadDir(p)
 	if err != nil {
 		return nil, err
 	}
 
 	nf := &File{
 		url:        url,
-		path:       u.Path,
+		path:       p,
 		migrations: source.NewMigrations(),
 	}
 
