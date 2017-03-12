@@ -8,18 +8,30 @@ import (
 
 func gotoCmd(m *migrate.Migrate, v uint) {
 	if err := m.Migrate(v); err != nil {
-		log.fatalErr(err)
+		if err != migrate.ErrNoChange {
+			log.fatalErr(err)
+		} else {
+			log.Println(err)
+		}
 	}
 }
 
 func upCmd(m *migrate.Migrate, limit int) {
 	if limit >= 0 {
 		if err := m.Steps(limit); err != nil {
-			log.fatalErr(err)
+			if err != migrate.ErrNoChange {
+				log.fatalErr(err)
+			} else {
+				log.Println(err)
+			}
 		}
 	} else {
 		if err := m.Up(); err != nil {
-			log.fatalErr(err)
+			if err != migrate.ErrNoChange {
+				log.fatalErr(err)
+			} else {
+				log.Println(err)
+			}
 		}
 	}
 }
@@ -27,11 +39,19 @@ func upCmd(m *migrate.Migrate, limit int) {
 func downCmd(m *migrate.Migrate, limit int) {
 	if limit >= 0 {
 		if err := m.Steps(-limit); err != nil {
-			log.fatalErr(err)
+			if err != migrate.ErrNoChange {
+				log.fatalErr(err)
+			} else {
+				log.Println(err)
+			}
 		}
 	} else {
 		if err := m.Down(); err != nil {
-			log.fatalErr(err)
+			if err != migrate.ErrNoChange {
+				log.fatalErr(err)
+			} else {
+				log.Println(err)
+			}
 		}
 	}
 }
