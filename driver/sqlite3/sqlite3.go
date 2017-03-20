@@ -92,7 +92,7 @@ func (driver *Driver) Migrate(f file.File, pipe chan interface{}) {
 	}
 
 	if _, err := tx.Exec(string(f.Content)); err != nil {
-		sqliteErr, isErr := err.(sqlite3.Error)
+		sqliteErr, isErr := err.(*sqlite3.Error)
 
 		if isErr {
 			// The sqlite3 library only provides error codes, not position information. Output what we do know
