@@ -7,6 +7,7 @@ go-test:
   <<: *go
   command: sh -c 'go get -t -v ./... && go test -v ./...'
   links:
+    - mssql
     - postgres
     - mysql
     - cassandra
@@ -30,3 +31,8 @@ crate:
   image: crate
 mongo:
   image: mongo:3.2.6
+mssql:
+  image: microsoft/mssql-server-linux
+  environment:
+    SA_PASSWORD: Passw0rd
+    ACCEPT_EULA: "Y"

@@ -33,6 +33,7 @@ __Features__
  * [Ql](driver/ql)
  * [MongoDB](driver/mongodb)
  * [CrateDB](driver/crate)
+ * [MSSQL](driver/mssql)
 
 Need another driver? Just implement the [Driver interface](http://godoc.org/github.com/mattes/migrate/driver#Driver) and open a PR.
 
