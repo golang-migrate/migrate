@@ -111,7 +111,7 @@ func (driver *Driver) Migrate(f file.File, pipe chan interface{}) {
 
 func (driver *Driver) Version() (uint64, error) {
 	var version uint64
-	err := driver.db.QueryRow("SELECT version FROM " + tableName + " ORDER BY version OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY").Scan(&version)
+	err := driver.db.QueryRow("SELECT version FROM " + tableName + " ORDER BY version DESC OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY").Scan(&version)
 	switch {
 	case err == sql.ErrNoRows:
 		return 0, nil
