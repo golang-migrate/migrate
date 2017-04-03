@@ -139,5 +139,7 @@ func (driver *Driver) Version() (uint64, error) {
 }
 
 func init() {
-	driver.RegisterDriver("postgres", &Driver{})
+	drv := Driver{}
+	driver.RegisterDriver("postgres", &drv)
+	driver.RegisterDriver("postgresql", &drv)
 }
