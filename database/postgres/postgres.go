@@ -13,7 +13,9 @@ import (
 )
 
 func init() {
-	database.Register("postgres", &Postgres{})
+	db := Postgres{}
+	database.Register("postgres", &db)
+	database.Register("postgresql", &db)
 }
 
 var DefaultMigrationsTable = "schema_migrations"
