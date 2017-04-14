@@ -24,7 +24,7 @@ var Regex = regexp.MustCompile(`^([0-9]+)_(.*)\.(` + string(Down) + `|` + string
 func Parse(raw string) (*Migration, error) {
 	m := Regex.FindStringSubmatch(raw)
 	if len(m) == 5 {
-		versionUint64, err := strconv.ParseUint(m[1], 10, 32)
+		versionUint64, err := strconv.ParseUint(m[1], 10, 64)
 		if err != nil {
 			return nil, err
 		}

@@ -51,6 +51,16 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
+			name:      "20170412214116_date_foobar.up.sql",
+			expectErr: nil,
+			expectMigration: &Migration{
+				Version:    20170412214116,
+				Identifier: "date_foobar",
+				Direction:  Up,
+				Raw:        "20170412214116_date_foobar.up.sql",
+			},
+		},
+		{
 			name:            "-1_foobar.up.sql",
 			expectErr:       ErrParse,
 			expectMigration: nil,
