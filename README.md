@@ -75,7 +75,7 @@ __[Go Documentation](https://godoc.org/github.com/mattes/migrate)__
 
 ```go
 import (
-    "github.com/mattes/migrate/migrate"
+    "github.com/mattes/migrate"
     _ "github.com/mattes/migrate/database/postgres"
     _ "github.com/mattes/migrate/source/github"
 )
@@ -94,7 +94,7 @@ Want to use an existing database client?
 import (
     "database/sql"
     _ "github.com/lib/pq"
-    "github.com/mattes/migrate/migrate"
+    "github.com/mattes/migrate"
     "github.com/mattes/migrate/database/postgres"
 )
 
