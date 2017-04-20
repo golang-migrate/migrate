@@ -1,4 +1,5 @@
-__[v3.0 in the making](https://github.com/mattes/migrate/tree/v3.0-prev)__
+# You are looking at a deprecated version. 
+# Use the [latest version](https://github.com/mattes/migrate) instead.
 
 ---
 
