@@ -14,6 +14,8 @@ __Database migrations written in Go. Use as [CLI](#cli-usage) or import as [libr
  * Database drivers don't assume things or try to correct user input. When in doubt, fail.
 
 
+Looking for [v1](https://github.com/mattes/migrate/tree/v1)?
+
 
 ## Databases 
 
