@@ -5,7 +5,8 @@
 #### With Go toolchain
 
 ```
-$ go get -u -tags 'postgres' -o migrate github.com/mattes/migrate/cli
+$ go get -u -tags 'postgres' -d github.com/mattes/migrate/cli
+$ go build -o /usr/local/bin/migrate github.com/mattes/migrate/cli
 ```
 
 #### MacOS
