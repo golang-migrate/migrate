@@ -1,6 +1,6 @@
 # postgres
 
-`postgres://user:password@host:port/dbname?query`
+`postgres://user:password@host:port/dbname?query` (`postgresql://` works, too)
 
 | URL Query  | WithInstance Config | Description |
 |------------|---------------------|-------------|
