@@ -1,25 +1,17 @@
 # go-bindata
 
-
 ## Usage
 
 
-```
+
+### Read bindata with NewWithSourceInstance
+
+```shell
 go get -u github.com/jteeuwen/go-bindata/...
 cd examples/migrations && go-bindata -pkg migrations .
 ```
 
-
-```
-// TODO
-// this will restore the assets in a tmp directory and then 
-// proxy to source/file
-// go-bindata must be in your $PATH
-migrate -source go-bindata://examples/migrations/bindata.go 
-```
-
-
-```
+```go
 import (
   "github.com/mattes/migrate"
   "github.com/mattes/migrate/source/go-bindata"
@@ -27,7 +19,7 @@ import (
 )
 
 func main() {
-	// wrap assets into Resource
+  // wrap assets into Resource
   s := bindata.Resource(migrations.AssetNames(),
     func(name string) ([]byte, error) {
       return migrations.Asset(name)
@@ -38,7 +30,13 @@ func main() {
 }
 ```
 
+### Read bindata with URL (todo)
 
+This will restore the assets in a tmp directory and then 
+proxy to source/file. go-bindata must be in your `$PATH`.
 
+```
+migrate -source go-bindata://examples/migrations/bindata.go 
+```
 
 
