@@ -5,8 +5,7 @@
 
 # migrate
 
-[![Build Status](https://travis-ci.org/mattes/migrate.svg?branch=master)](https://travis-ci.org/mattes/migrate)
-[![GoDoc](https://godoc.org/github.com/mattes/migrate?status.svg)](https://godoc.org/github.com/mattes/migrate)
+[![Build Status](https://travis-ci.org/mattes/migrate.svg?branch=v1)](https://travis-ci.org/mattes/migrate)
 
 A migration helper written in Go. Use it in your existing Golang code 
 or run commands via the CLI. 
