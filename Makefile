@@ -46,9 +46,6 @@ test-with-flags:
 	@echo -n '$(DATABASE)' | tr -s ' ' '\n' | xargs -I{} go test $(TEST_FLAGS) ./database/{}
 	@go test $(TEST_FLAGS) ./database/testing/...
 	@go test $(TEST_FLAGS) ./database/stub/...
-	
-	# deprecated v1compat:
-	@go test ./migrate/...
 
 
 kill-orphaned-docker-containers:
