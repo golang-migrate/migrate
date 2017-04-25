@@ -85,7 +85,9 @@ func (m *Mysql) Open(url string) (database.Driver, error) {
 		return nil, err
 	}
 
-	purl.Query().Set("multiStatements", "true")
+	q := purl.Query()
+	q.Set("multiStatements", "true")
+	purl.RawQuery = q.Encode()
 
 	db, err := sql.Open("mysql", strings.Replace(
 		migrate.FilterCustomQuery(purl).String(), "mysql://", "", 1))
