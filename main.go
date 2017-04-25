@@ -14,6 +14,7 @@ import (
 	_ "github.com/mattes/migrate/driver/bash"
 	_ "github.com/mattes/migrate/driver/cassandra"
 	_ "github.com/mattes/migrate/driver/crate"
+	_ "github.com/mattes/migrate/driver/mssql"
 	_ "github.com/mattes/migrate/driver/mysql"
 	_ "github.com/mattes/migrate/driver/neo4j"
 	_ "github.com/mattes/migrate/driver/postgres"
