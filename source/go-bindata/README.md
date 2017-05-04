@@ -15,7 +15,7 @@ cd examples/migrations && go-bindata -pkg migrations .
 import (
   "github.com/mattes/migrate"
   "github.com/mattes/migrate/source/go-bindata"
-  "github.com/mattes/migrate/source/go-bindata/examples/migrations
+  "github.com/mattes/migrate/source/go-bindata/examples/migrations"
 )
 
 func main() {
