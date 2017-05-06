@@ -59,7 +59,7 @@ V001_some_migration_operation_down
 
 ## Methods registration
 
-For a detailed example see: [sample_mongodb_migrator.go](https://github.com/mattes/migrate/blob/master/driver/mongodb/example/sample_mongdb_migrator.go)
+For a detailed example see: [sample_mongodb_migrator.go](https://github.com/mattes/migrate/blob/v1/driver/mongodb/example/sample_mongdb_migrator.go)
 
 ```go
 package my_mongo_db_migrator
