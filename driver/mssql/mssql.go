@@ -7,9 +7,9 @@ import (
 	"fmt"
 
 	"github.com/denisenkom/go-mssqldb"
-	"github.com/mattes/migrate/driver"
-	"github.com/mattes/migrate/file"
-	"github.com/mattes/migrate/migrate/direction"
+	"gopkg.in/mattes/migrate.v1/driver"
+	"gopkg.in/mattes/migrate.v1/file"
+	"gopkg.in/mattes/migrate.v1/migrate/direction"
 )
 
 type Driver struct {

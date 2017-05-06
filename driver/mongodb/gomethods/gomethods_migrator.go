@@ -7,8 +7,8 @@ import (
 	"path"
 	"strings"
 
-	"github.com/mattes/migrate/driver"
-	"github.com/mattes/migrate/file"
+	"gopkg.in/mattes/migrate.v1/driver"
+	"gopkg.in/mattes/migrate.v1/file"
 )
 
 type MethodNotFoundError string

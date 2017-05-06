@@ -10,7 +10,7 @@
 ## Usage in Go
 
 ```go
-import "github.com/mattes/migrate/migrate"
+import "gopkg.in/mattes/migrate.v1/migrate"
 
 // Import your migration methods package so that they are registered and available for the MongoDB driver.
 // There is no need to import the MongoDB driver explicitly, as it should already be imported by your migration methods package.
@@ -65,8 +65,8 @@ For a detailed example see: [sample_mongodb_migrator.go](https://github.com/matt
 package my_mongo_db_migrator
 
 import (
-  "github.com/mattes/migrate/driver/mongodb"
-  "github.com/mattes/migrate/driver/mongodb/gomethods"
+  "gopkg.in/mattes/migrate.v1/driver/mongodb"
+  "gopkg.in/mattes/migrate.v1/driver/mongodb/gomethods"
   "gopkg.in/mgo.v2"
 )
 

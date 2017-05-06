@@ -4,10 +4,10 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/mattes/migrate/file"
-	"github.com/mattes/migrate/migrate/direction"
+	"gopkg.in/mattes/migrate.v1/file"
+	"gopkg.in/mattes/migrate.v1/migrate/direction"
 
-	pipep "github.com/mattes/migrate/pipe"
+	pipep "gopkg.in/mattes/migrate.v1/pipe"
 )
 
 type FakeGoMethodsInvoker struct {
