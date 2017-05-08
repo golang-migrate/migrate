@@ -163,4 +163,5 @@ func (driver *Driver) Version() (uint64, error) {
 
 func init() {
 	driver.RegisterDriver("neo4j", &Driver{})
+	driver.RegisterDriver("neo4js", &Driver{})
 }
