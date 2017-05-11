@@ -7,7 +7,7 @@
 
 __Database migrations written in Go. Use as [CLI](#cli-usage) or import as [library](#use-in-your-go-project).__
 
- * Migrate reads migrations from [sources](#migration-sources) 
+ * Migrate reads migrations from [sources](#migration-sources)
    and applies them in correct order to a [database](#databases).
  * Drivers are "dumb", migrate glues everything together and makes sure the logic is bulletproof.  
    (Keeps the drivers lightweight, too.)
@@ -17,11 +17,12 @@ __Database migrations written in Go. Use as [CLI](#cli-usage) or import as [libr
 Looking for [v1](https://github.com/mattes/migrate/tree/v1)?
 
 
-## Databases 
+## Databases
 
 Database drivers run migrations. [Add a new database?](database/driver.go)
 
   * [PostgreSQL](database/postgres)
+  * [Redshift](database/redshift)
   * [Cassandra](database/cassandra) ([todo #164](https://github.com/mattes/migrate/issues/164))
   * [SQLite](database/sqlite) ([todo #165](https://github.com/mattes/migrate/issues/165))
   * [MySQL/ MariaDB](database/mysql)
@@ -46,7 +47,7 @@ Source drivers read migrations from local or remote sources. [Add a new source?]
 
 
 
-## CLI usage 
+## CLI usage
 
   * Simple wrapper around this library.
   * Handles ctrl+c (SIGINT) gracefully.
@@ -57,12 +58,12 @@ __[CLI Documentation](cli)__
 ([brew todo #156](https://github.com/mattes/migrate/issues/156))
 
 ```
-$ brew install migrate --with-postgres 
+$ brew install migrate --with-postgres
 $ migrate -database postgres://localhost:5432/database up 2
 ```
 
 
-## Use in your Go project 
+## Use in your Go project
 
  * API is stable and frozen for this release (v3.x).
  * Package migrate has no external dependencies.
