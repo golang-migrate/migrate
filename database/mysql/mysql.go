@@ -157,7 +157,7 @@ func (m *Mysql) Lock() error {
 	}
 
 	aid, err := database.GenerateAdvisoryLockId(
-		fmt.Sprintf("%s:%s", m.config.DatabaseName, m.config.MigrationsTable)
+		fmt.Sprintf("%s:%s", m.config.DatabaseName, m.config.MigrationsTable))
 	if err != nil {
 		return err
 	}
@@ -182,7 +182,7 @@ func (m *Mysql) Unlock() error {
 	}
 
 	aid, err := database.GenerateAdvisoryLockId(
-		fmt.Sprintf("%s:%s", m.config.DatabaseName, m.config.MigrationsTable)
+		fmt.Sprintf("%s:%s", m.config.DatabaseName, m.config.MigrationsTable))
 	if err != nil {
 		return err
 	}
