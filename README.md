@@ -23,11 +23,11 @@ Database drivers run migrations. [Add a new database?](database/driver.go)
 
   * [PostgreSQL](database/postgres)
   * [Redshift](database/redshift)
+  * [Ql](database/ql)
   * [Cassandra](database/cassandra) ([todo #164](https://github.com/mattes/migrate/issues/164))
   * [SQLite](database/sqlite) ([todo #165](https://github.com/mattes/migrate/issues/165))
   * [MySQL/ MariaDB](database/mysql)
   * [Neo4j](database/neo4j) ([todo #167](https://github.com/mattes/migrate/issues/167))
-  * [Ql](database/ql) ([todo #168](https://github.com/mattes/migrate/issues/168))
   * [MongoDB](database/mongodb) ([todo #169](https://github.com/mattes/migrate/issues/169))
   * [CrateDB](database/crate) ([todo #170](https://github.com/mattes/migrate/issues/170))
   * [Shell](database/shell) ([todo #171](https://github.com/mattes/migrate/issues/171))
@@ -42,8 +42,8 @@ Source drivers read migrations from local or remote sources. [Add a new source?]
   * [Filesystem](source/file) - read from fileystem (always included)
   * [Go-Bindata](source/go-bindata) - read from embedded binary data ([jteeuwen/go-bindata](https://github.com/jteeuwen/go-bindata))
   * [Github](source/github) - read from remote Github repositories
-  * [AWS S3](source/aws-s3) - read from Amazon Web Services S3 ([todo #162](https://github.com/mattes/migrate/issues/162))
-  * [Google Cloud Storage](source/google-cloud-storage) - read from Google Cloud Platform Storage ([todo #163](https://github.com/mattes/migrate/issues/163))
+  * [AWS S3](source/aws-s3) - read from Amazon Web Services S3
+  * [Google Cloud Storage](source/google-cloud-storage) - read from Google Cloud Platform Storage
 
 
 
