@@ -127,7 +127,7 @@ func (m *Ql) Drop() error {
 	if len(tableNames) > 0 {
 		for _, t := range tableNames {
 			query := "DROP TABLE " + t
-			err = m.ExecuteQuery(query)
+			err = m.executeQuery(query)
 			if err != nil {
 				return &database.Error{OrigErr: err, Query: []byte(query)}
 			}
@@ -160,9 +160,9 @@ func (m *Ql) Run(migration io.Reader) error {
 	}
 	query := string(migr[:])
 
-	return m.ExecuteQuery(query)
+	return m.executeQuery(query)
 }
-func (m *Ql) ExecuteQuery(query string) error {
+func (m *Ql) executeQuery(query string) error {
 	tx, err := m.db.Begin()
 	if err != nil {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
