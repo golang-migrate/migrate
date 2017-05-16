@@ -156,7 +156,8 @@ func (m *Mysql) Lock() error {
 		return database.ErrLocked
 	}
 
-	aid, err := database.GenerateAdvisoryLockId(m.config.DatabaseName)
+	aid, err := database.GenerateAdvisoryLockId(
+		fmt.Sprintf("%s:%s", m.config.DatabaseName, m.config.MigrationsTable)
 	if err != nil {
 		return err
 	}
@@ -180,7 +181,8 @@ func (m *Mysql) Unlock() error {
 		return nil
 	}
 
-	aid, err := database.GenerateAdvisoryLockId(m.config.DatabaseName)
+	aid, err := database.GenerateAdvisoryLockId(
+		fmt.Sprintf("%s:%s", m.config.DatabaseName, m.config.MigrationsTable)
 	if err != nil {
 		return err
 	}
