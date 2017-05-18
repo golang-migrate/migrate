@@ -59,9 +59,8 @@ html-coverage:
 deps:
 	-go get -v -u ./... 
 	-go test -v -i ./...
-
 	# TODO: why is this not being fetched with the command above?
-  -go get github.com/fsouza/fake-gcs-server/fakestorage
+	-go get github.com/fsouza/fake-gcs-server/fakestorage
 
 
 list-external-deps:
