@@ -6,6 +6,7 @@
 
 ```
 $ go get -u -d github.com/mattes/migrate/cli
+$ go get github.com/lib/pq
 $ go build -tags 'postgres' -o /usr/local/bin/migrate github.com/mattes/migrate/cli
 ```
 
