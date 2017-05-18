@@ -1,5 +1,5 @@
-SOURCE ?= file go-bindata github
-DATABASE ?= postgres mysql
+SOURCE ?= file go-bindata github aws-s3 google-cloud-storage
+DATABASE ?= postgres mysql ql redshift
 VERSION ?= $(shell git describe --tags 2>/dev/null | cut -c 2-)
 TEST_FLAGS ?=
 REPO_OWNER ?= $(shell cd .. && basename "$$(pwd)")
