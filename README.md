@@ -136,4 +136,4 @@ Also have a look at the [FAQ](FAQ.md).
 
 ---
 
-Looking for alternatives? [Database schema migrations](https://awesome-go.com/#database).
+Looking for alternatives? [https://awesome-go.com/#database](https://awesome-go.com/#database).
