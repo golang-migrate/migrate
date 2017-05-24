@@ -3,7 +3,7 @@ package testing
 
 import (
 	"bufio"
-	"context" // TODO: is issue with go < 1.7?
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,7 +12,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
 	dockertypes "github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
 	dockernetwork "github.com/docker/docker/api/types/network"
@@ -200,6 +199,11 @@ func (d *DockerContainer) Port() uint {
 		d.t.Fatal(err)
 	}
 	return port
+}
+
+func (d *DockerContainer) NetworkSettings() dockertypes.NetworkSettings {
+	netSettings := d.ContainerJSON.NetworkSettings
+	return *netSettings
 }
 
 type dockerImagePullOutput struct {
