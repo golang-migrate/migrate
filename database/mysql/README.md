@@ -1,4 +1,4 @@
-# mysql
+# MySQL
 
 `mysql://user:password@tcp(host:port)/dbname?query`
 
@@ -14,6 +14,35 @@
 | `x-tls-cert` | | Cert file location. |
 | `x-tls-key` | | Key file location. | 
 | `x-tls-insecure-skip-verify` | | Whether or not to use SSL (true\|false) | 
+
+## Use with existing client
+
+If you use the MySQL driver with existing database client, you must create the client with parameter `multiStatements=true`:
+
+```go
+package main
+
+import (
+    "database/sql"
+    
+    _ "github.com/go-sql-driver/mysql"
+    "github.com/mattes/migrate"
+    "github.com/mattes/migrate/database/mysql"
+    _ "github.com/mattes/migrate/source/file"
+)
+
+func main() {
+    db, _ := sql.Open("mysql", "user:password@tcp(host:port)/dbname?multiStatements=true")
+    driver, _ := mysql.WithInstance(db, &mysql.Config{})
+    m, _ := migrate.NewWithDatabaseInstance(
+        "file:///migrations",
+        "mysql", 
+        driver,
+    )
+    
+    m.Steps(2)
+}
+```
 
 ## Upgrading from v1
 
