@@ -31,7 +31,7 @@ Database drivers run migrations. [Add a new database?](database/driver.go)
   * [MongoDB](database/mongodb) ([todo #169](https://github.com/mattes/migrate/issues/169))
   * [CrateDB](database/crate) ([todo #170](https://github.com/mattes/migrate/issues/170))
   * [Shell](database/shell) ([todo #171](https://github.com/mattes/migrate/issues/171))
-  * [Google Cloud Spanner](database/spanner) ([todo #172](https://github.com/mattes/migrate/issues/172))
+  * [Google Cloud Spanner](database/spanner)
 
 
 
