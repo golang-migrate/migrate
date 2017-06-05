@@ -32,6 +32,8 @@ var drivers = make(map[string]Driver)
 //      All other functions are tested by tests in database/testing.
 //      Saves you some time and makes sure all database drivers behave the same way.
 //   5. Call Register in init().
+//   6. Create a migrate/cli/build_<driver-name>.go file
+//   7. Add driver name in 'DATABASE' variable in Makefile
 //
 // Guidelines:
 //   * Don't try to correct user input. Don't assume things.
@@ -71,7 +73,7 @@ type Driver interface {
 	// Dirty means, a previous migration failed and user interaction is required.
 	Version() (version int, dirty bool, err error)
 
-	// Drop deletes everyting in the database.
+	// Drop deletes everything in the database.
 	Drop() error
 }
 
