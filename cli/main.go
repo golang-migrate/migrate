@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"strings"
 	"os"
 	"os/signal"
 	"strconv"
@@ -41,6 +42,8 @@ Options:
   -help            Print usage
 
 Commands:
+  create [-ext E] [-dir D] NAME
+               Create a set of timestamped up/down migrations titled NAME, in directory D with extension E
   goto V       Migrate to version V
   up [N]       Apply all or N up migrations
   down [N]     Apply all or N down migrations
@@ -101,6 +104,30 @@ Commands:
 	startTime := time.Now()
 
 	switch flag.Arg(0) {
+	case "create":
+		args := flag.Args()[1:]
+
+		createFlagSet := flag.NewFlagSet("create", flag.ExitOnError)
+		extPtr := createFlagSet.String("ext", "", "File extension")
+		dirPtr := createFlagSet.String("dir", "", "Directory to place file in (default: current working directory)")
+		createFlagSet.Parse(args)
+
+		if createFlagSet.NArg() == 0 {
+			log.fatal("error: please specify name")
+		}
+		name := createFlagSet.Arg(0)
+
+		if *extPtr != "" {
+			*extPtr = "." + strings.TrimPrefix(*extPtr, ".")
+		}
+		if *dirPtr != "" {
+			*dirPtr = strings.Trim(*dirPtr, "/") + "/"
+		}
+
+		timestamp := startTime.Unix()
+
+		createCmd(*dirPtr, timestamp, name, *extPtr)
+
 	case "goto":
 		if migraterErr != nil {
 			log.fatalErr(migraterErr)
