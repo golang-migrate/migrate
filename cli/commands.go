@@ -4,7 +4,22 @@ import (
 	"github.com/mattes/migrate"
 	_ "github.com/mattes/migrate/database/stub" // TODO remove again
 	_ "github.com/mattes/migrate/source/file"
+	"os"
+	"fmt"
 )
+
+func createCmd(dir string, timestamp int64, name string, ext string) {
+	base := fmt.Sprintf("%v%v_%v.", dir, timestamp, name)
+	os.MkdirAll(dir, os.ModePerm)
+	createFile(base + "up" + ext)
+	createFile(base + "down" + ext)
+}
+
+func createFile(fname string) {
+  if _, err := os.Create(fname); err != nil {
+    log.fatalErr(err)
+  }
+}
 
 func gotoCmd(m *migrate.Migrate, v uint) {
 	if err := m.Migrate(v); err != nil {
