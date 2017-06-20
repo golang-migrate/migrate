@@ -27,3 +27,9 @@ See [Google Spanner Documentation](https://cloud.google.com/spanner/docs) for de
 > 1496539702/u add_city_to_users (41.647359754s)
 > 1496601752/u add_index_on_user_emails (2m12.155787369s)
 > 1496602638/u create_books_table (2m30.77299181s)
+
+## Testing
+
+To unit test the `spanner` driver, `SPANNER_DATABASE` needs to be set. You'll
+need to sign-up to Google Cloud Platform (GCP) and have a running Spanner
+instance since it is not possible to run Google Spanner outside GCP.
