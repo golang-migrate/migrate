@@ -80,7 +80,7 @@ func (ch *ClickHouse) Open(dsn string) (database.Driver, error) {
 
 func (ch *ClickHouse) init() error {
 	if len(ch.config.DatabaseName) == 0 {
-		if err := ch.conn.QueryRow("SELECT currentDatabase()").Scan(ch.config.DatabaseName); err != nil {
+		if err := ch.conn.QueryRow("SELECT currentDatabase()").Scan(&ch.config.DatabaseName); err != nil {
 			return err
 		}
 	}
