@@ -42,10 +42,6 @@ func WithInstance(conn *sql.DB, config *Config) (database.Driver, error) {
 		return nil, err
 	}
 
-	if err := ch.ensureVersionTable(); err != nil {
-		return nil, err
-	}
-
 	return ch, nil
 }
 
@@ -78,10 +74,6 @@ func (ch *ClickHouse) Open(dsn string) (database.Driver, error) {
 		return nil, err
 	}
 
-	if err := ch.ensureVersionTable(); err != nil {
-		return nil, err
-	}
-
 	return ch, nil
 }
 
@@ -91,10 +83,12 @@ func (ch *ClickHouse) init() error {
 			return err
 		}
 	}
+
 	if len(ch.config.MigrationsTable) == 0 {
 		ch.config.MigrationsTable = DefaultMigrationsTable
 	}
-	return nil
+
+	return ch.ensureVersionTable()
 }
 
 func (ch *ClickHouse) Run(r io.Reader) error {
