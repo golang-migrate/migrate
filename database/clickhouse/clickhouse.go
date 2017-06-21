@@ -24,6 +24,7 @@ type Config struct {
 func init() {
 	database.Register("clickhouse", &ClickHouse{})
 }
+
 func WithInstance(conn *sql.DB, config *Config) (database.Driver, error) {
 	if config == nil {
 		return nil, ErrNilConfig
