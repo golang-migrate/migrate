@@ -24,7 +24,6 @@ type Config struct {
 func init() {
 	database.Register("clickhouse", &ClickHouse{})
 }
-
 func WithInstance(conn *sql.DB, config *Config) (database.Driver, error) {
 	if config == nil {
 		return nil, ErrNilConfig
@@ -60,7 +59,6 @@ func (ch *ClickHouse) Open(dsn string) (database.Driver, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	q := migrate.FilterCustomQuery(purl)
 	q.Scheme = "tcp"
 	conn, err := sql.Open("clickhouse", q.String())
@@ -138,10 +136,12 @@ func (ch *ClickHouse) SetVersion(version int, dirty bool) error {
 	if err != nil {
 		return err
 	}
+
 	query := "INSERT INTO " + ch.config.MigrationsTable + " (version, dirty, sequence) VALUES (?, ?, ?)"
 	if _, err := tx.Exec(query, version, bool(dirty), time.Now().UnixNano()); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
+
 	return tx.Commit()
 }
 
@@ -186,7 +186,9 @@ func (ch *ClickHouse) Drop() error {
 		if err := tables.Scan(&table); err != nil {
 			return err
 		}
+
 		query = "DROP TABLE IF EXISTS " + ch.config.DatabaseName + "." + table
+
 		if _, err := ch.conn.Exec(query); err != nil {
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
