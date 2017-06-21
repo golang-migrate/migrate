@@ -32,7 +32,7 @@ Database drivers run migrations. [Add a new database?](database/driver.go)
   * [CrateDB](database/crate) ([todo #170](https://github.com/mattes/migrate/issues/170))
   * [Shell](database/shell) ([todo #171](https://github.com/mattes/migrate/issues/171))
   * [Google Cloud Spanner](database/spanner)
-
+  * [ClickHouse](database/clickhouse)
 
 
 ## Migration Sources
