@@ -1,5 +1,5 @@
 SOURCE ?= file go-bindata github aws-s3 google-cloud-storage
-DATABASE ?= postgres mysql redshift cassandra sqlite3
+DATABASE ?= postgres mysql redshift cassandra sqlite3 spanner
 VERSION ?= $(shell git describe --tags 2>/dev/null | cut -c 2-)
 TEST_FLAGS ?=
 REPO_OWNER ?= $(shell cd .. && basename "$$(pwd)")
