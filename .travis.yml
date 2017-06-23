@@ -1,5 +1,6 @@
 language: go
 sudo: required
+group: deprecated-2017Q2
 
 go:
   - 1.7
