@@ -166,7 +166,7 @@ func (d *DockerContainer) Logs() (io.ReadCloser, error) {
 	})
 }
 
-func (d *DockerContainer) mappingForPort(cPort int) (containerPort uint, hostIP string, hostPort uint, err error) {
+func (d *DockerContainer) portMapping(selectFirst bool, cPort int) (containerPort uint, hostIP string, hostPort uint, err error) {
 	if !d.containerInspected {
 		if err := d.Inspect(); err != nil {
 			d.t.Fatal(err)
@@ -174,7 +174,7 @@ func (d *DockerContainer) mappingForPort(cPort int) (containerPort uint, hostIP 
 	}
 
 	for port, bindings := range d.ContainerJSON.NetworkSettings.Ports {
-		if port.Int() != cPort {
+		if !selectFirst && port.Int() != cPort {
 			// Skip ahead until we find the port we want
 			continue
 		}
@@ -189,32 +189,15 @@ func (d *DockerContainer) mappingForPort(cPort int) (containerPort uint, hostIP 
 		}
 	}
 
-	return 0, "", 0, fmt.Errorf("specified port not bound")
-}
-
-func (d *DockerContainer) firstPortMapping() (containerPort uint, hostIP string, hostPort uint, err error) {
-	if !d.containerInspected {
-		if err := d.Inspect(); err != nil {
-			d.t.Fatal(err)
-		}
+	if selectFirst {
+		return 0, "", 0, fmt.Errorf("no port binding")
+	} else {
+		return 0, "", 0, fmt.Errorf("specified port not bound")
 	}
-
-	for port, bindings := range d.ContainerJSON.NetworkSettings.Ports {
-		for _, binding := range bindings {
-
-			hostPortUint, err := strconv.ParseUint(binding.HostPort, 10, 64)
-			if err != nil {
-				return 0, "", 0, err
-			}
-
-			return uint(port.Int()), binding.HostIP, uint(hostPortUint), nil
-		}
-	}
-	return 0, "", 0, fmt.Errorf("no port binding")
 }
 
 func (d *DockerContainer) Host() string {
-	_, hostIP, _, err := d.firstPortMapping()
+	_, hostIP, _, err := d.portMapping(true, -1)
 	if err != nil {
 		d.t.Fatal(err)
 	}
@@ -227,7 +210,7 @@ func (d *DockerContainer) Host() string {
 }
 
 func (d *DockerContainer) Port() uint {
-	_, _, port, err := d.firstPortMapping()
+	_, _, port, err := d.portMapping(true, -1)
 	if err != nil {
 		d.t.Fatal(err)
 	}
@@ -235,7 +218,7 @@ func (d *DockerContainer) Port() uint {
 }
 
 func (d *DockerContainer) PortFor(cPort int) uint {
-	_, _, port, err := d.mappingForPort(cPort)
+	_, _, port, err := d.portMapping(false, cPort)
 	if err != nil {
 		d.t.Fatal(err)
 	}
