@@ -258,7 +258,7 @@ func (s *Spanner) Drop() error {
 func (s *Spanner) ensureVersionTable() error {
 	ctx := context.Background()
 	tbl := s.config.MigrationsTable
-	iter := s.db.data.Single().Read(ctx, tbl, spanner.AllKeys(), nil)
+	iter := s.db.data.Single().Read(ctx, tbl, spanner.AllKeys(), []string{"Version"})
 	if err := iter.Do(func(r *spanner.Row) error { return nil }); err == nil {
 		return nil
 	}
