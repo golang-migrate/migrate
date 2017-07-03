@@ -25,7 +25,7 @@ func main() {
       return migrations.Asset(name)
     })
     
-	d, err := WithInstance(s)
+	d, err := bindata.WithInstance(s)
 	if err != nil {
 		t.Fatal(err)
 	}
