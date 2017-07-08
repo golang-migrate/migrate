@@ -17,6 +17,7 @@ type TestFunc func(*testing.T, Instance)
 type Version struct {
 	Image string
 	ENV   []string
+	Cmd   []string
 }
 
 func ParallelTest(t *testing.T, versions []Version, readyFn IsReadyFunc, testFn TestFunc) {
@@ -38,7 +39,7 @@ func ParallelTest(t *testing.T, versions []Version, readyFn IsReadyFunc, testFn 
 				t.Parallel()
 
 				// create new container
-				container, err := NewDockerContainer(t, version.Image, version.ENV)
+				container, err := NewDockerContainer(t, version.Image, version.ENV, version.Cmd)
 				if err != nil {
 					t.Fatalf("%v\n%s", err, containerLogs(t, container))
 				}
@@ -89,6 +90,7 @@ func containerLogs(t *testing.T, c *DockerContainer) []byte {
 type Instance interface {
 	Host() string
 	Port() uint
+	PortFor(int) uint
 	NetworkSettings() dockertypes.NetworkSettings
 	KeepForDebugging()
 }

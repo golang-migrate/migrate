@@ -18,10 +18,14 @@ import (
 	dockerclient "github.com/docker/docker/client"
 )
 
-func NewDockerContainer(t testing.TB, image string, env []string) (*DockerContainer, error) {
+func NewDockerContainer(t testing.TB, image string, env []string, cmd []string) (*DockerContainer, error) {
 	c, err := dockerclient.NewEnvClient()
 	if err != nil {
 		return nil, err
+	}
+
+	if cmd == nil {
+		cmd = make([]string, 0)
 	}
 
 	contr := &DockerContainer{
@@ -29,6 +33,7 @@ func NewDockerContainer(t testing.TB, image string, env []string) (*DockerContai
 		client:    c,
 		ImageName: image,
 		ENV:       env,
+		Cmd: 	   cmd,
 	}
 
 	if err := contr.PullImage(); err != nil {
@@ -48,6 +53,7 @@ type DockerContainer struct {
 	client             *dockerclient.Client
 	ImageName          string
 	ENV                []string
+	Cmd                []string
 	ContainerId        string
 	ContainerName      string
 	ContainerJSON      dockertypes.ContainerJSON
@@ -86,6 +92,7 @@ func (d *DockerContainer) Start() error {
 			Image:  d.ImageName,
 			Labels: map[string]string{"migrate_test": "true"},
 			Env:    d.ENV,
+			Cmd:    d.Cmd,
 		},
 		&dockercontainer.HostConfig{
 			PublishAllPorts: true,
@@ -159,7 +166,7 @@ func (d *DockerContainer) Logs() (io.ReadCloser, error) {
 	})
 }
 
-func (d *DockerContainer) firstPortMapping() (containerPort uint, hostIP string, hostPort uint, err error) {
+func (d *DockerContainer) portMapping(selectFirst bool, cPort int) (containerPort uint, hostIP string, hostPort uint, err error) {
 	if !d.containerInspected {
 		if err := d.Inspect(); err != nil {
 			d.t.Fatal(err)
@@ -167,6 +174,10 @@ func (d *DockerContainer) firstPortMapping() (containerPort uint, hostIP string,
 	}
 
 	for port, bindings := range d.ContainerJSON.NetworkSettings.Ports {
+		if !selectFirst && port.Int() != cPort {
+			// Skip ahead until we find the port we want
+			continue
+		}
 		for _, binding := range bindings {
 
 			hostPortUint, err := strconv.ParseUint(binding.HostPort, 10, 64)
@@ -177,11 +188,16 @@ func (d *DockerContainer) firstPortMapping() (containerPort uint, hostIP string,
 			return uint(port.Int()), binding.HostIP, uint(hostPortUint), nil
 		}
 	}
-	return 0, "", 0, fmt.Errorf("no port binding")
+
+	if selectFirst {
+		return 0, "", 0, fmt.Errorf("no port binding")
+	} else {
+		return 0, "", 0, fmt.Errorf("specified port not bound")
+	}
 }
 
 func (d *DockerContainer) Host() string {
-	_, hostIP, _, err := d.firstPortMapping()
+	_, hostIP, _, err := d.portMapping(true, -1)
 	if err != nil {
 		d.t.Fatal(err)
 	}
@@ -194,7 +210,15 @@ func (d *DockerContainer) Host() string {
 }
 
 func (d *DockerContainer) Port() uint {
-	_, _, port, err := d.firstPortMapping()
+	_, _, port, err := d.portMapping(true, -1)
+	if err != nil {
+		d.t.Fatal(err)
+	}
+	return port
+}
+
+func (d *DockerContainer) PortFor(cPort int) uint {
+	_, _, port, err := d.portMapping(false, cPort)
 	if err != nil {
 		d.t.Fatal(err)
 	}
