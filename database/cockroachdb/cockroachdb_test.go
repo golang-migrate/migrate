@@ -20,7 +20,6 @@ var versions = []mt.Version{
 }
 
 func isReady(i mt.Instance) bool {
-	fmt.Println("Checking readiness")
 	db, err := sql.Open("postgres", fmt.Sprintf("postgres://root@%v:%v?sslmode=disable", i.Host(), i.PortFor(26257)))
 	if err != nil {
 		return false
@@ -46,7 +45,6 @@ func Test(t *testing.T) {
 	mt.ParallelTest(t, versions, isReady,
 		func(t *testing.T, i mt.Instance) {
 			c := &CockroachDb{}
-			fmt.Println("Connecting in test")
 			addr := fmt.Sprintf("cockroach://root@%v:%v/migrate?sslmode=disable", i.Host(), i.PortFor(26257))
 			d, err := c.Open(addr)
 			if err != nil {
