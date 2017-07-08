@@ -176,14 +176,14 @@ func (p *Postgres) SetVersion(version int, dirty bool) error {
 	}
 
 	query := `TRUNCATE "` + p.config.MigrationsTable + `"`
-	if _, err := p.db.Exec(query); err != nil {
+	if _, err := tx.Exec(query); err != nil {
 		tx.Rollback()
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 
 	if version >= 0 {
 		query = `INSERT INTO "` + p.config.MigrationsTable + `" (version, dirty) VALUES ($1, $2)`
-		if _, err := p.db.Exec(query, version, dirty); err != nil {
+		if _, err := tx.Exec(query, version, dirty); err != nil {
 			tx.Rollback()
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}

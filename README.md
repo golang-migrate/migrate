@@ -33,7 +33,7 @@ Database drivers run migrations. [Add a new database?](database/driver.go)
   * [Shell](database/shell) ([todo #171](https://github.com/mattes/migrate/issues/171))
   * [Google Cloud Spanner](database/spanner)
   * [CockroachDB](database/cockroachdb)
-
+  * [ClickHouse](database/clickhouse)
 
 
 ## Migration Sources
