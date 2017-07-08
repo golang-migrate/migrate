@@ -11,8 +11,8 @@ import (
 )
 
 var versions = []mt.Version{
-	{"cassandra:3.0.10", []string{}},
-	{"cassandra:3.0", []string{}},
+	{Image: "cassandra:3.0.10"},
+	{Image: "cassandra:3.0"},
 }
 
 func isReady(i mt.Instance) bool {

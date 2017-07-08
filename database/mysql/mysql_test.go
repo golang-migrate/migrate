@@ -14,10 +14,10 @@ import (
 )
 
 var versions = []mt.Version{
-	{"mysql:8", []string{"MYSQL_ROOT_PASSWORD=root", "MYSQL_DATABASE=public"}},
-	{"mysql:5.7", []string{"MYSQL_ROOT_PASSWORD=root", "MYSQL_DATABASE=public"}},
-	{"mysql:5.6", []string{"MYSQL_ROOT_PASSWORD=root", "MYSQL_DATABASE=public"}},
-	{"mysql:5.5", []string{"MYSQL_ROOT_PASSWORD=root", "MYSQL_DATABASE=public"}},
+	{Image: "mysql:8", ENV: []string{"MYSQL_ROOT_PASSWORD=root", "MYSQL_DATABASE=public"}},
+	{Image: "mysql:5.7", ENV: []string{"MYSQL_ROOT_PASSWORD=root", "MYSQL_DATABASE=public"}},
+	{Image: "mysql:5.6", ENV: []string{"MYSQL_ROOT_PASSWORD=root", "MYSQL_DATABASE=public"}},
+	{Image: "mysql:5.5", ENV: []string{"MYSQL_ROOT_PASSWORD=root", "MYSQL_DATABASE=public"}},
 }
 
 func isReady(i mt.Instance) bool {
