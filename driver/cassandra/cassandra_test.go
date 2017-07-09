@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/gocql/gocql"
-	"github.com/mattes/migrate/file"
-	"github.com/mattes/migrate/migrate/direction"
-	pipep "github.com/mattes/migrate/pipe"
+	"gopkg.in/mattes/migrate.v1/file"
+	"gopkg.in/mattes/migrate.v1/migrate/direction"
+	pipep "gopkg.in/mattes/migrate.v1/pipe"
 )
 
 func TestMigrate(t *testing.T) {

@@ -1,6 +1,6 @@
 // Package main is the CLI.
 // You can use the CLI via Terminal.
-// import "github.com/mattes/migrate/migrate" for usage within Go.
+// import "gopkg.in/mattes/migrate.v1/migrate" for usage within Go.
 package main
 
 import (
@@ -11,18 +11,19 @@ import (
 	"time"
 
 	"github.com/fatih/color"
-	_ "github.com/mattes/migrate/driver/bash"
-	_ "github.com/mattes/migrate/driver/cassandra"
-	_ "github.com/mattes/migrate/driver/crate"
-	_ "github.com/mattes/migrate/driver/mysql"
-	_ "github.com/mattes/migrate/driver/neo4j"
-	_ "github.com/mattes/migrate/driver/postgres"
-	_ "github.com/mattes/migrate/driver/ql"
-	_ "github.com/mattes/migrate/driver/sqlite3"
-	"github.com/mattes/migrate/file"
-	"github.com/mattes/migrate/migrate"
-	"github.com/mattes/migrate/migrate/direction"
-	pipep "github.com/mattes/migrate/pipe"
+	_ "gopkg.in/mattes/migrate.v1/driver/bash"
+	_ "gopkg.in/mattes/migrate.v1/driver/cassandra"
+	_ "gopkg.in/mattes/migrate.v1/driver/crate"
+	_ "gopkg.in/mattes/migrate.v1/driver/mssql"
+	_ "gopkg.in/mattes/migrate.v1/driver/mysql"
+	_ "gopkg.in/mattes/migrate.v1/driver/neo4j"
+	_ "gopkg.in/mattes/migrate.v1/driver/postgres"
+	_ "gopkg.in/mattes/migrate.v1/driver/ql"
+	_ "gopkg.in/mattes/migrate.v1/driver/sqlite3"
+	"gopkg.in/mattes/migrate.v1/file"
+	"gopkg.in/mattes/migrate.v1/migrate"
+	"gopkg.in/mattes/migrate.v1/migrate/direction"
+	pipep "gopkg.in/mattes/migrate.v1/pipe"
 )
 
 var url = flag.String("url", os.Getenv("MIGRATE_URL"), "")

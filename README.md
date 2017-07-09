@@ -1,23 +1,23 @@
-__[v3.0 in the making](https://github.com/mattes/migrate/tree/v3.0-prev)__
+# You are looking at a deprecated version. 
+# Use the [latest version](https://github.com/mattes/migrate) instead.
 
 ---
 
 # migrate
 
-[![Build Status](https://travis-ci.org/mattes/migrate.svg?branch=master)](https://travis-ci.org/mattes/migrate)
-[![GoDoc](https://godoc.org/github.com/mattes/migrate?status.svg)](https://godoc.org/github.com/mattes/migrate)
+[![Build Status](https://travis-ci.org/mattes/migrate.svg?branch=v1)](https://travis-ci.org/mattes/migrate)
 
 A migration helper written in Go. Use it in your existing Golang code 
 or run commands via the CLI. 
 
 ```
-GoCode   import github.com/mattes/migrate/migrate
-CLI      go get -u github.com/mattes/migrate
+GoCode   import gopkg.in/mattes/migrate.v1/migrate
+CLI      go get -u gopkg.in/mattes/migrate.v1
 ```
 
 __Features__
 
-* Super easy to implement [Driver interface](http://godoc.org/github.com/mattes/migrate/driver#Driver).
+* Super easy to implement [Driver interface](http://godoc.org/gopkg.in/mattes/migrate.v1/driver#Driver).
 * Gracefully quit running migrations on ``^C``.
 * No magic search paths routines, no hard-coded config files.
 * CLI is build on top of the ``migrate package``.
@@ -33,15 +33,16 @@ __Features__
  * [Ql](driver/ql)
  * [MongoDB](driver/mongodb)
  * [CrateDB](driver/crate)
+ * [MSSQL](driver/mssql)
 
-Need another driver? Just implement the [Driver interface](http://godoc.org/github.com/mattes/migrate/driver#Driver) and open a PR.
+Need another driver? Just implement the [Driver interface](http://godoc.org/gopkg.in/mattes/migrate.v1/driver#Driver) and open a PR.
 
 
 ## Usage from Terminal
 
 ```bash
 # install
-go get github.com/mattes/migrate
+go get gopkg.in/mattes/migrate.v1
 
 # create new migration file in path
 migrate -url driver://url -path ./migrations create migration_file_xyz
@@ -80,13 +81,13 @@ migrate -url driver://url -path ./migrations goto v
 
 ## Usage in Go
 
-See GoDoc here: http://godoc.org/github.com/mattes/migrate/migrate
+See GoDoc here: http://godoc.org/gopkg.in/mattes/migrate.v1/migrate
 
 ```go
-import "github.com/mattes/migrate/migrate"
+import "gopkg.in/mattes/migrate.v1/migrate"
 
 // Import any required drivers so that they are registered and available
-import _ "github.com/mattes/migrate/driver/mysql"
+import _ "gopkg.in/mattes/migrate.v1/driver/mysql"
 
 // use synchronous versions of migration functions ...
 allErrors, ok := migrate.UpSync("driver://url", "./path")

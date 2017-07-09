@@ -1,13 +1,12 @@
-// Package sqlite3 implements the Driver interface.
-package sqlite3
+// Package mssql implements the Driver interface.
+package mssql
 
 import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strings"
 
-	"github.com/mattn/go-sqlite3"
+	"github.com/denisenkom/go-mssqldb"
 	"gopkg.in/mattes/migrate.v1/driver"
 	"gopkg.in/mattes/migrate.v1/file"
 	"gopkg.in/mattes/migrate.v1/migrate/direction"
@@ -17,15 +16,10 @@ type Driver struct {
 	db *sql.DB
 }
 
-const tableName = "schema_migration"
+const tableName = "schema_migrations"
 
 func (driver *Driver) Initialize(url string) error {
-	filename := strings.SplitN(url, "sqlite3://", 2)
-	if len(filename) != 2 {
-		return errors.New("invalid sqlite3:// scheme")
-	}
-
-	db, err := sql.Open("sqlite3", filename[1])
+	db, err := sql.Open("mssql", url)
 	if err != nil {
 		return err
 	}
@@ -48,7 +42,7 @@ func (driver *Driver) Close() error {
 }
 
 func (driver *Driver) ensureVersionTableExists() error {
-	if _, err := driver.db.Exec("CREATE TABLE IF NOT EXISTS " + tableName + " (version INTEGER PRIMARY KEY AUTOINCREMENT);"); err != nil {
+	if _, err := driver.db.Exec("if object_id('" + tableName + "') is null create table [" + tableName + "] ([version] BIGINT NOT NULL PRIMARY KEY);"); err != nil {
 		return err
 	}
 	return nil
@@ -92,19 +86,21 @@ func (driver *Driver) Migrate(f file.File, pipe chan interface{}) {
 	}
 
 	if _, err := tx.Exec(string(f.Content)); err != nil {
-		sqliteErr, isErr := err.(sqlite3.Error)
-
-		if isErr {
-			// The sqlite3 library only provides error codes, not position information. Output what we do know
-			pipe <- fmt.Errorf("SQLite Error (%s); Extended (%s)\nError: %s", sqliteErr.Code.Error(), sqliteErr.ExtendedCode.Error(), sqliteErr.Error())
-		} else {
-			pipe <- fmt.Errorf("An error occurred: %s", err.Error())
-		}
-
-		if err := tx.Rollback(); err != nil {
+		switch msErr := err.(type) {
+		case *mssql.Error:
+			errorPart := file.LinesBeforeAndAfter(f.Content, int(msErr.LineNo), 5, 5, true)
+			pipe <- errors.New(fmt.Sprintf("%v: %s in line %v:\n\n%s", msErr.Number, msErr.Message, msErr.LineNo, string(errorPart)))
+			if err := tx.Rollback(); err != nil {
+				pipe <- err
+			}
+			return
+		default:
 			pipe <- err
+			if err := tx.Rollback(); err != nil {
+				pipe <- err
+			}
+			return
 		}
-		return
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -115,7 +111,7 @@ func (driver *Driver) Migrate(f file.File, pipe chan interface{}) {
 
 func (driver *Driver) Version() (uint64, error) {
 	var version uint64
-	err := driver.db.QueryRow("SELECT version FROM " + tableName + " ORDER BY version DESC LIMIT 1").Scan(&version)
+	err := driver.db.QueryRow("SELECT version FROM " + tableName + " ORDER BY version DESC OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY").Scan(&version)
 	switch {
 	case err == sql.ErrNoRows:
 		return 0, nil
@@ -127,5 +123,6 @@ func (driver *Driver) Version() (uint64, error) {
 }
 
 func init() {
-	driver.RegisterDriver("sqlite3", &Driver{})
+	driver.RegisterDriver("mssql", &Driver{})
+	driver.RegisterDriver("sqlserver", &Driver{})
 }

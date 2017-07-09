@@ -6,9 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/jmcvetta/neoism"
-	"github.com/mattes/migrate/driver"
-	"github.com/mattes/migrate/file"
-	"github.com/mattes/migrate/migrate/direction"
+	"gopkg.in/mattes/migrate.v1/driver"
+	"gopkg.in/mattes/migrate.v1/file"
+	"gopkg.in/mattes/migrate.v1/migrate/direction"
 	"strings"
 )
 
@@ -163,4 +163,5 @@ func (driver *Driver) Version() (uint64, error) {
 
 func init() {
 	driver.RegisterDriver("neo4j", &Driver{})
+	driver.RegisterDriver("neo4js", &Driver{})
 }

@@ -1,9 +1,11 @@
-package postgres
+package mssql
 
 import (
 	"database/sql"
+	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	"gopkg.in/mattes/migrate.v1/file"
 	"gopkg.in/mattes/migrate.v1/migrate/direction"
@@ -17,15 +19,39 @@ func TestMigrate(t *testing.T) {
 		t.Skip("skipping test in short mode.")
 	}
 
-	host := os.Getenv("POSTGRES_PORT_5432_TCP_ADDR")
-	port := os.Getenv("POSTGRES_PORT_5432_TCP_PORT")
-	driverURL := "postgres://postgres@" + host + ":" + port + "/template1?sslmode=disable"
+	host := os.Getenv("MSSQL_PORT_1433_TCP_ADDR")
+	port := os.Getenv("MSSQL_PORT_1433_TCP_PORT")
+	driverURL := fmt.Sprintf("server=%s;user id=%s;password=%s;port=%s;database=%s;encrypt=disable;log=2;TrustServerCertificate=true",
+		host,
+		"sa",
+		"Passw0rd",
+		port,
+		"master",
+	)
+	// retry connection for 2 minutes
+	until := time.Now().Add(time.Second * 120)
 
+	ticker := time.NewTicker(time.Second)
+	var connection *sql.DB
+	var err error
 	// prepare clean database
-	connection, err := sql.Open("postgres", driverURL)
-	if err != nil {
-		t.Fatal(err)
+	for tick := range ticker.C {
+		if tick.After(until) {
+			ticker.Stop()
+			break
+		}
+		connection, err = sql.Open("mssql", driverURL)
+		err = connection.Ping()
+		if err == nil {
+			ticker.Stop()
+			break
+		}
 	}
+
+	if err != nil {
+		t.Fatal("Failed to connect to mssql docker container after 2 minutes", err)
+	}
+
 	if _, err := connection.Exec(`
 				DROP TABLE IF EXISTS yolo;
 				DROP TABLE IF EXISTS ` + tableName + `;`); err != nil {
@@ -51,7 +77,7 @@ func TestMigrate(t *testing.T) {
 			Direction: direction.Up,
 			Content: []byte(`
 				CREATE TABLE yolo (
-					id serial not null primary key
+					id BIGINT IDENTITY NOT NULL PRIMARY KEY
 				);
 			`),
 		},
@@ -84,9 +110,9 @@ func TestMigrate(t *testing.T) {
 			Name:      "demo",
 			Direction: direction.Up,
 			Content: []byte(`
-				CREATE TABLE demo (
-					id serial not null primary key
-				)
+			CREATE TABLE demo (
+				id BIGINT IDENTITY NOT NULL PRIMARY KEY
+			)
 			`),
 		},
 		{

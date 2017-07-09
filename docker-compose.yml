@@ -1,12 +1,13 @@
 go: &go
   image: golang
-  working_dir: /go/src/github.com/mattes/migrate
+  working_dir: /go/src/gopkg.in/mattes/migrate.v1
   volumes:
-    - $GOPATH:/go
+    - $GOPATH/src/github.com/mattes/migrate:/go/src/gopkg.in/mattes/migrate.v1  
 go-test:
   <<: *go
   command: sh -c 'go get -t -v ./... && go test -v ./...'
   links:
+    - mssql
     - postgres
     - mysql
     - cassandra
@@ -30,3 +31,8 @@ crate:
   image: crate
 mongo:
   image: mongo:3.2.6
+mssql:
+  image: microsoft/mssql-server-linux
+  environment:
+    SA_PASSWORD: Passw0rd
+    ACCEPT_EULA: "Y"
