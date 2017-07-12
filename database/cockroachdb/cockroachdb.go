@@ -12,6 +12,7 @@ import (
 	"github.com/mattes/migrate"
 	"github.com/mattes/migrate/database"
 	"regexp"
+	"strconv"
 )
 
 func init() {
@@ -32,6 +33,7 @@ var (
 type Config struct {
 	MigrationsTable string
 	LockTable		string
+	ForceLock		bool
 	DatabaseName    string
 }
 
@@ -114,10 +116,17 @@ func (c *CockroachDb) Open(url string) (database.Driver, error) {
 		lockTable = DefaultLockTable
 	}
 
+	forceLockQuery := purl.Query().Get("x-force-lock")
+	forceLock, err := strconv.ParseBool(forceLockQuery)
+	if err != nil {
+		forceLock = false
+	}
+
 	px, err := WithInstance(db, &Config{
 		DatabaseName:    purl.Path,
 		MigrationsTable: migrationsTable,
 		LockTable: lockTable,
+		ForceLock: forceLock,
 	})
 	if err != nil {
 		return nil, err
@@ -148,7 +157,7 @@ func (c *CockroachDb) Lock() error {
 
 		// If row exists at all, lock is present
 		locked := rows.Next()
-		if locked {
+		if locked && !c.config.ForceLock {
 			return database.Error{Err: "lock could not be acquired; already locked", Query: []byte(query)}
 		}
 
@@ -180,6 +189,15 @@ func (c *CockroachDb) Unlock() error {
 	// a better locking mechanism is added, a manual purging of the lock table may be required in such circumstances
 	query := "DELETE FROM " + c.config.LockTable + " WHERE lock_id = $1"
 	if _, err := c.db.Exec(query, aid); err != nil {
+		if e, ok := err.(*pq.Error); ok {
+			// 42P01 is "UndefinedTableError" in CockroachDB
+			// https://github.com/cockroachdb/cockroach/blob/master/pkg/sql/pgwire/pgerror/codes.go
+			if e.Code == "42P01" {
+				// On drops, the lock table is fully removed;  This is fine, and is a valid "unlocked" state for the schema
+				c.isLocked = false
+				return nil
+			}
+		}
 		return database.Error{OrigErr: err, Err: "failed to release migration lock", Query: []byte(query)}
 	}
 
