@@ -13,6 +13,7 @@ import (
 	"github.com/mattes/migrate/database"
 	"regexp"
 	"strconv"
+	"context"
 )
 
 func init() {
@@ -142,7 +143,7 @@ func (c *CockroachDb) Close() error {
 // Locking is done manually with a separate lock table.  Implementing advisory locks in CRDB is being discussed
 // See: https://github.com/cockroachdb/cockroach/issues/13546
 func (c *CockroachDb) Lock() error {
-	err := crdb.ExecuteTx(c.db, func(tx *sql.Tx) error {
+	err := crdb.ExecuteTx(context.Background(), c.db, nil, func(tx *sql.Tx) error {
 		aid, err := database.GenerateAdvisoryLockId(c.config.DatabaseName)
 		if err != nil {
 			return err
@@ -221,7 +222,7 @@ func (c *CockroachDb) Run(migration io.Reader) error {
 }
 
 func (c *CockroachDb) SetVersion(version int, dirty bool) error {
-	return crdb.ExecuteTx(c.db, func(tx *sql.Tx) error {
+	return crdb.ExecuteTx(context.Background(), c.db, nil, func(tx *sql.Tx) error {
 		if _, err := tx.Exec( `TRUNCATE "` + c.config.MigrationsTable + `"`); err != nil {
 			return err
 		}
