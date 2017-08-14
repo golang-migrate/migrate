@@ -61,7 +61,7 @@ type Migrate struct {
 
 	// GracefulStop accepts `true` and will stop executing migrations
 	// as soon as possible at a safe break point, so that the database
-	// is not corrpupted.
+	// is not corrupted.
 	GracefulStop   chan bool
 	isGracefulStop bool
 
@@ -300,7 +300,7 @@ func (m *Migrate) Down() error {
 	return m.unlockErr(m.runMigrations(ret))
 }
 
-// Drop deletes everyting in the database.
+// Drop deletes everything in the database.
 func (m *Migrate) Drop() error {
 	if err := m.lock(); err != nil {
 		return err
