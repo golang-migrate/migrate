@@ -16,6 +16,8 @@ system_schema table which comes with 3.X
 | `consistency` | ALL | Migration consistency
 | `protocol` |  | Cassandra protocol version (3 or 4)
 | `timeout` | 1 minute | Migration timeout
+| `username` | nil | Username to use when authenticating. |
+| `password` | nil | Password to use when authenticating. |
 
 
 `timeout` is parsed using [time.ParseDuration(s string)](https://golang.org/pkg/time/#ParseDuration)
