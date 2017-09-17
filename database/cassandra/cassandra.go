@@ -5,10 +5,11 @@ import (
 	"io"
 	"io/ioutil"
 	nurl "net/url"
-	"github.com/gocql/gocql"
-	"time"
-	"github.com/mattes/migrate/database"
 	"strconv"
+	"time"
+
+	"github.com/gocql/gocql"
+	"github.com/mattes/migrate/database"
 )
 
 func init() {
