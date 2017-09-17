@@ -112,7 +112,7 @@ func (p *Cassandra) Close() error {
 }
 
 func (p *Cassandra) Lock() error {
-	if (dbLocked) {
+	if dbLocked {
 		return database.ErrLocked
 	}
 	dbLocked = true
