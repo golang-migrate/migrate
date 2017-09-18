@@ -137,12 +137,12 @@ func (s *Spanner) Run(migration io.Reader) error {
 	}
 
 	// run migration
-	stmt := string(migr[:])
+	stmts := migrationStatements(migr)
 	ctx := context.Background()
 
 	op, err := s.db.admin.UpdateDatabaseDdl(ctx, &adminpb.UpdateDatabaseDdlRequest{
 		Database:   s.config.DatabaseName,
-		Statements: []string{stmt},
+		Statements: stmts,
 	})
 
 	if err != nil {
@@ -281,4 +281,14 @@ func (s *Spanner) ensureVersionTable() error {
 	}
 
 	return nil
+}
+
+func migrationStatements(migration []byte) []string {
+	regex := regexp.MustCompile(";$")
+	migrationString := string(migration[:])
+	migrationString = strings.TrimSpace(migrationString)
+	migrationString = regex.ReplaceAllString(migrationString, "")
+
+	statements := strings.Split(migrationString, ";")
+	return statements
 }
