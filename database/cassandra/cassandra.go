@@ -65,6 +65,13 @@ func (p *Cassandra) Open(url string) (database.Driver, error) {
 	cluster.Consistency = gocql.All
 	cluster.Timeout = 1 * time.Minute
 
+	if len(u.Query().Get("username")) > 0 && len(u.Query().Get("password")) > 0 {
+		authenticator := gocql.PasswordAuthenticator{
+			Username: u.Query().Get("username"),
+			Password: u.Query().Get("password"),
+		}
+		cluster.Authenticator = authenticator
+	}
 
 	// Retrieve query string configuration
 	if len(u.Query().Get("consistency")) > 0 {
