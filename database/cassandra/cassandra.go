@@ -5,10 +5,11 @@ import (
 	"io"
 	"io/ioutil"
 	nurl "net/url"
-	"github.com/gocql/gocql"
-	"time"
-	"github.com/mattes/migrate/database"
 	"strconv"
+	"time"
+
+	"github.com/gocql/gocql"
+	"github.com/mattes/migrate/database"
 )
 
 func init() {
@@ -20,8 +21,8 @@ var DefaultMigrationsTable = "schema_migrations"
 var dbLocked = false
 
 var (
-	ErrNilConfig = fmt.Errorf("no config")
-	ErrNoKeyspace = fmt.Errorf("no keyspace provided")
+	ErrNilConfig     = fmt.Errorf("no config")
+	ErrNoKeyspace    = fmt.Errorf("no keyspace provided")
 	ErrDatabaseDirty = fmt.Errorf("database is dirty")
 )
 
@@ -35,7 +36,7 @@ type Cassandra struct {
 	isLocked bool
 
 	// Open and WithInstance need to guarantee that config is never nil
-	config   *Config
+	config *Config
 }
 
 func (p *Cassandra) Open(url string) (database.Driver, error) {
@@ -111,7 +112,7 @@ func (p *Cassandra) Close() error {
 }
 
 func (p *Cassandra) Lock() error {
-	if (dbLocked) {
+	if dbLocked {
 		return database.ErrLocked
 	}
 	dbLocked = true
@@ -153,7 +154,6 @@ func (p *Cassandra) SetVersion(version int, dirty bool) error {
 	return nil
 }
 
-
 // Return current keyspace version
 func (p *Cassandra) Version() (version int, dirty bool, err error) {
 	query := `SELECT version, dirty FROM "` + p.config.MigrationsTable + `" LIMIT 1`
@@ -191,7 +191,6 @@ func (p *Cassandra) Drop() error {
 	return nil
 }
 
-
 // Ensure version table exists
 func (p *Cassandra) ensureVersionTable() error {
 	err := p.session.Query(fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (version bigint, dirty boolean, PRIMARY KEY(version))", p.config.MigrationsTable)).Exec()
@@ -203,7 +202,6 @@ func (p *Cassandra) ensureVersionTable() error {
 	}
 	return nil
 }
-
 
 // ParseConsistency wraps gocql.ParseConsistency
 // to return an error instead of a panicking.
