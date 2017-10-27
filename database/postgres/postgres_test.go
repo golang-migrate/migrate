@@ -12,6 +12,7 @@ import (
 	"github.com/lib/pq"
 	dt "github.com/mattes/migrate/database/testing"
 	mt "github.com/mattes/migrate/testing"
+	"context"
 )
 
 var versions = []mt.Version{
@@ -69,7 +70,7 @@ func TestMultiStatement(t *testing.T) {
 
 			// make sure second table exists
 			var exists bool
-			if err := d.(*Postgres).db.QueryRow("SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'bar' AND table_schema = (SELECT current_schema()))").Scan(&exists); err != nil {
+			if err := d.(*Postgres).db.QueryRowContext(context.Background(), "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'bar' AND table_schema = (SELECT current_schema()))").Scan(&exists); err != nil {
 				t.Fatal(err)
 			}
 			if !exists {
@@ -147,4 +148,40 @@ func TestWithSchema(t *testing.T) {
 
 func TestWithInstance(t *testing.T) {
 
+}
+
+func TestPostgres_Lock(t *testing.T) {
+	mt.ParallelTest(t, versions, isReady,
+		func(t *testing.T, i mt.Instance) {
+			p := &Postgres{}
+			addr := fmt.Sprintf("postgres://postgres@%v:%v/postgres?sslmode=disable", i.Host(), i.Port())
+			d, err := p.Open(addr)
+			if err != nil {
+				t.Fatalf("%v", err)
+			}
+
+			dt.Test(t, d, []byte("SELECT 1"))
+
+			ps := d.(*Postgres)
+
+			err = ps.Lock()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			err = ps.Unlock()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			err = ps.Lock()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			err = ps.Unlock()
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
 }
