@@ -223,7 +223,7 @@ func (c *CockroachDb) Run(migration io.Reader) error {
 
 func (c *CockroachDb) SetVersion(version int, dirty bool) error {
 	return crdb.ExecuteTx(context.Background(), c.db, nil, func(tx *sql.Tx) error {
-		if _, err := tx.Exec( `TRUNCATE "` + c.config.MigrationsTable + `"`); err != nil {
+		if _, err := tx.Exec(`DELETE FROM "` + c.config.MigrationsTable + `"`); err != nil {
 			return err
 		}
 
