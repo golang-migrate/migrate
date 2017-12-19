@@ -90,6 +90,7 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 }
 
 func (m *Mysql) Open(url string) (database.Driver, error) {
+	url = strings.TrimPrefix(url, "mysql://")
 	purl, err := nurl.Parse(url)
 	if err != nil {
 		return nil, err
@@ -99,8 +100,7 @@ func (m *Mysql) Open(url string) (database.Driver, error) {
 	q.Set("multiStatements", "true")
 	purl.RawQuery = q.Encode()
 
-	db, err := sql.Open("mysql", strings.Replace(
-		migrate.FilterCustomQuery(purl).String(), "mysql://", "", 1))
+	db, err := sql.Open("mysql", migrate.FilterCustomQuery(purl).String())
 	if err != nil {
 		return nil, err
 	}
