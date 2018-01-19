@@ -1,6 +1,6 @@
-[![Build Status](https://travis-ci.org/mattes/migrate.svg?branch=master)](https://travis-ci.org/mattes/migrate)
+[![Build Status](https://travis-ci.org/golang-migrate/migrate.svg?branch=master)](https://travis-ci.org/golang-migrate/migrate)
 [![GoDoc](https://godoc.org/github.com/mattes/migrate?status.svg)](https://godoc.org/github.com/mattes/migrate)
-[![Coverage Status](https://coveralls.io/repos/github/mattes/migrate/badge.svg?branch=v3.0-prev)](https://coveralls.io/github/mattes/migrate?branch=v3.0-prev)
+[![Coverage Status](https://coveralls.io/repos/github/golang-migrate/migrate/badge.svg)](https://coveralls.io/github/golang-migrate/migrate)
 [![packagecloud.io](https://img.shields.io/badge/deb-packagecloud.io-844fec.svg)](https://packagecloud.io/mattes/migrate?filter=debs)
 
 # migrate
@@ -79,9 +79,9 @@ __[Go Documentation](https://godoc.org/github.com/mattes/migrate)__
 
 ```go
 import (
-    "github.com/mattes/migrate"
-    _ "github.com/mattes/migrate/database/postgres"
-    _ "github.com/mattes/migrate/source/github"
+    "github.com/golang-migrate/migrate"
+    _ "github.com/golang-migrate/migrate/database/postgres"
+    _ "github.com/golang-migrate/migrate/source/github"
 )
 
 func main() {
@@ -98,9 +98,9 @@ Want to use an existing database client?
 import (
     "database/sql"
     _ "github.com/lib/pq"
-    "github.com/mattes/migrate"
-    "github.com/mattes/migrate/database/postgres"
-    _ "github.com/mattes/migrate/source/file"
+    "github.com/golang-migrate/migrate"
+    "github.com/golang-migrate/migrate/database/postgres"
+    _ "github.com/golang-migrate/migrate/source/file"
 )
 
 func main() {
