@@ -1,9 +1,9 @@
 package main
 
 import (
-	"github.com/mattes/migrate"
-	_ "github.com/mattes/migrate/database/stub" // TODO remove again
-	_ "github.com/mattes/migrate/source/file"
+	"github.com/golang-migrate/migrate"
+	_ "github.com/golang-migrate/migrate/database/stub" // TODO remove again
+	_ "github.com/golang-migrate/migrate/source/file"
 	"os"
 	"fmt"
 )

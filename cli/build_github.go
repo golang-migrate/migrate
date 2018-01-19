@@ -3,5 +3,5 @@
 package main
 
 import (
-	_ "github.com/mattes/migrate/source/github"
+	_ "github.com/golang-migrate/migrate/source/github"
 )
