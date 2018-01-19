@@ -21,9 +21,7 @@ var versions = []mt.Version{
 }
 
 func isReady(i mt.Instance) bool {
-	connStr := fmt.Sprintf("root:root@tcp(%v:%v)/public", i.Host(), i.Port())
-	fmt.Println(connStr)
-	db, err := sql.Open("mysql", connStr)
+	db, err := sql.Open("mysql", fmt.Sprintf("root:root@tcp(%v:%v)/public", i.Host(), i.Port()))
 	if err != nil {
 		return false
 	}
