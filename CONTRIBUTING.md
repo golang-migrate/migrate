@@ -12,11 +12,12 @@
  
 Some more helpful commands:
 
-  * You can specify which database/ source tests to run:  
+  * You can specify which database/ source tests to run:
     `make test-short SOURCE='file go-bindata' DATABASE='postgres cassandra'`
-  * After `make test`, run `make html-coverage` which opens a shiny test coverage overview.  
+  * After `make test`, run `make html-coverage` which opens a shiny test coverage overview.
   * Missing imports? `make deps`
   * `make build-cli` builds the CLI in directory `cli/build/`.
   * `make list-external-deps` lists all external dependencies for each package
-  * `make docs && make open-docs` opens godoc in your browser, `make kill-docs` kills the godoc server.  
-    Repeatedly call `make docs` to refresh the server.  
+  * `make docs && make open-docs` opens godoc in your browser, `make kill-docs` kills the godoc server.
+    Repeatedly call `make docs` to refresh the server.
+  * Set the `DOCKER_API_VERSION` environment variable to the latest supported version if you get errors regarding the docker client API version being too new.
