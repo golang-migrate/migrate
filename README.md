@@ -1,5 +1,5 @@
 [![Build Status](https://travis-ci.org/golang-migrate/migrate.svg?branch=master)](https://travis-ci.org/golang-migrate/migrate)
-[![GoDoc](https://godoc.org/github.com/mattes/migrate?status.svg)](https://godoc.org/github.com/mattes/migrate)
+[![GoDoc](https://godoc.org/github.com/golang-migrate/migrate?status.svg)](https://godoc.org/github.com/golang-migrate/migrate)
 [![Coverage Status](https://coveralls.io/repos/github/golang-migrate/migrate/badge.svg)](https://coveralls.io/github/golang-migrate/migrate)
 [![packagecloud.io](https://img.shields.io/badge/deb-packagecloud.io-844fec.svg)](https://packagecloud.io/mattes/migrate?filter=debs)
 
@@ -9,12 +9,12 @@ __Database migrations written in Go. Use as [CLI](#cli-usage) or import as [libr
 
  * Migrate reads migrations from [sources](#migration-sources)
    and applies them in correct order to a [database](#databases).
- * Drivers are "dumb", migrate glues everything together and makes sure the logic is bulletproof.  
+ * Drivers are "dumb", migrate glues everything together and makes sure the logic is bulletproof.
    (Keeps the drivers lightweight, too.)
  * Database drivers don't assume things or try to correct user input. When in doubt, fail.
 
 
-Looking for [v1](https://github.com/mattes/migrate/tree/v1)?
+Looking for [v1](https://github.com/golang-migrate/migrate/tree/v1)?
 
 
 ## Databases
@@ -69,13 +69,13 @@ $ migrate -database postgres://localhost:5432/database up 2
  * API is stable and frozen for this release (v3.x).
  * Package migrate has no external dependencies.
  * Only import the drivers you need.
-   (check [dependency_tree.txt](https://github.com/mattes/migrate/releases) for each driver)
+   (check [dependency_tree.txt](https://github.com/golang-migrate/migrate/releases) for each driver)
  * To help prevent database corruptions, it supports graceful stops via `GracefulStop chan bool`.
  * Bring your own logger.
  * Uses `io.Reader` streams internally for low memory overhead.
  * Thread-safe and no goroutine leaks.
 
-__[Go Documentation](https://godoc.org/github.com/mattes/migrate)__
+__[Go Documentation](https://godoc.org/github.com/golang-migrate/migrate)__
 
 ```go
 import (
