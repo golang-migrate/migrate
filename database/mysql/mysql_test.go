@@ -2,7 +2,7 @@ package mysql
 
 import (
 	"database/sql"
-	sqldriver "database/sql/driver"
+	// sqldriver "database/sql/driver"
 	"fmt"
 	// "io/ioutil"
 	// "log"
@@ -21,14 +21,14 @@ var versions = []mt.Version{
 }
 
 func isReady(i mt.Instance) bool {
-	db, err := sql.Open("mysql", fmt.Sprintf("root:root@tcp(%v:%v)/public", i.Host(), i.Port()))
+	connStr := fmt.Sprintf("root:root@tcp(%v:%v)/public", i.Host(), i.Port())
+	fmt.Println(connStr)
+	db, err := sql.Open("mysql", connStr)
 	if err != nil {
 		return false
 	}
 	defer db.Close()
-	err = db.Ping()
-
-	if err == sqldriver.ErrBadConn {
+	if err = db.Ping(); err != nil {
 		return false
 	}
 
