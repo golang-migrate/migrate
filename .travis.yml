@@ -6,7 +6,7 @@ go:
   - 1.9
 
 env:
-  - MIGRATE_TEST_CONTAINER_BOOT_DELAY=10
+  - MIGRATE_TEST_CONTAINER_BOOT_TIMEOUT=60
 
 # TODO: https://docs.docker.com/engine/installation/linux/ubuntu/    
 # pre-provision with travis docker setup and pin down docker version in install step

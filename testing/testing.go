@@ -21,9 +21,9 @@ type Version struct {
 }
 
 func ParallelTest(t *testing.T, versions []Version, readyFn IsReadyFunc, testFn TestFunc) {
-	delay, err := strconv.Atoi(os.Getenv("MIGRATE_TEST_CONTAINER_BOOT_DELAY"))
+	timeout, err := strconv.Atoi(os.Getenv("MIGRATE_TEST_CONTAINER_BOOT_TIMEOUT"))
 	if err != nil {
-		delay = 0
+		timeout = 60 // Cassandra docker image can take ~30s to start
 	}
 
 	for i, version := range versions {
@@ -49,8 +49,8 @@ func ParallelTest(t *testing.T, versions []Version, readyFn IsReadyFunc, testFn 
 
 				// wait until database is ready
 				tick := time.Tick(1000 * time.Millisecond)
-				timeout := time.After(time.Duration(delay + 60) * time.Second)
-				outer:
+				timeout := time.After(time.Duration(timeout) * time.Second)
+			outer:
 				for {
 					select {
 					case <-tick:
@@ -62,8 +62,6 @@ func ParallelTest(t *testing.T, versions []Version, readyFn IsReadyFunc, testFn 
 						t.Fatalf("Docker: Container not ready, timeout for %v.\n%s", version, containerLogs(t, container))
 					}
 				}
-
-				time.Sleep(time.Duration(int64(delay)) * time.Second)
 
 				// we can now run the tests
 				testFn(t, container)
