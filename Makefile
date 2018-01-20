@@ -28,7 +28,7 @@ test:
 	@mkdir .coverage
 	make test-with-flags TEST_FLAGS='-v -race -covermode atomic -coverprofile .coverage/_$$(RAND).txt -bench=. -benchmem -timeout 20m'
 	@echo 'mode: atomic' > .coverage/combined.txt
-	@cat .coverage/*.txt | grep -v 'mode: atomic' >> .coverage/combined.txt
+	@cat .coverage/_*.txt | grep -v 'mode: atomic' >> .coverage/combined.txt
 
 
 test-with-flags:
