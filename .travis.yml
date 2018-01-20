@@ -11,7 +11,16 @@ env:
 # TODO: https://docs.docker.com/engine/installation/linux/ubuntu/    
 # pre-provision with travis docker setup and pin down docker version in install step
 services:
-  - docker 
+  - docker
+
+before_cache:
+  - rm -rf $GOPATH/src/github.com/golang-migrate
+  - rm -rf $GOPATH/pkg/**/github.com/golang-migrate
+
+cache:
+  directories:
+    - $GOPATH/src
+    - $GOPATH/pkg
 
 install:
   - make deps
@@ -20,10 +29,10 @@ install:
   - go get github.com/mattn/goveralls 
 
 script:
-  - make test
+  - make test COVERAGE_DIR=/tmp/coverage
 
 after_success:
-  - goveralls -service=travis-ci -coverprofile .coverage/combined.txt
+  - goveralls -service=travis-ci -coverprofile /tmp/coverage/combined.txt
   - make list-external-deps > dependency_tree.txt && cat dependency_tree.txt
 
 before_deploy:
