@@ -3,6 +3,7 @@ DATABASE ?= postgres mysql redshift cassandra sqlite3 spanner cockroachdb clickh
 VERSION ?= $(shell git describe --tags 2>/dev/null | cut -c 2-)
 TEST_FLAGS ?=
 REPO_OWNER ?= $(shell cd .. && basename "$$(pwd)")
+COVERAGE_DIR ?= .coverage
 
 
 build-cli: clean
@@ -24,11 +25,11 @@ test-short:
 
 
 test:
-	@-rm -r .coverage
-	@mkdir .coverage
-	make test-with-flags TEST_FLAGS='-v -race -covermode atomic -coverprofile .coverage/_$$(RAND).txt -bench=. -benchmem -timeout 20m'
-	@echo 'mode: atomic' > .coverage/combined.txt
-	@cat .coverage/_*.txt | grep -v 'mode: atomic' >> .coverage/combined.txt
+	@-rm -r $(COVERAGE_DIR)
+	@mkdir $(COVERAGE_DIR)
+	make test-with-flags TEST_FLAGS='-v -race -covermode atomic -coverprofile $$(COVERAGE_DIR)/_$$(RAND).txt -bench=. -benchmem -timeout 20m'
+	@echo 'mode: atomic' > $(COVERAGE_DIR)/combined.txt
+	@cat $(COVERAGE_DIR)/_*.txt | grep -v 'mode: atomic' >> $(COVERAGE_DIR)/combined.txt
 
 
 test-with-flags:
@@ -53,7 +54,7 @@ kill-orphaned-docker-containers:
 
 
 html-coverage:
-	go tool cover -html=.coverage/combined.txt
+	go tool cover -html=$(COVERAGE_DIR)/combined.txt
 
 
 deps:
