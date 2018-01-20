@@ -2,13 +2,13 @@ package mysql
 
 import (
 	"database/sql"
-	// sqldriver "database/sql/driver"
+	sqldriver "database/sql/driver"
 	"fmt"
 	// "io/ioutil"
 	// "log"
 	"testing"
 
-	// "github.com/go-sql-driver/mysql"
+	"github.com/go-sql-driver/mysql"
 	dt "github.com/golang-migrate/migrate/database/testing"
 	mt "github.com/golang-migrate/migrate/testing"
 )
@@ -27,6 +27,12 @@ func isReady(i mt.Instance) bool {
 	}
 	defer db.Close()
 	if err = db.Ping(); err != nil {
+		switch err {
+		case sqldriver.ErrBadConn, mysql.ErrInvalidConn:
+			return false
+		default:
+			fmt.Println(err)
+		}
 		return false
 	}
 
@@ -44,6 +50,7 @@ func Test(t *testing.T) {
 			if err != nil {
 				t.Fatalf("%v", err)
 			}
+			defer d.Close()
 			dt.Test(t, d, []byte("SELECT 1"))
 
 			// check ensureVersionTable
