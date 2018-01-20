@@ -60,8 +60,9 @@ html-coverage:
 deps:
 	-go get -v -u ./... 
 	-go test -v -i ./...
-	# TODO: why is this not being fetched with the command above?
+	# TODO: why are these not being fetched by `go get`?
 	-go get -u github.com/fsouza/fake-gcs-server/fakestorage
+	-go get -u github.com/kshvakov/clickhouse
 
 
 list-external-deps:
