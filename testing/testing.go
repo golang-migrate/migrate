@@ -73,13 +73,13 @@ func ParallelTest(t *testing.T, versions []Version, readyFn IsReadyFunc, testFn 
 func containerLogs(t *testing.T, c *DockerContainer) []byte {
 	r, err := c.Logs()
 	if err != nil {
-		t.Error("%v", err)
+		t.Error(err)
 		return nil
 	}
 	defer r.Close()
 	b, err := ioutil.ReadAll(r)
 	if err != nil {
-		t.Error("%v", err)
+		t.Error(err)
 		return nil
 	}
 	return b
