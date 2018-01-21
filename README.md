@@ -1,6 +1,6 @@
-[![Build Status](https://travis-ci.org/golang-migrate/migrate.svg?branch=master)](https://travis-ci.org/golang-migrate/migrate)
+[![Build Status](https://img.shields.io/travis/golang-migrate/migrate/master.svg)](https://travis-ci.org/golang-migrate/migrate)
 [![GoDoc](https://godoc.org/github.com/golang-migrate/migrate?status.svg)](https://godoc.org/github.com/golang-migrate/migrate)
-[![Coverage Status](https://coveralls.io/repos/github/golang-migrate/migrate/badge.svg)](https://coveralls.io/github/golang-migrate/migrate)
+[![Coverage Status](https://img.shields.io/coveralls/github/golang-migrate/migrate/master.svg)](https://coveralls.io/github/golang-migrate/migrate?branch=master)
 [![packagecloud.io](https://img.shields.io/badge/deb-packagecloud.io-844fec.svg)](https://packagecloud.io/golang-migrate/migrate?filter=debs)
 
 # migrate
