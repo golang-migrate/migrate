@@ -40,7 +40,7 @@ type Config struct {
 type Mysql struct {
 	// mysql RELEASE_LOCK must be called from the same conn, so
 	// just do everything over a single conn anyway.
-	db       *sql.Conn
+	conn     *sql.Conn
 	isLocked bool
 
 	config *Config
@@ -78,7 +78,7 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	}
 
 	mx := &Mysql{
-		db:     conn,
+		conn:   conn,
 		config: config,
 	}
 
@@ -158,7 +158,7 @@ func (m *Mysql) Open(url string) (database.Driver, error) {
 }
 
 func (m *Mysql) Close() error {
-	return m.db.Close()
+	return m.conn.Close()
 }
 
 func (m *Mysql) Lock() error {
@@ -174,7 +174,7 @@ func (m *Mysql) Lock() error {
 
 	query := "SELECT GET_LOCK(?, 10)"
 	var success bool
-	if err := m.db.QueryRowContext(context.Background(), query, aid).Scan(&success); err != nil {
+	if err := m.conn.QueryRowContext(context.Background(), query, aid).Scan(&success); err != nil {
 		return &database.Error{OrigErr: err, Err: "try lock failed", Query: []byte(query)}
 	}
 
@@ -198,7 +198,7 @@ func (m *Mysql) Unlock() error {
 	}
 
 	query := `SELECT RELEASE_LOCK(?)`
-	if _, err := m.db.ExecContext(context.Background(), query, aid); err != nil {
+	if _, err := m.conn.ExecContext(context.Background(), query, aid); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 
@@ -217,7 +217,7 @@ func (m *Mysql) Run(migration io.Reader) error {
 	}
 
 	query := string(migr[:])
-	if _, err := m.db.ExecContext(context.Background(), query); err != nil {
+	if _, err := m.conn.ExecContext(context.Background(), query); err != nil {
 		return database.Error{OrigErr: err, Err: "migration failed", Query: migr}
 	}
 
@@ -225,7 +225,7 @@ func (m *Mysql) Run(migration io.Reader) error {
 }
 
 func (m *Mysql) SetVersion(version int, dirty bool) error {
-	tx, err := m.db.BeginTx(context.Background(), &sql.TxOptions{})
+	tx, err := m.conn.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
 	}
@@ -253,7 +253,7 @@ func (m *Mysql) SetVersion(version int, dirty bool) error {
 
 func (m *Mysql) Version() (version int, dirty bool, err error) {
 	query := "SELECT version, dirty FROM `" + m.config.MigrationsTable + "` LIMIT 1"
-	err = m.db.QueryRowContext(context.Background(), query).Scan(&version, &dirty)
+	err = m.conn.QueryRowContext(context.Background(), query).Scan(&version, &dirty)
 	switch {
 	case err == sql.ErrNoRows:
 		return database.NilVersion, false, nil
@@ -274,7 +274,7 @@ func (m *Mysql) Version() (version int, dirty bool, err error) {
 func (m *Mysql) Drop() error {
 	// select all tables
 	query := `SHOW TABLES LIKE '%'`
-	tables, err := m.db.QueryContext(context.Background(), query)
+	tables, err := m.conn.QueryContext(context.Background(), query)
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
@@ -296,7 +296,7 @@ func (m *Mysql) Drop() error {
 		// delete one by one ...
 		for _, t := range tableNames {
 			query = "DROP TABLE IF EXISTS `" + t + "` CASCADE"
-			if _, err := m.db.ExecContext(context.Background(), query); err != nil {
+			if _, err := m.conn.ExecContext(context.Background(), query); err != nil {
 				return &database.Error{OrigErr: err, Query: []byte(query)}
 			}
 		}
@@ -312,7 +312,7 @@ func (m *Mysql) ensureVersionTable() error {
 	// check if migration table exists
 	var result string
 	query := `SHOW TABLES LIKE "` + m.config.MigrationsTable + `"`
-	if err := m.db.QueryRowContext(context.Background(), query).Scan(&result); err != nil {
+	if err := m.conn.QueryRowContext(context.Background(), query).Scan(&result); err != nil {
 		if err != sql.ErrNoRows {
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
@@ -322,7 +322,7 @@ func (m *Mysql) ensureVersionTable() error {
 
 	// if not, create the empty migration table
 	query = "CREATE TABLE `" + m.config.MigrationsTable + "` (version bigint not null primary key, dirty boolean not null)"
-	if _, err := m.db.ExecContext(context.Background(), query); err != nil {
+	if _, err := m.conn.ExecContext(context.Background(), query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 	return nil
