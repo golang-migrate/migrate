@@ -2,46 +2,53 @@ language: go
 sudo: required
 
 go:
-  - 1.7
-  - 1.8
-  - 1.9
-  - 1.9.1
-  - 1.9.2
+  - "1.9.x"
+  - "1.10"
 
 env:
-  - MIGRATE_TEST_CONTAINER_BOOT_DELAY=10
+  - MIGRATE_TEST_CONTAINER_BOOT_TIMEOUT=60
 
 # TODO: https://docs.docker.com/engine/installation/linux/ubuntu/    
 # pre-provision with travis docker setup and pin down docker version in install step
 services:
-  - docker 
+  - docker
+
+before_cache:
+  - mv $GOPATH/src/github.com/golang-migrate /tmp/golang-migrate
+  - rm -rf $GOPATH/pkg/**/github.com/golang-migrate
+
+cache:
+  directories:
+    - $GOPATH/src
+    - $GOPATH/pkg
 
 install:
   - make deps
   - (cd $GOPATH/src/github.com/docker/docker && git fetch --all --tags --prune && git checkout v17.05.0-ce)
-  - sudo apt-get update && sudo apt-get install docker-ce=17.05.0*
+  - sudo apt-get update && sudo apt-get --allow-downgrades install docker-ce=17.05.0*
   - go get github.com/mattn/goveralls 
 
 script:
-  - make test
+  - make test COVERAGE_DIR=/tmp/coverage
 
 after_success:
-  - goveralls -service=travis-ci -coverprofile .coverage/combined.txt
+  - mv /tmp/golang-migrate $GOPATH/src/github.com/golang-migrate
+  - goveralls -service=travis-ci -coverprofile /tmp/coverage/combined.txt
   - make list-external-deps > dependency_tree.txt && cat dependency_tree.txt
 
 before_deploy:
   - make build-cli
   - gem install --no-ri --no-rdoc fpm 
-  - fpm -s dir -t deb -n migrate -v "$(git describe --tags 2>/dev/null | cut -c 2-)" --license MIT -m matthias.kadenbach@gmail.com --url https://github.com/mattes/migrate --description='Database migrations' -a amd64 -p migrate.$(git describe --tags 2>/dev/null | cut -c 2-).deb --deb-no-default-config-files -f -C cli/build migrate.linux-amd64=/usr/bin/migrate
+  - fpm -s dir -t deb -n migrate -v "$(git describe --tags 2>/dev/null | cut -c 2-)" --license MIT -m dhui@users.noreply.github.com --url https://github.com/golang-migrate/migrate --description='Database migrations' -a amd64 -p migrate.$(git describe --tags 2>/dev/null | cut -c 2-).deb --deb-no-default-config-files -f -C cli/build migrate.linux-amd64=/usr/bin/migrate
 
 deploy:
   - provider: releases
     api_key:
-      secure: EFow50BI448HVb/uQ1Kk2Kq0xzmwIYq3V67YyymXIuqSCodvXEsMiBPUoLrxEknpPEIc67LEQTNdfHBgvyHk6oRINWAfie+7pr5tKrpOTF9ghyxoN1PlO8WKQCqwCvGMBCnc5ur5rvzp0bqfpV2rs5q9/nngy3kBuEvs12V7iho=
+      secure: hWH1HLPpzpfA8pXQ93T1qKQVFSpQp0as/JLQ7D91jHuJ8p+RxVeqblDrR6HQY/95R/nyiE9GJmvUolSuw5h449LSrGxPtVWhdh6EnkxlQHlen5XeMhVjRjFV0sE9qGe8v7uAkiTfRO61ktTWHrEAvw5qpyqnNISodmZS78XIasPODQbNlzwINhWhDTHIjXGb4FpizYaL3OGCanrxfR9fQyCaqKGGBjRq3Mfq8U6Yd4mApmsE+uJxgaZV8K5zBqpkSzQRWhcVGNL5DuLsU3gfSJOo7kZeA2G71SHffH577dBoqtCZ4VFv169CoUZehLWCb+7XKJZmHXVujCURATSySLGUOPc6EoLFAn3YtsCA04mS4bZVo5FZPWVwfhjmkhtDR4f6wscKp7r1HsFHSOgm59QfETQdrn4MnZ44H2Jd39axqndn5DvK9EcZVjPHynOPnueXP2u6mTuUgh2VyyWBCDO3CNo0fGlo7VJI69IkIWNSD87K9cHZWYMClyKZkUzS+PmRAhHRYbVd+9ZjKOmnU36kUHNDG/ft1D4ogsY+rhVtXB4lgWDM5adri+EIScYdYnB1/pQexLBigcJY9uE7nQTR0U6QgVNYvun7uRNs40E0c4voSfmPdFO0FlOD2y1oQhnaXfWLbu9nMcTcs4RFGrcC7NzkUN4/WjG8s285V6w=
     skip_cleanup: true
     on:
-      go: 1.9
-      repo: mattes/migrate
+      go: "1.10"
+      repo: golang-migrate/migrate
       tags: true
     file:
       - cli/build/migrate.linux-amd64.tar.gz
@@ -51,14 +58,13 @@ deploy:
       - dependency_tree.txt
   - provider: packagecloud
     repository: migrate
-    username: mattes
+    username: golang-migrate
     token:
-      secure: RiHJ/+J9DvXUah/APYdWySWZ5uOOISYJ0wS7xddc7/BNStRVjzFzvJ9zmb67RkyZZrvGuVjPiL4T8mtDyCJCj47RmU/56wPdEHbar/FjsiUCgwvR19RlulkgbV4okBCePbwzMw6HNHRp14TzfQCPtnN4kef0lOI4gZJkImN7rtQ=
+      secure: aICwu3gJ1sJ1QVCD3elpg+Jxzt4P+Zj1uoh5f0sOwnjDNIZ4FwUT1cMrWloP8P2KD0iyCOawuZER27o/kQ21oX2OxHvQbYPReA2znLm7lHzCmypAAOHPxpgnQ4rMGHHJXd+OsxtdclGs67c+EbdBfoRRbK400Qz/vjPJEDeH4mh02ZHC2nw4Nk/wV4jjBIkIt9dGEx6NgOA17FCMa3MaPHlHeFIzU7IfTlDHbS0mCCYbg/wafWBWcbGqtZLWAYtJDmfjrAStmDLdAX5J5PsB7taGSGPZHmPmpGoVgrKt/tb9Xz1rFBGslTpGROOiO4CiMAvkEKFn8mxrBGjfSBqp7Dp3eeSalKXB1DJAbEXx2sEbMcvmnoR9o43meaAn+ZRts8lRL8S/skBloe6Nk8bx3NlJCGB9WPK1G56b7c/fZnJxQbrCw6hxDfbZwm8S2YPviFTo/z1BfZDhRsL74reKsN2kgnGo2W/k38vvzIpsssQ9DHN1b0TLCxolCNPtQ7oHcQ1ohcjP2UgYXk0FhqDoL+9LQva/DU4N9sKH0UbAaqsMVSErLeG8A4aauuFcVrWRBaDYyTag4dQqzTulEy7iru2kDDIBgSQ1gMW/yoBOIPK4oi6MtbTf1X39fzXFLS1cDd3LW61yAu3YrbjAetpfx2frIvrRAiL9TxWA1gnrs5o=
     dist: ubuntu/xenial
     package_glob: '*.deb'
     skip_cleanup: true
     on:
-      go: 1.9
-      repo: mattes/migrate
+      go: "1.10"
+      repo: golang-migrate/migrate
       tags: true
-

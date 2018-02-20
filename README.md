@@ -1,7 +1,9 @@
-[![Build Status](https://travis-ci.org/mattes/migrate.svg?branch=master)](https://travis-ci.org/mattes/migrate)
-[![GoDoc](https://godoc.org/github.com/mattes/migrate?status.svg)](https://godoc.org/github.com/mattes/migrate)
-[![Coverage Status](https://coveralls.io/repos/github/mattes/migrate/badge.svg?branch=v3.0-prev)](https://coveralls.io/github/mattes/migrate?branch=v3.0-prev)
-[![packagecloud.io](https://img.shields.io/badge/deb-packagecloud.io-844fec.svg)](https://packagecloud.io/mattes/migrate?filter=debs)
+[![Build Status](https://img.shields.io/travis/golang-migrate/migrate/master.svg)](https://travis-ci.org/golang-migrate/migrate)
+[![GoDoc](https://godoc.org/github.com/golang-migrate/migrate?status.svg)](https://godoc.org/github.com/golang-migrate/migrate)
+[![Coverage Status](https://img.shields.io/coveralls/github/golang-migrate/migrate/master.svg)](https://coveralls.io/github/golang-migrate/migrate?branch=master)
+[![packagecloud.io](https://img.shields.io/badge/deb-packagecloud.io-844fec.svg)](https://packagecloud.io/golang-migrate/migrate?filter=debs)
+[![GitHub Release](https://img.shields.io/github/release/golang-migrate/migrate.svg)](https://github.com/golang-migrate/migrate/releases)
+
 
 # migrate
 
@@ -9,12 +11,12 @@ __Database migrations written in Go. Use as [CLI](#cli-usage) or import as [libr
 
  * Migrate reads migrations from [sources](#migration-sources)
    and applies them in correct order to a [database](#databases).
- * Drivers are "dumb", migrate glues everything together and makes sure the logic is bulletproof.  
+ * Drivers are "dumb", migrate glues everything together and makes sure the logic is bulletproof.
    (Keeps the drivers lightweight, too.)
  * Database drivers don't assume things or try to correct user input. When in doubt, fail.
 
 
-Looking for [v1](https://github.com/mattes/migrate/tree/v1)?
+Looking for [v1](https://github.com/golang-migrate/migrate/tree/v1)?
 
 
 ## Databases
@@ -25,7 +27,7 @@ Database drivers run migrations. [Add a new database?](database/driver.go)
   * [Redshift](database/redshift)
   * [Ql](database/ql)
   * [Cassandra](database/cassandra)
-  * [SQLite](database/sqlite3)
+  * [SQLite](database/sqlite3) ([todo #165](https://github.com/mattes/migrate/issues/165))
   * [MySQL/ MariaDB](database/mysql)
   * [Neo4j](database/neo4j) ([todo #167](https://github.com/mattes/migrate/issues/167))
   * [MongoDB](database/mongodb) ([todo #169](https://github.com/mattes/migrate/issues/169))
@@ -69,19 +71,19 @@ $ migrate -database postgres://localhost:5432/database up 2
  * API is stable and frozen for this release (v3.x).
  * Package migrate has no external dependencies.
  * Only import the drivers you need.
-   (check [dependency_tree.txt](https://github.com/mattes/migrate/releases) for each driver)
+   (check [dependency_tree.txt](https://github.com/golang-migrate/migrate/releases) for each driver)
  * To help prevent database corruptions, it supports graceful stops via `GracefulStop chan bool`.
  * Bring your own logger.
  * Uses `io.Reader` streams internally for low memory overhead.
  * Thread-safe and no goroutine leaks.
 
-__[Go Documentation](https://godoc.org/github.com/mattes/migrate)__
+__[Go Documentation](https://godoc.org/github.com/golang-migrate/migrate)__
 
 ```go
 import (
-    "github.com/mattes/migrate"
-    _ "github.com/mattes/migrate/database/postgres"
-    _ "github.com/mattes/migrate/source/github"
+    "github.com/golang-migrate/migrate"
+    _ "github.com/golang-migrate/migrate/database/postgres"
+    _ "github.com/golang-migrate/migrate/source/github"
 )
 
 func main() {
@@ -98,9 +100,9 @@ Want to use an existing database client?
 import (
     "database/sql"
     _ "github.com/lib/pq"
-    "github.com/mattes/migrate"
-    "github.com/mattes/migrate/database/postgres"
-    _ "github.com/mattes/migrate/source/file"
+    "github.com/golang-migrate/migrate"
+    "github.com/golang-migrate/migrate/database/postgres"
+    _ "github.com/golang-migrate/migrate/source/file"
 )
 
 func main() {

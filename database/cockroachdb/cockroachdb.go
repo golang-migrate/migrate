@@ -9,8 +9,8 @@ import (
 
 	"github.com/cockroachdb/cockroach-go/crdb"
 	"github.com/lib/pq"
-	"github.com/mattes/migrate"
-	"github.com/mattes/migrate/database"
+	"github.com/golang-migrate/migrate"
+	"github.com/golang-migrate/migrate/database"
 	"regexp"
 	"strconv"
 	"context"
@@ -223,7 +223,7 @@ func (c *CockroachDb) Run(migration io.Reader) error {
 
 func (c *CockroachDb) SetVersion(version int, dirty bool) error {
 	return crdb.ExecuteTx(context.Background(), c.db, nil, func(tx *sql.Tx) error {
-		if _, err := tx.Exec( `TRUNCATE "` + c.config.MigrationsTable + `"`); err != nil {
+		if _, err := tx.Exec(`DELETE FROM "` + c.config.MigrationsTable + `"`); err != nil {
 			return err
 		}
 

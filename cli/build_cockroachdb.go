@@ -3,5 +3,5 @@
 package main
 
 import (
-	_ "github.com/mattes/migrate/database/cockroachdb"
+	_ "github.com/golang-migrate/migrate/database/cockroachdb"
 )

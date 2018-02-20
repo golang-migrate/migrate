@@ -5,14 +5,15 @@ package postgres
 import (
 	"bytes"
 	"database/sql"
+	sqldriver "database/sql/driver"
 	"fmt"
 	"io"
 	"testing"
 
-	"github.com/lib/pq"
-	dt "github.com/mattes/migrate/database/testing"
-	mt "github.com/mattes/migrate/testing"
 	"context"
+	dt "github.com/golang-migrate/migrate/database/testing"
+	mt "github.com/golang-migrate/migrate/testing"
+	// "github.com/lib/pq"
 )
 
 var versions = []mt.Version{
@@ -29,14 +30,14 @@ func isReady(i mt.Instance) bool {
 		return false
 	}
 	defer db.Close()
-	err = db.Ping()
-	if err == io.EOF {
-		return false
-
-	} else if e, ok := err.(*pq.Error); ok {
-		if e.Code.Name() == "cannot_connect_now" {
+	if err = db.Ping(); err != nil {
+		switch err {
+		case sqldriver.ErrBadConn, io.EOF:
 			return false
+		default:
+			fmt.Println(err)
 		}
+		return false
 	}
 
 	return true
@@ -51,6 +52,7 @@ func Test(t *testing.T) {
 			if err != nil {
 				t.Fatalf("%v", err)
 			}
+			defer d.Close()
 			dt.Test(t, d, []byte("SELECT 1"))
 		})
 }
@@ -64,6 +66,7 @@ func TestMultiStatement(t *testing.T) {
 			if err != nil {
 				t.Fatalf("%v", err)
 			}
+			defer d.Close()
 			if err := d.Run(bytes.NewReader([]byte("CREATE TABLE foo (foo text); CREATE TABLE bar (bar text);"))); err != nil {
 				t.Fatalf("expected err to be nil, got %v", err)
 			}
@@ -84,10 +87,11 @@ func TestFilterCustomQuery(t *testing.T) {
 		func(t *testing.T, i mt.Instance) {
 			p := &Postgres{}
 			addr := fmt.Sprintf("postgres://postgres@%v:%v/postgres?sslmode=disable&x-custom=foobar", i.Host(), i.Port())
-			_, err := p.Open(addr)
+			d, err := p.Open(addr)
 			if err != nil {
 				t.Fatalf("%v", err)
 			}
+			defer d.Close()
 		})
 }
 
@@ -100,6 +104,7 @@ func TestWithSchema(t *testing.T) {
 			if err != nil {
 				t.Fatalf("%v", err)
 			}
+			defer d.Close()
 
 			// create foobar schema
 			if err := d.Run(bytes.NewReader([]byte("CREATE SCHEMA foobar AUTHORIZATION postgres"))); err != nil {
@@ -114,6 +119,7 @@ func TestWithSchema(t *testing.T) {
 			if err != nil {
 				t.Fatalf("%v", err)
 			}
+			defer d2.Close()
 
 			version, _, err := d2.Version()
 			if err != nil {

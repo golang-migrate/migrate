@@ -8,9 +8,9 @@ import (
 	// "log"
 	"testing"
 
-	// "github.com/go-sql-driver/mysql"
-	dt "github.com/mattes/migrate/database/testing"
-	mt "github.com/mattes/migrate/testing"
+	"github.com/go-sql-driver/mysql"
+	dt "github.com/golang-migrate/migrate/database/testing"
+	mt "github.com/golang-migrate/migrate/testing"
 )
 
 var versions = []mt.Version{
@@ -26,9 +26,13 @@ func isReady(i mt.Instance) bool {
 		return false
 	}
 	defer db.Close()
-	err = db.Ping()
-
-	if err == sqldriver.ErrBadConn {
+	if err = db.Ping(); err != nil {
+		switch err {
+		case sqldriver.ErrBadConn, mysql.ErrInvalidConn:
+			return false
+		default:
+			fmt.Println(err)
+		}
 		return false
 	}
 
@@ -46,6 +50,7 @@ func Test(t *testing.T) {
 			if err != nil {
 				t.Fatalf("%v", err)
 			}
+			defer d.Close()
 			dt.Test(t, d, []byte("SELECT 1"))
 
 			// check ensureVersionTable

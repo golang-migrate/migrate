@@ -9,7 +9,7 @@ type Direction string
 
 const (
 	Down Direction = "down"
-	Up             = "up"
+	Up   Direction = "up"
 )
 
 // Migration is a helper struct for source drivers that need to

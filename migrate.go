@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mattes/migrate/database"
-	"github.com/mattes/migrate/source"
+	"github.com/golang-migrate/migrate/database"
+	"github.com/golang-migrate/migrate/source"
 )
 
 // DefaultPrefetchMigrations sets the number of migrations to pre-read

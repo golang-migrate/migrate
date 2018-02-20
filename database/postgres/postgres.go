@@ -1,4 +1,5 @@
 // +build go1.9
+
 package postgres
 
 import (
@@ -8,10 +9,10 @@ import (
 	"io/ioutil"
 	nurl "net/url"
 
-	"github.com/lib/pq"
-	"github.com/mattes/migrate"
-	"github.com/mattes/migrate/database"
 	"context"
+	"github.com/golang-migrate/migrate"
+	"github.com/golang-migrate/migrate/database"
+	"github.com/lib/pq"
 )
 
 func init() {
@@ -207,7 +208,7 @@ func (p *Postgres) SetVersion(version int, dirty bool) error {
 
 func (p *Postgres) Version() (version int, dirty bool, err error) {
 	query := `SELECT version, dirty FROM "` + p.config.MigrationsTable + `" LIMIT 1`
-	err = p.db.QueryRowContext(context.Background(),query).Scan(&version, &dirty)
+	err = p.db.QueryRowContext(context.Background(), query).Scan(&version, &dirty)
 	switch {
 	case err == sql.ErrNoRows:
 		return database.NilVersion, false, nil
@@ -228,7 +229,7 @@ func (p *Postgres) Version() (version int, dirty bool, err error) {
 func (p *Postgres) Drop() error {
 	// select all tables in current schema
 	query := `SELECT table_name FROM information_schema.tables WHERE table_schema=(SELECT current_schema())`
-	tables, err := p.db.QueryContext(context.Background(),query)
+	tables, err := p.db.QueryContext(context.Background(), query)
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
@@ -266,7 +267,7 @@ func (p *Postgres) ensureVersionTable() error {
 	// check if migration table exists
 	var count int
 	query := `SELECT COUNT(1) FROM information_schema.tables WHERE table_name = $1 AND table_schema = (SELECT current_schema()) LIMIT 1`
-	if err := p.db.QueryRowContext(context.Background(),query, p.config.MigrationsTable).Scan(&count); err != nil {
+	if err := p.db.QueryRowContext(context.Background(), query, p.config.MigrationsTable).Scan(&count); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 	if count == 1 {
@@ -275,7 +276,7 @@ func (p *Postgres) ensureVersionTable() error {
 
 	// if not, create the empty migration table
 	query = `CREATE TABLE "` + p.config.MigrationsTable + `" (version bigint not null primary key, dirty boolean not null)`
-	if _, err := p.db.ExecContext(context.Background(),query); err != nil {
+	if _, err := p.db.ExecContext(context.Background(), query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 	return nil
