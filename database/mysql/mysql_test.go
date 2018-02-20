@@ -63,3 +63,37 @@ func Test(t *testing.T) {
 			}
 		})
 }
+
+func TestLockWorks(t *testing.T) {
+	mt.ParallelTest(t, versions, isReady,
+		func(t *testing.T, i mt.Instance) {
+			p := &Mysql{}
+			addr := fmt.Sprintf("mysql://root:root@tcp(%v:%v)/public", i.Host(), i.Port())
+			d, err := p.Open(addr)
+			if err != nil {
+				t.Fatalf("%v", err)
+			}
+			dt.Test(t, d, []byte("SELECT 1"))
+
+			ms := d.(*Mysql)
+
+			err = ms.Lock()
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = ms.Unlock()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// make sure the 2nd lock works (RELEASE_LOCK is very finicky)
+			err = ms.Lock()
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = ms.Unlock()
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
+}
