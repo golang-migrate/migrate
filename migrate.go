@@ -887,13 +887,44 @@ func (m *Migrate) unlock() error {
 	m.isLockedMu.Lock()
 	defer m.isLockedMu.Unlock()
 
-	if err := m.databaseDrv.Unlock(); err != nil {
-		// BUG: Can potentially create a deadlock. Add a timeout.
-		return err
-	}
+	// create done channel, used in the timeout goroutine
+	done := make(chan bool, 1)
+	defer func() {
+		done <- true
+	}()
 
-	m.isLocked = false
-	return nil
+	// use errchan to signal error back to this context
+	errchan := make(chan error, 2)
+
+	// start timeout goroutine
+	timeout := time.After(m.LockTimeout)
+	go func() {
+		for {
+			select {
+			case <-done:
+				return
+			case <-timeout:
+				errchan <- ErrLockTimeout
+				return
+			}
+		}
+	}()
+
+	// now try to unlock
+	go func() {
+		if err := m.databaseDrv.Unlock(); err != nil {
+			errchan <- err
+		} else {
+			errchan <- nil
+		}
+		return
+	}()
+
+	err := <-errchan
+	if err == nil {
+		m.isLocked = false
+	}
+	return err
 }
 
 // unlockErr calls unlock and returns a combined error

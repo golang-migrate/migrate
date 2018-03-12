@@ -131,7 +131,7 @@ func (p *Postgres) Lock() error {
 
 	// This will either obtain the lock immediately and return true,
 	// or return false if the lock cannot be acquired immediately.
-	query := `SELECT pg_try_advisory_lock($1)`
+	query := `SELECT pg_advisory_lock($1)`
 	var success bool
 	if err := p.conn.QueryRowContext(context.Background(), query, aid).Scan(&success); err != nil {
 		return &database.Error{OrigErr: err, Err: "try lock failed", Query: []byte(query)}
