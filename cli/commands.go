@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func nextSeq(matches []string, dir string, seqDigits int) (string, error) {
@@ -48,8 +49,11 @@ func nextSeq(matches []string, dir string, seqDigits int) (string, error) {
 	return nextSeqStr, nil
 }
 
-func createCmd(dir string, timestamp int64, name string, ext string, seq bool, seqDigits int) {
+func createCmd(dir string, timestamp int64, name string, ext string, seq bool, seqDigits int, datetime bool) {
 	var base string
+	if seq && datetime {
+		log.fatalErr(errors.New("seq and datetime options are mutually exclusive"))
+	}
 	if seq {
 		if seqDigits <= 0 {
 			log.fatalErr(errors.New("Digits must be positive"))
@@ -63,6 +67,12 @@ func createCmd(dir string, timestamp int64, name string, ext string, seq bool, s
 			log.fatalErr(err)
 		}
 		base = fmt.Sprintf("%v%v_%v.", dir, nextSeqStr, name)
+	} else if datetime {
+		now := time.Now();
+		year, month, day := now.Date();
+		var m = int(month);
+		hr, min, sec := now.Clock();
+		base = fmt.Sprintf("%04d%02d%02d%02d%02d%02d_%v.",year,m,day, hr, min, sec, name)
 	} else {
 		base = fmt.Sprintf("%v%v_%v.", dir, timestamp, name)
 	}
