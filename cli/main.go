@@ -42,10 +42,10 @@ Options:
   -help            Print usage
 
 Commands:
-  create [-ext E] [-dir D] [-seq] [-digits N] [-datetime] NAME
+  create [-ext E] [-dir D] [-seq] [-digits N] [-format] NAME
 			   Create a set of timestamped up/down migrations titled NAME, in directory D with extension E.
 			   Use -seq option to generate sequential up/down migrations with N digits.
-			   Use -datetime option to generate migrations where the version is yyyymmddhhmmss.
+			   Use -format option to specify a Go time format string.
   goto V       Migrate to version V
   up [N]       Apply all or N up migrations
   down [N]     Apply all or N down migrations
@@ -110,14 +110,13 @@ Commands:
 		args := flag.Args()[1:]
 		seq := false
 		seqDigits := 6
-		datetime := false
 
 		createFlagSet := flag.NewFlagSet("create", flag.ExitOnError)
 		extPtr := createFlagSet.String("ext", "", "File extension")
 		dirPtr := createFlagSet.String("dir", "", "Directory to place file in (default: current working directory)")
+		formatPtr := createFlagSet.String("format", "", "Specify the format of the version using a Go time format string.  For yyyymmddhhmmss use format of 20060102150405.  If not specified the version will be the unix timestamp.")
 		createFlagSet.BoolVar(&seq, "seq", seq, "Use sequential numbers instead of timestamps (default: false)")
 		createFlagSet.IntVar(&seqDigits, "digits", seqDigits, "The number of digits to use in sequences (default: 6)")
-		createFlagSet.BoolVar(&datetime, "datetime", datetime, "Generate migrations where the version is yyyymmddhhmmss")
 		createFlagSet.Parse(args)
 
 		if createFlagSet.NArg() == 0 {
@@ -134,7 +133,7 @@ Commands:
 
 		timestamp := startTime.Unix()
 
-		createCmd(*dirPtr, timestamp, name, *extPtr, seq, seqDigits, datetime)
+		createCmd(*dirPtr, timestamp, *formatPtr, name, *extPtr, seq, seqDigits)
 
 	case "goto":
 		if migraterErr != nil {

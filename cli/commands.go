@@ -49,10 +49,10 @@ func nextSeq(matches []string, dir string, seqDigits int) (string, error) {
 	return nextSeqStr, nil
 }
 
-func createCmd(dir string, timestamp int64, name string, ext string, seq bool, seqDigits int, datetime bool) {
+func createCmd(dir string, timestamp int64, format string, name string, ext string, seq bool, seqDigits int) {
 	var base string
-	if seq && datetime {
-		log.fatalErr(errors.New("seq and datetime options are mutually exclusive"))
+	if seq && len(format) > 0 {
+		log.fatalErr(errors.New("The seq and format options are mutually exclusive"))
 	}
 	if seq {
 		if seqDigits <= 0 {
@@ -67,20 +67,29 @@ func createCmd(dir string, timestamp int64, name string, ext string, seq bool, s
 			log.fatalErr(err)
 		}
 		base = fmt.Sprintf("%v%v_%v.", dir, nextSeqStr, name)
-	} else if datetime {
-		now := time.Now();
-		year, month, day := now.Date();
-		var m = int(month);
-		hr, min, sec := now.Clock();
-		base = fmt.Sprintf("%04d%02d%02d%02d%02d%02d_%v.",year,m,day, hr, min, sec, name)
 	} else {
-		base = fmt.Sprintf("%v%v_%v.", dir, timestamp, name)
+		if len(format) > 0 {
+			t := time.Unix(timestamp, 0)
+			version := t.Format(format)
+			base = fmt.Sprintf("%v%v_%v.", dir, version, name)
+		} else {
+			log.Println("Time format not specified")
+			base = fmt.Sprintf("%v%v_%v.", dir, timestamp, name)
+		}
 	}
 
 	os.MkdirAll(dir, os.ModePerm)
 	createFile(base + "up" + ext)
 	createFile(base + "down" + ext)
 }
+
+/*else if datetime {
+		now := time.Now();
+		year, month, day := now.Date();
+		var m = int(month);
+		hr, min, sec := now.Clock();
+		base = fmt.Sprintf("%04d%02d%02d%02d%02d%02d_%v.",year,m,day, hr, min, sec, name)
+	} */
 
 func createFile(fname string) {
 	if _, err := os.Create(fname); err != nil {
