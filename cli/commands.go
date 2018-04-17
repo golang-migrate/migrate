@@ -83,14 +83,6 @@ func createCmd(dir string, timestamp int64, format string, name string, ext stri
 	createFile(base + "down" + ext)
 }
 
-/*else if datetime {
-		now := time.Now();
-		year, month, day := now.Date();
-		var m = int(month);
-		hr, min, sec := now.Clock();
-		base = fmt.Sprintf("%04d%02d%02d%02d%02d%02d_%v.",year,m,day, hr, min, sec, name)
-	} */
-
 func createFile(fname string) {
 	if _, err := os.Create(fname); err != nil {
 		log.fatalErr(err)
