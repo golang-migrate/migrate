@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func nextSeq(matches []string, dir string, seqDigits int) (string, error) {
@@ -48,8 +49,11 @@ func nextSeq(matches []string, dir string, seqDigits int) (string, error) {
 	return nextSeqStr, nil
 }
 
-func createCmd(dir string, timestamp int64, name string, ext string, seq bool, seqDigits int) {
+func createCmd(dir string, timestamp int64, format string, name string, ext string, seq bool, seqDigits int) {
 	var base string
+	if seq && len(format) > 0 {
+		log.fatalErr(errors.New("The seq and format options are mutually exclusive"))
+	}
 	if seq {
 		if seqDigits <= 0 {
 			log.fatalErr(errors.New("Digits must be positive"))
@@ -64,7 +68,14 @@ func createCmd(dir string, timestamp int64, name string, ext string, seq bool, s
 		}
 		base = fmt.Sprintf("%v%v_%v.", dir, nextSeqStr, name)
 	} else {
-		base = fmt.Sprintf("%v%v_%v.", dir, timestamp, name)
+		if len(format) > 0 {
+			t := time.Unix(timestamp, 0)
+			version := t.Format(format)
+			base = fmt.Sprintf("%v%v_%v.", dir, version, name)
+		} else {
+			log.Println("Time format not specified")
+			base = fmt.Sprintf("%v%v_%v.", dir, timestamp, name)
+		}
 	}
 
 	os.MkdirAll(dir, os.ModePerm)
