@@ -23,7 +23,7 @@ func Test(t *testing.T) {
 	}
 
 	g := &Github{}
-	d, err := g.Open("github://" + GithubTestSecret + "@mattes/migrate_test_tmp/test")
+	d, err := g.Open("github://" + GithubTestSecret + "@mattes/migrate_test_tmp/test#452b8003e7")
 	if err != nil {
 		t.Fatal(err)
 	}

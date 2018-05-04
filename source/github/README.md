@@ -1,6 +1,6 @@
 # github
 
-`github://user:personal-access-token@owner/repo/path`
+`github://user:personal-access-token@owner/repo/path#ref`
 
 | URL Query  | WithInstance Config | Description |
 |------------|---------------------|-------------|
@@ -9,3 +9,4 @@
 | owner | | the repo owner |
 | repo | | the name of the repository |
 | path | | path in repo to migrations |
+| ref | | (optional) can be a SHA, branch, or tag |
