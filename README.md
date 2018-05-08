@@ -65,6 +65,12 @@ $ brew install migrate --with-postgres
 $ migrate -database postgres://localhost:5432/database up 2
 ```
 
+### Docker usage
+
+```
+$ docker run -v {{ migration dir }}:/migrations --network host migrate/migrate 
+    -path=/migrations/ -database postgres://localhost:5432/database up 2
+```
 
 ## Use in your Go project
 
