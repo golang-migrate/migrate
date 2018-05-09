@@ -1,8 +1,12 @@
 FROM golang:1.10-alpine3.7 AS downloader
+ARG VERSION
 
 RUN apk add --no-cache git gcc musl-dev
 
 WORKDIR /go/src/github.com/golang-migrate/migrate
+
+ENV DATABASES="postgres mysql redshift cassandra spanner cockroachdb clickhouse"
+ENV SOURCES="file go-bindata github aws-s3 google-cloud-storage"
 
 COPY *.go ./
 COPY cli ./cli
@@ -12,7 +16,7 @@ COPY source ./source
 RUN go get -v ./... && \
     go get -u github.com/fsouza/fake-gcs-server/fakestorage && \
     go get -u github.com/kshvakov/clickhouse && \
-    GOOS=linux GOARCH=386 go build -a -o build/migrate.linux-386 -ldflags='-X main.Version=$(VERSION)' -tags '$(DATABASE) $(SOURCE)' ./cli
+    go build -a -o build/migrate.linux-386 -ldflags="-X main.Version=${VERSION}" -tags "$DATABASES $SOURCES" ./cli
 
 FROM alpine:3.7
 
