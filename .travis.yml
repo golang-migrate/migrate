@@ -68,3 +68,9 @@ deploy:
       go: "1.10"
       repo: golang-migrate/migrate
       tags: true
+  - provider: script
+    script: ./docker-deploy.sh
+    on:
+      go: "1.10"
+      repo: golang-migrate/migrate
+      tags: true
