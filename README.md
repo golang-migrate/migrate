@@ -58,10 +58,9 @@ Source drivers read migrations from local or remote sources. [Add a new source?]
 
 __[CLI Documentation](cli)__
 
-([brew todo #156](https://github.com/mattes/migrate/issues/156))
+### Basic usage:
 
 ```
-$ brew install migrate --with-postgres
 $ migrate -database postgres://localhost:5432/database up 2
 ```
 
