@@ -3,7 +3,7 @@ sudo: required
 
 go:
   - "1.9.x"
-  - "1.10"
+  - "1.10.x"
 
 env:
   - MIGRATE_TEST_CONTAINER_BOOT_TIMEOUT=60
