@@ -57,14 +57,6 @@ html-coverage:
 	go tool cover -html=$(COVERAGE_DIR)/combined.txt
 
 
-deps:
-	-go get -v -u ./... 
-	-go test -v -i ./...
-	# TODO: why are these not being fetched by `go get`?
-	-go get -u github.com/fsouza/fake-gcs-server/fakestorage
-	-go get -u github.com/kshvakov/clickhouse
-
-
 list-external-deps:
 	$(call external_deps,'.')
 	$(call external_deps,'./cli/...')
@@ -116,7 +108,7 @@ define external_deps
 endef
 
 
-.PHONY: build-cli clean test-short test test-with-flags deps html-coverage \
+.PHONY: build-cli clean test-short test test-with-flags html-coverage \
         restore-import-paths rewrite-import-paths list-external-deps release \
         docs kill-docs open-docs kill-orphaned-docker-containers
 
