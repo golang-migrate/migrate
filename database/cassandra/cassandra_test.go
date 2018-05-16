@@ -2,12 +2,18 @@ package cassandra
 
 import (
 	"fmt"
+	"strconv"
 	"testing"
+	"time"
+)
+
+import (
+	"github.com/gocql/gocql"
+)
+
+import (
 	dt "github.com/golang-migrate/migrate/database/testing"
 	mt "github.com/golang-migrate/migrate/testing"
-	"github.com/gocql/gocql"
-	"time"
-	"strconv"
 )
 
 var versions = []mt.Version{
@@ -27,11 +33,12 @@ func isReady(i mt.Instance) bool {
 	cluster.Port = port
 	//cluster.ProtoVersion = 4
 	cluster.Consistency = gocql.All
-	cluster.Timeout = 1 * time.Minute
+	cluster.Timeout = 10 * time.Second
 	p, err := cluster.CreateSession()
 	if err != nil {
 		return false
 	}
+	defer p.Close()
 	// Create keyspace for tests
 	p.Query("CREATE KEYSPACE testks WITH REPLICATION = {'class': 'SimpleStrategy', 'replication_factor':1}").Exec()
 	return true
