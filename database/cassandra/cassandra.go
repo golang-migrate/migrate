@@ -36,7 +36,7 @@ type Cassandra struct {
 	session  *gocql.Session
 	isLocked bool
 
-	// Open and WithInstance need to guarantee that config is never nil
+	// Open and WithSession need to guarantee that config is never nil
 	config *Config
 }
 
