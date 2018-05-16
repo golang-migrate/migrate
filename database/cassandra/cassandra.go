@@ -36,11 +36,11 @@ type Cassandra struct {
 	session  *gocql.Session
 	isLocked bool
 
-	// Open and WithSession need to guarantee that config is never nil
+	// Open and WithInstance need to guarantee that config is never nil
 	config *Config
 }
 
-func WithSession(session *gocql.Session, config *Config) (database.Driver, error) {
+func WithInstance(session *gocql.Session, config *Config) (database.Driver, error) {
 	if config == nil {
 		return nil, ErrNilConfig
 	} else if isClosed := session.Closed(); isClosed {
