@@ -18,7 +18,6 @@ func init() {
 }
 
 var DefaultMigrationsTable = "schema_migrations"
-var dbLocked = false
 
 var (
 	ErrNilConfig     = fmt.Errorf("no config")
@@ -142,15 +141,15 @@ func (c *Cassandra) Close() error {
 }
 
 func (c *Cassandra) Lock() error {
-	if dbLocked {
+	if c.isLocked {
 		return database.ErrLocked
 	}
-	dbLocked = true
+	c.isLocked = true
 	return nil
 }
 
 func (c *Cassandra) Unlock() error {
-	dbLocked = false
+	c.isLocked = false
 	return nil
 }
 
