@@ -4,14 +4,9 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
-	"time"
-)
 
-import (
 	"github.com/gocql/gocql"
-)
 
-import (
 	dt "github.com/golang-migrate/migrate/database/testing"
 	mt "github.com/golang-migrate/migrate/testing"
 )
@@ -31,16 +26,16 @@ func isReady(i mt.Instance) bool {
 
 	cluster := gocql.NewCluster(i.Host())
 	cluster.Port = port
-	//cluster.ProtoVersion = 4
 	cluster.Consistency = gocql.All
-	cluster.Timeout = 10 * time.Second
 	p, err := cluster.CreateSession()
 	if err != nil {
 		return false
 	}
 	defer p.Close()
 	// Create keyspace for tests
-	p.Query("CREATE KEYSPACE testks WITH REPLICATION = {'class': 'SimpleStrategy', 'replication_factor':1}").Exec()
+	if err = p.Query("CREATE KEYSPACE testks WITH REPLICATION = {'class': 'SimpleStrategy', 'replication_factor':1}").Exec(); err != nil {
+		return false
+	}
 	return true
 }
 
@@ -55,6 +50,7 @@ func Test(t *testing.T) {
 			if err != nil {
 				t.Fatalf("%v", err)
 			}
+			defer d.Close()
 			dt.Test(t, d, []byte("SELECT table_name from system_schema.tables"))
 		})
 }
