@@ -1,19 +1,24 @@
 package cockroachdb
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"io"
 	"io/ioutil"
 	nurl "net/url"
-
-	"github.com/cockroachdb/cockroach-go/crdb"
-	"github.com/lib/pq"
-	"github.com/golang-migrate/migrate"
-	"github.com/golang-migrate/migrate/database"
 	"regexp"
 	"strconv"
-	"context"
+)
+
+import (
+	"github.com/cockroachdb/cockroach-go/crdb"
+	"github.com/lib/pq"
+)
+
+import (
+	"github.com/golang-migrate/migrate"
+	"github.com/golang-migrate/migrate/database"
 )
 
 func init() {
@@ -33,8 +38,8 @@ var (
 
 type Config struct {
 	MigrationsTable string
-	LockTable		string
-	ForceLock		bool
+	LockTable       string
+	ForceLock       bool
 	DatabaseName    string
 }
 
@@ -126,8 +131,8 @@ func (c *CockroachDb) Open(url string) (database.Driver, error) {
 	px, err := WithInstance(db, &Config{
 		DatabaseName:    purl.Path,
 		MigrationsTable: migrationsTable,
-		LockTable: lockTable,
-		ForceLock: forceLock,
+		LockTable:       lockTable,
+		ForceLock:       forceLock,
 	})
 	if err != nil {
 		return nil, err
@@ -159,11 +164,11 @@ func (c *CockroachDb) Lock() error {
 		// If row exists at all, lock is present
 		locked := rows.Next()
 		if locked && !c.config.ForceLock {
-			return database.Error{Err: "lock could not be acquired; already locked", Query: []byte(query)}
+			return database.ErrLocked
 		}
 
 		query = "INSERT INTO " + c.config.LockTable + " (lock_id) VALUES ($1)"
-		if _, err := tx.Exec(query, aid) ; err != nil {
+		if _, err := tx.Exec(query, aid); err != nil {
 			return database.Error{OrigErr: err, Err: "failed to set migration lock", Query: []byte(query)}
 		}
 
@@ -228,7 +233,7 @@ func (c *CockroachDb) SetVersion(version int, dirty bool) error {
 		}
 
 		if version >= 0 {
-			if _, err := tx.Exec(`INSERT INTO "` + c.config.MigrationsTable + `" (version, dirty) VALUES ($1, $2)`, version, dirty); err != nil {
+			if _, err := tx.Exec(`INSERT INTO "`+c.config.MigrationsTable+`" (version, dirty) VALUES ($1, $2)`, version, dirty); err != nil {
 				return err
 			}
 		}
@@ -315,7 +320,6 @@ func (c *CockroachDb) ensureVersionTable() error {
 	}
 	return nil
 }
-
 
 func (c *CockroachDb) ensureLockTable() error {
 	// check if lock table exists
