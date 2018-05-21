@@ -224,7 +224,7 @@
     "internal/murmur",
     "internal/streams"
   ]
-  revision = "181004e14a3fb735efcc826a4256369d0c96747b"
+  revision = "bb8b1dc0d7a543e57fbe6bd27b5fc20eff72adb2"
 
 [[projects]]
   name = "github.com/golang/protobuf"
