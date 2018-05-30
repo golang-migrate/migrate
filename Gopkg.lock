@@ -213,7 +213,7 @@
   branch = "master"
   name = "github.com/go-sql-driver/mysql"
   packages = ["."]
-  revision = "ceae19ce1c5ac766abad8db04d649a7a83e91ced"
+  revision = "7413002f368fba928eefaf762c91a2acfeabdf68"
 
 [[projects]]
   branch = "master"
@@ -224,7 +224,7 @@
     "internal/murmur",
     "internal/streams"
   ]
-  revision = "bb8b1dc0d7a543e57fbe6bd27b5fc20eff72adb2"
+  revision = "3c37daec2f4d3def4b3b21668c6c2e80d3265a69"
 
 [[projects]]
   name = "github.com/golang/protobuf"
