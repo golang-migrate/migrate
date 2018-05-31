@@ -19,7 +19,6 @@ before_cache:
 
 cache:
   directories:
-    - $GOPATH/src
     - $GOPATH/pkg
 
 before_install:
