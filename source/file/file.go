@@ -82,7 +82,7 @@ func (f *File) Close() error {
 
 func (f *File) First() (version uint, err error) {
 	if v, ok := f.migrations.First(); !ok {
-		return 0, &os.PathError{"first", f.path, os.ErrNotExist}
+		return 0, &os.PathError{Op: "first", Path: f.path, Err: os.ErrNotExist}
 	} else {
 		return v, nil
 	}
@@ -90,7 +90,7 @@ func (f *File) First() (version uint, err error) {
 
 func (f *File) Prev(version uint) (prevVersion uint, err error) {
 	if v, ok := f.migrations.Prev(version); !ok {
-		return 0, &os.PathError{fmt.Sprintf("prev for version %v", version), f.path, os.ErrNotExist}
+		return 0, &os.PathError{Op: fmt.Sprintf("prev for version %v", version), Path: f.path, Err: os.ErrNotExist}
 	} else {
 		return v, nil
 	}
@@ -98,7 +98,7 @@ func (f *File) Prev(version uint) (prevVersion uint, err error) {
 
 func (f *File) Next(version uint) (nextVersion uint, err error) {
 	if v, ok := f.migrations.Next(version); !ok {
-		return 0, &os.PathError{fmt.Sprintf("next for version %v", version), f.path, os.ErrNotExist}
+		return 0, &os.PathError{Op: fmt.Sprintf("next for version %v", version), Path: f.path, Err: os.ErrNotExist}
 	} else {
 		return v, nil
 	}
@@ -112,7 +112,7 @@ func (f *File) ReadUp(version uint) (r io.ReadCloser, identifier string, err err
 		}
 		return r, m.Identifier, nil
 	}
-	return nil, "", &os.PathError{fmt.Sprintf("read version %v", version), f.path, os.ErrNotExist}
+	return nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: f.path, Err: os.ErrNotExist}
 }
 
 func (f *File) ReadDown(version uint) (r io.ReadCloser, identifier string, err error) {
@@ -123,5 +123,5 @@ func (f *File) ReadDown(version uint) (r io.ReadCloser, identifier string, err e
 		}
 		return r, m.Identifier, nil
 	}
-	return nil, "", &os.PathError{fmt.Sprintf("read version %v", version), f.path, os.ErrNotExist}
+	return nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: f.path, Err: os.ErrNotExist}
 }
