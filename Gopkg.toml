@@ -26,10 +26,6 @@
 
 
 [[constraint]]
-  name = "cloud.google.com/go"
-  version = "0.19.0"
-
-[[constraint]]
   name = "github.com/aws/aws-sdk-go"
   version = "1.13.47"
 
@@ -84,6 +80,10 @@
 [[constraint]]
   branch = "master"
   name = "google.golang.org/genproto"
+
+[[override]]
+  name = "cloud.google.com/go"
+  version = "0.23.0"
 
 [prune]
   go-tests = true

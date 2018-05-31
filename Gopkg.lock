@@ -12,6 +12,7 @@
     "internal/fields",
     "internal/optional",
     "internal/protostruct",
+    "internal/trace",
     "internal/version",
     "longrunning",
     "longrunning/autogen",
@@ -19,8 +20,8 @@
     "spanner/admin/database/apiv1",
     "storage"
   ]
-  revision = "20d4028b8a750c2aca76bf9fefa8ed2d0109b573"
-  version = "v0.19.0"
+  revision = "0fd7230b2a7505833d5f69b75cbd6c9582401479"
+  version = "v0.23.0"
 
 [[projects]]
   name = "github.com/Microsoft/go-winio"
@@ -450,6 +451,7 @@
     "googleapis/api/annotations",
     "googleapis/iam/v1",
     "googleapis/longrunning",
+    "googleapis/rpc/code",
     "googleapis/rpc/errdetails",
     "googleapis/rpc/status",
     "googleapis/spanner/admin/database/v1",
@@ -498,6 +500,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "cc1d8b43c9fdbe04224374dd40bf82803cc27044a61958c8bd015ba76bf79381"
+  inputs-digest = "48c51d905f8ddc56632c559e57973899a121d6056d00d31189b78b91fb19df13"
   solver-name = "gps-cdcl"
   solver-version = 1
