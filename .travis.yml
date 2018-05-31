@@ -28,7 +28,7 @@ before_install:
   - chmod +x $GOPATH/bin/dep
 
 install:
-  - dep ensure
+  - dep ensure -vendor-only
   - sudo apt-get update && sudo apt-get --allow-downgrades install docker-ce=17.05.0*
   - go get github.com/mattn/goveralls 
 
