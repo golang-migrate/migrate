@@ -5,6 +5,8 @@ go:
   - "1.9.x"
   - "1.10.x"
 
+go_import_path: github.com/golang-migrate/migrate
+
 env:
   - MIGRATE_TEST_CONTAINER_BOOT_TIMEOUT=60
 
