@@ -3,7 +3,7 @@ package bindata
 import (
 	"testing"
 
-	"github.com/golang-migrate/migrate/source/go-bindata/testdata"
+	"github.com/golang-migrate/migrate/source/go_bindata/testdata"
 	st "github.com/golang-migrate/migrate/source/testing"
 )
 

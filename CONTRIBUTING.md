@@ -12,7 +12,7 @@
 Some more helpful commands:
 
   * You can specify which database/ source tests to run:
-    `make test-short SOURCE='file go-bindata' DATABASE='postgres cassandra'`
+    `make test-short SOURCE='file go_bindata' DATABASE='postgres cassandra'`
   * After `make test`, run `make html-coverage` which opens a shiny test coverage overview.
   * `make build-cli` builds the CLI in directory `cli/build/`.
   * `make list-external-deps` lists all external dependencies for each package

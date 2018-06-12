@@ -1,4 +1,4 @@
-# go-bindata
+# go_bindata
 
 ## Usage
 
@@ -14,8 +14,8 @@ cd examples/migrations && go-bindata -pkg migrations .
 ```go
 import (
   "github.com/golang-migrate/migrate"
-  "github.com/golang-migrate/migrate/source/go-bindata"
-  "github.com/golang-migrate/migrate/source/go-bindata/examples/migrations"
+  "github.com/golang-migrate/migrate/source/go_bindata"
+  "github.com/golang-migrate/migrate/source/go_bindata/examples/migrations"
 )
 
 func main() {
@@ -33,11 +33,11 @@ func main() {
 
 ### Read bindata with URL (todo)
 
-This will restore the assets in a tmp directory and then 
+This will restore the assets in a tmp directory and then
 proxy to source/file. go-bindata must be in your `$PATH`.
 
 ```
-migrate -source go-bindata://examples/migrations/bindata.go 
+migrate -source go-bindata://examples/migrations/bindata.go
 ```
 
 

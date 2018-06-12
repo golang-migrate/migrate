@@ -1,3 +1,3 @@
-# google-cloud-storage
+# google_cloud_storage
 
 `gcs://<bucket>/<prefix>`
