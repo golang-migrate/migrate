@@ -110,3 +110,14 @@ func Register(name string, driver Driver) {
 	}
 	drivers[name] = driver
 }
+
+// List lists the registered drivers
+func List() []string {
+	driversMu.RLock()
+	defer driversMu.RUnlock()
+	names := make([]string, 0, len(drivers))
+	for n := range drivers {
+		names = append(names, n)
+	}
+	return names
+}

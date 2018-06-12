@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/golang-migrate/migrate"
+	"github.com/golang-migrate/migrate/database"
+	"github.com/golang-migrate/migrate/source"
 )
 
 // set main log
@@ -52,7 +54,9 @@ Commands:
   drop         Drop everyting inside database
   force V      Set version V but don't run migration (ignores dirty state)
   version      Print current migration version
-`)
+
+Source drivers: `+strings.Join(source.List(), ", ")+`
+Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 	}
 
 	flag.Parse()
