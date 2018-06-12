@@ -246,7 +246,7 @@ func (m *Mysql) SetVersion(version int, dirty bool) error {
 }
 
 func (m *Mysql) Version() (version int, dirty bool, err error) {
-	query := "SELECT version, dirty FROM `" + m.config.MigrationsTable + "` LIMIT 1"
+	query := "SELECT version, dirty FROM `" + m.config.MigrationsTable + "` ORDER BY version DESC LIMIT 1"
 	err = m.conn.QueryRowContext(context.Background(), query).Scan(&version, &dirty)
 	switch {
 	case err == sql.ErrNoRows:
