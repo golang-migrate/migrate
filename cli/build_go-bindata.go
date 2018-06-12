@@ -1,4 +1,4 @@
-// +build go-bindata
+// +build go_bindata
 
 package main
 

@@ -1,4 +1,4 @@
-SOURCE ?= file go-bindata github aws-s3 google-cloud-storage
+SOURCE ?= file go_bindata github aws_s3 google_cloud_storage
 DATABASE ?= postgres mysql redshift cassandra spanner cockroachdb clickhouse
 VERSION ?= $(shell git describe --tags 2>/dev/null | cut -c 2-)
 TEST_FLAGS ?=

@@ -1,4 +1,4 @@
-// +build google-cloud-storage
+// +build google_cloud_storage
 
 package main
 
