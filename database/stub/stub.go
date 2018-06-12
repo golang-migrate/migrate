@@ -81,6 +81,10 @@ func (s *Stub) Version() (version int, dirty bool, err error) {
 	return s.CurrentVersion, s.IsDirty, nil
 }
 
+func (s *Stub) GetAllVersions() (versions map[string]bool, err error) {
+	return versions, err
+}
+
 const DROP = "DROP"
 
 func (s *Stub) Drop() error {

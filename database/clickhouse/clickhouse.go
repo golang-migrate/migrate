@@ -118,6 +118,10 @@ func (ch *ClickHouse) Version() (int, bool, error) {
 	return version, dirty == 1, nil
 }
 
+func (ch *ClickHouse) GetAllVersions() (versions map[string]bool, err error) {
+	return versions, err
+}
+
 func (ch *ClickHouse) SetVersion(version int, dirty bool) error {
 	var (
 		bool = func(v bool) uint8 {

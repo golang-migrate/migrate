@@ -204,6 +204,10 @@ func (s *Spanner) Version() (version int, dirty bool, err error) {
 	return version, dirty, nil
 }
 
+func (s *Spanner) GetAllVersions() (versions map[string]bool, err error) {
+	return versions, err
+}
+
 // Drop implements database.Driver. Retrieves the database schema first and
 // creates statements to drop the indexes and tables accordingly.
 // Note: The drop statements are created in reverse order to how they're

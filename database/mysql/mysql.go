@@ -265,6 +265,24 @@ func (m *Mysql) Version() (version int, dirty bool, err error) {
 	}
 }
 
+func (m *Mysql) GetAllVersions() (versions map[string]bool, err error) {
+	query := "SELECT * FROM `" + m.config.MigrationsTable + "`"
+	migrations, err := m.conn.QueryContext(context.Background(), query)
+	if err != nil {
+		return nil, &database.Error{OrigErr: err, Query: []byte(query)}
+	}
+	defer migrations.Close()
+	for migrations.Next() {
+		var versionNumber string
+		var dirty bool
+		if err := migrations.Scan(&versionNumber, &dirty); err != nil {
+			return nil, err
+		}
+		versions[versionNumber] = dirty
+	}
+	return versions, nil
+}
+
 func (m *Mysql) Drop() error {
 	// select all tables
 	query := `SHOW TABLES LIKE '%'`

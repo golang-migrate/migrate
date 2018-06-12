@@ -265,6 +265,10 @@ func (c *CockroachDb) Version() (version int, dirty bool, err error) {
 	}
 }
 
+func (c *CockroachDb) GetAllVersions() (versions map[string]bool, err error) {
+	return versions, err
+}
+
 func (c *CockroachDb) Drop() error {
 	// select all tables in current schema
 	query := `SELECT table_name FROM information_schema.tables WHERE table_schema=(SELECT current_schema())`

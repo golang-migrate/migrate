@@ -197,6 +197,10 @@ func (c *Cassandra) Version() (version int, dirty bool, err error) {
 	}
 }
 
+func (c *Cassandra) GetAllVersions() (versions map[string]bool, err error) {
+	return versions, err
+}
+
 func (c *Cassandra) Drop() error {
 	// select all tables in current schema
 	query := fmt.Sprintf(`SELECT table_name from system_schema.tables WHERE keyspace_name='%s'`, c.config.KeyspaceName)
