@@ -230,15 +230,9 @@ func (m *Mysql) SetVersion(version int, dirty bool) error {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
 	}
 
-	query := "TRUNCATE `" + m.config.MigrationsTable + "`"
-	if _, err := tx.ExecContext(context.Background(), query); err != nil {
-		tx.Rollback()
-		return &database.Error{OrigErr: err, Query: []byte(query)}
-	}
-
 	if version >= 0 {
-		query := "INSERT INTO `" + m.config.MigrationsTable + "` (version, dirty) VALUES (?, ?)"
-		if _, err := tx.ExecContext(context.Background(), query, version, dirty); err != nil {
+		query := "INSERT INTO `" + m.config.MigrationsTable + "` (version, dirty) VALUES (?, ?) ON DUPLICATE KEY UPDATE dirty = ?"
+		if _, err := tx.ExecContext(context.Background(), query, version, dirty, dirty); err != nil {
 			tx.Rollback()
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
