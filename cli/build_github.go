@@ -3,5 +3,5 @@
 package main
 
 import (
-	_ "github.com/golang-migrate/migrate/source/github"
+	_ "github.com/basekit/migrate/source/github"
 )

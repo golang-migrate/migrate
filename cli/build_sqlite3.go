@@ -3,5 +3,5 @@
 package main
 
 import (
-	_ "github.com/golang-migrate/migrate/database/sqlite3"
+	_ "github.com/basekit/migrate/database/sqlite3"
 )

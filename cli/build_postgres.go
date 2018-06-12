@@ -3,5 +3,5 @@
 package main
 
 import (
-	_ "github.com/golang-migrate/migrate/database/postgres"
+	_ "github.com/basekit/migrate/database/postgres"
 )

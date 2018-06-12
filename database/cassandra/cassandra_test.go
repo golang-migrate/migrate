@@ -7,8 +7,8 @@ import (
 
 	"github.com/gocql/gocql"
 
-	dt "github.com/golang-migrate/migrate/database/testing"
-	mt "github.com/golang-migrate/migrate/testing"
+	dt "github.com/basekit/migrate/database/testing"
+	mt "github.com/basekit/migrate/testing"
 )
 
 var versions = []mt.Version{

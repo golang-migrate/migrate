@@ -17,8 +17,8 @@ import (
 )
 
 import (
-	"github.com/golang-migrate/migrate"
-	"github.com/golang-migrate/migrate/database"
+	"github.com/basekit/migrate"
+	"github.com/basekit/migrate/database"
 )
 
 func init() {

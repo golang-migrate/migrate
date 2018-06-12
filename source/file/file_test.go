@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	st "github.com/golang-migrate/migrate/source/testing"
+	st "github.com/basekit/migrate/source/testing"
 )
 
 func Test(t *testing.T) {

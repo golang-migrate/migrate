@@ -3,5 +3,5 @@
 package main
 
 import (
-	_ "github.com/golang-migrate/migrate/source/go-bindata"
+	_ "github.com/basekit/migrate/source/go-bindata"
 )

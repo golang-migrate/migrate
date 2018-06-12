@@ -3,8 +3,8 @@ package redshift
 import (
 	"net/url"
 
-	"github.com/golang-migrate/migrate/database"
-	"github.com/golang-migrate/migrate/database/postgres"
+	"github.com/basekit/migrate/database"
+	"github.com/basekit/migrate/database/postgres"
 )
 
 // init registers the driver under the name 'redshift'
