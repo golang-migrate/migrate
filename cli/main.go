@@ -116,7 +116,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 		seqDigits := 6
 
 		createFlagSet := flag.NewFlagSet("create", flag.ExitOnError)
-		extPtr := createFlagSet.String("ext", "", "File extension")
+		extPtr := createFlagSet.String("ext", "sql", "File extension")
 		dirPtr := createFlagSet.String("dir", "", "Directory to place file in (default: current working directory)")
 		formatPtr := createFlagSet.String("format", "", "Specify the format of the version using a Go time format string.  For yyyymmddhhmmss use format of 20060102150405.  If not specified the version will be the unix timestamp.")
 		createFlagSet.BoolVar(&seq, "seq", seq, "Use sequential numbers instead of timestamps (default: false)")
