@@ -271,6 +271,7 @@ func (m *Mysql) GetAllVersions() (versions map[string]bool, err error) {
 	if err != nil {
 		return nil, &database.Error{OrigErr: err, Query: []byte(query)}
 	}
+	versions = make(map[string]bool)
 	defer migrations.Close()
 	for migrations.Next() {
 		var versionNumber string

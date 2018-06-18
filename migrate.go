@@ -9,6 +9,7 @@ import (
 	"os"
 	"sync"
 	"time"
+	"strconv"
 
 	"github.com/basekit/migrate/database"
 	"github.com/basekit/migrate/source"
@@ -25,10 +26,11 @@ var DefaultPrefetchMigrations = uint(10)
 var DefaultLockTimeout = 15 * time.Second
 
 var (
-	ErrNoChange    = fmt.Errorf("no change")
-	ErrNilVersion  = fmt.Errorf("no migration")
-	ErrLocked      = fmt.Errorf("database locked")
-	ErrLockTimeout = fmt.Errorf("timeout: can't acquire database lock")
+	ErrNoChange    		= fmt.Errorf("no change")
+	ErrNilVersion  		= fmt.Errorf("no migration")
+	ErrLocked      		= fmt.Errorf("database locked")
+	ErrLockTimeout 		= fmt.Errorf("timeout: can't acquire database lock")
+	ErrGetAllVersions 	= fmt.Errorf("all versions not available")
 )
 
 // ErrShortLimit is an error returned when not enough migrations
@@ -71,6 +73,8 @@ type Migrate struct {
 	// PrefetchMigrations defaults to DefaultPrefetchMigrations,
 	// but can be set per Migrate instance.
 	PrefetchMigrations uint
+
+
 
 	// LockTimeout defaults to DefaultLockTimeout,
 	// but can be set per Migrate instance.
@@ -249,7 +253,7 @@ func (m *Migrate) Steps(n int) error {
 	ret := make(chan interface{}, m.PrefetchMigrations)
 
 	if n > 0 {
-		go m.readUp(curVersion, n, ret)
+		go m.readUp(curVersion, n, ret, false)
 	} else {
 		go m.readDown(curVersion, -n, ret)
 	}
@@ -259,12 +263,28 @@ func (m *Migrate) Steps(n int) error {
 
 // Up looks at the currently active migration version
 // and will migrate all the way up (applying all up migrations).
-func (m *Migrate) Up() error {
+func (m *Migrate) Up(includeMissing bool) error {
 	if err := m.lock(); err != nil {
 		return err
 	}
 
+	allVersions := make(map[string]bool)
 	curVersion, dirty, err := m.databaseDrv.Version()
+
+	if includeMissing == true {
+		allVersions, err = m.databaseDrv.GetAllVersions()
+		if err != nil {
+			return m.unlockErr(err)
+		}
+		if (len(allVersions) > 0) {
+			for k, v := range allVersions {
+				curVersion, _ = strconv.Atoi(k)
+				dirty = v
+				break
+			}
+		}
+	}
+
 	if err != nil {
 		return m.unlockErr(err)
 	}
@@ -275,7 +295,7 @@ func (m *Migrate) Up() error {
 
 	ret := make(chan interface{}, m.PrefetchMigrations)
 
-	go m.readUp(curVersion, -1, ret)
+	go m.readUp(curVersion, -1, ret, includeMissing)
 	return m.unlockErr(m.runMigrations(ret))
 }
 
@@ -502,7 +522,7 @@ func (m *Migrate) read(from int, to int, ret chan<- interface{}) {
 // Each migration is then written to the ret channel.
 // If an error occurs during reading, that error is written to the ret channel, too.
 // Once readUp is done reading it will close the ret channel.
-func (m *Migrate) readUp(from int, limit int, ret chan<- interface{}) {
+func (m *Migrate) readUp(from int, limit int, ret chan<- interface{}, includeMissing bool) {
 	defer close(ret)
 
 	// check if from version exists
@@ -516,6 +536,20 @@ func (m *Migrate) readUp(from int, limit int, ret chan<- interface{}) {
 	if limit == 0 {
 		ret <- ErrNoChange
 		return
+	}
+
+	allVersions := make(map[string]bool)
+	var err error
+	versionCheck := false;
+	if includeMissing == true {
+		allVersions, err = m.databaseDrv.GetAllVersions()
+		if err != nil {
+			ret <- ErrGetAllVersions
+			return
+		}
+		if len(allVersions) > 0 {
+			versionCheck = true;
+		}
 	}
 
 	count := 0
@@ -547,6 +581,14 @@ func (m *Migrate) readUp(from int, limit int, ret chan<- interface{}) {
 
 		// apply next migration
 		next, err := m.sourceDrv.Next(suint(from))
+		if versionCheck == true {
+			nextStr := fmt.Sprint(next)
+			if _, ok := allVersions[nextStr]; ok {
+				from = int(next)
+				continue
+			}
+		}
+
 		if os.IsNotExist(err) {
 			// no limit, but no migrations applied?
 			if limit == -1 && count == 0 {

@@ -99,7 +99,7 @@ func gotoCmd(m *migrate.Migrate, v uint) {
 	}
 }
 
-func upCmd(m *migrate.Migrate, limit int) {
+func upCmd(m *migrate.Migrate, limit int, includeMissing bool) {
 	if limit >= 0 {
 		if err := m.Steps(limit); err != nil {
 			if err != migrate.ErrNoChange {
@@ -109,7 +109,7 @@ func upCmd(m *migrate.Migrate, limit int) {
 			}
 		}
 	} else {
-		if err := m.Up(); err != nil {
+		if err := m.Up(includeMissing); err != nil {
 			if err != migrate.ErrNoChange {
 				log.fatalErr(err)
 			} else {

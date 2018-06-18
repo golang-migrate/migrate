@@ -47,7 +47,9 @@ Commands:
 			   Use -seq option to generate sequential up/down migrations with N digits.
 			   Use -format option to specify a Go time format string.
   goto V       Migrate to version V
-  up [N]       Apply all or N up migrations
+  up [-include-missing=true] N
+  			   Apply all or N up migrations
+  			   Use -include-missing=BOOLEAN to migrate any missed migrations
   down [N]     Apply all or N down migrations
   drop         Drop everyting inside database
   force V      Set version V but don't run migration (ignores dirty state)
@@ -160,16 +162,21 @@ Commands:
 			log.fatalErr(migraterErr)
 		}
 
+		args := flag.Args()[1:]
+		upFlagSet := flag.NewFlagSet("up", flag.ExitOnError)
+		includeMissing := upFlagSet.Bool("include-missing", false, "Include missing files to migrate")
+		upFlagSet.Parse(args)
+
 		limit := -1
-		if flag.Arg(1) != "" {
-			n, err := strconv.ParseUint(flag.Arg(1), 10, 64)
+		if  upFlagSet.Arg(0) != "" {
+			n, err := strconv.ParseUint(upFlagSet.Arg(0), 10, 64)
 			if err != nil {
 				log.fatal("error: can't read limit argument N")
 			}
 			limit = int(n)
 		}
 
-		upCmd(migrater, limit)
+		upCmd(migrater, limit, *includeMissing)
 
 		if log.verbose {
 			log.Println("Finished after", time.Now().Sub(startTime))
