@@ -408,6 +408,15 @@
 
 [[projects]]
   branch = "master"
+  name = "golang.org/x/tools"
+  packages = [
+    "godoc/vfs",
+    "godoc/vfs/mapfs"
+  ]
+  revision = "c06a8d8ed11aae27b08c1c109a509ada9de81240"
+
+[[projects]]
+  branch = "master"
   name = "google.golang.org/api"
   packages = [
     "gensupport",
@@ -500,6 +509,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "48c51d905f8ddc56632c559e57973899a121d6056d00d31189b78b91fb19df13"
+  inputs-digest = "952240f227fe19a7d62faa43d3acad05b097803337542117c1c3bd81cc5ffd6d"
   solver-name = "gps-cdcl"
   solver-version = 1

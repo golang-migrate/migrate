@@ -85,6 +85,10 @@
   name = "cloud.google.com/go"
   version = "0.23.0"
 
+[[override]]
+  branch = "master"
+  name = "golang.org/x/tools"
+
 [prune]
   go-tests = true
   unused-packages = true
