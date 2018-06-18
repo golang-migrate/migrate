@@ -128,9 +128,11 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 		}
 		name := createFlagSet.Arg(0)
 
-		if *extPtr != "" {
-			*extPtr = "." + strings.TrimPrefix(*extPtr, ".")
+		if *extPtr == "" {
+			log.fatal("error: -ext flag must be specified")
 		}
+		*extPtr = "." + strings.TrimPrefix(*extPtr, ".")
+
 		if *dirPtr != "" {
 			*dirPtr = strings.Trim(*dirPtr, "/") + "/"
 		}
