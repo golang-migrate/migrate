@@ -8,7 +8,9 @@ go:
 go_import_path: github.com/golang-migrate/migrate
 
 env:
-  - MIGRATE_TEST_CONTAINER_BOOT_TIMEOUT=60
+  global:
+    - MIGRATE_TEST_CONTAINER_BOOT_TIMEOUT=60
+    - DOCKER_USERNAME=golangmigrate
 
 # TODO: https://docs.docker.com/engine/installation/linux/ubuntu/    
 # pre-provision with travis docker setup and pin down docker version in install step
@@ -76,6 +78,8 @@ deploy:
       tags: true
   - provider: script
     script: ./docker-deploy.sh
+    token:
+      secure: oOS5KJcC0LksqMwntC4IfXRTc4WpMKBbwGz42TQknkzM5Hfk2PZC4Kr4h8x2qhxl8Ji/az36IaMCMkE8Z/Dzp0rUr/TIz+li4nXWkUqAwxFF7Q6HO1Y9T7Fs70+jCsfFGXrgIBifvwoudHyqSHBUWf5VwvJuzraGbjme0ix3eJguj+17ECAPSADWs0Y66+W1c0+TDImojtT6GLQQPC1+xGrj3mZzhjsmXRkZu7KyjdM5O+8Qe84ELgwwj1ctrJ1OfWCR2BQvrP+oHzWz13oBc5GNKiOuJraFc/nGvBmWowJOsRLbVSvsyd5nZZb2AULLC4ZT8I/Efcd1M6KlRgZR1nQcoL1AQ1qj54EmhSPpXuj/+FgE++fF3lSeIkSQbm5zm1vAxmVGgSo6wJYjfhaPqhLOzoRiayMexWR/Tr++FInzqbY65DycVv65seA8AmmYmabQ0VBJHfT9jtrYcwvyvVXFw8KtTFGsETzBzys5zbgIG9CIeg6m1Tmcg6GB+2z8ECgjGSL4MwTHO/SJ+l0zz40oKmGiU1Olle9P06c2ZcLXyDVCLX4vjfkHENXz53Zu0T+zt7YE6GLFUP+aa/nCxou3zhOsBnDe8czhh57PB0kiL0MXTt9cA5w/84PMT5jVR/0iEBC4lJmc4sOqJ27bgqi0cxWfNKLKwU8QVpkQric=
     on:
       go: "1.10"
       repo: golang-migrate/migrate
