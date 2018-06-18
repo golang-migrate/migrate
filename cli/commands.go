@@ -49,9 +49,9 @@ func nextSeq(matches []string, dir string, seqDigits int) (string, error) {
 	return nextSeqStr, nil
 }
 
-func createCmd(dir string, timestamp int64, format string, name string, ext string, seq bool, seqDigits int) {
+func createCmd(dir string, startTime time.Time, format string, name string, ext string, seq bool, seqDigits int) {
 	var base string
-	if seq && len(format) > 0 {
+	if seq && format != defaultTimeFormat {
 		log.fatalErr(errors.New("The seq and format options are mutually exclusive"))
 	}
 	if seq {
@@ -68,13 +68,15 @@ func createCmd(dir string, timestamp int64, format string, name string, ext stri
 		}
 		base = fmt.Sprintf("%v%v_%v.", dir, nextSeqStr, name)
 	} else {
-		if len(format) > 0 {
-			t := time.Unix(timestamp, 0)
-			version := t.Format(format)
-			base = fmt.Sprintf("%v%v_%v.", dir, version, name)
-		} else {
-			log.Println("Time format not specified")
-			base = fmt.Sprintf("%v%v_%v.", dir, timestamp, name)
+		switch format {
+		case "":
+			log.fatal("Time format may not be empty")
+		case "unix":
+			base = fmt.Sprintf("%v%v_%v.", dir, startTime.Unix(), name)
+		case "unixNano":
+			base = fmt.Sprintf("%v%v_%v.", dir, startTime.UnixNano(), name)
+		default:
+			base = fmt.Sprintf("%v%v_%v.", dir, startTime.Format(format), name)
 		}
 	}
 

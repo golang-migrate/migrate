@@ -15,6 +15,8 @@ import (
 	"github.com/golang-migrate/migrate/source"
 )
 
+const defaultTimeFormat = "20060102150405"
+
 // set main log
 var log = &Log{}
 
@@ -118,7 +120,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 		createFlagSet := flag.NewFlagSet("create", flag.ExitOnError)
 		extPtr := createFlagSet.String("ext", "", "File extension")
 		dirPtr := createFlagSet.String("dir", "", "Directory to place file in (default: current working directory)")
-		formatPtr := createFlagSet.String("format", "", "Specify the format of the version using a Go time format string.  For yyyymmddhhmmss use format of 20060102150405.  If not specified the version will be the unix timestamp.")
+		formatPtr := createFlagSet.String("format", defaultTimeFormat, `The Go time format string to use. If the string "unix" or "unixNano" is specified, then the seconds or nanoseconds since January 1, 1970 UTC respectively will be used. Caution, due to the behavior of time.Time.Format(), invalid format strings will not error`)
 		createFlagSet.BoolVar(&seq, "seq", seq, "Use sequential numbers instead of timestamps (default: false)")
 		createFlagSet.IntVar(&seqDigits, "digits", seqDigits, "The number of digits to use in sequences (default: 6)")
 		createFlagSet.Parse(args)
@@ -137,9 +139,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 			*dirPtr = strings.Trim(*dirPtr, "/") + "/"
 		}
 
-		timestamp := startTime.Unix()
-
-		createCmd(*dirPtr, timestamp, *formatPtr, name, *extPtr, seq, seqDigits)
+		createCmd(*dirPtr, startTime, *formatPtr, name, *extPtr, seq, seqDigits)
 
 	case "goto":
 		if migraterErr != nil {
