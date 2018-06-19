@@ -228,6 +228,12 @@
   revision = "3c37daec2f4d3def4b3b21668c6c2e80d3265a69"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/golang/glog"
+  packages = ["."]
+  revision = "23def4e6c14b4da8ac2ed8007337bc5eb5007998"
+
+[[projects]]
   name = "github.com/golang/protobuf"
   packages = [
     "proto",
@@ -324,9 +330,27 @@
   revision = "a6d0ee40d4207ea02364bd3b9e8e77b9159ba1eb"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/pkg/browser"
+  packages = ["."]
+  revision = "c90ca0c84f15f81c982e32665bffd8d7aac8f097"
+
+[[projects]]
   name = "github.com/pkg/errors"
   packages = ["."]
   revision = "839d9e913e063e28dfd0e6c7b7512793e0a48be9"
+
+[[projects]]
+  name = "github.com/satori/go.uuid"
+  packages = ["."]
+  revision = "f58768cc1a7a7e77a3bd49e98cdd21419399b6a3"
+  version = "v1.2.0"
+
+[[projects]]
+  name = "github.com/snowflakedb/gosnowflake"
+  packages = ["."]
+  revision = "b41243953b6b5f2887a69c06a95805101f3a7246"
+  version = "v1.1.8"
 
 [[projects]]
   name = "go.opencensus.io"
@@ -347,6 +371,12 @@
   ]
   revision = "c3ed530f775d85e577ca652cb052a52c078aad26"
   version = "v0.11.0"
+
+[[projects]]
+  branch = "master"
+  name = "golang.org/x/crypto"
+  packages = ["ocsp"]
+  revision = "027cca12c2d63e3d62b670d901e8a2c95854feec"
 
 [[projects]]
   branch = "master"
@@ -509,6 +539,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "952240f227fe19a7d62faa43d3acad05b097803337542117c1c3bd81cc5ffd6d"
+  inputs-digest = "6866bc57be62d75d9e0985f67733e648f7fdb644dd1062fa29bd8f0a5664901b"
   solver-name = "gps-cdcl"
   solver-version = 1
