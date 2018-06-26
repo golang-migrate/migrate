@@ -58,8 +58,10 @@ Options:
   -help            Print usage
 
 Commands:
-  create [-ext E] [-dir D] NAME
-               Create a set of timestamped up/down migrations titled NAME, in directory D with extension E
+  create [-ext E] [-dir D] [-seq] [-digits N] [-format] NAME
+               Create a set of timestamped up/down migrations titled NAME, in directory D with extension E.
+               Use -seq option to generate sequential up/down migrations with N digits.
+               Use -format option to specify a Go time format string.
   goto V       Migrate to version V
   up [N]       Apply all or N up migrations
   down [N]     Apply all or N down migrations
