@@ -9,11 +9,14 @@ $ go get -u -d github.com/golang-migrate/migrate/cli github.com/lib/pq
 $ go build -tags 'postgres' -o /usr/local/bin/migrate github.com/golang-migrate/migrate/cli
 ```
 
-Note: This example builds the cli which will only work with postgres.  In order
+##### Notes:
+1. This example builds the cli which will only work with postgres.  In order
 to build the cli for use with other databases, replace the `postgres` build tag
 with the appropriate database tag(s) for the databases desired.  The tags
 correspond to the names of the sub-packages underneath the
 [`database`](../database) package.
+1. Support for build constraints will be removed in the future: https://github.com/golang-migrate/migrate/issues/60
+1. If possible, use a dependency manager like [dep](https://github.com/golang/dep) instead of `go get`
 
 #### MacOS
 
