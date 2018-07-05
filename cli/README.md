@@ -2,21 +2,13 @@
 
 ## Installation
 
-#### With Go toolchain
+#### Download pre-build binary (Windows, MacOS, or Linux)
+
+[Release Downloads](https://github.com/golang-migrate/migrate/releases)
 
 ```
-$ go get -u -d github.com/golang-migrate/migrate/cli github.com/lib/pq
-$ go build -tags 'postgres' -o /usr/local/bin/migrate github.com/golang-migrate/migrate/cli
+$ curl -L https://github.com/golang-migrate/migrate/releases/download/$version/migrate.$platform-amd64.tar.gz | tar xvz
 ```
-
-##### Notes:
-1. This example builds the cli which will only work with postgres.  In order
-to build the cli for use with other databases, replace the `postgres` build tag
-with the appropriate database tag(s) for the databases desired.  The tags
-correspond to the names of the sub-packages underneath the
-[`database`](../database) package.
-1. Support for build constraints will be removed in the future: https://github.com/golang-migrate/migrate/issues/60
-1. If possible, use a dependency manager like [dep](https://github.com/golang/dep) instead of `go get`
 
 #### MacOS
 
@@ -33,14 +25,23 @@ $ apt-get update
 $ apt-get install -y migrate
 ```
 
-#### Download pre-build binary (Windows, MacOS, or Linux)
-
-[Release Downloads](https://github.com/golang-migrate/migrate/releases)
+#### With Go toolchain
 
 ```
-$ curl -L https://github.com/golang-migrate/migrate/releases/download/$version/migrate.$platform-amd64.tar.gz | tar xvz
+$ go get -u -d github.com/golang-migrate/migrate/cli
+$ cd $GOPATH/src/github.com/golang-migrate/migrate/cli
+$ dep ensure
+$ go build -tags 'postgres' -o /usr/local/bin/migrate github.com/golang-migrate/migrate/cli
 ```
 
+##### Notes:
+1. This example builds the cli which will only work with postgres.  In order
+to build the cli for use with other databases, replace the `postgres` build tag
+with the appropriate database tag(s) for the databases desired.  The tags
+correspond to the names of the sub-packages underneath the
+[`database`](../database) package.
+1. Similarly to the database build tags, if you need to support other sources, use the appropriate build tag(s).
+1. Support for build constraints will be removed in the future: https://github.com/golang-migrate/migrate/issues/60
 
 
 ## Usage
