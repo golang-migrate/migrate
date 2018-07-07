@@ -3,13 +3,15 @@
 package postgres
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"io"
 	"io/ioutil"
 	nurl "net/url"
+	"strconv"
+	"strings"
 
-	"context"
 	"github.com/golang-migrate/migrate"
 	"github.com/golang-migrate/migrate/database"
 	"github.com/lib/pq"
@@ -167,11 +169,51 @@ func (p *Postgres) Run(migration io.Reader) error {
 	// run migration
 	query := string(migr[:])
 	if _, err := p.conn.ExecContext(context.Background(), query); err != nil {
-		// TODO: cast to postgress error and get line number
+		if pgErr, ok := err.(*pq.Error); ok {
+			var line uint
+			var col uint
+			var lineColOK bool
+			if pgErr.Position != "" {
+				if pos, err := strconv.ParseUint(pgErr.Position, 10, 64); err == nil {
+					if line, col, ok = computeLineFromPos(query, uint(pos)); ok {
+						lineColOK = true
+					}
+				}
+			}
+			message := fmt.Sprintf("migration failed: %s", pgErr.Message)
+			if lineColOK {
+				message = fmt.Sprintf("%s (column %d)", message, col)
+			}
+			if pgErr.Detail != "" {
+				message = fmt.Sprintf("%s, %s", message, pgErr.Detail)
+			}
+			return database.Error{OrigErr: err, Err: message, Query: migr, Line: line}
+		}
 		return database.Error{OrigErr: err, Err: "migration failed", Query: migr}
 	}
 
 	return nil
+}
+
+func computeLineFromPos(s string, pos uint) (uint, uint, bool) {
+	newLine := "\n"
+	if i := strings.Index(s, "\r\n"); i >= 0 {
+		newLine = "\r\n"
+	}
+	lines := strings.Split(s, newLine)
+	remaining := int(pos)
+	lineNr := 1
+	var curr int
+	for _, line := range lines {
+		lineLength := len(line)
+		curr += lineLength + 1
+		if remaining < lineLength {
+			return uint(lineNr), uint(remaining), true
+		}
+		remaining -= lineLength + 1
+		lineNr++
+	}
+	return 0, 0, false
 }
 
 func (p *Postgres) SetVersion(version int, dirty bool) error {
