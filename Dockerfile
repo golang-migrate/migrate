@@ -25,7 +25,6 @@ FROM alpine:3.7
 RUN apk add --no-cache ca-certificates
 
 COPY --from=downloader /go/src/github.com/golang-migrate/migrate/build/migrate.linux-386 /migrate
-RUN chmod u+x /migrate
 
 ENTRYPOINT ["/migrate"]
 CMD ["--help"]
