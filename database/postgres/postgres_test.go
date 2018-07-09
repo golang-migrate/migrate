@@ -4,16 +4,17 @@ package postgres
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	sqldriver "database/sql/driver"
 	"fmt"
 	"io"
+	"strconv"
+	"strings"
 	"testing"
 
-	"context"
 	dt "github.com/golang-migrate/migrate/database/testing"
 	mt "github.com/golang-migrate/migrate/testing"
-	// "github.com/lib/pq"
 )
 
 var versions = []mt.Version{
@@ -24,8 +25,12 @@ var versions = []mt.Version{
 	{Image: "postgres:9.2"},
 }
 
+func pgConnectionString(host string, port uint) string {
+	return fmt.Sprintf("postgres://postgres@%s:%v/postgres?sslmode=disable", host, port)
+}
+
 func isReady(i mt.Instance) bool {
-	db, err := sql.Open("postgres", fmt.Sprintf("postgres://postgres@%v:%v/postgres?sslmode=disable", i.Host(), i.Port()))
+	db, err := sql.Open("postgres", pgConnectionString(i.Host(), i.Port()))
 	if err != nil {
 		return false
 	}
@@ -47,7 +52,7 @@ func Test(t *testing.T) {
 	mt.ParallelTest(t, versions, isReady,
 		func(t *testing.T, i mt.Instance) {
 			p := &Postgres{}
-			addr := fmt.Sprintf("postgres://postgres@%v:%v/postgres?sslmode=disable", i.Host(), i.Port())
+			addr := pgConnectionString(i.Host(), i.Port())
 			d, err := p.Open(addr)
 			if err != nil {
 				t.Fatalf("%v", err)
@@ -61,7 +66,7 @@ func TestMultiStatement(t *testing.T) {
 	mt.ParallelTest(t, versions, isReady,
 		func(t *testing.T, i mt.Instance) {
 			p := &Postgres{}
-			addr := fmt.Sprintf("postgres://postgres@%v:%v/postgres?sslmode=disable", i.Host(), i.Port())
+			addr := pgConnectionString(i.Host(), i.Port())
 			d, err := p.Open(addr)
 			if err != nil {
 				t.Fatalf("%v", err)
@@ -78,6 +83,27 @@ func TestMultiStatement(t *testing.T) {
 			}
 			if !exists {
 				t.Fatalf("expected table bar to exist")
+			}
+		})
+}
+
+func TestErrorParsing(t *testing.T) {
+	mt.ParallelTest(t, versions, isReady,
+		func(t *testing.T, i mt.Instance) {
+			p := &Postgres{}
+			addr := pgConnectionString(i.Host(), i.Port())
+			d, err := p.Open(addr)
+			if err != nil {
+				t.Fatalf("%v", err)
+			}
+			defer d.Close()
+
+			wantErr := `migration failed: syntax error at or near "TABLEE" (column 37) in line 1: CREATE TABLE foo ` +
+				`(foo text); CREATE TABLEE bar (bar text); (details: pq: syntax error at or near "TABLEE")`
+			if err := d.Run(bytes.NewReader([]byte("CREATE TABLE foo (foo text); CREATE TABLEE bar (bar text);"))); err == nil {
+				t.Fatal("expected err but got nil")
+			} else if err.Error() != wantErr {
+				t.Fatalf("expected '%s' but got '%s'", wantErr, err.Error())
 			}
 		})
 }
@@ -99,7 +125,7 @@ func TestWithSchema(t *testing.T) {
 	mt.ParallelTest(t, versions, isReady,
 		func(t *testing.T, i mt.Instance) {
 			p := &Postgres{}
-			addr := fmt.Sprintf("postgres://postgres@%v:%v/postgres?sslmode=disable", i.Host(), i.Port())
+			addr := pgConnectionString(i.Host(), i.Port())
 			d, err := p.Open(addr)
 			if err != nil {
 				t.Fatalf("%v", err)
@@ -160,7 +186,7 @@ func TestPostgres_Lock(t *testing.T) {
 	mt.ParallelTest(t, versions, isReady,
 		func(t *testing.T, i mt.Instance) {
 			p := &Postgres{}
-			addr := fmt.Sprintf("postgres://postgres@%v:%v/postgres?sslmode=disable", i.Host(), i.Port())
+			addr := pgConnectionString(i.Host(), i.Port())
 			d, err := p.Open(addr)
 			if err != nil {
 				t.Fatalf("%v", err)
@@ -190,4 +216,85 @@ func TestPostgres_Lock(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
+}
+
+func Test_computeLineFromPos(t *testing.T) {
+	testcases := []struct {
+		pos      int
+		wantLine uint
+		wantCol  uint
+		input    string
+		wantOk   bool
+	}{
+		{
+			15, 2, 6, "SELECT *\nFROM foo", true, // foo table does not exists
+		},
+		{
+			16, 3, 6, "SELECT *\n\nFROM foo", true, // foo table does not exists, empty line
+		},
+		{
+			25, 3, 7, "SELECT *\nFROM foo\nWHERE x", true, // x column error
+		},
+		{
+			27, 5, 7, "SELECT *\n\nFROM foo\n\nWHERE x", true, // x column error, empty lines
+		},
+		{
+			10, 2, 1, "SELECT *\nFROMM foo", true, // FROMM typo
+		},
+		{
+			11, 3, 1, "SELECT *\n\nFROMM foo", true, // FROMM typo, empty line
+		},
+		{
+			17, 2, 8, "SELECT *\nFROM foo", true, // last character
+		},
+		{
+			18, 0, 0, "SELECT *\nFROM foo", false, // invalid position
+		},
+	}
+	for i, tc := range testcases {
+		t.Run("tc"+strconv.Itoa(i), func(t *testing.T) {
+			run := func(crlf bool, nonASCII bool) {
+				var name string
+				if crlf {
+					name = "crlf"
+				} else {
+					name = "lf"
+				}
+				if nonASCII {
+					name += "-nonascii"
+				} else {
+					name += "-ascii"
+				}
+				t.Run(name, func(t *testing.T) {
+					input := tc.input
+					if crlf {
+						input = strings.Replace(input, "\n", "\r\n", -1)
+					}
+					if nonASCII {
+						input = strings.Replace(input, "FROM", "FRÖM", -1)
+					}
+					gotLine, gotCol, gotOK := computeLineFromPos(input, tc.pos)
+
+					if tc.wantOk {
+						t.Logf("pos %d, want %d:%d, %#v", tc.pos, tc.wantLine, tc.wantCol, input)
+					}
+
+					if gotOK != tc.wantOk {
+						t.Fatalf("expected ok %v but got %v", tc.wantOk, gotOK)
+					}
+					if gotLine != tc.wantLine {
+						t.Fatalf("expected line %d but got %d", tc.wantLine, gotLine)
+					}
+					if gotCol != tc.wantCol {
+						t.Fatalf("expected col %d but got %d", tc.wantCol, gotCol)
+					}
+				})
+			}
+			run(false, false)
+			run(true, false)
+			run(false, true)
+			run(true, true)
+		})
+	}
+
 }
