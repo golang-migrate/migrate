@@ -175,9 +175,7 @@ func (p *Postgres) Run(migration io.Reader) error {
 			var lineColOK bool
 			if pgErr.Position != "" {
 				if pos, err := strconv.ParseUint(pgErr.Position, 10, 64); err == nil {
-					if line, col, ok = computeLineFromPos(query, uint(pos)); ok {
-						lineColOK = true
-					}
+					line, col, lineColOK = computeLineFromPos(query, int(pos))
 				}
 			}
 			message := fmt.Sprintf("migration failed: %s", pgErr.Message)
@@ -195,25 +193,39 @@ func (p *Postgres) Run(migration io.Reader) error {
 	return nil
 }
 
-func computeLineFromPos(s string, pos uint) (uint, uint, bool) {
-	newLine := "\n"
-	if i := strings.Index(s, "\r\n"); i >= 0 {
-		newLine = "\r\n"
+func computeLineFromPos(s string, pos int) (line uint, col uint, ok bool) {
+	// replace crlf with lf
+	s = strings.Replace(s, "\r\n", "\n", -1)
+	// pg docs: pos uses index 1 for the first character, and positions are measured in characters not bytes
+	runes := []rune(s)
+	if pos > len(runes) {
+		return 0, 0, false
 	}
-	lines := strings.Split(s, newLine)
-	remaining := int(pos)
-	lineNr := 1
-	var curr int
-	for _, line := range lines {
-		lineLength := len(line)
-		curr += lineLength + 1
-		if remaining < lineLength {
-			return uint(lineNr), uint(remaining), true
+	sel := runes[:pos]
+	line = uint(runesCount(sel, newLine) + 1)
+	col = uint(pos - 1 - runesLastIndex(sel, newLine))
+	return line, col, true
+}
+
+const newLine = '\n'
+
+func runesCount(input []rune, target rune) int {
+	var count int
+	for _, r := range input {
+		if r == target {
+			count++
 		}
-		remaining -= lineLength + 1
-		lineNr++
 	}
-	return 0, 0, false
+	return count
+}
+
+func runesLastIndex(input []rune, target rune) int {
+	for i := len(input) - 1; i >= 0; i-- {
+		if input[i] == target {
+			return i
+		}
+	}
+	return -1
 }
 
 func (p *Postgres) SetVersion(version int, dirty bool) error {

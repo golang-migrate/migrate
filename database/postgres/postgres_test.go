@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"strings"
 	"testing"
 
 	dt "github.com/golang-migrate/migrate/database/testing"
@@ -219,49 +220,80 @@ func TestPostgres_Lock(t *testing.T) {
 
 func Test_computeLineFromPos(t *testing.T) {
 	testcases := []struct {
-		pos      uint
+		pos      int
 		wantLine uint
 		wantCol  uint
 		input    string
 		wantOk   bool
 	}{
 		{
-			9, 2, 1, "foo bar\nother foo bar", true,
+			15, 2, 6, "SELECT *\nFROM foo", true, // foo table does not exists
 		},
 		{
-			9, 2, 1, "foo bar\r\nother foo bar", true,
+			16, 3, 6, "SELECT *\n\nFROM foo", true, // foo table does not exists, empty line
 		},
 		{
-			0, 1, 0, "foo bar\nother foo bar", true,
+			25, 3, 7, "SELECT *\nFROM foo\nWHERE x", true, // x column error
 		},
 		{
-			6, 1, 6, "foo bar\nother foo bar", true,
+			27, 5, 7, "SELECT *\n\nFROM foo\n\nWHERE x", true, // x column error, empty lines
 		},
 		{
-			8, 2, 0, "foo bar\nother foo bar", true,
+			10, 2, 1, "SELECT *\nFROMM foo", true, // FROMM typo
 		},
 		{
-			15, 3, 6, "foo bar\n\nother foo bar", true,
+			11, 3, 1, "SELECT *\n\nFROMM foo", true, // FROMM typo, empty line
 		},
 		{
-			15, 3, 6, "foo bar\r\n\r\nother foo bar", true,
+			17, 2, 8, "SELECT *\nFROM foo", true, // last character
 		},
 		{
-			999, 0, 0, "foo bar\nother foo bar", false,
+			18, 0, 0, "SELECT *\nFROM foo", false, // invalid position
 		},
 	}
 	for i, tc := range testcases {
 		t.Run("tc"+strconv.Itoa(i), func(t *testing.T) {
-			gotLine, gotCol, gotOK := computeLineFromPos(tc.input, tc.pos)
-			if gotOK != tc.wantOk {
-				t.Fatalf("expected ok %v but got %v", tc.wantOk, gotOK)
+			run := func(crlf bool, nonASCII bool) {
+				var name string
+				if crlf {
+					name = "crlf"
+				} else {
+					name = "lf"
+				}
+				if nonASCII {
+					name += "-nonascii"
+				} else {
+					name += "-ascii"
+				}
+				t.Run(name, func(t *testing.T) {
+					input := tc.input
+					if crlf {
+						input = strings.Replace(input, "\n", "\r\n", -1)
+					}
+					if nonASCII {
+						input = strings.Replace(input, "FROM", "FRÖM", -1)
+					}
+					gotLine, gotCol, gotOK := computeLineFromPos(input, tc.pos)
+
+					if tc.wantOk {
+						t.Logf("pos %d, want %d:%d, %#v", tc.pos, tc.wantLine, tc.wantCol, input)
+					}
+
+					if gotOK != tc.wantOk {
+						t.Fatalf("expected ok %v but got %v", tc.wantOk, gotOK)
+					}
+					if gotLine != tc.wantLine {
+						t.Fatalf("expected line %d but got %d", tc.wantLine, gotLine)
+					}
+					if gotCol != tc.wantCol {
+						t.Fatalf("expected col %d but got %d", tc.wantCol, gotCol)
+					}
+				})
 			}
-			if gotLine != tc.wantLine {
-				t.Fatalf("expected line %d but got %d", tc.wantLine, gotLine)
-			}
-			if gotCol != tc.wantCol {
-				t.Fatalf("expected col %d but got %d", tc.wantCol, gotCol)
-			}
+			run(false, false)
+			run(true, false)
+			run(false, true)
+			run(true, true)
 		})
 	}
 
