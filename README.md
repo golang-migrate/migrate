@@ -38,6 +38,7 @@ Database drivers run migrations. [Add a new database?](database/driver.go)
   * [Google Cloud Spanner](database/spanner)
   * [CockroachDB](database/cockroachdb)
   * [ClickHouse](database/clickhouse)
+  * [Snowflake](database/snowflake)
 
 
 ## Migration Sources
