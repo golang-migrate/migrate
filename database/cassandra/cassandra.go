@@ -155,9 +155,17 @@ func (c *Cassandra) Run(migration io.Reader) error {
 	}
 	// run migration
 	query := string(migr[:])
-	if err := c.session.Query(query).Exec(); err != nil {
-		// TODO: cast to Cassandra error and get line number
-		return database.Error{OrigErr: err, Err: "migration failed", Query: migr}
+
+	// split query by semi-colon
+	queries := strings.Split(query, ";\n")
+
+	for _, q := range(queries) {
+		tq := strings.TrimSpace(q)
+		if (tq == "") { continue }
+		if err := c.session.Query(tq).Exec(); err != nil {
+			// TODO: cast to Cassandra error and get line number
+			return database.Error{OrigErr: err, Err: "migration failed", Query: migr}
+		}
 	}
 
 	return nil
