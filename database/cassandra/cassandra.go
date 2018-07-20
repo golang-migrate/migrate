@@ -31,6 +31,7 @@ var (
 type Config struct {
 	MigrationsTable string
 	KeyspaceName    string
+	MultiStatementEnabled bool
 }
 
 type Cassandra struct {
@@ -127,6 +128,7 @@ func (c *Cassandra) Open(url string) (database.Driver, error) {
 	return WithInstance(session, &Config{
 		KeyspaceName:    strings.TrimPrefix(u.Path, "/"),
 		MigrationsTable: u.Query().Get("x-migrations-table"),
+		MultiStatementEnabled: u.Query().Get("x-multi-statement") == "true",
 	})
 }
 
@@ -156,13 +158,20 @@ func (c *Cassandra) Run(migration io.Reader) error {
 	// run migration
 	query := string(migr[:])
 
-	// split query by semi-colon
-	queries := strings.Split(query, ";\n")
+	if c.config.MultiStatementEnabled {
+		// split query by semi-colon
+		queries := strings.Split(query, ";")
 
-	for _, q := range(queries) {
-		tq := strings.TrimSpace(q)
-		if (tq == "") { continue }
-		if err := c.session.Query(tq).Exec(); err != nil {
+		for _, q := range(queries) {
+			tq := strings.TrimSpace(q)
+			if (tq == "") { continue }
+			if err := c.session.Query(tq).Exec(); err != nil {
+				// TODO: cast to Cassandra error and get line number
+				return database.Error{OrigErr: err, Err: "migration failed", Query: migr}
+			}
+		}
+	} else {
+		if err := c.session.Query(query).Exec(); err != nil {
 			// TODO: cast to Cassandra error and get line number
 			return database.Error{OrigErr: err, Err: "migration failed", Query: migr}
 		}
