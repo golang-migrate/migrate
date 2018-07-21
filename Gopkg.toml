@@ -89,6 +89,10 @@
   branch = "master"
   name = "golang.org/x/tools"
 
+[[override]]
+  branch = "master"
+  name = "github.com/docker/distribution"
+
 [prune]
   go-tests = true
   unused-packages = true

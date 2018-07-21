@@ -143,13 +143,13 @@
   revision = "2533cb5b45cc6c07421468ce262899ddc9d53fb7"
 
 [[projects]]
+  branch = "master"
   name = "github.com/docker/distribution"
   packages = [
-    "digest",
+    "digestset",
     "reference"
   ]
-  revision = "48294d928ced5dd9b378f7fd7c6f5da3ff3f2c89"
-  version = "v2.6.2"
+  revision = "0dae0957e5fe3156c265d22bef4cba9efbf388e2"
 
 [[projects]]
   name = "github.com/docker/docker"
@@ -325,6 +325,12 @@
   packages = ["."]
   revision = "25ecb14adfc7543176f7d85291ec7dba82c6f7e4"
   version = "v1.9.0"
+
+[[projects]]
+  name = "github.com/opencontainers/go-digest"
+  packages = ["."]
+  revision = "279bed98673dd5bef374d3b6e4b09e2af76183bf"
+  version = "v1.0.0-rc1"
 
 [[projects]]
   name = "github.com/pkg/errors"
@@ -522,6 +528,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "7ee6325e2189d621cfa0b4ab393ceaf53b863fc53d805567100f9abbd991792d"
+  inputs-digest = "9096636db76a3fa5e1b6fae202bfd3d6462ad4b50d90a1493b586d90891ba0ab"
   solver-name = "gps-cdcl"
   solver-version = 1
