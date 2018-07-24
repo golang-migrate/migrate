@@ -3,6 +3,9 @@
 * Drop command will not work on Cassandra 2.X because it rely on
 system_schema table which comes with 3.X
 * Other commands should work properly but are **not tested**
+* The Cassandra driver (gocql) does not natively support executing multipe statements in a single query. To allow for multiple statements in a single migration, you can use the `x-multi-statement` param. There are two important caveats:
+  * This mode splits the migration text into separately-executed statements by a semi-colon `;`. Thus `x-multi-statement` cannot be used when a statement in the migration contains a string with a semi-colon.
+  * The queries are not executed in any sort of transaction/batch, meaning you are responsible for fixing partial migrations.
 
 
 ## Usage
@@ -12,6 +15,7 @@ system_schema table which comes with 3.X
 | URL Query  | Default value | Description |
 |------------|-------------|-----------|
 | `x-migrations-table` | schema_migrations | Name of the migrations table |
+| `x-multi-statement` | false | Enable multiple statements to be ran in a single migration (See note above) |
 | `port` | 9042 | The port to bind to  |
 | `consistency` | ALL | Migration consistency
 | `protocol` |  | Cassandra protocol version (3 or 4)
