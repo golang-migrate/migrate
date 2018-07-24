@@ -170,13 +170,13 @@ func (c *Cassandra) Run(migration io.Reader) error {
 				return database.Error{OrigErr: err, Err: "migration failed", Query: migr}
 			}
 		}
-	} else {
-		if err := c.session.Query(query).Exec(); err != nil {
-			// TODO: cast to Cassandra error and get line number
-			return database.Error{OrigErr: err, Err: "migration failed", Query: migr}
-		}
+		return nil
 	}
 
+	if err := c.session.Query(query).Exec(); err != nil {
+		// TODO: cast to Cassandra error and get line number
+		return database.Error{OrigErr: err, Err: "migration failed", Query: migr}
+	}
 	return nil
 }
 
