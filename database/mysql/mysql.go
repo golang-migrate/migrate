@@ -13,8 +13,13 @@ import (
 	nurl "net/url"
 	"strconv"
 	"strings"
+)
 
+import (
 	"github.com/go-sql-driver/mysql"
+)
+
+import (
 	"github.com/golang-migrate/migrate"
 	"github.com/golang-migrate/migrate/database"
 )
@@ -89,6 +94,25 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	return mx, nil
 }
 
+// urlToMySQLConfig takes a net/url URL and returns a go-sql-driver/mysql Config.
+// Manually sets username and password to avoid net/url from url-encoding the reserved URL characters
+func urlToMySQLConfig(u nurl.URL) (*mysql.Config, error) {
+	origUserInfo := u.User
+	u.User = nil
+
+	c, err := mysql.ParseDSN(strings.TrimPrefix(u.String(), "mysql://"))
+	if err != nil {
+		return nil, err
+	}
+	if origUserInfo != nil {
+		c.User = origUserInfo.Username()
+		if p, ok := origUserInfo.Password(); ok {
+			c.Passwd = p
+		}
+	}
+	return c, nil
+}
+
 func (m *Mysql) Open(url string) (database.Driver, error) {
 	purl, err := nurl.Parse(url)
 	if err != nil {
@@ -99,8 +123,11 @@ func (m *Mysql) Open(url string) (database.Driver, error) {
 	q.Set("multiStatements", "true")
 	purl.RawQuery = q.Encode()
 
-	db, err := sql.Open("mysql", strings.Replace(
-		migrate.FilterCustomQuery(purl).String(), "mysql://", "", 1))
+	c, err := urlToMySQLConfig(*migrate.FilterCustomQuery(purl))
+	if err != nil {
+		return nil, err
+	}
+	db, err := sql.Open("mysql", c.FormatDSN())
 	if err != nil {
 		return nil, err
 	}
