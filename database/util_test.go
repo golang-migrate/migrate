@@ -1,12 +1,28 @@
 package database
 
+import (
+	"testing"
+)
+
 func TestGenerateAdvisoryLockId(t *testing.T) {
-	id, err := p.generateAdvisoryLockId("database_name")
-	if err != nil {
-		t.Errorf("expected err to be nil, got %v", err)
+	testcases := []struct {
+		dbname     string
+		expectedID string // empty string signifies that an error is expected
+	}{
+		{dbname: "database_name", expectedID: "1764327054"},
 	}
-	if len(id) == 0 {
-		t.Errorf("expected generated id not to be empty")
+
+	for _, tc := range testcases {
+		t.Run(tc.dbname, func(t *testing.T) {
+			if id, err := GenerateAdvisoryLockId("database_name"); err == nil {
+				if id != tc.expectedID {
+					t.Error("Generated incorrect ID:", id, "!=", tc.expectedID)
+				}
+			} else {
+				if tc.expectedID != "" {
+					t.Error("Got unexpected error:", err)
+				}
+			}
+		})
 	}
-	t.Logf("generated id: %v", id)
 }

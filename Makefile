@@ -38,6 +38,7 @@ test-with-flags:
 
 	@go test $(TEST_FLAGS) .
 	@go test $(TEST_FLAGS) ./cli/...
+	@go test $(TEST_FLAGS) ./database
 	@go test $(TEST_FLAGS) ./testing/...
 
 	@echo -n '$(SOURCE)' | tr -s ' ' '\n' | xargs -I{} go test $(TEST_FLAGS) ./source/{}
