@@ -71,8 +71,8 @@
     "service/s3/s3iface",
     "service/sts"
   ]
-  revision = "bc3f534c19ffdf835e524e11f0f825b3eaf541c3"
-  version = "v1.14.31"
+  revision = "468b9714c11f10b22e533253b35eb9c28f4be691"
+  version = "v1.14.32"
 
 [[projects]]
   branch = "master"
@@ -363,7 +363,7 @@
   branch = "master"
   name = "golang.org/x/crypto"
   packages = ["ssh/terminal"]
-  revision = "a2144134853fc9a27a7b1e3eb4f19f1a76df13c9"
+  revision = "c126467f60eb25f8f27e5a981f32a87e3965053f"
 
 [[projects]]
   branch = "master"
@@ -380,7 +380,7 @@
     "proxy",
     "trace"
   ]
-  revision = "a680a1efc54dd51c040b3b5ce4939ea3cf2ea0d1"
+  revision = "3673e40ba22529d22c3fd7c93e97b0ce50fa7bdd"
 
 [[projects]]
   branch = "master"
@@ -392,7 +392,7 @@
     "jws",
     "jwt"
   ]
-  revision = "ef147856a6ddbb60760db74283d2424e98c87bff"
+  revision = "3d292e4d0cdc3a0113e6d207bb137145ef1de42f"
 
 [[projects]]
   branch = "master"
@@ -401,7 +401,7 @@
     "unix",
     "windows"
   ]
-  revision = "ac767d655b305d4e9612f5f6e33120b9176c4ad4"
+  revision = "e072cadbbdc8dd3d3ffa82b8b4b9304c261d9311"
 
 [[projects]]
   name = "golang.org/x/text"
@@ -431,7 +431,7 @@
     "godoc/vfs",
     "godoc/vfs/mapfs"
   ]
-  revision = "99195f4d4ffa6331a9bc856c72697a15d9842950"
+  revision = "526516e9c4bf5a3f76fe506dec01ca51d04cbe50"
 
 [[projects]]
   branch = "master"
@@ -449,7 +449,7 @@
     "transport/grpc",
     "transport/http"
   ]
-  revision = "efcb5f25ac56eae06c8b5672456c0b7767522685"
+  revision = "2c45710c7f3fb0ab63506810a1ba84325ab90ab8"
 
 [[projects]]
   name = "google.golang.org/appengine"
@@ -484,7 +484,7 @@
     "googleapis/spanner/admin/database/v1",
     "googleapis/spanner/v1"
   ]
-  revision = "fedd2861243fd1a8152376292b921b394c7bef7e"
+  revision = "02b4e95473316948020af0b7a4f0f22c73929b0e"
 
 [[projects]]
   name = "google.golang.org/grpc"
