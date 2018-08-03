@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/golang-migrate/migrate"
@@ -17,8 +18,9 @@ var DefaultMigrationsTable = "schema_migrations"
 var ErrNilConfig = fmt.Errorf("no config")
 
 type Config struct {
-	DatabaseName    string
-	MigrationsTable string
+	DatabaseName          string
+	MigrationsTable       string
+	MultiStatementEnabled bool
 }
 
 func init() {
@@ -66,8 +68,9 @@ func (ch *ClickHouse) Open(dsn string) (database.Driver, error) {
 	ch = &ClickHouse{
 		conn: conn,
 		config: &Config{
-			MigrationsTable: purl.Query().Get("x-migrations-table"),
-			DatabaseName:    purl.Query().Get("database"),
+			MigrationsTable:       purl.Query().Get("x-migrations-table"),
+			DatabaseName:          purl.Query().Get("database"),
+			MultiStatementEnabled: purl.Query().Get("x-multi-statement") == "true",
 		},
 	}
 
@@ -97,6 +100,22 @@ func (ch *ClickHouse) Run(r io.Reader) error {
 	if err != nil {
 		return err
 	}
+
+	if ch.config.MultiStatementEnabled {
+		// split query by semi-colon
+		queries := strings.Split(string(migration), ";")
+		for _, q := range queries {
+			tq := strings.TrimSpace(q)
+			if tq == "" {
+				continue
+			}
+			if _, err := ch.conn.Exec(string(q)); err != nil {
+				return database.Error{OrigErr: err, Err: "migration failed", Query: []byte(q)}
+			}
+		}
+		return nil
+	}
+
 	if _, err := ch.conn.Exec(string(migration)); err != nil {
 		return database.Error{OrigErr: err, Err: "migration failed", Query: migration}
 	}
