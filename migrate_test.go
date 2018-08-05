@@ -375,6 +375,60 @@ func TestStepsDirty(t *testing.T) {
 	}
 }
 
+func TestAllCombinations(t *testing.T) {
+	m, _ := New("stub://", "stub://")
+	m.sourceDrv.(*sStub.Stub).Migrations = sourceStubMigrations
+	dbDrv := m.databaseDrv.(*dStub.Stub)
+
+	if err := m.AllCombinations(); err != nil {
+		t.Fatal(err)
+	}
+
+	expectedSequence := []*Migration{
+		// Go all the way up first
+		MR("CREATE 1"),
+		MR("CREATE 3"),
+		MR("CREATE 4"),
+		MR("CREATE 7"),
+
+		// Step down 1 level and then back up
+		MR("DROP 7"),
+		MR("CREATE 7"),
+
+		// Step down 2 levels and then back up
+		MR("DROP 7"),
+		MR("DROP 5"),
+		MR("CREATE 7"),
+
+		// Step down 3 levels and then back up
+		MR("DROP 7"),
+		MR("DROP 5"),
+		MR("DROP 4"),
+		MR("CREATE 4"),
+		MR("CREATE 7"),
+
+		// Step down 4 levels and then back up
+		MR("DROP 7"),
+		MR("DROP 5"),
+		MR("DROP 4"),
+		MR("CREATE 3"),
+		MR("CREATE 4"),
+		MR("CREATE 7"),
+
+		// Step down all levels and then back up
+		MR("DROP 7"),
+		MR("DROP 5"),
+		MR("DROP 4"),
+		MR("DROP 1"),
+		MR("CREATE 1"),
+		MR("CREATE 3"),
+		MR("CREATE 4"),
+		MR("CREATE 7"),
+	}
+
+	equalDbSeq(t, 1, expectedSequence, dbDrv)
+}
+
 func TestUpAndDown(t *testing.T) {
 	m, _ := New("stub://", "stub://")
 	m.sourceDrv.(*sStub.Stub).Migrations = sourceStubMigrations
