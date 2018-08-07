@@ -72,14 +72,14 @@ func (s *Stub) Next(version uint) (nextVersion uint, err error) {
 
 func (s *Stub) ReadUp(version uint) (r io.ReadCloser, identifier string, err error) {
 	if m, ok := s.Migrations.Up(version); ok {
-		return ioutil.NopCloser(bytes.NewBufferString(m.Identifier)), fmt.Sprintf("%v.up.stub", version), nil
+		return ioutil.NopCloser(bytes.NewBufferString(m.Raw)), fmt.Sprintf("%v.up.stub", version), nil
 	}
 	return nil, "", &os.PathError{fmt.Sprintf("read up version %v", version), s.Url, os.ErrNotExist}
 }
 
 func (s *Stub) ReadDown(version uint) (r io.ReadCloser, identifier string, err error) {
 	if m, ok := s.Migrations.Down(version); ok {
-		return ioutil.NopCloser(bytes.NewBufferString(m.Identifier)), fmt.Sprintf("%v.down.stub", version), nil
+		return ioutil.NopCloser(bytes.NewBufferString(m.Raw)), fmt.Sprintf("%v.down.stub", version), nil
 	}
 	return nil, "", &os.PathError{fmt.Sprintf("read down version %v", version), s.Url, os.ErrNotExist}
 }

@@ -101,6 +101,15 @@ func gotoCmd(m *migrate.Migrate, v uint) {
 	}
 }
 
+func allCombinationsCmd(m *migrate.Migrate) {
+	err := m.AllCombinations()
+	if err != migrate.ErrNoChange {
+		log.fatalErr(err)
+	} else {
+		log.Println(err)
+	}
+}
+
 func upCmd(m *migrate.Migrate, limit int) {
 	if limit >= 0 {
 		if err := m.Steps(limit); err != nil {

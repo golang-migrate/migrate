@@ -21,14 +21,14 @@ var sourceStubMigrations *source.Migrations
 
 func init() {
 	sourceStubMigrations = source.NewMigrations()
-	sourceStubMigrations.Append(&source.Migration{Version: 1, Direction: source.Up})
-	sourceStubMigrations.Append(&source.Migration{Version: 1, Direction: source.Down})
-	sourceStubMigrations.Append(&source.Migration{Version: 3, Direction: source.Up})
-	sourceStubMigrations.Append(&source.Migration{Version: 4, Direction: source.Up})
-	sourceStubMigrations.Append(&source.Migration{Version: 4, Direction: source.Down})
-	sourceStubMigrations.Append(&source.Migration{Version: 5, Direction: source.Down})
-	sourceStubMigrations.Append(&source.Migration{Version: 7, Direction: source.Up})
-	sourceStubMigrations.Append(&source.Migration{Version: 7, Direction: source.Down})
+	sourceStubMigrations.Append(&source.Migration{Version: 1, Direction: source.Up, Raw: "CREATE 1"})
+	sourceStubMigrations.Append(&source.Migration{Version: 1, Direction: source.Down, Raw: "DROP 1"})
+	sourceStubMigrations.Append(&source.Migration{Version: 3, Direction: source.Up, Raw: "CREATE 3"})
+	sourceStubMigrations.Append(&source.Migration{Version: 4, Direction: source.Up, Raw: "CREATE 4"})
+	sourceStubMigrations.Append(&source.Migration{Version: 4, Direction: source.Down, Raw: "DROP 4"})
+	sourceStubMigrations.Append(&source.Migration{Version: 5, Direction: source.Down, Raw: "DROP 5"})
+	sourceStubMigrations.Append(&source.Migration{Version: 7, Direction: source.Up, Raw: "CREATE 7"})
+	sourceStubMigrations.Append(&source.Migration{Version: 7, Direction: source.Down, Raw: "DROP 7"})
 }
 
 type DummyInstance struct{ Name string }
@@ -233,33 +233,33 @@ func TestMigrate(t *testing.T) {
 		expectSeq     migrationSequence
 	}{
 		// migrate all the way Up in single steps
-		{version: 0, expectErr: os.ErrNotExist},
-		{version: 1, expectErr: nil, expectVersion: 1, expectSeq: seq.add(M(1))},
-		{version: 2, expectErr: os.ErrNotExist},
-		{version: 3, expectErr: nil, expectVersion: 3, expectSeq: seq.add(M(3))},
-		{version: 4, expectErr: nil, expectVersion: 4, expectSeq: seq.add(M(4))},
+		{version: 0, expectErr: os.ErrNotExist, expectSeq: seq.add()},
+		{version: 1, expectErr: nil, expectVersion: 1, expectSeq: seq.add(MR("CREATE 1"))},
+		{version: 2, expectErr: os.ErrNotExist, expectSeq: seq.add()},
+		{version: 3, expectErr: nil, expectVersion: 3, expectSeq: seq.add(MR("CREATE 3"))},
+		{version: 4, expectErr: nil, expectVersion: 4, expectSeq: seq.add(MR("CREATE 4"))},
 		{version: 5, expectErr: nil, expectVersion: 5, expectSeq: seq.add()}, // 5 has no up migration
-		{version: 6, expectErr: os.ErrNotExist},
-		{version: 7, expectErr: nil, expectVersion: 7, expectSeq: seq.add(M(7))},
-		{version: 8, expectErr: os.ErrNotExist},
+		{version: 6, expectErr: os.ErrNotExist, expectSeq: seq.add()},
+		{version: 7, expectErr: nil, expectVersion: 7, expectSeq: seq.add(MR("CREATE 7"))},
+		{version: 8, expectErr: os.ErrNotExist, expectSeq: seq.add()},
 
 		// migrate all the way Down in single steps
-		{version: 6, expectErr: os.ErrNotExist},
-		{version: 5, expectErr: nil, expectVersion: 5, expectSeq: seq.add(M(7, 5))},
-		{version: 4, expectErr: nil, expectVersion: 4, expectSeq: seq.add(M(5, 4))},
-		{version: 3, expectErr: nil, expectVersion: 3, expectSeq: seq.add(M(4, 3))},
-		{version: 2, expectErr: os.ErrNotExist},
+		{version: 6, expectErr: os.ErrNotExist, expectSeq: seq.add()},
+		{version: 5, expectErr: nil, expectVersion: 5, expectSeq: seq.add(MR("DROP 7"))},
+		{version: 4, expectErr: nil, expectVersion: 4, expectSeq: seq.add(MR("DROP 5"))},
+		{version: 3, expectErr: nil, expectVersion: 3, expectSeq: seq.add(MR("DROP 4"))},
+		{version: 2, expectErr: os.ErrNotExist, expectSeq: seq.add()},
 		{version: 1, expectErr: nil, expectVersion: 1, expectSeq: seq.add()}, // 3 has no down migration
-		{version: 0, expectErr: os.ErrNotExist},
+		{version: 0, expectErr: os.ErrNotExist, expectSeq: seq.add()},
 
 		// migrate all the way Up in one step
-		{version: 7, expectErr: nil, expectVersion: 7, expectSeq: seq.add(M(3), M(4), M(7))},
+		{version: 7, expectErr: nil, expectVersion: 7, expectSeq: seq.add(MR("CREATE 3"), MR("CREATE 4"), MR("CREATE 7"))},
 
 		// migrate all the way Down in one step
-		{version: 1, expectErr: nil, expectVersion: 1, expectSeq: seq.add(M(7, 5), M(5, 4), M(4, 3), M(3, 1))},
+		{version: 1, expectErr: nil, expectVersion: 1, expectSeq: seq.add(MR("DROP 7"), MR("DROP 5"), MR("DROP 4"))},
 
 		// can't migrate the same version twice
-		{version: 1, expectErr: ErrNoChange},
+		{version: 1, expectErr: ErrNoChange, expectSeq: seq.add()},
 	}
 
 	for i, v := range tt {
@@ -276,8 +276,8 @@ func TestMigrate(t *testing.T) {
 			if version != v.expectVersion {
 				t.Errorf("expected version %v, got %v, in %v", v.expectVersion, version, i)
 			}
-			equalDbSeq(t, i, v.expectSeq, dbDrv)
 		}
+		equalDbSeq(t, i, v.expectSeq, dbDrv)
 	}
 }
 
@@ -313,31 +313,31 @@ func TestSteps(t *testing.T) {
 		{n: -1, expectErr: os.ErrNotExist},
 
 		// migrate all the way Up
-		{n: 1, expectErr: nil, expectVersion: 1, expectSeq: seq.add(M(1))},
-		{n: 1, expectErr: nil, expectVersion: 3, expectSeq: seq.add(M(3))},
-		{n: 1, expectErr: nil, expectVersion: 4, expectSeq: seq.add(M(4))},
+		{n: 1, expectErr: nil, expectVersion: 1, expectSeq: seq.add(MR("CREATE 1"))},
+		{n: 1, expectErr: nil, expectVersion: 3, expectSeq: seq.add(MR("CREATE 3"))},
+		{n: 1, expectErr: nil, expectVersion: 4, expectSeq: seq.add(MR("CREATE 4"))},
 		{n: 1, expectErr: nil, expectVersion: 5, expectSeq: seq.add()},
-		{n: 1, expectErr: nil, expectVersion: 7, expectSeq: seq.add(M(7))},
-		{n: 1, expectErr: os.ErrNotExist},
+		{n: 1, expectErr: nil, expectVersion: 7, expectSeq: seq.add(MR("CREATE 7"))},
+		{n: 1, expectErr: os.ErrNotExist, expectSeq: seq.add()},
 
 		// migrate all the way Down
-		{n: -1, expectErr: nil, expectVersion: 5, expectSeq: seq.add(M(7, 5))},
-		{n: -1, expectErr: nil, expectVersion: 4, expectSeq: seq.add(M(5, 4))},
-		{n: -1, expectErr: nil, expectVersion: 3, expectSeq: seq.add(M(4, 3))},
-		{n: -1, expectErr: nil, expectVersion: 1, expectSeq: seq.add(M(3, 1))},
-		{n: -1, expectErr: nil, expectVersion: -1, expectSeq: seq.add(M(1, -1))},
+		{n: -1, expectErr: nil, expectVersion: 5, expectSeq: seq.add(MR("DROP 7"))},
+		{n: -1, expectErr: nil, expectVersion: 4, expectSeq: seq.add(MR("DROP 5"))},
+		{n: -1, expectErr: nil, expectVersion: 3, expectSeq: seq.add(MR("DROP 4"))},
+		{n: -1, expectErr: nil, expectVersion: 1, expectSeq: seq.add()},
+		{n: -1, expectErr: nil, expectVersion: -1, expectSeq: seq.add(MR("DROP 1"))},
 
 		// migrate Up in bigger step
-		{n: 4, expectErr: nil, expectVersion: 5, expectSeq: seq.add(M(1), M(3), M(4), M(5))},
+		{n: 4, expectErr: nil, expectVersion: 5, expectSeq: seq.add(MR("CREATE 1"), MR("CREATE 3"), MR("CREATE 4"))},
 
 		// apply one migration, then reaches out of boundary
-		{n: 2, expectErr: ErrShortLimit{1}, expectVersion: 7, expectSeq: seq.add(M(7))},
+		{n: 2, expectErr: ErrShortLimit{1}, expectVersion: 7, expectSeq: seq.add(MR("CREATE 7"))},
 
 		// migrate Down in bigger step
-		{n: -4, expectErr: nil, expectVersion: 1, expectSeq: seq.add(M(7, 5), M(5, 4), M(4, 3), M(3, 1))},
+		{n: -4, expectErr: nil, expectVersion: 1, expectSeq: seq.add(MR("DROP 7"), MR("DROP 5"), MR("DROP 4"))},
 
 		// apply one migration, then reaches out of boundary
-		{n: -2, expectErr: ErrShortLimit{1}, expectVersion: -1, expectSeq: seq.add(M(1, -1))},
+		{n: -2, expectErr: ErrShortLimit{1}, expectVersion: -1, expectSeq: seq.add(MR("DROP 1"))},
 	}
 
 	for i, v := range tt {
@@ -357,8 +357,8 @@ func TestSteps(t *testing.T) {
 			} else if v.expectVersion >= 0 && version != uint(v.expectVersion) {
 				t.Errorf("expected version %v, got %v, in %v", v.expectVersion, version, i)
 			}
-			equalDbSeq(t, i, v.expectSeq, dbDrv)
 		}
+		equalDbSeq(t, i, v.expectSeq, dbDrv)
 	}
 }
 
@@ -375,6 +375,60 @@ func TestStepsDirty(t *testing.T) {
 	}
 }
 
+func TestAllCombinations(t *testing.T) {
+	m, _ := New("stub://", "stub://")
+	m.sourceDrv.(*sStub.Stub).Migrations = sourceStubMigrations
+	dbDrv := m.databaseDrv.(*dStub.Stub)
+
+	if err := m.AllCombinations(); err != nil {
+		t.Fatal(err)
+	}
+
+	expectedSequence := []*Migration{
+		// Go all the way up first
+		MR("CREATE 1"),
+		MR("CREATE 3"),
+		MR("CREATE 4"),
+		MR("CREATE 7"),
+
+		// Step down 1 level and then back up
+		MR("DROP 7"),
+		MR("CREATE 7"),
+
+		// Step down 2 levels and then back up
+		MR("DROP 7"),
+		MR("DROP 5"),
+		MR("CREATE 7"),
+
+		// Step down 3 levels and then back up
+		MR("DROP 7"),
+		MR("DROP 5"),
+		MR("DROP 4"),
+		MR("CREATE 4"),
+		MR("CREATE 7"),
+
+		// Step down 4 levels and then back up
+		MR("DROP 7"),
+		MR("DROP 5"),
+		MR("DROP 4"),
+		MR("CREATE 3"),
+		MR("CREATE 4"),
+		MR("CREATE 7"),
+
+		// Step down all levels and then back up
+		MR("DROP 7"),
+		MR("DROP 5"),
+		MR("DROP 4"),
+		MR("DROP 1"),
+		MR("CREATE 1"),
+		MR("CREATE 3"),
+		MR("CREATE 4"),
+		MR("CREATE 7"),
+	}
+
+	equalDbSeq(t, 1, expectedSequence, dbDrv)
+}
+
 func TestUpAndDown(t *testing.T) {
 	m, _ := New("stub://", "stub://")
 	m.sourceDrv.(*sStub.Stub).Migrations = sourceStubMigrations
@@ -385,31 +439,33 @@ func TestUpAndDown(t *testing.T) {
 	if err := m.Up(); err != nil {
 		t.Fatal(err)
 	}
-	equalDbSeq(t, 0, seq.add(M(1), M(3), M(4), M(5), M(7)), dbDrv)
+	equalDbSeq(t, 0, seq.add(MR("CREATE 1"), MR("CREATE 3"), MR("CREATE 4"), MR("CREATE 7")), dbDrv)
 
 	// go Down
 	if err := m.Down(); err != nil {
 		t.Fatal(err)
 	}
-	equalDbSeq(t, 1, seq.add(M(7, 5), M(5, 4), M(4, 3), M(3, 1), M(1, -1)), dbDrv)
+	equalDbSeq(t, 1, seq.add(MR("DROP 7"), MR("DROP 5"), MR("DROP 4"), MR("DROP 1")), dbDrv)
 
 	// go 1 Up and then all the way Up
 	if err := m.Steps(1); err != nil {
 		t.Fatal(err)
 	}
+	equalDbSeq(t, 2, seq.add(MR("CREATE 1")), dbDrv)
 	if err := m.Up(); err != nil {
 		t.Fatal(err)
 	}
-	equalDbSeq(t, 2, seq.add(M(1), M(3), M(4), M(5), M(7)), dbDrv)
+	equalDbSeq(t, 3, seq.add(MR("CREATE 3"), MR("CREATE 4"), MR("CREATE 7")), dbDrv)
 
 	// go 1 Down and then all the way Down
 	if err := m.Steps(-1); err != nil {
 		t.Fatal(err)
 	}
+	equalDbSeq(t, 1, seq.add(MR("DROP 7")), dbDrv)
 	if err := m.Down(); err != nil {
 		t.Fatal(err)
 	}
-	equalDbSeq(t, 0, seq.add(M(7, 5), M(5, 4), M(4, 3), M(3, 1), M(1, -1)), dbDrv)
+	equalDbSeq(t, 1, seq.add(MR("DROP 5"), MR("DROP 4"), MR("DROP 1")), dbDrv)
 }
 
 func TestUpDirty(t *testing.T) {
@@ -892,6 +948,8 @@ func (m *migrationSequence) bodySequence() []string {
 			v.Body = ioutil.NopCloser(bytes.NewReader(body))
 
 			r = append(r, string(body[:]))
+		} else {
+			r = append(r, "<empty>")
 		}
 	}
 	return r
@@ -914,6 +972,13 @@ func M(version uint, targetVersion ...int) *Migration {
 		panic(err)
 	}
 	return migr
+}
+
+// MR is a convenience func to create a new *Migration from the raw database query
+func MR(value string) *Migration {
+	return &Migration{
+		Body: ioutil.NopCloser(bytes.NewReader([]byte(value))),
+	}
 }
 
 func equalMigSeq(t *testing.T, i int, expected, got migrationSequence) {

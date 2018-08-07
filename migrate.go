@@ -257,6 +257,47 @@ func (m *Migrate) Steps(n int) error {
 	return m.unlockErr(m.runMigrations(ret))
 }
 
+// AllCombinations migrates a database schema upward and downward to test all
+// combinations.
+//
+// For a schema with 10 migrations, the function proceeds like this:
+// v10 -> v9 -> v10
+// v10 -> v9 -> v8 -> v9 -> v10
+// v10 -> v9 -> v8 -> v7 -> v8 -> v9 -> v10
+// etc.
+//
+// We want to step through each combination of upward and downward migrations to detect
+// problems that might otherwise be obfuscated by `DROP TABLE` statements in initial
+// 'down' migration files.
+func (m *Migrate) AllCombinations() error {
+	err := m.Up()
+	if err != nil {
+		return err
+	}
+
+	topVersion, dirty, err := m.databaseDrv.Version()
+	if err != nil {
+		return m.unlockErr(err)
+	}
+	if dirty {
+		return m.unlockErr(ErrDirty{topVersion})
+	}
+
+	for i := 1; i < topVersion-1; i++ {
+		err = m.Steps(-i)
+		if err != nil {
+			return err
+		}
+
+		err = m.Up()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // Up looks at the currently active migration version
 // and will migrate all the way up (applying all up migrations).
 func (m *Migrate) Up() error {
