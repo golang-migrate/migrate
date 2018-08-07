@@ -395,16 +395,16 @@ func (m *Migrate) read(from int, to int, ret chan<- interface{}) {
 
 	// check if from version exists
 	if from >= 0 {
-		if m.versionExists(suint(from)) != nil {
-			ret <- os.ErrNotExist
+		if err := m.versionExists(suint(from)); err != nil {
+			ret <- err
 			return
 		}
 	}
 
 	// check if to version exists
 	if to >= 0 {
-		if m.versionExists(suint(to)) != nil {
-			ret <- os.ErrNotExist
+		if err := m.versionExists(suint(to)); err != nil {
+			ret <- err
 			return
 		}
 	}
@@ -507,8 +507,8 @@ func (m *Migrate) readUp(from int, limit int, ret chan<- interface{}) {
 
 	// check if from version exists
 	if from >= 0 {
-		if m.versionExists(suint(from)) != nil {
-			ret <- os.ErrNotExist
+		if err := m.versionExists(suint(from)); err != nil {
+			ret <- err
 			return
 		}
 	}
@@ -599,8 +599,8 @@ func (m *Migrate) readDown(from int, limit int, ret chan<- interface{}) {
 
 	// check if from version exists
 	if from >= 0 {
-		if m.versionExists(suint(from)) != nil {
-			ret <- os.ErrNotExist
+		if err := m.versionExists(suint(from)); err != nil {
+			ret <- err
 			return
 		}
 	}
