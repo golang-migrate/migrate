@@ -84,7 +84,7 @@ __[CLI Documentation](cli)__
 ### Basic usage:
 
 ```
-$ migrate -database postgres://localhost:5432/database up 2
+$ migrate -source file://path/to/migrations -database postgres://localhost:5432/database up 2
 ```
 
 ### Docker usage

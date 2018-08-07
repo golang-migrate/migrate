@@ -78,7 +78,7 @@ Commands:
 So let's say you want to run the first two migrations
 
 ```
-$ migrate -database postgres://localhost:5432/database up 2
+$ migrate -source file://path/to/migrations -database postgres://localhost:5432/database up 2
 ```
 
 If your migrations are hosted on github
