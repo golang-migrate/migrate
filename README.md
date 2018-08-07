@@ -20,6 +20,8 @@ __Database migrations written in Go. Use as [CLI](#cli-usage) or import as [libr
 
 Looking for [v1](https://github.com/golang-migrate/migrate/tree/v1)?
 
+Forked from [mattes/migrate](https://github.com/mattes/migrate)
+
 
 ## Databases
 
