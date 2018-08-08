@@ -82,13 +82,13 @@ type Migrate struct {
 func New(sourceUrl, databaseUrl string) (*Migrate, error) {
 	m := newCommon()
 
-	sourceName, err := schemeFromUrl(sourceUrl)
+	sourceName, err := sourceSchemeFromUrl(sourceUrl)
 	if err != nil {
 		return nil, err
 	}
 	m.sourceName = sourceName
 
-	databaseName, err := schemeFromUrl(databaseUrl)
+	databaseName, err := databaseSchemeFromUrl(databaseUrl)
 	if err != nil {
 		return nil, err
 	}
