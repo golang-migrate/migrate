@@ -18,11 +18,11 @@ import (
 )
 
 var versions = []mt.Version{
+	{Image: "postgres:10"},
 	{Image: "postgres:9.6"},
 	{Image: "postgres:9.5"},
 	{Image: "postgres:9.4"},
 	{Image: "postgres:9.3"},
-	{Image: "postgres:9.2"},
 }
 
 func pgConnectionString(host string, port uint) string {
