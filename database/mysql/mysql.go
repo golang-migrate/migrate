@@ -123,15 +123,6 @@ func (m *Mysql) Open(url string) (database.Driver, error) {
 	q.Set("multiStatements", "true")
 	purl.RawQuery = q.Encode()
 
-	c, err := urlToMySQLConfig(*migrate.FilterCustomQuery(purl))
-	if err != nil {
-		return nil, err
-	}
-	db, err := sql.Open("mysql", c.FormatDSN())
-	if err != nil {
-		return nil, err
-	}
-
 	migrationsTable := purl.Query().Get("x-migrations-table")
 	if len(migrationsTable) == 0 {
 		migrationsTable = DefaultMigrationsTable
@@ -151,9 +142,13 @@ func (m *Mysql) Open(url string) (database.Driver, error) {
 				return nil, ErrAppendPEM
 			}
 
-			certs, err := tls.LoadX509KeyPair(purl.Query().Get("x-tls-cert"), purl.Query().Get("x-tls-key"))
-			if err != nil {
-				return nil, err
+			clientCert := make([]tls.Certificate, 0, 1)
+			if purl.Query().Get("x-tls-cert") != "" && purl.Query().Get("x-tls-key") != "" {
+				certs, err := tls.LoadX509KeyPair(purl.Query().Get("x-tls-cert"), purl.Query().Get("x-tls-key"))
+				if err != nil {
+					return nil, err
+				}
+				clientCert = append(clientCert, certs)
 			}
 
 			insecureSkipVerify := false
@@ -167,10 +162,19 @@ func (m *Mysql) Open(url string) (database.Driver, error) {
 
 			mysql.RegisterTLSConfig(ctls, &tls.Config{
 				RootCAs:            rootCertPool,
-				Certificates:       []tls.Certificate{certs},
+				Certificates:       clientCert,
 				InsecureSkipVerify: insecureSkipVerify,
 			})
 		}
+	}
+
+	c, err := urlToMySQLConfig(*migrate.FilterCustomQuery(purl))
+	if err != nil {
+		return nil, err
+	}
+	db, err := sql.Open("mysql", c.FormatDSN())
+	if err != nil {
+		return nil, err
 	}
 
 	mx, err := WithInstance(db, &Config{

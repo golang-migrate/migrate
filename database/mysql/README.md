@@ -10,6 +10,7 @@
 | `password` | | The user's password | 
 | `host` | | The host to connect to. |
 | `port` | | The port to bind to. |
+| `tls`  | | The custom TLS config name, use with `x-tls-` queries. |
 | `x-tls-ca` | | The location of the root certificate file. |
 | `x-tls-cert` | | Cert file location. |
 | `x-tls-key` | | Key file location. | 
