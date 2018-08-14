@@ -143,8 +143,8 @@ func (m *Mysql) Open(url string) (database.Driver, error) {
 			}
 
 			clientCert := make([]tls.Certificate, 0, 1)
-			if purl.Query().Get("x-tls-cert") != "" && purl.Query().Get("x-tls-key") != "" {
-				certs, err := tls.LoadX509KeyPair(purl.Query().Get("x-tls-cert"), purl.Query().Get("x-tls-key"))
+			if ccert, ckey := purl.Query().Get("x-tls-cert"), purl.Query().Get("x-tls-key"); ccert != "" || ckey != "" {
+				certs, err := tls.LoadX509KeyPair(ccert, ckey)
 				if err != nil {
 					return nil, err
 				}
