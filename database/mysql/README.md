@@ -10,7 +10,7 @@
 | `password` | | The user's password | 
 | `host` | | The host to connect to. |
 | `port` | | The port to bind to. |
-| `tls`  | | The custom TLS config name, use with `x-tls-` queries. |
+| `tls`  | | TLS / SSL encrypted connection parameter; see [go-sql-driver](https://github.com/go-sql-driver/mysql#tls). Use any name (e.g. `migrate`) if you want to use a custom TLS config (`x-tls-` queries). |
 | `x-tls-ca` | | The location of the root certificate file. |
 | `x-tls-cert` | | Cert file location. |
 | `x-tls-key` | | Key file location. | 
