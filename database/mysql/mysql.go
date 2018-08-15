@@ -35,6 +35,7 @@ var (
 	ErrNilConfig      = fmt.Errorf("no config")
 	ErrNoDatabaseName = fmt.Errorf("no database name")
 	ErrAppendPEM      = fmt.Errorf("failed to append PEM")
+	ErrTLSCertKeyConfig = fmt.Errorf("To use TLS client authentication, both x-tls-cert and x-tls-key must not be empty")
 )
 
 type Config struct {
@@ -123,15 +124,6 @@ func (m *Mysql) Open(url string) (database.Driver, error) {
 	q.Set("multiStatements", "true")
 	purl.RawQuery = q.Encode()
 
-	c, err := urlToMySQLConfig(*migrate.FilterCustomQuery(purl))
-	if err != nil {
-		return nil, err
-	}
-	db, err := sql.Open("mysql", c.FormatDSN())
-	if err != nil {
-		return nil, err
-	}
-
 	migrationsTable := purl.Query().Get("x-migrations-table")
 	if len(migrationsTable) == 0 {
 		migrationsTable = DefaultMigrationsTable
@@ -151,9 +143,16 @@ func (m *Mysql) Open(url string) (database.Driver, error) {
 				return nil, ErrAppendPEM
 			}
 
-			certs, err := tls.LoadX509KeyPair(purl.Query().Get("x-tls-cert"), purl.Query().Get("x-tls-key"))
-			if err != nil {
-				return nil, err
+			clientCert := make([]tls.Certificate, 0, 1)
+			if ccert, ckey := purl.Query().Get("x-tls-cert"), purl.Query().Get("x-tls-key"); ccert != "" || ckey != "" {
+				if ccert == "" || ckey == "" {
+					return nil, ErrTLSCertKeyConfig
+				}
+				certs, err := tls.LoadX509KeyPair(ccert, ckey)
+				if err != nil {
+					return nil, err
+				}
+				clientCert = append(clientCert, certs)
 			}
 
 			insecureSkipVerify := false
@@ -167,10 +166,19 @@ func (m *Mysql) Open(url string) (database.Driver, error) {
 
 			mysql.RegisterTLSConfig(ctls, &tls.Config{
 				RootCAs:            rootCertPool,
-				Certificates:       []tls.Certificate{certs},
+				Certificates:       clientCert,
 				InsecureSkipVerify: insecureSkipVerify,
 			})
 		}
+	}
+
+	c, err := urlToMySQLConfig(*migrate.FilterCustomQuery(purl))
+	if err != nil {
+		return nil, err
+	}
+	db, err := sql.Open("mysql", c.FormatDSN())
+	if err != nil {
+		return nil, err
 	}
 
 	mx, err := WithInstance(db, &Config{
