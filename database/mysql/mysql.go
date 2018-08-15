@@ -35,6 +35,7 @@ var (
 	ErrNilConfig      = fmt.Errorf("no config")
 	ErrNoDatabaseName = fmt.Errorf("no database name")
 	ErrAppendPEM      = fmt.Errorf("failed to append PEM")
+	ErrTLSCertKeyConfig = fmt.Errorf("To use TLS client authentication, both x-tls-cert and x-tls-key must not be empty")
 )
 
 type Config struct {
@@ -144,6 +145,9 @@ func (m *Mysql) Open(url string) (database.Driver, error) {
 
 			clientCert := make([]tls.Certificate, 0, 1)
 			if ccert, ckey := purl.Query().Get("x-tls-cert"), purl.Query().Get("x-tls-key"); ccert != "" || ckey != "" {
+				if ccert == "" || ckey == "" {
+					return nil, ErrTLSCertKeyConfig
+				}
 				certs, err := tls.LoadX509KeyPair(ccert, ckey)
 				if err != nil {
 					return nil, err
