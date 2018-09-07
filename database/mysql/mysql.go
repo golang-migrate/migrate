@@ -31,10 +31,10 @@ func init() {
 var DefaultMigrationsTable = "schema_migrations"
 
 var (
-	ErrDatabaseDirty  = fmt.Errorf("database is dirty")
-	ErrNilConfig      = fmt.Errorf("no config")
-	ErrNoDatabaseName = fmt.Errorf("no database name")
-	ErrAppendPEM      = fmt.Errorf("failed to append PEM")
+	ErrDatabaseDirty    = fmt.Errorf("database is dirty")
+	ErrNilConfig        = fmt.Errorf("no config")
+	ErrNoDatabaseName   = fmt.Errorf("no database name")
+	ErrAppendPEM        = fmt.Errorf("failed to append PEM")
 	ErrTLSCertKeyConfig = fmt.Errorf("To use TLS client authentication, both x-tls-cert and x-tls-key must not be empty")
 )
 
@@ -47,6 +47,7 @@ type Mysql struct {
 	// mysql RELEASE_LOCK must be called from the same conn, so
 	// just do everything over a single conn anyway.
 	conn     *sql.Conn
+	db       *sql.DB
 	isLocked bool
 
 	config *Config
@@ -85,6 +86,7 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 
 	mx := &Mysql{
 		conn:   conn,
+		db:     instance,
 		config: config,
 	}
 
@@ -193,7 +195,12 @@ func (m *Mysql) Open(url string) (database.Driver, error) {
 }
 
 func (m *Mysql) Close() error {
-	return m.conn.Close()
+	connErr := m.conn.Close()
+	dbErr := m.db.Close()
+	if connErr != nil || dbErr != nil {
+		return fmt.Errorf("conn: %v, db: %v", connErr, dbErr)
+	}
+	return nil
 }
 
 func (m *Mysql) Lock() error {
