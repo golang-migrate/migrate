@@ -40,6 +40,7 @@ type Config struct {
 type Postgres struct {
 	// Locking and unlocking need to use the same connection
 	conn     *sql.Conn
+	db       *sql.DB
 	isLocked bool
 
 	// Open and WithInstance need to garantuee that config is never nil
@@ -79,6 +80,7 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 
 	px := &Postgres{
 		conn:   conn,
+		db:     instance,
 		config: config,
 	}
 
@@ -117,7 +119,12 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 }
 
 func (p *Postgres) Close() error {
-	return p.conn.Close()
+	connErr := p.conn.Close()
+	dbErr := p.db.Close()
+	if connErr != nil || dbErr != nil {
+		return fmt.Errorf("conn: %v, db: %v", connErr, dbErr)
+	}
+	return nil
 }
 
 // https://www.postgresql.org/docs/9.6/static/explicit-locking.html#ADVISORY-LOCKS
