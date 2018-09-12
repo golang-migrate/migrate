@@ -34,12 +34,12 @@
   version = "v0.4.9"
 
 [[projects]]
-  digest = "1:d867dfa6751c8d7a435821ad3b736310c2ed68945d05b50fb9d23aee0540c8cc"
+  branch = "master"
+  digest = "1:e401263ad228a4761a67c1de1438187c769c7bd4733067e9642816e303ba4c2f"
   name = "github.com/Sirupsen/logrus"
   packages = ["."]
   pruneopts = "UT"
-  revision = "3e01752db0189b9157070a0e1668a620f9a85da2"
-  version = "v1.0.6"
+  revision = "f3df9aeffda7c12bd9f5a03f9251d75d35993165"
 
 [[projects]]
   digest = "1:1a42d6d0e8fe8cc1024ed542c5f8a0bc7346a292701b3bd94a07996f29fcbd38"
@@ -282,6 +282,39 @@
   ]
   pruneopts = "UT"
   revision = "e06f8c1bcd787e6bf0608288b314522f08cc7848"
+
+[[projects]]
+  digest = "1:56a4c5b0ea79d81320468aac2c43c0f4295181dce20148fef2227c40f2b34644"
+  name = "github.com/golang-migrate/migrate"
+  packages = [
+    ".",
+    "database",
+    "database/cassandra",
+    "database/clickhouse",
+    "database/cockroachdb",
+    "database/mysql",
+    "database/postgres",
+    "database/ql",
+    "database/redshift",
+    "database/spanner",
+    "database/sqlite3",
+    "database/stub",
+    "database/testing",
+    "source",
+    "source/aws_s3",
+    "source/file",
+    "source/github",
+    "source/go_bindata",
+    "source/go_bindata/testdata",
+    "source/godoc_vfs",
+    "source/google_cloud_storage",
+    "source/stub",
+    "source/testing",
+    "testing",
+  ]
+  pruneopts = "UT"
+  revision = "93d53a5ae84d81945eedadfe8f6865530d61d51c"
+  version = "v3.5.1"
 
 [[projects]]
   digest = "1:d6d8ef66dbf92848883e228323ca4ee7404eb4fe3681c0e0395f515f128e0d29"
@@ -632,6 +665,7 @@
     "cloud.google.com/go/spanner",
     "cloud.google.com/go/spanner/admin/database/apiv1",
     "cloud.google.com/go/storage",
+    "github.com/Sirupsen/logrus",
     "github.com/aws/aws-sdk-go/aws",
     "github.com/aws/aws-sdk-go/aws/session",
     "github.com/aws/aws-sdk-go/service/s3",
@@ -645,6 +679,30 @@
     "github.com/fsouza/fake-gcs-server/fakestorage",
     "github.com/go-sql-driver/mysql",
     "github.com/gocql/gocql",
+    "github.com/golang-migrate/migrate",
+    "github.com/golang-migrate/migrate/database",
+    "github.com/golang-migrate/migrate/database/cassandra",
+    "github.com/golang-migrate/migrate/database/clickhouse",
+    "github.com/golang-migrate/migrate/database/cockroachdb",
+    "github.com/golang-migrate/migrate/database/mysql",
+    "github.com/golang-migrate/migrate/database/postgres",
+    "github.com/golang-migrate/migrate/database/ql",
+    "github.com/golang-migrate/migrate/database/redshift",
+    "github.com/golang-migrate/migrate/database/spanner",
+    "github.com/golang-migrate/migrate/database/sqlite3",
+    "github.com/golang-migrate/migrate/database/stub",
+    "github.com/golang-migrate/migrate/database/testing",
+    "github.com/golang-migrate/migrate/source",
+    "github.com/golang-migrate/migrate/source/aws_s3",
+    "github.com/golang-migrate/migrate/source/file",
+    "github.com/golang-migrate/migrate/source/github",
+    "github.com/golang-migrate/migrate/source/go_bindata",
+    "github.com/golang-migrate/migrate/source/go_bindata/testdata",
+    "github.com/golang-migrate/migrate/source/godoc_vfs",
+    "github.com/golang-migrate/migrate/source/google_cloud_storage",
+    "github.com/golang-migrate/migrate/source/stub",
+    "github.com/golang-migrate/migrate/source/testing",
+    "github.com/golang-migrate/migrate/testing",
     "github.com/google/go-github/github",
     "github.com/kshvakov/clickhouse",
     "github.com/lib/pq",
