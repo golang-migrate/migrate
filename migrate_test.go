@@ -8,9 +8,9 @@ import (
 	"os"
 	"testing"
 
-	dStub "github.com/golang-migrate/migrate/database/stub"
-	"github.com/golang-migrate/migrate/source"
-	sStub "github.com/golang-migrate/migrate/source/stub"
+	dStub "github.com/golang-migrate/migrate/v3/database/stub"
+	"github.com/golang-migrate/migrate/v3/source"
+	sStub "github.com/golang-migrate/migrate/v3/source/stub"
 )
 
 // sourceStubMigrations hold the following migrations:
