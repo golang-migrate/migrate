@@ -1,0 +1,14 @@
+help: false
+version: false
+verbose: true
+prefetch: 10
+lockTimeout: 15
+path: "/atlas-migrations/migrations"
+#source: "file:///atlas-migrations/migrations"
+database:
+  driver: postgres
+  address: postgres:5432
+  name: app_db
+  user: postgres
+  password: postgres
+  ssl: disable

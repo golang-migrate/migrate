@@ -1,8 +1,9 @@
 package main
 
 import (
-	"flag"
 	"fmt"
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 	"os"
 	"os/signal"
 	"strconv"
@@ -20,30 +21,28 @@ const defaultTimeFormat = "20060102150405"
 // set main log
 var log = &Log{}
 
-func main() {
-	helpPtr := flag.Bool("help", false, "")
-	versionPtr := flag.Bool("version", false, "")
-	verbosePtr := flag.Bool("verbose", false, "")
-	prefetchPtr := flag.Uint("prefetch", 10, "")
-	lockTimeoutPtr := flag.Uint("lock-timeout", 15, "")
-	pathPtr := flag.String("path", "", "")
-	databasePtr := flag.String("database", "", "")
-	sourcePtr := flag.String("source", "", "")
-
-	flag.Usage = func() {
+func init() {
+	pflag.Usage = func() {
 		fmt.Fprint(os.Stderr,
 			`Usage: migrate OPTIONS COMMAND [arg...]
-       migrate [ -version | -help ]
+       migrate [ --version | --help ]
 
 Options:
-  -source          Location of the migrations (driver://url)
-  -path            Shorthand for -source=file://path 
-  -database        Run migrations against this database (driver://url)
-  -prefetch N      Number of migrations to load in advance before executing (default 10)
-  -lock-timeout N  Allow N seconds to acquire database lock (default 15)
-  -verbose         Print verbose logging
-  -version         Print version
-  -help            Print usage
+  --config.source        directory of the configuration file (default "/cli/config")
+  --config.file          configuration file name (without extension)
+  --database.driver      database driver (default postgres)
+  --database.address     address of the database (default "0.0.0.0:5432")
+  --database.name        name of the database
+  --database.user        database username (default "postgres")
+  --database.password    database password (default "postgres")
+  --database.ssl         database ssl mode (default "disable")
+  --path                 Shorthand for -source=file://path
+  --source               Location of the migrations (driver://url)
+  --lock-timeout         Allow N seconds to acquire database lock (default 15)
+  --prefetch             Number of migrations to load in advance before executing (default 10)
+  --verbose              Print verbose logging (default true)
+  --version              Print version
+  --help                 Print usage
 
 Commands:
   create [-ext E] [-dir D] [-seq] [-digits N] [-format] NAME
@@ -61,32 +60,57 @@ Source drivers: `+strings.Join(source.List(), ", ")+`
 Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 	}
 
-	flag.Parse()
+	pflag.Parse()
+	viper.BindPFlags(pflag.CommandLine)
+	viper.AutomaticEnv()
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	viper.AddConfigPath(viper.GetString("config.source"))
+	if viper.GetString("config.file") != "" {
+		viper.SetConfigName(viper.GetString("config.file"))
+		if err := viper.ReadInConfig(); err != nil {
+			log.fatalf("cannot load configuration: %v", err)
+		}
+	}
+}
+
+func main() {
+	help := viper.GetBool("help")
+	version := viper.GetBool("version")
+	verbose := viper.GetBool("verbose")
+	prefetch := viper.GetInt("prefetch")
+	lockTimeout := viper.GetInt("lock-timeout")
+	path := viper.GetString("path")
+	sourcePtr := viper.GetString("source")
+	dbSource := dbMakeConnectionString(
+		viper.GetString("database.driver"), viper.GetString("database.user"),
+		viper.GetString("database.password"), viper.GetString("database.address"),
+		viper.GetString("database.name"), viper.GetString("database.ssl"),
+	)
 
 	// initialize logger
-	log.verbose = *verbosePtr
+	log.verbose = verbose
 
 	// show cli version
-	if *versionPtr {
+	if version {
 		fmt.Fprintln(os.Stderr, Version)
 		os.Exit(0)
 	}
 
 	// show help
-	if *helpPtr {
-		flag.Usage()
+	if help {
+		pflag.Usage()
 		os.Exit(0)
 	}
 
 	// translate -path into -source if given
-	if *sourcePtr == "" && *pathPtr != "" {
-		*sourcePtr = fmt.Sprintf("file://%v", *pathPtr)
+	if sourcePtr == "" && path != "" {
+		sourcePtr = fmt.Sprintf("file://%v", path)
 	}
 
 	// initialize migrate
 	// don't catch migraterErr here and let each command decide
 	// how it wants to handle the error
-	migrater, migraterErr := migrate.New(*sourcePtr, *databasePtr)
+	migrater, migraterErr := migrate.New(sourcePtr, dbSource)
 	defer func() {
 		if migraterErr == nil {
 			migrater.Close()
@@ -94,8 +118,8 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 	}()
 	if migraterErr == nil {
 		migrater.Log = log
-		migrater.PrefetchMigrations = *prefetchPtr
-		migrater.LockTimeout = time.Duration(int64(*lockTimeoutPtr)) * time.Second
+		migrater.PrefetchMigrations = uint(prefetch)
+		migrater.LockTimeout = time.Duration(int64(lockTimeout)) * time.Second
 
 		// handle Ctrl+c
 		signals := make(chan os.Signal, 1)
@@ -111,13 +135,13 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 
 	startTime := time.Now()
 
-	switch flag.Arg(0) {
+	switch pflag.Arg(0) {
 	case "create":
-		args := flag.Args()[1:]
+		args := pflag.Args()[1:]
 		seq := false
 		seqDigits := 6
 
-		createFlagSet := flag.NewFlagSet("create", flag.ExitOnError)
+		createFlagSet := pflag.NewFlagSet("create", pflag.ExitOnError)
 		extPtr := createFlagSet.String("ext", "", "File extension")
 		dirPtr := createFlagSet.String("dir", "", "Directory to place file in (default: current working directory)")
 		formatPtr := createFlagSet.String("format", defaultTimeFormat, `The Go time format string to use. If the string "unix" or "unixNano" is specified, then the seconds or nanoseconds since January 1, 1970 UTC respectively will be used. Caution, due to the behavior of time.Time.Format(), invalid format strings will not error`)
@@ -146,11 +170,11 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 			log.fatalErr(migraterErr)
 		}
 
-		if flag.Arg(1) == "" {
+		if pflag.Arg(1) == "" {
 			log.fatal("error: please specify version argument V")
 		}
 
-		v, err := strconv.ParseUint(flag.Arg(1), 10, 64)
+		v, err := strconv.ParseUint(pflag.Arg(1), 10, 64)
 		if err != nil {
 			log.fatal("error: can't read version argument V")
 		}
@@ -167,8 +191,8 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 		}
 
 		limit := -1
-		if flag.Arg(1) != "" {
-			n, err := strconv.ParseUint(flag.Arg(1), 10, 64)
+		if pflag.Arg(1) != "" {
+			n, err := strconv.ParseUint(pflag.Arg(1), 10, 64)
 			if err != nil {
 				log.fatal("error: can't read limit argument N")
 			}
@@ -187,8 +211,8 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 		}
 
 		limit := -1
-		if flag.Arg(1) != "" {
-			n, err := strconv.ParseUint(flag.Arg(1), 10, 64)
+		if pflag.Arg(1) != "" {
+			n, err := strconv.ParseUint(pflag.Arg(1), 10, 64)
 			if err != nil {
 				log.fatal("error: can't read limit argument N")
 			}
@@ -217,11 +241,11 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 			log.fatalErr(migraterErr)
 		}
 
-		if flag.Arg(1) == "" {
+		if pflag.Arg(1) == "" {
 			log.fatal("error: please specify version argument V")
 		}
 
-		v, err := strconv.ParseInt(flag.Arg(1), 10, 64)
+		v, err := strconv.ParseInt(pflag.Arg(1), 10, 64)
 		if err != nil {
 			log.fatal("error: can't read version argument V")
 		}
@@ -244,7 +268,13 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 		versionCmd(migrater)
 
 	default:
-		flag.Usage()
+		pflag.Usage()
 		os.Exit(0)
 	}
+}
+
+func dbMakeConnectionString(driver, user, password, address, name, ssl string) string {
+	return fmt.Sprintf("%s://%s:%s@%s/%s?sslmode=%s",
+		driver, user, password, address, name, ssl,
+	)
 }
