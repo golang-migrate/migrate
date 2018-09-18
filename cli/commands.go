@@ -147,8 +147,8 @@ func dropCmd(m *migrate.Migrate) {
 	}
 }
 
-func forceCmd(m *migrate.Migrate, v int) {
-	if err := m.Force(v); err != nil {
+func forceCmd(m *migrate.Migrate, v int, skip bool) {
+	if err := m.ForceWithSkip(v,skip); err != nil {
 		log.fatalErr(err)
 	}
 }

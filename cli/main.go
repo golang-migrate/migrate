@@ -54,7 +54,9 @@ Commands:
   up [N]       Apply all or N up migrations
   down [N]     Apply all or N down migrations
   drop         Drop everyting inside database
-  force V      Set version V but don't run migration (ignores dirty state)
+  force [-skip] V
+			   Set version V but don't run migration (ignores dirty state)
+			   Use -skip to avoid force in case the migration is lower version than of currently applied.
   version      Print current migration version
 
 Source drivers: `+strings.Join(source.List(), ", ")+`
@@ -213,15 +215,23 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 		}
 
 	case "force":
+		args := flag.Args()[1:]
+		skip := false
+
+		createFlagSet := flag.NewFlagSet("force", flag.ExitOnError)
+		createFlagSet.BoolVar(&skip, "skip", skip, "Skip the force in case applied version is hire than this (default: false)")
+		createFlagSet.Parse(args)
+
 		if migraterErr != nil {
 			log.fatalErr(migraterErr)
 		}
 
-		if flag.Arg(1) == "" {
+		ver := createFlagSet.Arg(0)
+		if ver == "" {
 			log.fatal("error: please specify version argument V")
 		}
 
-		v, err := strconv.ParseInt(flag.Arg(1), 10, 64)
+		v, err := strconv.ParseInt(ver, 10, 64)
 		if err != nil {
 			log.fatal("error: can't read version argument V")
 		}
@@ -230,7 +240,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 			log.fatal("error: argument V must be >= -1")
 		}
 
-		forceCmd(migrater, int(v))
+		forceCmd(migrater, int(v),skip)
 
 		if log.verbose {
 			log.Println("Finished after", time.Now().Sub(startTime))
