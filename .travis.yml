@@ -1,9 +1,14 @@
 language: go
 sudo: required
 
-go:
-  - "1.10.x"
-  - "1.11.x"
+matrix:
+  allow_failures:
+    - go: master
+  include:
+    # Supported versions of Go: https://golang.org/dl/
+    - go: "1.10.x"
+    - go: "1.11.x"
+    - go: master
 
 go_import_path: github.com/golang-migrate/migrate
 

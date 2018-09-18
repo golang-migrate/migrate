@@ -9,10 +9,10 @@ import (
 	"io"
 	"testing"
 
-	"github.com/lib/pq"
-	dt "github.com/golang-migrate/migrate/database/testing"
-	mt "github.com/golang-migrate/migrate/testing"
 	"bytes"
+	dt "github.com/golang-migrate/migrate/v3/database/testing"
+	mt "github.com/golang-migrate/migrate/v3/testing"
+	"github.com/lib/pq"
 )
 
 var versions = []mt.Version{
@@ -28,7 +28,7 @@ func isReady(i mt.Instance) bool {
 	err = db.Ping()
 	if err == io.EOF {
 		_, err = db.Exec("CREATE DATABASE migrate")
-		return err == nil;
+		return err == nil
 	} else if e, ok := err.(*pq.Error); ok {
 		if e.Code.Name() == "cannot_connect_now" {
 			return false
@@ -36,7 +36,7 @@ func isReady(i mt.Instance) bool {
 	}
 
 	_, err = db.Exec("CREATE DATABASE migrate")
-	return err == nil;
+	return err == nil
 
 	return true
 }
