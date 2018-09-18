@@ -3,7 +3,7 @@ package stub
 import (
 	"testing"
 
-	dt "github.com/golang-migrate/migrate/database/testing"
+	dt "github.com/golang-migrate/migrate/v3/database/testing"
 )
 
 func Test(t *testing.T) {
