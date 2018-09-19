@@ -28,6 +28,10 @@ Obtained by running: `migrate -help`
 e.g. spanner, stub, clickhouse, cockroachdb, crdb-postgres, postgres, postgresql, redshift, cassandra, cockroach, mysql
 Obtained by running: `migrate -help`
 
+**Go Version**
+e.g. go version go1.11 linux/amd64
+Obtained by running: `go version`
+
 **Stacktrace**
 Please provide if available
 
