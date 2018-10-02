@@ -135,7 +135,7 @@ func main() {
     db, err := sql.Open("postgres", "postgres://localhost:5432/database?sslmode=enable")
     driver, err := postgres.WithInstance(db, &postgres.Config{})
     m, err := migrate.NewWithDatabaseInstance(
-        "file:///migrations",
+        "file://migrations",
         "postgres", driver)
     m.Steps(2)
 }
