@@ -30,6 +30,7 @@ func init() {
 Options:
   --config.source        directory of the configuration file (default "/cli/config")
   --config.file          configuration file name (without extension)
+  --database.dsn         database connection string
   --database.driver      database driver (default postgres)
   --database.address     address of the database (default "0.0.0.0:5432")
   --database.name        name of the database
@@ -81,11 +82,15 @@ func main() {
 	lockTimeout := viper.GetInt("lock-timeout")
 	path := viper.GetString("path")
 	sourcePtr := viper.GetString("source")
-	dbSource := dbMakeConnectionString(
-		viper.GetString("database.driver"), viper.GetString("database.user"),
-		viper.GetString("database.password"), viper.GetString("database.address"),
-		viper.GetString("database.name"), viper.GetString("database.ssl"),
-	)
+
+	dbSource := viper.GetString("database.dsn")
+	if dbSource == "" {
+		dbSource = dbMakeConnectionString(
+			viper.GetString("database.driver"), viper.GetString("database.user"),
+			viper.GetString("database.password"), viper.GetString("database.address"),
+			viper.GetString("database.name"), viper.GetString("database.ssl"),
+		)
+	}
 
 	// initialize logger
 	log.verbose = verbose

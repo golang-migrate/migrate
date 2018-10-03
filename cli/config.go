@@ -4,6 +4,7 @@ import "github.com/spf13/pflag"
 
 const (
 	// configuration defaults support local development (i.e. "go run ...")
+	defaultDatabaseDSN      = ""
 	defaultDatabaseDriver   = "postgres"
 	defaultDatabaseAddress  = "0.0.0.0:5432"
 	defaultDatabaseName     = ""
@@ -21,6 +22,7 @@ var (
 	flagPrefetch       = pflag.Uint("prefetch", 10, "Number of migrations to load in advance before executing")
 	flaglockTimeout    = pflag.Uint("lock-timeout", 15, "Allow N seconds to acquire database lock")
 
+	flagDatabaseDSN      = pflag.String("database.dsn", defaultDatabaseDSN, "database connection string")
 	flagDatabaseDriver   = pflag.String("database.driver", defaultDatabaseDriver, "database driver")
 	flagDatabaseAddress  = pflag.String("database.address", defaultDatabaseAddress, "address of the database")
 	flagDatabaseName     = pflag.String("database.name", defaultDatabaseName, "name of the database")
