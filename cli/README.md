@@ -47,19 +47,19 @@ correspond to the names of the sub-packages underneath the
 ## Usage
 
 ```
-$ migrate -help
+$ migrate --help
 Usage: migrate OPTIONS COMMAND [arg...]
-       migrate [ -version | -help ]
+       migrate [ --version | --help ]
 
 Options:
-  -source          Location of the migrations (driver://url)
-  -path            Shorthand for -source=file://path
-  -database        Run migrations against this database (driver://url)
-  -prefetch N      Number of migrations to load in advance before executing (default 10)
-  -lock-timeout N  Allow N seconds to acquire database lock (default 15)
-  -verbose         Print verbose logging
-  -version         Print version
-  -help            Print usage
+  --source          Location of the migrations (driver://url)
+  --path            Shorthand for -source=file://path
+  --database        Run migrations against this database (driver://url)
+  --prefetch N      Number of migrations to load in advance before executing (default 10)
+  --lock-timeout N  Allow N seconds to acquire database lock (default 15)
+  --verbose         Print verbose logging
+  --version         Print version
+  --help            Print usage
 
 Commands:
   create [-ext E] [-dir D] [-seq] [-digits N] [-format] NAME
@@ -78,14 +78,14 @@ Commands:
 So let's say you want to run the first two migrations
 
 ```
-$ migrate -source file://path/to/migrations -database postgres://localhost:5432/database up 2
+$ migrate --source file://path/to/migrations --database postgres://localhost:5432/database up 2
 ```
 
 If your migrations are hosted on github
 
 ```
-$ migrate -source github://mattes:personal-access-token@mattes/migrate_test \
-    -database postgres://localhost:5432/database down 2
+$ migrate --source github://mattes:personal-access-token@mattes/migrate_test \
+    --database postgres://localhost:5432/database down 2
 ```
 
 The CLI will gracefully stop at a safe point when SIGINT (ctrl+c) is received.
@@ -98,7 +98,7 @@ Send SIGKILL for immediate halt.
 ##### ENV variables
 
 ```
-$ migrate -database "$MY_MIGRATE_DATABASE"
+$ migrate --database "$MY_MIGRATE_DATABASE"
 ```
 
 ##### JSON files
@@ -106,12 +106,12 @@ $ migrate -database "$MY_MIGRATE_DATABASE"
 Check out https://stedolan.github.io/jq/
 
 ```
-$ migrate -database "$(cat config.json | jq '.database')"
+$ migrate --database "$(cat config.json | jq '.database')"
 ```
 
 ##### YAML files
 
 ````
-$ migrate -database "$(cat config/database.yml | ruby -ryaml -e "print YAML.load(STDIN.read)['database']")"
-$ migrate -database "$(cat config/database.yml | python -c 'import yaml,sys;print yaml.safe_load(sys.stdin)["database"]')"
+$ migrate --database "$(cat config/database.yml | ruby -ryaml -e "print YAML.load(STDIN.read)['database']")"
+$ migrate --database "$(cat config/database.yml | python -c 'import yaml,sys;print yaml.safe_load(sys.stdin)["database"]')"
 ```
