@@ -3,8 +3,8 @@ package bindata
 import (
 	"testing"
 
-	"github.com/golang-migrate/migrate/v3/source/go_bindata/testdata"
-	st "github.com/golang-migrate/migrate/v3/source/testing"
+	"github.com/golang-migrate/migrate/v4/source/go_bindata/testdata"
+	st "github.com/golang-migrate/migrate/v4/source/testing"
 )
 
 func Test(t *testing.T) {
