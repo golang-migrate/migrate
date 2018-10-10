@@ -186,7 +186,7 @@ func newCommon() *Migrate {
 	}
 }
 
-// Close closes the the source and the database.
+// Close closes the source and the database.
 func (m *Migrate) Close() (source error, database error) {
 	databaseSrvClose := make(chan error)
 	sourceSrvClose := make(chan error)
