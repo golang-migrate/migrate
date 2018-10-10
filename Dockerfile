@@ -15,6 +15,7 @@ COPY cli ./cli
 COPY database ./database
 COPY source ./source
 
+ENV GO111MODULE=on
 ENV DATABASES="postgres mysql redshift cassandra spanner cockroachdb clickhouse"
 ENV SOURCES="file go_bindata github aws_s3 google_cloud_storage"
 
