@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang-migrate/migrate/v3/database"
+	"github.com/golang-migrate/migrate/database"
 )
 
 // Test runs tests against database implementations.

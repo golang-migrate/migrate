@@ -3,5 +3,5 @@
 package main
 
 import (
-	_ "github.com/golang-migrate/migrate/v3/database/ql"
+	_ "github.com/golang-migrate/migrate/database/ql"
 )

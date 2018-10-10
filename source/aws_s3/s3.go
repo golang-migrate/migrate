@@ -12,7 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
-	"github.com/golang-migrate/migrate/v3/source"
+	"github.com/golang-migrate/migrate/source"
 )
 
 func init() {

@@ -14,7 +14,6 @@ go_import_path: github.com/golang-migrate/migrate
 
 env:
   global:
-    - GO111MODULE=on
     - MIGRATE_TEST_CONTAINER_BOOT_TIMEOUT=60
     - DOCKER_USERNAME=golangmigrate
     -   secure: "oSOznzUrgr5h45qW4PONkREpisPAt40tnM+KFWtS/Ggu5UI2Ie0CmyYXWuBjbt7B97a4yN9Qzmn8FxJHJ7kk+ABOi3muhkxeIhr6esXbzHhX/Jhv0mj1xkzX7KoVN9oHBz3cOI/QeRyEAO68xjDHNE2kby4RTT9VBt6TQUakKVkqI5qkqLBTADepCjVC+9XhxVxUNyeWKU8ormaUfJBjoNVoDlwXekUPnJenfmfZqXxUInvBCfUyp7Pq+kurBORmg4yc6qOlRYuK67Xw+i5xpjbZouNlXPk0rq7pPy5zjhmZQ3kImoFPvNMeKViDcI6kSIJKtjdhms9/g/6MgXS9HlL5kFy8tYKbsyiHnHB1BsvaLAKXctbUZFDPstgMPADfnad2kZXPrNqIhfWKZrGRWidawCYJ1sKKwYxLMKrtA0umqgMoL90MmBOELhuGmvMV0cFJB+zo+K2YWjEiMGd8xRb5mC5aAy0ZcCehO46jGtpr217EJmMF8Ywr7cFqM2Shg5U2jev9qUpYiXwmPnJKDuoT2ZHuHmPgFIkYiWC5yeJnnmG5bed1sKBp93AFrJX+1Rx5oC4BpNegewmBZKpOSwls/D1uMAeQK3dPmQHLsT6o2VBLfeDGr+zY0R85ywwPZCv00vGol02zYoTqN7eFqr6Qhjr/qx5K1nnxJdFK3Ts="
@@ -33,12 +32,12 @@ cache:
 before_install:
   - echo "TRAVIS_GO_VERSION=${TRAVIS_GO_VERSION}"
   # Download the binary to bin folder in $GOPATH
-  - if [[ "${TRAVIS_GO_VERSION}" == 1.10* ]]; then curl -L -s https://github.com/golang/dep/releases/download/v0.5.0/dep-linux-amd64 -o $GOPATH/bin/dep; fi
+  - curl -L -s https://github.com/golang/dep/releases/download/v0.5.0/dep-linux-amd64 -o $GOPATH/bin/dep
   # Make the binary executable
-  - if [[ "${TRAVIS_GO_VERSION}" == 1.10* ]]; then chmod +x $GOPATH/bin/dep; fi
+  - chmod +x $GOPATH/bin/dep
 
 install:
-  - if [[ "${TRAVIS_GO_VERSION}" == 1.10* ]]; then dep ensure -vendor-only; fi
+  - dep ensure -vendor-only
   - go get github.com/mattn/goveralls
 
 script:
