@@ -1,19 +1,11 @@
 FROM golang:1.11-alpine3.8 AS downloader
 ARG VERSION
 
-RUN apk add --no-cache git gcc musl-dev curl
-
-RUN curl -fsSL -o /usr/local/bin/dep https://github.com/golang/dep/releases/download/v0.4.1/dep-linux-amd64 && chmod +x /usr/local/bin/dep
+RUN apk add --no-cache git gcc musl-dev
 
 WORKDIR /go/src/github.com/golang-migrate/migrate
 
-COPY Gopkg.toml Gopkg.lock ./
-RUN dep ensure -vendor-only
-
-COPY *.go ./
-COPY cli ./cli
-COPY database ./database
-COPY source ./source
+COPY . ./
 
 ENV GO111MODULE=on
 ENV DATABASES="postgres mysql redshift cassandra spanner cockroachdb clickhouse"
