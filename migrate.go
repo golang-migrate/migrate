@@ -371,6 +371,37 @@ func (m *Migrate) Force(version int) error {
 	return m.unlock()
 }
 
+// Force sets a migration version.
+// It does not check any currently active version in database.
+// It resets the dirty state to false.
+func (m *Migrate) ForceWithSkip(version int, skip bool) error {
+	if version < -1 {
+		panic("version must be >= -1")
+	}
+
+	if skip {
+		v, _, err := m.databaseDrv.Version()
+		if err != nil {
+			return err
+		}
+
+		if v != database.NilVersion && v > version {
+			m.logPrintf("Forcing version aborted, Current version(%d) is higher than %d.\n",v,version );
+			return nil
+		}
+	}
+	
+	if err := m.lock(); err != nil {
+		return err
+	}
+
+	if err := m.databaseDrv.SetVersion(version, false); err != nil {
+		return m.unlockErr(err)
+	}
+
+	return m.unlock()
+}
+
 // Version returns the currently active migration version.
 // If no migration has been applied, yet, it will return ErrNilVersion.
 func (m *Migrate) Version() (version uint, dirty bool, err error) {

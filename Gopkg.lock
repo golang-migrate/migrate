@@ -2,7 +2,7 @@
 
 
 [[projects]]
-  digest = "1:098b27970336695d686ef8a701328cfb231445e2d54564d09c3b0c7d43ce129a"
+  digest = "1:4a799555f4a58b849ca3a3bed67c10ca484a2d3cedf4199773211d04b0109793"
   name = "cloud.google.com/go"
   packages = [
     "civil",
@@ -22,8 +22,8 @@
     "storage",
   ]
   pruneopts = "UT"
-  revision = "0fd7230b2a7505833d5f69b75cbd6c9582401479"
-  version = "v0.23.0"
+  revision = "c728a003b238b26cef9ab6753a5dc424b331c3ad"
+  version = "v0.27.0"
 
 [[projects]]
   digest = "1:adbfc2db750d6fbe0c165ad801ba2d730883a3bc40bc8fe829516eb42ed17771"
@@ -42,7 +42,7 @@
   version = "v1.0.6"
 
 [[projects]]
-  digest = "1:1a42d6d0e8fe8cc1024ed542c5f8a0bc7346a292701b3bd94a07996f29fcbd38"
+  digest = "1:9b74ad2ee73f0398575de3c085ceec81220db75b238b2e3d2258114ff4b46e25"
   name = "github.com/aws/aws-sdk-go"
   packages = [
     "aws",
@@ -79,8 +79,8 @@
     "service/sts",
   ]
   pruneopts = "UT"
-  revision = "468b9714c11f10b22e533253b35eb9c28f4be691"
-  version = "v1.14.32"
+  revision = "34699de98eac41fa94737f6ce7b83d7a621c2634"
+  version = "v1.15.36"
 
 [[projects]]
   branch = "master"
@@ -105,6 +105,14 @@
   packages = ["."]
   pruneopts = "UT"
   revision = "6a051e75936f623600b67c2b1116b6b6c0ffb936"
+
+[[projects]]
+  branch = "master"
+  digest = "1:2a4afef2ef0e4e4ab66b4f4f6a70bf6551ae8b727184771b5547e2b90245fe58"
+  name = "github.com/cznic/golex"
+  packages = ["lex"]
+  pruneopts = "UT"
+  revision = "4ab7c5e190e49208c823ce8ec803aa39e6a4b31a"
 
 [[projects]]
   digest = "1:a9e2943ed681d4758a43d1bd9e80d7e993b66ce5adc7aa5dcc083ba48a47a4eb"
@@ -135,7 +143,7 @@
   revision = "ca4c9f2c136954238c3158b92de72078c7672ecc"
 
 [[projects]]
-  digest = "1:905947603b7f1066a7149576b2cbad2e6f890729f892c827cdbcee046d07db9c"
+  digest = "1:336a34e066968a8e30ee73a0d4419f37d3e8286b94f996cddf46a5e82d13b2fa"
   name = "github.com/cznic/ql"
   packages = [
     ".",
@@ -143,8 +151,8 @@
     "vendored/github.com/camlistore/go4/lock",
   ]
   pruneopts = "UT"
-  revision = "7a63cd7aa46ecd9f549b96983029576af2178f60"
-  version = "v1.1.0"
+  revision = "47bf73cf8ed137969f12b223b7016784cdd9d42e"
+  version = "v1.2.0"
 
 [[projects]]
   branch = "master"
@@ -247,12 +255,15 @@
   revision = "0bce6a6887123b67a60366d2c9fe2dfb74289d2e"
 
 [[projects]]
-  digest = "1:3a1c71661e5d956a3c3ff639dba511871757b5f37cb2107abf717d631ece8b1a"
+  digest = "1:812c304ad1cbb214459f7a198cc246a9c8a114a6a92063cef7b31c4ec42a5d6c"
   name = "github.com/fsouza/fake-gcs-server"
-  packages = ["fakestorage"]
+  packages = [
+    "fakestorage",
+    "internal/backend",
+  ]
   pruneopts = "UT"
-  revision = "9162fe06459e3d9859987fc2802fa729ddb6dc53"
-  version = "v1.0.0"
+  revision = "cc97eeaffd5289d552fea1e1f08e979a48f6d6f0"
+  version = "v1.2.0"
 
 [[projects]]
   digest = "1:fe8a03a8222d5b913f256972933d26d24ad7c8286692a42943bc01633cc8fce3"
@@ -309,12 +320,12 @@
   revision = "2e65f85255dbc3072edf28d6b5b8efc472979f5a"
 
 [[projects]]
-  digest = "1:51bee9f1987dcdb9f9a1b4c20745d78f6bf6f5f14ad4e64ca883eb64df4c0045"
+  digest = "1:f3fb942d9a52aff79191a8318317147ab76ca609bced931b8be9ab1825569993"
   name = "github.com/google/go-github"
   packages = ["github"]
   pruneopts = "UT"
-  revision = "e48060a28fac52d0f1cb758bc8b87c07bac4a87d"
-  version = "v15.0.0"
+  revision = "747f93dd9b489bd56f7442b3c42bfea12800a75b"
+  version = "v17.0.0"
 
 [[projects]]
   branch = "master"
@@ -364,7 +375,7 @@
   revision = "0b12d6b5"
 
 [[projects]]
-  digest = "1:729cb96e4ff32f992aab19a58384fc4304c05f414a9169ef46b8c6ebb5515f77"
+  digest = "1:f02dbf2124e5dfb5305a6c3c8957a41d54a89d2a3ef60f030769f86e7851d5f5"
   name = "github.com/kshvakov/clickhouse"
   packages = [
     ".",
@@ -376,19 +387,19 @@
     "lib/writebuffer",
   ]
   pruneopts = "UT"
-  revision = "8a2dd1e831a6c7381c11d40bcaf80ae98023c605"
-  version = "v1.3.3"
+  revision = "aeedb7b9d0584f393905447021238b5c6e9c5154"
+  version = "v1.3.4"
 
 [[projects]]
-  branch = "master"
-  digest = "1:37ce7d7d80531b227023331002c0d42b4b4b291a96798c82a049d03a54ba79e4"
+  digest = "1:8ef506fc2bb9ced9b151dafa592d4046063d744c646c1bbe801982ce87e4bc24"
   name = "github.com/lib/pq"
   packages = [
     ".",
     "oid",
   ]
   pruneopts = "UT"
-  revision = "90697d60dd844d5ef6ff15135d0203f65d2f53b8"
+  revision = "4ded0e9383f75c197b3a2aaa6d590ac52df6fd79"
+  version = "v1.0.0"
 
 [[projects]]
   digest = "1:3cafc6a5a1b8269605d9df4c6956d43d8011fc57f266ca6b9d04da6c09dee548"
