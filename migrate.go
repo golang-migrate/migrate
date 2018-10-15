@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang-migrate/migrate/v3/database"
-	"github.com/golang-migrate/migrate/v3/source"
+	"github.com/golang-migrate/migrate/v4/database"
+	"github.com/golang-migrate/migrate/v4/source"
 )
 
 // DefaultPrefetchMigrations sets the number of migrations to pre-read
@@ -186,7 +186,7 @@ func newCommon() *Migrate {
 	}
 }
 
-// Close closes the the source and the database.
+// Close closes the source and the database.
 func (m *Migrate) Close() (source error, database error) {
 	databaseSrvClose := make(chan error)
 	sourceSrvClose := make(chan error)
