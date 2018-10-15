@@ -39,7 +39,7 @@
 
 [[constraint]]
   name = "github.com/docker/docker"
-  version = "v17.05.0-ce"
+  revision = "453f2b8b40b923862ce1c08c11531ff5042770f1"
 
 [[constraint]]
   name = "github.com/fsouza/fake-gcs-server"
