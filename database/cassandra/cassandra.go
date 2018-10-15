@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/gocql/gocql"
-	"github.com/golang-migrate/migrate/v3/database"
+	"github.com/golang-migrate/migrate/v4/database"
 )
 
 func init() {
