@@ -22,7 +22,10 @@ system_schema table which comes with 3.X
 | `timeout` | 1 minute | Migration timeout
 | `username` | nil | Username to use when authenticating. |
 | `password` | nil | Password to use when authenticating. |
-
+| `sslcert` | | Cert file location. The file must contain PEM encoded data. |
+| `sslkey` | | Key file location. The file must contain PEM encoded data. |
+| `sslrootcert` | | The location of the root certificate file. The file must contain PEM encoded data. |
+| `sslmode` | | Whether or not to use SSL (disable\|require\|verify-ca\|verify-full) |
 
 `timeout` is parsed using [time.ParseDuration(s string)](https://golang.org/pkg/time/#ParseDuration)
 
