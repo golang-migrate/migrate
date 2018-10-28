@@ -55,6 +55,13 @@ type DB struct {
 	data  *spanner.Client
 }
 
+func NewDB(admin sdb.DatabaseAdminClient, data spanner.Client) *DB {
+	return &DB{
+		admin: &admin,
+		data:  &data,
+	}
+}
+
 // WithInstance implements database.Driver
 func WithInstance(instance *DB, config *Config) (database.Driver, error) {
 	if config == nil {
