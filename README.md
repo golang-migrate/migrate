@@ -97,7 +97,7 @@ $ docker run -v {{ migration dir }}:/migrations --network host migrate/migrate
 ## Use in your Go project
 
  * API is stable and frozen for this release (v3.x).
- * Uses [dep](https://github.com/golang/dep) to manage dependencies
+ * Uses [Go modules](https://golang.org/cmd/go/#hdr-Modules__module_versions__and_more) to manage dependencies
  * To help prevent database corruptions, it supports graceful stops via `GracefulStop chan bool`.
  * Bring your own logger.
  * Uses `io.Reader` streams internally for low memory overhead.

@@ -2,8 +2,9 @@
 
   1. Make sure you have a running Docker daemon
      (Install for [MacOS](https://docs.docker.com/docker-for-mac/))
+  1. Use a version of Go that supports [modules](https://golang.org/cmd/go/#hdr-Modules__module_versions__and_more) (e.g. Go 1.11+)
   1. Fork this repo and `git clone` somewhere to `$GOPATH/src/github.com/golang-migrate/migrate`
-  1. Install [dep](https://github.com/golang/dep) and run `dep ensure` to pull dependencies
+      * Ensure that [Go modules are enabled](https://golang.org/cmd/go/#hdr-Preliminary_module_support) (e.g. your repo path or the `GO111MODULE` environment variable are set correctly)
   1. Confirm tests are working: `make test-short`
   1. Write awesome code ...
   1. `make test` to run all tests against all database versions

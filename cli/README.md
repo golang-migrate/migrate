@@ -30,11 +30,11 @@ $ apt-get install -y migrate
 ```
 $ go get -u -d github.com/golang-migrate/migrate/cli
 $ cd $GOPATH/src/github.com/golang-migrate/migrate/cli
-$ dep ensure
 $ go build -tags 'postgres' -o /usr/local/bin/migrate github.com/golang-migrate/migrate/cli
 ```
 
 ##### Notes:
+1. Requires a version of Go that [supports modules](https://golang.org/cmd/go/#hdr-Preliminary_module_support). e.g. Go 1.11+
 1. This example builds the cli which will only work with postgres.  In order
 to build the cli for use with other databases, replace the `postgres` build tag
 with the appropriate database tag(s) for the databases desired.  The tags
