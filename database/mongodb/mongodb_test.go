@@ -190,6 +190,9 @@ func TestTransaction(t *testing.T) {
 		d, err := WithInstance(client, &Config{
 			DatabaseName: "testMigration",
 		})
+		if err != nil {
+			t.Fatal(err)
+		}
 		defer d.Close()
 		//We have to create collection
 		//transactions don't support operations with creating new dbs, collections

@@ -22,6 +22,11 @@ import (
 //  | u d |  -  | u   | u d |   d |  -  | u d |
 var sourceStubMigrations *source.Migrations
 
+const (
+	srcDrvNameStub = "stub"
+	dbDrvNameStub  = "stub"
+)
+
 func init() {
 	sourceStubMigrations = source.NewMigrations()
 	sourceStubMigrations.Append(&source.Migration{Version: 1, Direction: source.Up, Identifier: "CREATE 1"})
@@ -42,14 +47,14 @@ func TestNew(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if m.sourceName != "stub" {
+	if m.sourceName != srcDrvNameStub {
 		t.Errorf("expected stub, got %v", m.sourceName)
 	}
 	if m.sourceDrv == nil {
 		t.Error("expected sourceDrv not to be nil")
 	}
 
-	if m.databaseName != "stub" {
+	if m.databaseName != dbDrvNameStub {
 		t.Errorf("expected stub, got %v", m.databaseName)
 	}
 	if m.databaseDrv == nil {
@@ -77,19 +82,19 @@ func TestNewWithDatabaseInstance(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	m, err := NewWithDatabaseInstance("stub://", "stub", dbInst)
+	m, err := NewWithDatabaseInstance("stub://", dbDrvNameStub, dbInst)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if m.sourceName != "stub" {
+	if m.sourceName != srcDrvNameStub {
 		t.Errorf("expected stub, got %v", m.sourceName)
 	}
 	if m.sourceDrv == nil {
 		t.Error("expected sourceDrv not to be nil")
 	}
 
-	if m.databaseName != "stub" {
+	if m.databaseName != dbDrvNameStub {
 		t.Errorf("expected stub, got %v", m.databaseName)
 	}
 	if m.databaseDrv == nil {
@@ -132,19 +137,19 @@ func TestNewWithSourceInstance(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	m, err := NewWithSourceInstance("stub", sInst, "stub://")
+	m, err := NewWithSourceInstance(srcDrvNameStub, sInst, "stub://")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if m.sourceName != "stub" {
+	if m.sourceName != srcDrvNameStub {
 		t.Errorf("expected stub, got %v", m.sourceName)
 	}
 	if m.sourceDrv == nil {
 		t.Error("expected sourceDrv not to be nil")
 	}
 
-	if m.databaseName != "stub" {
+	if m.databaseName != dbDrvNameStub {
 		t.Errorf("expected stub, got %v", m.databaseName)
 	}
 	if m.databaseDrv == nil {
@@ -164,7 +169,7 @@ func ExampleNewWithSourceInstance() {
 	}
 
 	// Read migrations from Stub and connect to a local postgres database.
-	m, err := NewWithSourceInstance("stub", instance, "postgres://mattes:secret@localhost:5432/database?sslmode=disable")
+	m, err := NewWithSourceInstance(srcDrvNameStub, instance, "postgres://mattes:secret@localhost:5432/database?sslmode=disable")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -188,19 +193,19 @@ func TestNewWithInstance(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	m, err := NewWithInstance("stub", sInst, "stub", dbInst)
+	m, err := NewWithInstance(srcDrvNameStub, sInst, dbDrvNameStub, dbInst)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if m.sourceName != "stub" {
+	if m.sourceName != srcDrvNameStub {
 		t.Errorf("expected stub, got %v", m.sourceName)
 	}
 	if m.sourceDrv == nil {
 		t.Error("expected sourceDrv not to be nil")
 	}
 
-	if m.databaseName != "stub" {
+	if m.databaseName != dbDrvNameStub {
 		t.Errorf("expected stub, got %v", m.databaseName)
 	}
 	if m.databaseDrv == nil {
@@ -1313,12 +1318,12 @@ func TestLock(t *testing.T) {
 func migrationsFromChannel(ret chan interface{}) ([]*Migration, error) {
 	slice := make([]*Migration, 0)
 	for r := range ret {
-		switch r.(type) {
+		switch t := r.(type) {
 		case error:
-			return slice, r.(error)
+			return slice, t
 
 		case *Migration:
-			slice = append(slice, r.(*Migration))
+			slice = append(slice, t)
 		}
 	}
 	return slice, nil
@@ -1330,7 +1335,7 @@ func newMigSeq(migr ...*Migration) migrationSequence {
 	return migr
 }
 
-func (m *migrationSequence) add(migr ...*Migration) migrationSequence {
+func (m *migrationSequence) add(migr ...*Migration) migrationSequence { // nolint:unused
 	*m = append(*m, migr...)
 	return *m
 }
