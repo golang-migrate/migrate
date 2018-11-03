@@ -25,8 +25,16 @@ var versions = []mt.Version{
 	{Image: "postgres:9.3"},
 }
 
+func redshiftConnectionString(host string, port uint) string {
+	return connectionString("redshift", host, port)
+}
+
 func pgConnectionString(host string, port uint) string {
-	return fmt.Sprintf("postgres://postgres@%s:%v/postgres?sslmode=disable", host, port)
+	return connectionString("postgres", host, port)
+}
+
+func connectionString(schema, host string, port uint) string {
+	return fmt.Sprintf("%s://postgres@%s:%v/postgres?sslmode=disable", schema, host, port)
 }
 
 func isReady(i mt.Instance) bool {
@@ -52,7 +60,7 @@ func Test(t *testing.T) {
 	mt.ParallelTest(t, versions, isReady,
 		func(t *testing.T, i mt.Instance) {
 			p := &Redshift{}
-			addr := pgConnectionString(i.Host(), i.Port())
+			addr := redshiftConnectionString(i.Host(), i.Port())
 			d, err := p.Open(addr)
 			if err != nil {
 				t.Fatalf("%v", err)
@@ -66,7 +74,7 @@ func TestMultiStatement(t *testing.T) {
 	mt.ParallelTest(t, versions, isReady,
 		func(t *testing.T, i mt.Instance) {
 			p := &Redshift{}
-			addr := pgConnectionString(i.Host(), i.Port())
+			addr := redshiftConnectionString(i.Host(), i.Port())
 			d, err := p.Open(addr)
 			if err != nil {
 				t.Fatalf("%v", err)
@@ -91,7 +99,7 @@ func TestErrorParsing(t *testing.T) {
 	mt.ParallelTest(t, versions, isReady,
 		func(t *testing.T, i mt.Instance) {
 			p := &Redshift{}
-			addr := pgConnectionString(i.Host(), i.Port())
+			addr := redshiftConnectionString(i.Host(), i.Port())
 			d, err := p.Open(addr)
 			if err != nil {
 				t.Fatalf("%v", err)
@@ -125,7 +133,7 @@ func TestWithSchema(t *testing.T) {
 	mt.ParallelTest(t, versions, isReady,
 		func(t *testing.T, i mt.Instance) {
 			p := &Redshift{}
-			addr := pgConnectionString(i.Host(), i.Port())
+			addr := redshiftConnectionString(i.Host(), i.Port())
 			d, err := p.Open(addr)
 			if err != nil {
 				t.Fatalf("%v", err)

@@ -94,6 +94,7 @@ func (p *Redshift) Open(url string) (database.Driver, error) {
 	if err != nil {
 		return nil, err
 	}
+	purl.Scheme = "postgres"
 
 	db, err := sql.Open("postgres", migrate.FilterCustomQuery(purl).String())
 	if err != nil {
