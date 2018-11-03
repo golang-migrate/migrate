@@ -37,10 +37,9 @@ type Config struct {
 }
 
 type Redshift struct {
-	// Locking and unlocking need to use the same connection
+	isLocked bool
 	conn     *sql.Conn
 	db       *sql.DB
-	isLocked bool
 
 	// Open and WithInstance need to garantuee that config is never nil
 	config *Config
@@ -126,42 +125,16 @@ func (p *Redshift) Close() error {
 	return nil
 }
 
-// https://www.postgresql.org/docs/9.6/static/explicit-locking.html#ADVISORY-LOCKS
+// Redshift does not support advisory lock functions: https://docs.aws.amazon.com/redshift/latest/dg/c_unsupported-postgresql-functions.html
 func (p *Redshift) Lock() error {
 	if p.isLocked {
 		return database.ErrLocked
 	}
-
-	aid, err := database.GenerateAdvisoryLockId(p.config.DatabaseName)
-	if err != nil {
-		return err
-	}
-
-	// This will either obtain the lock immediately and return true,
-	// or return false if the lock cannot be acquired immediately.
-	query := `SELECT pg_advisory_lock($1)`
-	if _, err := p.conn.ExecContext(context.Background(), query, aid); err != nil {
-		return &database.Error{OrigErr: err, Err: "try lock failed", Query: []byte(query)}
-	}
-
 	p.isLocked = true
 	return nil
 }
 
 func (p *Redshift) Unlock() error {
-	if !p.isLocked {
-		return nil
-	}
-
-	aid, err := database.GenerateAdvisoryLockId(p.config.DatabaseName)
-	if err != nil {
-		return err
-	}
-
-	query := `SELECT pg_advisory_unlock($1)`
-	if _, err := p.conn.ExecContext(context.Background(), query, aid); err != nil {
-		return &database.Error{OrigErr: err, Query: []byte(query)}
-	}
 	p.isLocked = false
 	return nil
 }
