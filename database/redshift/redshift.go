@@ -27,8 +27,6 @@ var DefaultMigrationsTable = "schema_migrations"
 var (
 	ErrNilConfig      = fmt.Errorf("no config")
 	ErrNoDatabaseName = fmt.Errorf("no database name")
-	ErrNoSchema       = fmt.Errorf("no schema")
-	ErrDatabaseDirty  = fmt.Errorf("database is dirty")
 )
 
 type Config struct {
