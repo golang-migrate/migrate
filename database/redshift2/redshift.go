@@ -18,7 +18,7 @@ import (
 )
 
 func init() {
-	db := Postgres{}
+	db := Redshift{}
 	database.Register("redshift2", &db)
 }
 
@@ -36,7 +36,7 @@ type Config struct {
 	DatabaseName    string
 }
 
-type Postgres struct {
+type Redshift struct {
 	// Locking and unlocking need to use the same connection
 	conn     *sql.Conn
 	db       *sql.DB
@@ -77,7 +77,7 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		return nil, err
 	}
 
-	px := &Postgres{
+	px := &Redshift{
 		conn:   conn,
 		db:     instance,
 		config: config,
@@ -90,7 +90,7 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	return px, nil
 }
 
-func (p *Postgres) Open(url string) (database.Driver, error) {
+func (p *Redshift) Open(url string) (database.Driver, error) {
 	purl, err := nurl.Parse(url)
 	if err != nil {
 		return nil, err
@@ -117,7 +117,7 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 	return px, nil
 }
 
-func (p *Postgres) Close() error {
+func (p *Redshift) Close() error {
 	connErr := p.conn.Close()
 	dbErr := p.db.Close()
 	if connErr != nil || dbErr != nil {
@@ -127,7 +127,7 @@ func (p *Postgres) Close() error {
 }
 
 // https://www.postgresql.org/docs/9.6/static/explicit-locking.html#ADVISORY-LOCKS
-func (p *Postgres) Lock() error {
+func (p *Redshift) Lock() error {
 	if p.isLocked {
 		return database.ErrLocked
 	}
@@ -148,7 +148,7 @@ func (p *Postgres) Lock() error {
 	return nil
 }
 
-func (p *Postgres) Unlock() error {
+func (p *Redshift) Unlock() error {
 	if !p.isLocked {
 		return nil
 	}
@@ -166,7 +166,7 @@ func (p *Postgres) Unlock() error {
 	return nil
 }
 
-func (p *Postgres) Run(migration io.Reader) error {
+func (p *Redshift) Run(migration io.Reader) error {
 	migr, err := ioutil.ReadAll(migration)
 	if err != nil {
 		return err
@@ -234,7 +234,7 @@ func runesLastIndex(input []rune, target rune) int {
 	return -1
 }
 
-func (p *Postgres) SetVersion(version int, dirty bool) error {
+func (p *Redshift) SetVersion(version int, dirty bool) error {
 	tx, err := p.conn.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
@@ -261,7 +261,7 @@ func (p *Postgres) SetVersion(version int, dirty bool) error {
 	return nil
 }
 
-func (p *Postgres) Version() (version int, dirty bool, err error) {
+func (p *Redshift) Version() (version int, dirty bool, err error) {
 	query := `SELECT version, dirty FROM "` + p.config.MigrationsTable + `" LIMIT 1`
 	err = p.conn.QueryRowContext(context.Background(), query).Scan(&version, &dirty)
 	switch {
@@ -281,7 +281,7 @@ func (p *Postgres) Version() (version int, dirty bool, err error) {
 	}
 }
 
-func (p *Postgres) Drop() error {
+func (p *Redshift) Drop() error {
 	// select all tables in current schema
 	query := `SELECT table_name FROM information_schema.tables WHERE table_schema=(SELECT current_schema()) AND table_type='BASE TABLE'`
 	tables, err := p.conn.QueryContext(context.Background(), query)
@@ -318,7 +318,7 @@ func (p *Postgres) Drop() error {
 	return nil
 }
 
-func (p *Postgres) ensureVersionTable() error {
+func (p *Redshift) ensureVersionTable() error {
 	// check if migration table exists
 	var count int
 	query := `SELECT COUNT(1) FROM information_schema.tables WHERE table_name = $1 AND table_schema = (SELECT current_schema()) LIMIT 1`

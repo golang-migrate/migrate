@@ -51,7 +51,7 @@ func isReady(i mt.Instance) bool {
 func Test(t *testing.T) {
 	mt.ParallelTest(t, versions, isReady,
 		func(t *testing.T, i mt.Instance) {
-			p := &Postgres{}
+			p := &Redshift{}
 			addr := pgConnectionString(i.Host(), i.Port())
 			d, err := p.Open(addr)
 			if err != nil {
@@ -65,7 +65,7 @@ func Test(t *testing.T) {
 func TestMultiStatement(t *testing.T) {
 	mt.ParallelTest(t, versions, isReady,
 		func(t *testing.T, i mt.Instance) {
-			p := &Postgres{}
+			p := &Redshift{}
 			addr := pgConnectionString(i.Host(), i.Port())
 			d, err := p.Open(addr)
 			if err != nil {
@@ -78,7 +78,7 @@ func TestMultiStatement(t *testing.T) {
 
 			// make sure second table exists
 			var exists bool
-			if err := d.(*Postgres).conn.QueryRowContext(context.Background(), "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'bar' AND table_schema = (SELECT current_schema()))").Scan(&exists); err != nil {
+			if err := d.(*Redshift).conn.QueryRowContext(context.Background(), "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'bar' AND table_schema = (SELECT current_schema()))").Scan(&exists); err != nil {
 				t.Fatal(err)
 			}
 			if !exists {
@@ -90,7 +90,7 @@ func TestMultiStatement(t *testing.T) {
 func TestErrorParsing(t *testing.T) {
 	mt.ParallelTest(t, versions, isReady,
 		func(t *testing.T, i mt.Instance) {
-			p := &Postgres{}
+			p := &Redshift{}
 			addr := pgConnectionString(i.Host(), i.Port())
 			d, err := p.Open(addr)
 			if err != nil {
@@ -111,7 +111,7 @@ func TestErrorParsing(t *testing.T) {
 func TestFilterCustomQuery(t *testing.T) {
 	mt.ParallelTest(t, versions, isReady,
 		func(t *testing.T, i mt.Instance) {
-			p := &Postgres{}
+			p := &Redshift{}
 			addr := fmt.Sprintf("postgres://postgres@%v:%v/postgres?sslmode=disable&x-custom=foobar", i.Host(), i.Port())
 			d, err := p.Open(addr)
 			if err != nil {
@@ -124,7 +124,7 @@ func TestFilterCustomQuery(t *testing.T) {
 func TestWithSchema(t *testing.T) {
 	mt.ParallelTest(t, versions, isReady,
 		func(t *testing.T, i mt.Instance) {
-			p := &Postgres{}
+			p := &Redshift{}
 			addr := pgConnectionString(i.Host(), i.Port())
 			d, err := p.Open(addr)
 			if err != nil {
@@ -182,10 +182,10 @@ func TestWithInstance(t *testing.T) {
 
 }
 
-func TestPostgres_Lock(t *testing.T) {
+func TestRedshift_Lock(t *testing.T) {
 	mt.ParallelTest(t, versions, isReady,
 		func(t *testing.T, i mt.Instance) {
-			p := &Postgres{}
+			p := &Redshift{}
 			addr := pgConnectionString(i.Host(), i.Port())
 			d, err := p.Open(addr)
 			if err != nil {
@@ -194,7 +194,7 @@ func TestPostgres_Lock(t *testing.T) {
 
 			dt.Test(t, d, []byte("SELECT 1"))
 
-			ps := d.(*Postgres)
+			ps := d.(*Redshift)
 
 			err = ps.Lock()
 			if err != nil {
