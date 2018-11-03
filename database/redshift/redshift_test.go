@@ -1,4 +1,4 @@
-package redshift2
+package redshift
 
 // error codes https://github.com/lib/pq/blob/master/error.go
 
