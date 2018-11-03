@@ -214,7 +214,7 @@ func (p *Redshift) SetVersion(version int, dirty bool) error {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
 	}
 
-	query := `TRUNCATE "` + p.config.MigrationsTable + `"`
+	query := `DELETE FROM "` + p.config.MigrationsTable + `"`
 	if _, err := tx.Exec(query); err != nil {
 		tx.Rollback()
 		return &database.Error{OrigErr: err, Query: []byte(query)}
