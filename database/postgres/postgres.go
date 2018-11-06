@@ -35,6 +35,7 @@ var (
 type Config struct {
 	MigrationsTable string
 	DatabaseName    string
+	SchemaName      string
 }
 
 type Postgres struct {
@@ -67,6 +68,18 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	}
 
 	config.DatabaseName = databaseName
+
+	query = `SELECT CURRENT_SCHEMA()`
+	var schemaName string
+	if err := instance.QueryRow(query).Scan(&schemaName); err != nil {
+		return nil, &database.Error{OrigErr: err, Query: []byte(query)}
+	}
+
+	if len(schemaName) == 0 {
+		return nil, ErrNoSchema
+	}
+
+	config.SchemaName = schemaName
 
 	if len(config.MigrationsTable) == 0 {
 		config.MigrationsTable = DefaultMigrationsTable
@@ -133,7 +146,7 @@ func (p *Postgres) Lock() error {
 		return database.ErrLocked
 	}
 
-	aid, err := database.GenerateAdvisoryLockId(p.config.DatabaseName)
+	aid, err := database.GenerateAdvisoryLockId(p.config.DatabaseName, p.config.SchemaName)
 	if err != nil {
 		return err
 	}

@@ -178,6 +178,56 @@ func TestWithSchema(t *testing.T) {
 		})
 }
 
+func TestParallelSchema(t *testing.T) {
+	mt.ParallelTest(t, versions, isReady,
+		func(t *testing.T, i mt.Instance) {
+			p := &Postgres{}
+			addr := pgConnectionString(i.Host(), i.Port())
+			d, err := p.Open(addr)
+			if err != nil {
+				t.Fatalf("%v", err)
+			}
+			defer d.Close()
+
+			// create foo and bar schemas
+			if err := d.Run(bytes.NewReader([]byte("CREATE SCHEMA foo AUTHORIZATION postgres"))); err != nil {
+				t.Fatal(err)
+			}
+			if err := d.Run(bytes.NewReader([]byte("CREATE SCHEMA bar AUTHORIZATION postgres"))); err != nil {
+				t.Fatal(err)
+			}
+
+			// re-connect using that schemas
+			dfoo, err := p.Open(fmt.Sprintf("postgres://postgres@%v:%v/postgres?sslmode=disable&search_path=foo", i.Host(), i.Port()))
+			if err != nil {
+				t.Fatalf("%v", err)
+			}
+			defer dfoo.Close()
+
+			dbar, err := p.Open(fmt.Sprintf("postgres://postgres@%v:%v/postgres?sslmode=disable&search_path=bar", i.Host(), i.Port()))
+			if err != nil {
+				t.Fatalf("%v", err)
+			}
+			defer dbar.Close()
+
+			if err := dfoo.Lock(); err != nil {
+				t.Fatal(err)
+			}
+
+			if err := dbar.Lock(); err != nil {
+				t.Fatal(err)
+			}
+
+			if err := dbar.Unlock(); err != nil {
+				t.Fatal(err)
+			}
+
+			if err := dfoo.Unlock(); err != nil {
+				t.Fatal(err)
+			}
+		})
+}
+
 func TestWithInstance(t *testing.T) {
 
 }
