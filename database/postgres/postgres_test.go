@@ -3,7 +3,6 @@ package postgres
 // error codes https://github.com/lib/pq/blob/master/error.go
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	sqldriver "database/sql/driver"
@@ -12,7 +11,9 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+)
 
+import (
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
 	mt "github.com/golang-migrate/migrate/v4/testing"
 )
@@ -72,7 +73,7 @@ func TestMultiStatement(t *testing.T) {
 				t.Fatalf("%v", err)
 			}
 			defer d.Close()
-			if err := d.Run(bytes.NewReader([]byte("CREATE TABLE foo (foo text); CREATE TABLE bar (bar text);"))); err != nil {
+			if err := d.Run(strings.NewReader("CREATE TABLE foo (foo text); CREATE TABLE bar (bar text);")); err != nil {
 				t.Fatalf("expected err to be nil, got %v", err)
 			}
 
@@ -100,7 +101,7 @@ func TestErrorParsing(t *testing.T) {
 
 			wantErr := `migration failed: syntax error at or near "TABLEE" (column 37) in line 1: CREATE TABLE foo ` +
 				`(foo text); CREATE TABLEE bar (bar text); (details: pq: syntax error at or near "TABLEE")`
-			if err := d.Run(bytes.NewReader([]byte("CREATE TABLE foo (foo text); CREATE TABLEE bar (bar text);"))); err == nil {
+			if err := d.Run(strings.NewReader("CREATE TABLE foo (foo text); CREATE TABLEE bar (bar text);")); err == nil {
 				t.Fatal("expected err but got nil")
 			} else if err.Error() != wantErr {
 				t.Fatalf("expected '%s' but got '%s'", wantErr, err.Error())
@@ -133,7 +134,7 @@ func TestWithSchema(t *testing.T) {
 			defer d.Close()
 
 			// create foobar schema
-			if err := d.Run(bytes.NewReader([]byte("CREATE SCHEMA foobar AUTHORIZATION postgres"))); err != nil {
+			if err := d.Run(strings.NewReader("CREATE SCHEMA foobar AUTHORIZATION postgres")); err != nil {
 				t.Fatal(err)
 			}
 			if err := d.SetVersion(1, false); err != nil {
@@ -190,10 +191,10 @@ func TestParallelSchema(t *testing.T) {
 			defer d.Close()
 
 			// create foo and bar schemas
-			if err := d.Run(bytes.NewReader([]byte("CREATE SCHEMA foo AUTHORIZATION postgres"))); err != nil {
+			if err := d.Run(strings.NewReader("CREATE SCHEMA foo AUTHORIZATION postgres")); err != nil {
 				t.Fatal(err)
 			}
-			if err := d.Run(bytes.NewReader([]byte("CREATE SCHEMA bar AUTHORIZATION postgres"))); err != nil {
+			if err := d.Run(strings.NewReader("CREATE SCHEMA bar AUTHORIZATION postgres")); err != nil {
 				t.Fatal(err)
 			}
 

@@ -3,13 +3,14 @@ package cockroachdb
 // error codes https://github.com/lib/pq/blob/master/error.go
 
 import (
-	//"bytes"
 	"database/sql"
 	"fmt"
 	"io"
+	"strings"
 	"testing"
+)
 
-	"bytes"
+import (
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
 	mt "github.com/golang-migrate/migrate/v4/testing"
 	"github.com/lib/pq"
@@ -63,7 +64,7 @@ func TestMultiStatement(t *testing.T) {
 			if err != nil {
 				t.Fatalf("%v", err)
 			}
-			if err := d.Run(bytes.NewReader([]byte("CREATE TABLE foo (foo text); CREATE TABLE bar (bar text);"))); err != nil {
+			if err := d.Run(strings.NewReader("CREATE TABLE foo (foo text); CREATE TABLE bar (bar text);")); err != nil {
 				t.Fatalf("expected err to be nil, got %v", err)
 			}
 

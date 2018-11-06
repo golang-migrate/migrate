@@ -1,7 +1,6 @@
 package github
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -10,7 +9,9 @@ import (
 	"os"
 	"path"
 	"strings"
+)
 
+import (
 	"github.com/golang-migrate/migrate/v4/source"
 	"github.com/google/go-github/github"
 )
@@ -158,7 +159,7 @@ func (g *Github) ReadUp(version uint) (r io.ReadCloser, identifier string, err e
 			if err != nil {
 				return nil, "", err
 			}
-			return ioutil.NopCloser(bytes.NewReader([]byte(r))), m.Identifier, nil
+			return ioutil.NopCloser(strings.NewReader(r)), m.Identifier, nil
 		}
 	}
 	return nil, "", &os.PathError{fmt.Sprintf("read version %v", version), g.path, os.ErrNotExist}
@@ -175,7 +176,7 @@ func (g *Github) ReadDown(version uint) (r io.ReadCloser, identifier string, err
 			if err != nil {
 				return nil, "", err
 			}
-			return ioutil.NopCloser(bytes.NewReader([]byte(r))), m.Identifier, nil
+			return ioutil.NopCloser(strings.NewReader(r)), m.Identifier, nil
 		}
 	}
 	return nil, "", &os.PathError{fmt.Sprintf("read version %v", version), g.path, os.ErrNotExist}

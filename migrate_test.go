@@ -6,8 +6,11 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"strings"
 	"testing"
+)
 
+import (
 	dStub "github.com/golang-migrate/migrate/v4/database/stub"
 	"github.com/golang-migrate/migrate/v4/source"
 	sStub "github.com/golang-migrate/migrate/v4/source/stub"
@@ -1375,7 +1378,7 @@ func M(version uint, targetVersion ...int) *Migration {
 // mr is a convenience func to create a new *Migration from the raw database query
 func mr(value string) *Migration {
 	return &Migration{
-		Body: ioutil.NopCloser(bytes.NewReader([]byte(value))),
+		Body: ioutil.NopCloser(strings.NewReader(value)),
 	}
 }
 
