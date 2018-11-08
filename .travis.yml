@@ -22,10 +22,6 @@ env:
 services:
   - docker
 
-before_cache:
-  - mv $GOPATH/src/github.com/golang-migrate /tmp/golang-migrate
-  - rm -rf $GOPATH/pkg/**/github.com/golang-migrate
-
 cache:
   directories:
     - $GOPATH/pkg
@@ -45,7 +41,6 @@ script:
   - make test COVERAGE_DIR=/tmp/coverage
 
 after_success:
-  - mv /tmp/golang-migrate $GOPATH/src/github.com/golang-migrate
   - goveralls -service=travis-ci -coverprofile /tmp/coverage/combined.txt
   - make list-external-deps > dependency_tree.txt && cat dependency_tree.txt
 
