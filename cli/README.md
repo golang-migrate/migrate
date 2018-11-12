@@ -30,7 +30,7 @@ $ apt-get install -y migrate
 ```
 $ go get -u -d github.com/golang-migrate/migrate/cli
 $ cd $GOPATH/src/github.com/golang-migrate/migrate/cli
-$ go build -tags 'postgres' -o /usr/local/bin/migrate github.com/golang-migrate/migrate/cli
+$ go build -tags 'postgres' -ldflags="-X main.Version=$(git describe --tags)" -o /usr/local/bin/migrate github.com/golang-migrate/migrate/cli
 ```
 
 ##### Notes:
