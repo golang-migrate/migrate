@@ -28,9 +28,7 @@ $ apt-get install -y migrate
 #### With Go toolchain
 
 ```
-$ go get -u -d github.com/golang-migrate/migrate/cli
-$ cd $GOPATH/src/github.com/golang-migrate/migrate/cli
-$ go build -tags 'postgres' -ldflags="-X main.Version=$(git describe --tags)" -o /usr/local/bin/migrate github.com/golang-migrate/migrate/cli
+$ go get -tags 'postgres' -u -d github.com/golang-migrate/migrate/cmd/migrate
 ```
 
 ##### Notes:
