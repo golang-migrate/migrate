@@ -17,11 +17,7 @@ __Database migrations written in Go. Use as [CLI](#cli-usage) or import as [libr
    (Keeps the drivers lightweight, too.)
  * Database drivers don't assume things or try to correct user input. When in doubt, fail.
 
-
-Looking for [v1](https://github.com/golang-migrate/migrate/tree/v1)?
-
 Forked from [mattes/migrate](https://github.com/mattes/migrate)
-
 
 ## Databases
 
@@ -96,8 +92,8 @@ $ docker run -v {{ migration dir }}:/migrations --network host migrate/migrate
 
 ## Use in your Go project
 
- * API is stable and frozen for this release (v3.x).
- * Uses [Go modules](https://golang.org/cmd/go/#hdr-Modules__module_versions__and_more) to manage dependencies
+ * API is stable and frozen for this release (v3 & v4).
+ * Uses [Go modules](https://golang.org/cmd/go/#hdr-Modules__module_versions__and_more) to manage dependencies.
  * To help prevent database corruptions, it supports graceful stops via `GracefulStop chan bool`.
  * Bring your own logger.
  * Uses `io.Reader` streams internally for low memory overhead.
@@ -152,7 +148,13 @@ Each migration has an up and down migration. [Why?](FAQ.md#why-two-separate-file
 
 [Best practices: How to write migrations.](MIGRATIONS.md)
 
+## Supported Major Versions
 
+Version | Go Modules | Min Go Version | Import | Notes
+--------|------------|----------------|--------|------
+**master** | :white_check_mark: | 1.10.3 | `import "github.com/golang-migrate/migrate/v4"` | New features and bug fixes arrive here first |
+**v4** | :white_check_mark: | 1.10.3 | `import "github.com/golang-migrate/migrate/v4"` | |
+**v3** | :x: | 1.10 | `import "github.com/golang-migrate/migrate"` (with package manager) or `import "gopkg.in/golang-migrate/migrate.v3"` (not recommended) | Only security fixes are backported. Only use if your project is not using Go modules. |
 
 ## Development and Contributing
 
