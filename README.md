@@ -50,7 +50,7 @@ Any [reserved URL characters](https://en.wikipedia.org/wiki/Percent-encoding#Per
 Explicitly, the following characters need to be escaped:
 `!`, `#`, `$`, `%`, `&`, `'`, `(`, `)`, `*`, `+`, `,`, `/`, `:`, `;`, `=`, `?`, `@`, `[`, `]`
 
-It's easiest to always run the URL parts of your DB connection URL (e.g. username, password, etc) through an URL encoder. See the example Python helpers below:
+It's easiest to always run the URL parts of your DB connection URL (e.g. username, password, etc) through an URL encoder. See the example Python snippets below:
 ```bash
 $ python3 -c 'import urllib.parse; print(urllib.parse.quote(input("String to encode: "), ""))'
 String to encode: FAKEpassword!#$%&'()*+,/:;=?@[]
