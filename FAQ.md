@@ -65,6 +65,6 @@
   and then "force" the expected version.
 
 #### What happens if two programs try and update the database at the same time?
-  Database-specific locking features are used by each migration driver to prevent multiple processes from attempting to migrate
+Database-specific locking features are used by *some* database drivers to prevent multiple instances of migrate from running migrations at the same time
   the same database at the same time. For example, the MySQL driver uses the `GET_LOCK` function, while the Postgres driver uses
   the `pg_advisory_lock` function.
