@@ -64,4 +64,7 @@
   which prevents attempts to run more migrations on top of a failed migration. You need to manually fix the error
   and then "force" the expected version.
 
-
+#### What happens if two programs try and update the database at the same time?
+Database-specific locking features are used by *some* database drivers to prevent multiple instances of migrate from running migrations at the same time
+  the same database at the same time. For example, the MySQL driver uses the `GET_LOCK` function, while the Postgres driver uses
+  the `pg_advisory_lock` function.
