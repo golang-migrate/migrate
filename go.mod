@@ -16,7 +16,7 @@ require (
 	github.com/docker/go-units v0.3.3 // indirect
 	github.com/fsouza/fake-gcs-server v1.3.0
 	github.com/go-ini/ini v1.39.0 // indirect
-	github.com/go-sql-driver/mysql v1.4.0
+	github.com/go-sql-driver/mysql v1.4.1
 	github.com/gocql/gocql v0.0.0-20181012100315-44e29ed5b8a4
 	github.com/gogo/protobuf v1.1.1 // indirect
 	github.com/google/go-cmp v0.2.0 // indirect

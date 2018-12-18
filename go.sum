@@ -57,8 +57,8 @@ github.com/fsouza/fake-gcs-server v1.3.0/go.mod h1:Lq+43m2znsXfDKHnQMfdA0HpYYAEJ
 github.com/go-ini/ini v1.25.4/go.mod h1:ByCAeIL28uOIIG0E3PJtZPDL8WnHpFKFOtgjp+3Ies8=
 github.com/go-ini/ini v1.39.0 h1:/CyW/jTlZLjuzy52jc1XnhJm6IUKEuunpJFpecywNeI=
 github.com/go-ini/ini v1.39.0/go.mod h1:ByCAeIL28uOIIG0E3PJtZPDL8WnHpFKFOtgjp+3Ies8=
-github.com/go-sql-driver/mysql v1.4.0 h1:7LxgVwFb2hIQtMm87NdgAVfXjnt4OePseqT1tKx+opk=
-github.com/go-sql-driver/mysql v1.4.0/go.mod h1:zAC/RDZ24gD3HViQzih4MyKcchzm+sOG5ZlKdlhCg5w=
+github.com/go-sql-driver/mysql v1.4.1 h1:g24URVg0OFbNUTx9qqY1IRZ9D9z3iPyi5zKhQZpNwpA=
+github.com/go-sql-driver/mysql v1.4.1/go.mod h1:zAC/RDZ24gD3HViQzih4MyKcchzm+sOG5ZlKdlhCg5w=
 github.com/gocql/gocql v0.0.0-20181012100315-44e29ed5b8a4 h1:Zqj6+hV7PwTdjwDMZ78rX9ZMi8VCX9HEJmMhsQhTrSY=
 github.com/gocql/gocql v0.0.0-20181012100315-44e29ed5b8a4/go.mod h1:4Fw1eo5iaEhDUs8XyuhSVCVy52Jq3L+/3GJgYkwc+/0=
 github.com/gogo/protobuf v1.1.1 h1:72R+M5VuhED/KujmZVcIquuo8mBgX4oVda//DQb3PXo=
