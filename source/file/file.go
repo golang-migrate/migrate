@@ -30,7 +30,10 @@ func (f *File) Open(url string) (source.Driver, error) {
 
 	// concat host and path to restore full path
 	// host might be `.`
-	p := u.Host + u.Path
+	p := u.Opaque
+	if len(p) == 0 {
+		p = u.Host + u.Path
+	}
 
 	if len(p) == 0 {
 		// default to current directory if no path
