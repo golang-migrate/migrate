@@ -3,7 +3,7 @@ package file
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
+	"net/http"
 	nurl "net/url"
 	"os"
 	"path"
@@ -13,10 +13,25 @@ import (
 )
 
 func init() {
-	source.Register("file", &File{})
+	source.Register("file", &File{
+		fs:   &HTTPFS{},
+		bare: true,
+	})
+}
+
+type HTTPFS struct{}
+
+func (HTTPFS) Open(name string) (http.File, error) {
+	return os.Open(name)
+}
+
+func New(fs http.FileSystem) *File {
+	return &File{fs: fs}
 }
 
 type File struct {
+	fs         http.FileSystem
+	bare       bool
 	url        string
 	path       string
 	migrations *source.Migrations
@@ -35,30 +50,39 @@ func (f *File) Open(url string) (source.Driver, error) {
 		p = u.Host + u.Path
 	}
 
-	if len(p) == 0 {
-		// default to current directory if no path
-		wd, err := os.Getwd()
-		if err != nil {
-			return nil, err
-		}
-		p = wd
+	if f.bare {
+		if len(p) == 0 {
+			// default to current directory if no path
+			wd, err := os.Getwd()
+			if err != nil {
+				return nil, err
+			}
+			p = wd
 
-	} else if p[0:1] == "." || p[0:1] != "/" {
-		// make path absolute if relative
-		abs, err := filepath.Abs(p)
-		if err != nil {
-			return nil, err
+		} else if p[0:1] == "." || p[0:1] != "/" {
+			// make path absolute if relative
+			abs, err := filepath.Abs(p)
+			if err != nil {
+				return nil, err
+			}
+			p = abs
 		}
-		p = abs
 	}
 
 	// scan directory
-	files, err := ioutil.ReadDir(p)
+	file, err := f.fs.Open(p)
+	if err != nil {
+		return nil, err
+	}
+	limit := 0 // unlimited
+	files, err := file.Readdir(limit)
 	if err != nil {
 		return nil, err
 	}
 
 	nf := &File{
+		fs:         f.fs,
+		bare:       f.bare,
 		url:        url,
 		path:       p,
 		migrations: source.NewMigrations(),
@@ -109,7 +133,7 @@ func (f *File) Next(version uint) (nextVersion uint, err error) {
 
 func (f *File) ReadUp(version uint) (r io.ReadCloser, identifier string, err error) {
 	if m, ok := f.migrations.Up(version); ok {
-		r, err := os.Open(path.Join(f.path, m.Raw))
+		r, err := f.fs.Open(path.Join(f.path, m.Raw))
 		if err != nil {
 			return nil, "", err
 		}
@@ -120,7 +144,7 @@ func (f *File) ReadUp(version uint) (r io.ReadCloser, identifier string, err err
 
 func (f *File) ReadDown(version uint) (r io.ReadCloser, identifier string, err error) {
 	if m, ok := f.migrations.Down(version); ok {
-		r, err := os.Open(path.Join(f.path, m.Raw))
+		r, err := f.fs.Open(path.Join(f.path, m.Raw))
 		if err != nil {
 			return nil, "", err
 		}
