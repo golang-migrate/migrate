@@ -14,7 +14,7 @@ import (
 
 func init() {
 	source.Register("file", &File{
-		fs:   &HTTPFS{},
+		fs:   HTTPFS{},
 		bare: true,
 	})
 }
@@ -38,6 +38,10 @@ type File struct {
 }
 
 func (f *File) Open(url string) (source.Driver, error) {
+	if nil == f.fs {
+		f.fs = HTTPFS{}
+		f.bare = true
+	}
 	u, err := nurl.Parse(url)
 	if err != nil {
 		return nil, err
