@@ -12,10 +12,11 @@ func New(box http.FileSystem) source.Driver {
 	//
 	// import (
 	//   "github.com/gobuffalo/packr"
+	//   mpacker "github.com/golang-migrate/migrate/v4/source/packr"
 	// )
 	//
 	// box := packr.NewBox("./templates")
-	// driver := packr.New(box)
+	// driver := mpackr.New(box)
 	return file.New(box)
 }
 
