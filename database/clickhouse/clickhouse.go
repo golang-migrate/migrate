@@ -175,7 +175,7 @@ func (ch *ClickHouse) ensureVersionTable() error {
 	// if not, create the empty migration table
 	query = `
 		CREATE TABLE ` + ch.config.MigrationsTable + ` (
-			version    UInt32, 
+			version    Int64, 
 			dirty      UInt8,
 			sequence   UInt64
 		) Engine=TinyLog
