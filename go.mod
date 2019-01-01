@@ -17,6 +17,7 @@ require (
 	github.com/fsouza/fake-gcs-server v1.3.0
 	github.com/go-ini/ini v1.39.0 // indirect
 	github.com/go-sql-driver/mysql v1.4.1
+	github.com/go-stack/stack v1.8.0 // indirect
 	github.com/gocql/gocql v0.0.0-20181012100315-44e29ed5b8a4
 	github.com/gogo/protobuf v1.1.1 // indirect
 	github.com/google/go-cmp v0.2.0 // indirect
@@ -34,6 +35,7 @@ require (
 	github.com/kshvakov/clickhouse v1.3.4
 	github.com/lib/pq v1.0.0
 	github.com/mattn/go-sqlite3 v1.9.0
+	github.com/mongodb/mongo-go-driver v0.1.0
 	github.com/opencontainers/go-digest v1.0.0-rc1 // indirect
 	github.com/opencontainers/image-spec v1.0.1 // indirect
 	github.com/pkg/errors v0.8.0 // indirect
@@ -43,6 +45,9 @@ require (
 	github.com/smartystreets/assertions v0.0.0-20180927180507-b2de0cb4f26d // indirect
 	github.com/smartystreets/goconvey v0.0.0-20180222194500-ef6db91d284a // indirect
 	github.com/stretchr/testify v1.2.2 // indirect
+	github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c // indirect
+	github.com/xdg/stringprep v1.0.0 // indirect
+	golang.org/x/crypto v0.0.0-20181203042331-505ab145d0a9 // indirect
 	golang.org/x/net v0.0.0-20181011144130-49bb7cea24b1
 	golang.org/x/oauth2 v0.0.0-20181003184128-c57b0facaced // indirect
 	golang.org/x/sys v0.0.0-20181011152604-fa43e7bc11ba // indirect

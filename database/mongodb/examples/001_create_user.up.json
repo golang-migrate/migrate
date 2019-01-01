@@ -1,0 +1,12 @@
+[
+  {
+    "createUser": "deminem",
+    "pwd": "gogo",
+    "roles": [
+      {
+        "role": "readWrite",
+        "db": "testMigration"
+      }
+    ]
+  }
+]
