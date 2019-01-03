@@ -19,7 +19,7 @@ func init() {
 	database.Register("mongodb", &Mongo{})
 }
 
-var DefaultMigrationsTable = "schema_migrations"
+var DefaultMigrationsCollection = "schema_migrations"
 
 var (
 	ErrNoDatabaseName = fmt.Errorf("no database name")
@@ -36,6 +36,7 @@ type Mongo struct {
 type Config struct {
 	DatabaseName         string
 	MigrationsCollection string
+	TransactionMode      bool
 }
 
 type versionInfo struct {
@@ -51,7 +52,7 @@ func WithInstance(instance *mongo.Client, config *Config) (database.Driver, erro
 		return nil, ErrNoDatabaseName
 	}
 	if len(config.MigrationsCollection) == 0 {
-		config.MigrationsCollection = DefaultMigrationsTable
+		config.MigrationsCollection = DefaultMigrationsCollection
 	}
 	mc := &Mongo{
 		client: instance,
@@ -76,8 +77,10 @@ func (m *Mongo) Open(dsn string) (database.Driver, error) {
 	}
 	migrationsCollection := purl.Query().Get("x-migrations-collection")
 	if len(migrationsCollection) == 0 {
-		migrationsCollection = DefaultMigrationsTable
+		migrationsCollection = DefaultMigrationsCollection
 	}
+
+	transactionMode := purl.Query().Get("x-transaction-mode") == "true"
 
 	q := migrate.FilterCustomQuery(purl)
 	q.Scheme = "mongodb"
@@ -92,6 +95,7 @@ func (m *Mongo) Open(dsn string) (database.Driver, error) {
 	mc, err := WithInstance(client, &Config{
 		DatabaseName:         uri.Database,
 		MigrationsCollection: migrationsCollection,
+		TransactionMode:      transactionMode,
 	})
 	if err != nil {
 		return nil, err
@@ -134,10 +138,44 @@ func (m *Mongo) Run(migration io.Reader) error {
 	if err != nil {
 		return fmt.Errorf("unmarshaling json error: %s", err)
 	}
-	for _, cmd := range cmds {
-		err := m.db.RunCommand(context.TODO(), cmd).Err()
-		if err != nil {
+	if m.config.TransactionMode {
+		if err := m.executeCommandsWithTransaction(context.TODO(), cmds); err != nil {
 			return err
+		}
+	} else {
+		if err := m.executeCommands(context.TODO(), cmds); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (m *Mongo) executeCommandsWithTransaction(ctx context.Context, cmds []bsonx.Doc) error {
+	err := m.db.Client().UseSession(ctx, func(sessionContext mongo.SessionContext) error {
+		if err := sessionContext.StartTransaction(); err != nil {
+			return &database.Error{OrigErr: err, Err: "failed to start transaction"}
+		}
+		if err := m.executeCommands(sessionContext, cmds); err != nil {
+			//When command execution is failed, it's aborting transaction
+			//If you tried to call abortTransaction, it`s return error that transaction already aborted
+			return err
+		}
+		if err := sessionContext.CommitTransaction(sessionContext); err != nil {
+			return &database.Error{OrigErr: err, Err: "failed to commit transaction"}
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (m *Mongo) executeCommands(ctx context.Context, cmds []bsonx.Doc) error {
+	for _, cmd := range cmds {
+		err := m.db.RunCommand(ctx, cmd).Err()
+		if err != nil {
+			return &database.Error{OrigErr: err, Err: fmt.Sprintf("failed to execute command:%s", cmd.String())}
 		}
 	}
 	return nil

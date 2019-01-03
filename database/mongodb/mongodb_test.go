@@ -72,26 +72,32 @@ func TestWithAuth(t *testing.T) {
 			if err != nil {
 				t.Fatalf("%v", err)
 			}
-
-			driverWithAuth, err := p.Open(fmt.Sprintf("mongodb://deminem:gogo@%s:%v/testMigration", i.Host(), i.Port()))
-			if err != nil {
-				t.Fatalf("%v", err)
+			testcases := []struct {
+				name            string
+				connectUri      string
+				isErrorExpected bool
+			}{
+				{"right auth data", "mongodb://deminem:gogo@%s:%v/testMigration", false},
+				{"wrong auth data", "mongodb://wrong:auth@%s:%v/testMigration", true},
 			}
-			defer driverWithAuth.Close()
 			insertCMD := []byte(`[{"insert":"hello","documents":[{"wild":"world"}]}]`)
-			err = driverWithAuth.Run(bytes.NewReader(insertCMD))
-			if err != nil {
-				t.Fatalf("%v", err)
-			}
 
-			driverWithWrongAuth, err := p.Open(fmt.Sprintf("mongodb://wrong:auth@%s:%v/testMigration", i.Host(), i.Port()))
-			if err != nil {
-				t.Fatalf("%v", err)
-			}
-			defer driverWithWrongAuth.Close()
-			err = driverWithWrongAuth.Run(bytes.NewReader(insertCMD))
-			if err == nil {
-				t.Fatal("no error with wrong authorization")
+			for _, tcase := range testcases {
+				t.Run(tcase.name, func(t *testing.T) {
+					mc := &Mongo{}
+					d, err := mc.Open(fmt.Sprintf(tcase.connectUri, i.Host(), i.Port()))
+					if err != nil {
+						t.Fatalf("%v", err)
+					}
+					defer d.Close()
+					err = d.Run(bytes.NewReader(insertCMD))
+					switch {
+					case tcase.isErrorExpected && err == nil:
+						t.Fatalf("no error when expected")
+					case !tcase.isErrorExpected && err != nil:
+						t.Fatalf("unexpected error: %v", err)
+					}
+				})
 			}
 		})
 }
