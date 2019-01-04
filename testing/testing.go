@@ -48,17 +48,19 @@ func ParallelTest(t *testing.T, versions []Version, readyFn IsReadyFunc, testFn 
 				defer container.Remove()
 
 				// wait until database is ready
-				tick := time.Tick(1000 * time.Millisecond)
-				timeout := time.After(time.Duration(timeout) * time.Second)
+				tick := time.NewTicker(1000 * time.Millisecond)
+				defer tick.Stop()
+				timeout := time.NewTimer(time.Duration(timeout) * time.Second)
+				defer timeout.Stop()
 			outer:
 				for {
 					select {
-					case <-tick:
+					case <-tick.C:
 						if readyFn(container) {
 							break outer
 						}
 
-					case <-timeout:
+					case <-timeout.C:
 						t.Fatalf("Docker: Container not ready, timeout for %v.\n%s", version, containerLogs(t, container))
 					}
 				}
