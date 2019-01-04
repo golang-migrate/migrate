@@ -6,12 +6,12 @@ import (
 	"io"
 	"io/ioutil"
 	"net/url"
+	"strconv"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/mongodb/mongo-go-driver/bson"
 	"github.com/mongodb/mongo-go-driver/mongo"
-	"github.com/mongodb/mongo-go-driver/x/bsonx"
 	"github.com/mongodb/mongo-go-driver/x/network/connstring"
 )
 
@@ -80,7 +80,7 @@ func (m *Mongo) Open(dsn string) (database.Driver, error) {
 		migrationsCollection = DefaultMigrationsCollection
 	}
 
-	transactionMode := purl.Query().Get("x-transaction-mode") == "true"
+	transactionMode, _ := strconv.ParseBool(purl.Query().Get("x-transaction-mode"))
 
 	q := migrate.FilterCustomQuery(purl)
 	q.Scheme = "mongodb"
@@ -133,7 +133,7 @@ func (m *Mongo) Run(migration io.Reader) error {
 	if err != nil {
 		return err
 	}
-	var cmds []bsonx.Doc
+	var cmds []bson.D
 	err = bson.UnmarshalExtJSON(migr, true, &cmds)
 	if err != nil {
 		return fmt.Errorf("unmarshaling json error: %s", err)
@@ -150,7 +150,7 @@ func (m *Mongo) Run(migration io.Reader) error {
 	return nil
 }
 
-func (m *Mongo) executeCommandsWithTransaction(ctx context.Context, cmds []bsonx.Doc) error {
+func (m *Mongo) executeCommandsWithTransaction(ctx context.Context, cmds []bson.D) error {
 	err := m.db.Client().UseSession(ctx, func(sessionContext mongo.SessionContext) error {
 		if err := sessionContext.StartTransaction(); err != nil {
 			return &database.Error{OrigErr: err, Err: "failed to start transaction"}
@@ -171,11 +171,11 @@ func (m *Mongo) executeCommandsWithTransaction(ctx context.Context, cmds []bsonx
 	return nil
 }
 
-func (m *Mongo) executeCommands(ctx context.Context, cmds []bsonx.Doc) error {
+func (m *Mongo) executeCommands(ctx context.Context, cmds []bson.D) error {
 	for _, cmd := range cmds {
 		err := m.db.RunCommand(ctx, cmd).Err()
 		if err != nil {
-			return &database.Error{OrigErr: err, Err: fmt.Sprintf("failed to execute command:%s", cmd.String())}
+			return &database.Error{OrigErr: err, Err: fmt.Sprintf("failed to execute command:%v", cmd.Map())}
 		}
 	}
 	return nil
