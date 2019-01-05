@@ -175,7 +175,7 @@ func (m *Mongo) executeCommands(ctx context.Context, cmds []bson.D) error {
 	for _, cmd := range cmds {
 		err := m.db.RunCommand(ctx, cmd).Err()
 		if err != nil {
-			return &database.Error{OrigErr: err, Err: fmt.Sprintf("failed to execute command:%v", cmd.Map())}
+			return &database.Error{OrigErr: err, Err: fmt.Sprintf("failed to execute command:%v", cmd)}
 		}
 	}
 	return nil

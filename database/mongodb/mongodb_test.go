@@ -83,6 +83,9 @@ func TestWithAuth(t *testing.T) {
 			insertCMD := []byte(`[{"insert":"hello","documents":[{"wild":"world"}]}]`)
 
 			for _, tcase := range testcases {
+				//With wrong authenticate `Open` func doesn't return auth error
+				//Because at the moment golang mongo driver doesn't support auth during connection
+				//For getting auth error we should execute database command
 				t.Run(tcase.name, func(t *testing.T) {
 					mc := &Mongo{}
 					d, err := mc.Open(fmt.Sprintf(tcase.connectUri, i.Host(), i.Port()))
