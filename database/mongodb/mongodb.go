@@ -63,6 +63,7 @@ func WithInstance(instance *mongo.Client, config *Config) (database.Driver, erro
 }
 
 func (m *Mongo) Open(dsn string) (database.Driver, error) {
+	//connsting is experimental package, but it used for parse connection string in mongo.Connect function
 	uri, err := connstring.Parse(dsn)
 	if err != nil {
 		return nil, err

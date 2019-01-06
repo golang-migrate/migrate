@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"testing"
+	"time"
 
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
 	mt "github.com/golang-migrate/migrate/v4/testing"
@@ -18,7 +19,9 @@ var versions = []mt.Version{
 }
 
 func mongoConnectionString(host string, port uint) string {
-	return fmt.Sprintf("mongodb://%s:%v/testMigration", host, port)
+	//there is connect option for excluding serverConnection algorithm
+	//it's let avoid errors with mongo replica set connection in docker container
+	return fmt.Sprintf("mongodb://%s:%v/testMigration?connect=single", host, port)
 }
 
 func isReady(i mt.Instance) bool {
@@ -99,6 +102,114 @@ func TestWithAuth(t *testing.T) {
 						t.Fatalf("no error when expected")
 					case !tcase.isErrorExpected && err != nil:
 						t.Fatalf("unexpected error: %v", err)
+					}
+				})
+			}
+		})
+}
+
+func TestTransaction(t *testing.T) {
+	versionsSupportedTransactions := []mt.Version{
+		{
+			Image: "mongo:4",
+			Cmd: []string{
+				"/bin/bash",
+				"-c",
+				"mongod --fork --logpath /data/log.log --bind_ip_all --replSet rs0 && mongo --eval 'rs.initiate()' && tail -f /data/log.log",
+			}},
+	}
+	mt.ParallelTest(t, versionsSupportedTransactions, isReady,
+		func(t *testing.T, i mt.Instance) {
+			//We should wait for replica init
+			//atm driver can't determine during initialization primary node without reconnect
+			time.Sleep(5 * time.Second)
+			p := &Mongo{}
+			addr := mongoConnectionString(i.Host(), i.Port())
+			d, err := p.Open(addr)
+			if err != nil {
+				t.Fatalf("%v", err)
+			}
+			defer d.Close()
+			//We have to create collection
+			//transactions don't support operations with creating new dbs, collections
+			//Unique index need for checking transaction aborting
+			insertCMD := []byte(`[
+				{"create":"hello"},
+				{"createIndexes": "hello",
+					"indexes": [{
+      					"key": {
+        					"wild": 1
+      					},
+      					"name": "unique_wild",
+     					"unique": true,
+      					"background": true
+    				}]
+			}]`)
+			err = d.Run(bytes.NewReader(insertCMD))
+			if err != nil {
+				t.Fatalf("%v", err)
+			}
+			testcases := []struct {
+				name            string
+				cmds            []byte
+				documentsCount  int64
+				isErrorExpected bool
+			}{
+				{
+					name: "success transaction",
+					cmds: []byte(`[{"insert":"hello","documents":[
+										{"wild":"world"},
+										{"wild":"west"},
+										{"wild":"natural"}
+									 ]
+								  }]`),
+					documentsCount:  3,
+					isErrorExpected: false,
+				},
+				{
+					name: "failure transaction",
+					//transaction have to be failure - duplicate unique key wild:west
+					//none of the documents should be added
+					cmds: []byte(`[{"insert":"hello","documents":[{"wild":"flower"}]},
+									{"insert":"hello","documents":[
+										{"wild":"cat"},
+										{"wild":"west"}
+									 ]
+								  }]`),
+					documentsCount:  3,
+					isErrorExpected: true,
+				},
+			}
+			for _, tcase := range testcases {
+				t.Run(tcase.name, func(t *testing.T) {
+					client, err := mongo.Connect(context.TODO(), mongoConnectionString(i.Host(), i.Port()))
+					if err != nil {
+						t.Fatalf("%v", err)
+					}
+					err = client.Ping(context.TODO(), nil)
+					if err != nil {
+						t.Fatalf("%v", err)
+					}
+					d, err := WithInstance(client, &Config{
+						DatabaseName:    "testMigration",
+						TransactionMode: true,
+					})
+					if err != nil {
+						t.Fatalf("%v", err)
+					}
+					defer d.Close()
+					runErr := d.Run(bytes.NewReader(tcase.cmds))
+					if runErr != nil {
+						if !tcase.isErrorExpected {
+							t.Fatalf("%v", runErr)
+						}
+					}
+					documentsCount, err := client.Database("testMigration").Collection("hello").Count(context.TODO(), nil)
+					if err != nil {
+						t.Fatalf("%v", err)
+					}
+					if tcase.documentsCount != documentsCount {
+						t.Fatalf("expected %d and actual %d documents count not equal. run migration error:%s", tcase.documentsCount, documentsCount, runErr)
 					}
 				})
 			}
