@@ -10,6 +10,7 @@ import (
 
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
 	mt "github.com/golang-migrate/migrate/v4/testing"
+	"github.com/mongodb/mongo-go-driver/bson"
 	"github.com/mongodb/mongo-go-driver/mongo"
 )
 
@@ -113,22 +114,33 @@ func TestTransaction(t *testing.T) {
 		{
 			Image: "mongo:4",
 			Cmd: []string{
-				"/bin/bash",
-				"-c",
-				"mongod --fork --logpath /data/log.log --bind_ip_all --replSet rs0 && mongo --eval 'rs.initiate()' && tail -f /data/log.log",
+				"mongod",
+				"--bind_ip_all",
+				"--replSet", "rs0",
 			}},
 	}
 	mt.ParallelTest(t, versionsSupportedTransactions, isReady,
 		func(t *testing.T, i mt.Instance) {
-			//We should wait for replica init
-			//atm driver can't determine during initialization primary node without reconnect
-			time.Sleep(5 * time.Second)
-			p := &Mongo{}
-			addr := mongoConnectionString(i.Host(), i.Port())
-			d, err := p.Open(addr)
+			client, err := mongo.Connect(context.TODO(), mongoConnectionString(i.Host(), i.Port()))
 			if err != nil {
 				t.Fatalf("%v", err)
 			}
+			err = client.Ping(context.TODO(), nil)
+			if err != nil {
+				t.Fatalf("%v", err)
+			}
+			//rs.initiate()
+			err = client.Database("admin").RunCommand(context.TODO(), bson.D{{"replSetInitiate", bson.D{}}}).Err()
+			if err != nil {
+				t.Fatalf("%v", err)
+			}
+			err = waitForReplicaInit(client)
+			if err != nil {
+				t.Fatalf("%v", err)
+			}
+			d, err := WithInstance(client, &Config{
+				DatabaseName: "testMigration",
+			})
 			defer d.Close()
 			//We have to create collection
 			//transactions don't support operations with creating new dbs, collections
@@ -214,4 +226,42 @@ func TestTransaction(t *testing.T) {
 				})
 			}
 		})
+}
+
+type replicaSetStatus struct {
+	Members []replicaMember `bson:"members"`
+}
+
+type replicaMember struct {
+	StateStr string `bson:"stateStr"`
+}
+
+func waitForReplicaInit(client *mongo.Client) error {
+	ticker := time.NewTicker(time.Second * 5)
+	defer ticker.Stop()
+	timeout := time.NewTimer(time.Second * 30)
+	defer timeout.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			status := replicaSetStatus{}
+			result := client.Database("admin").RunCommand(context.TODO(), bson.D{{"replSetGetStatus", 1}})
+			r, err := result.DecodeBytes()
+			if err != nil {
+				return err
+			}
+			err = bson.Unmarshal(r, &status)
+			if err != nil {
+				return err
+			}
+			if len(status.Members) > 0 {
+				if status.Members[0].StateStr == "PRIMARY" {
+					return nil
+				}
+			}
+		case <-timeout.C:
+			return fmt.Errorf("replica init timeout")
+		}
+	}
+
 }
