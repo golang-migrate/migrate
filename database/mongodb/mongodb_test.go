@@ -5,6 +5,8 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
+	"strconv"
 	"testing"
 	"time"
 
@@ -228,24 +230,27 @@ func TestTransaction(t *testing.T) {
 		})
 }
 
-type replicaSetStatus struct {
-	Members []replicaMember `bson:"members"`
-}
-
-type replicaMember struct {
-	StateStr string `bson:"stateStr"`
+type isMaster struct {
+	IsMaster bool `bson:"ismaster"`
 }
 
 func waitForReplicaInit(client *mongo.Client) error {
-	ticker := time.NewTicker(time.Second * 5)
+	ticker := time.NewTicker(time.Second * 1)
 	defer ticker.Stop()
-	timeout := time.NewTimer(time.Second * 30)
-	defer timeout.Stop()
+	timeout, err := strconv.Atoi(os.Getenv("MIGRATE_TEST_MONGO_REPLICA_SET_INIT_TIMEOUT"))
+	if err != nil {
+		timeout = 30
+	}
+	timeoutTimer := time.NewTimer(time.Duration(timeout) * time.Second)
+	defer timeoutTimer.Stop()
 	for {
 		select {
 		case <-ticker.C:
-			status := replicaSetStatus{}
-			result := client.Database("admin").RunCommand(context.TODO(), bson.D{{"replSetGetStatus", 1}})
+			var status isMaster
+			//Check that node is primary because
+			//during replica set initialization, the first node first becomes a secondary and then becomes the primary
+			//should consider that initialization is completed only after the node has become the primary
+			result := client.Database("admin").RunCommand(context.TODO(), bson.D{{"isMaster", 1}})
 			r, err := result.DecodeBytes()
 			if err != nil {
 				return err
@@ -254,12 +259,10 @@ func waitForReplicaInit(client *mongo.Client) error {
 			if err != nil {
 				return err
 			}
-			if len(status.Members) > 0 {
-				if status.Members[0].StateStr == "PRIMARY" {
-					return nil
-				}
+			if status.IsMaster {
+				return nil
 			}
-		case <-timeout.C:
+		case <-timeoutTimer.C:
 			return fmt.Errorf("replica init timeout")
 		}
 	}
