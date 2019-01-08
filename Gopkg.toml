@@ -81,6 +81,10 @@
   branch = "master"
   name = "google.golang.org/genproto"
 
+[[constraint]]
+  name = "github.com/mongodb/mongo-go-driver"
+  version = "0.1.0"
+
 [[override]]
   name = "cloud.google.com/go"
   version = "0.27.0"
