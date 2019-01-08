@@ -12,29 +12,43 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-
-	dt "github.com/golang-migrate/migrate/v4/database/testing"
-	mt "github.com/golang-migrate/migrate/v4/testing"
 )
 
-var versions = []mt.Version{
-	{Image: "postgres:8"},
-}
+import (
+	"github.com/dhui/dktest"
+)
 
-func redshiftConnectionString(host string, port uint) string {
+import (
+	dt "github.com/golang-migrate/migrate/v4/database/testing"
+	"github.com/golang-migrate/migrate/v4/dktesting"
+)
+
+var (
+	opts  = dktest.Options{PortRequired: true, ReadyFunc: isReady}
+	specs = []dktesting.ContainerSpec{
+		{ImageName: "postgres:8", Options: opts},
+	}
+)
+
+func redshiftConnectionString(host, port string) string {
 	return connectionString("redshift", host, port)
 }
 
-func pgConnectionString(host string, port uint) string {
+func pgConnectionString(host, port string) string {
 	return connectionString("postgres", host, port)
 }
 
-func connectionString(schema, host string, port uint) string {
-	return fmt.Sprintf("%s://postgres@%s:%v/postgres?sslmode=disable", schema, host, port)
+func connectionString(schema, host, port string) string {
+	return fmt.Sprintf("%s://postgres@%s:%s/postgres?sslmode=disable", schema, host, port)
 }
 
-func isReady(i mt.Instance) bool {
-	db, err := sql.Open("postgres", pgConnectionString(i.Host(), i.Port()))
+func isReady(c dktest.ContainerInfo) bool {
+	ip, port, err := c.FirstPort()
+	if err != nil {
+		return false
+	}
+
+	db, err := sql.Open("postgres", pgConnectionString(ip, port))
 	if err != nil {
 		return false
 	}
@@ -53,133 +67,153 @@ func isReady(i mt.Instance) bool {
 }
 
 func Test(t *testing.T) {
-	mt.ParallelTest(t, versions, isReady,
-		func(t *testing.T, i mt.Instance) {
-			p := &Redshift{}
-			addr := redshiftConnectionString(i.Host(), i.Port())
-			d, err := p.Open(addr)
-			if err != nil {
-				t.Fatalf("%v", err)
-			}
-			defer d.Close()
-			dt.Test(t, d, []byte("SELECT 1"))
-		})
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := redshiftConnectionString(ip, port)
+		p := &Redshift{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+		defer d.Close()
+		dt.Test(t, d, []byte("SELECT 1"))
+	})
 }
 
 func TestMultiStatement(t *testing.T) {
-	mt.ParallelTest(t, versions, isReady,
-		func(t *testing.T, i mt.Instance) {
-			p := &Redshift{}
-			addr := redshiftConnectionString(i.Host(), i.Port())
-			d, err := p.Open(addr)
-			if err != nil {
-				t.Fatalf("%v", err)
-			}
-			defer d.Close()
-			if err := d.Run(bytes.NewReader([]byte("CREATE TABLE foo (foo text); CREATE TABLE bar (bar text);"))); err != nil {
-				t.Fatalf("expected err to be nil, got %v", err)
-			}
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
 
-			// make sure second table exists
-			var exists bool
-			if err := d.(*Redshift).conn.QueryRowContext(context.Background(), "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'bar' AND table_schema = (SELECT current_schema()))").Scan(&exists); err != nil {
-				t.Fatal(err)
-			}
-			if !exists {
-				t.Fatalf("expected table bar to exist")
-			}
-		})
+		addr := redshiftConnectionString(ip, port)
+		p := &Redshift{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+		defer d.Close()
+		if err := d.Run(bytes.NewReader([]byte("CREATE TABLE foo (foo text); CREATE TABLE bar (bar text);"))); err != nil {
+			t.Fatalf("expected err to be nil, got %v", err)
+		}
+
+		// make sure second table exists
+		var exists bool
+		if err := d.(*Redshift).conn.QueryRowContext(context.Background(), "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'bar' AND table_schema = (SELECT current_schema()))").Scan(&exists); err != nil {
+			t.Fatal(err)
+		}
+		if !exists {
+			t.Fatalf("expected table bar to exist")
+		}
+	})
 }
 
 func TestErrorParsing(t *testing.T) {
-	mt.ParallelTest(t, versions, isReady,
-		func(t *testing.T, i mt.Instance) {
-			p := &Redshift{}
-			addr := redshiftConnectionString(i.Host(), i.Port())
-			d, err := p.Open(addr)
-			if err != nil {
-				t.Fatalf("%v", err)
-			}
-			defer d.Close()
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
 
-			wantErr := `migration failed: syntax error at or near "TABLEE" (column 37) in line 1: CREATE TABLE foo ` +
-				`(foo text); CREATE TABLEE bar (bar text); (details: pq: syntax error at or near "TABLEE")`
-			if err := d.Run(bytes.NewReader([]byte("CREATE TABLE foo (foo text); CREATE TABLEE bar (bar text);"))); err == nil {
-				t.Fatal("expected err but got nil")
-			} else if err.Error() != wantErr {
-				t.Fatalf("expected '%s' but got '%s'", wantErr, err.Error())
-			}
-		})
+		addr := redshiftConnectionString(ip, port)
+		p := &Redshift{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+		defer d.Close()
+
+		wantErr := `migration failed: syntax error at or near "TABLEE" (column 37) in line 1: CREATE TABLE foo ` +
+			`(foo text); CREATE TABLEE bar (bar text); (details: pq: syntax error at or near "TABLEE")`
+		if err := d.Run(bytes.NewReader([]byte("CREATE TABLE foo (foo text); CREATE TABLEE bar (bar text);"))); err == nil {
+			t.Fatal("expected err but got nil")
+		} else if err.Error() != wantErr {
+			t.Fatalf("expected '%s' but got '%s'", wantErr, err.Error())
+		}
+	})
 }
 
 func TestFilterCustomQuery(t *testing.T) {
-	mt.ParallelTest(t, versions, isReady,
-		func(t *testing.T, i mt.Instance) {
-			p := &Redshift{}
-			addr := fmt.Sprintf("postgres://postgres@%v:%v/postgres?sslmode=disable&x-custom=foobar", i.Host(), i.Port())
-			d, err := p.Open(addr)
-			if err != nil {
-				t.Fatalf("%v", err)
-			}
-			defer d.Close()
-		})
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := fmt.Sprintf("postgres://postgres@%v:%v/postgres?sslmode=disable&x-custom=foobar", ip, port)
+		p := &Redshift{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+		defer d.Close()
+	})
 }
 
 func TestWithSchema(t *testing.T) {
-	mt.ParallelTest(t, versions, isReady,
-		func(t *testing.T, i mt.Instance) {
-			p := &Redshift{}
-			addr := redshiftConnectionString(i.Host(), i.Port())
-			d, err := p.Open(addr)
-			if err != nil {
-				t.Fatalf("%v", err)
-			}
-			defer d.Close()
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
 
-			// create foobar schema
-			if err := d.Run(bytes.NewReader([]byte("CREATE SCHEMA foobar AUTHORIZATION postgres"))); err != nil {
-				t.Fatal(err)
-			}
-			if err := d.SetVersion(1, false); err != nil {
-				t.Fatal(err)
-			}
+		addr := redshiftConnectionString(ip, port)
+		p := &Redshift{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+		defer d.Close()
 
-			// re-connect using that schema
-			d2, err := p.Open(fmt.Sprintf("postgres://postgres@%v:%v/postgres?sslmode=disable&search_path=foobar", i.Host(), i.Port()))
-			if err != nil {
-				t.Fatalf("%v", err)
-			}
-			defer d2.Close()
+		// create foobar schema
+		if err := d.Run(bytes.NewReader([]byte("CREATE SCHEMA foobar AUTHORIZATION postgres"))); err != nil {
+			t.Fatal(err)
+		}
+		if err := d.SetVersion(1, false); err != nil {
+			t.Fatal(err)
+		}
 
-			version, _, err := d2.Version()
-			if err != nil {
-				t.Fatal(err)
-			}
-			if version != -1 {
-				t.Fatal("expected NilVersion")
-			}
+		// re-connect using that schema
+		d2, err := p.Open(fmt.Sprintf("postgres://postgres@%v:%v/postgres?sslmode=disable&search_path=foobar", ip, port))
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+		defer d2.Close()
 
-			// now update version and compare
-			if err := d2.SetVersion(2, false); err != nil {
-				t.Fatal(err)
-			}
-			version, _, err = d2.Version()
-			if err != nil {
-				t.Fatal(err)
-			}
-			if version != 2 {
-				t.Fatal("expected version 2")
-			}
+		version, _, err := d2.Version()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if version != -1 {
+			t.Fatal("expected NilVersion")
+		}
 
-			// meanwhile, the public schema still has the other version
-			version, _, err = d.Version()
-			if err != nil {
-				t.Fatal(err)
-			}
-			if version != 1 {
-				t.Fatal("expected version 2")
-			}
-		})
+		// now update version and compare
+		if err := d2.SetVersion(2, false); err != nil {
+			t.Fatal(err)
+		}
+		version, _, err = d2.Version()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if version != 2 {
+			t.Fatal("expected version 2")
+		}
+
+		// meanwhile, the public schema still has the other version
+		version, _, err = d.Version()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if version != 1 {
+			t.Fatal("expected version 2")
+		}
+	})
 }
 
 func TestWithInstance(t *testing.T) {
@@ -187,39 +221,43 @@ func TestWithInstance(t *testing.T) {
 }
 
 func TestRedshift_Lock(t *testing.T) {
-	mt.ParallelTest(t, versions, isReady,
-		func(t *testing.T, i mt.Instance) {
-			p := &Redshift{}
-			addr := pgConnectionString(i.Host(), i.Port())
-			d, err := p.Open(addr)
-			if err != nil {
-				t.Fatalf("%v", err)
-			}
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
 
-			dt.Test(t, d, []byte("SELECT 1"))
+		addr := pgConnectionString(ip, port)
+		p := &Redshift{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
 
-			ps := d.(*Redshift)
+		dt.Test(t, d, []byte("SELECT 1"))
 
-			err = ps.Lock()
-			if err != nil {
-				t.Fatal(err)
-			}
+		ps := d.(*Redshift)
 
-			err = ps.Unlock()
-			if err != nil {
-				t.Fatal(err)
-			}
+		err = ps.Lock()
+		if err != nil {
+			t.Fatal(err)
+		}
 
-			err = ps.Lock()
-			if err != nil {
-				t.Fatal(err)
-			}
+		err = ps.Unlock()
+		if err != nil {
+			t.Fatal(err)
+		}
 
-			err = ps.Unlock()
-			if err != nil {
-				t.Fatal(err)
-			}
-		})
+		err = ps.Lock()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = ps.Unlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
 }
 
 func Test_computeLineFromPos(t *testing.T) {

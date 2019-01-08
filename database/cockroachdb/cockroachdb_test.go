@@ -5,88 +5,130 @@ package cockroachdb
 import (
 	"database/sql"
 	"fmt"
-	"io"
 	"strings"
 	"testing"
 )
 
 import (
-	dt "github.com/golang-migrate/migrate/v4/database/testing"
-	mt "github.com/golang-migrate/migrate/v4/testing"
-	"github.com/lib/pq"
+	"github.com/dhui/dktest"
+	_ "github.com/lib/pq"
 )
 
-var versions = []mt.Version{
-	{Image: "cockroachdb/cockroach:v1.0.2", Cmd: []string{"start", "--insecure"}},
-}
+import (
+	dt "github.com/golang-migrate/migrate/v4/database/testing"
+	"github.com/golang-migrate/migrate/v4/dktesting"
+)
 
-func isReady(i mt.Instance) bool {
-	db, err := sql.Open("postgres", fmt.Sprintf("postgres://root@%v:%v?sslmode=disable", i.Host(), i.PortFor(26257)))
+const defaultPort = 26257
+
+var (
+	opts  = dktest.Options{Cmd: []string{"start", "--insecure"}, PortRequired: true, ReadyFunc: isReady}
+	specs = []dktesting.ContainerSpec{{ImageName: "cockroachdb/cockroach:v1.0.2", Options: opts}}
+)
+
+func isReady(c dktest.ContainerInfo) bool {
+	ip, port, err := c.Port(defaultPort)
 	if err != nil {
+		fmt.Println("port error:", err)
 		return false
 	}
-	defer db.Close()
-	err = db.Ping()
-	if err == io.EOF {
-		_, err = db.Exec("CREATE DATABASE migrate")
-		return err == nil
-	} else if e, ok := err.(*pq.Error); ok {
-		if e.Code.Name() == "cannot_connect_now" {
-			return false
-		}
+
+	db, err := sql.Open("postgres", fmt.Sprintf("postgres://root@%v:%v?sslmode=disable", ip, port))
+	if err != nil {
+		fmt.Println("open error:", err)
+		return false
 	}
-
-	_, err = db.Exec("CREATE DATABASE migrate")
-	return err == nil
-
+	if err := db.Ping(); err != nil {
+		fmt.Println("ping error:", err)
+		return false
+	}
+	db.Close()
 	return true
 }
 
+func createDB(t *testing.T, c dktest.ContainerInfo) {
+	ip, port, err := c.Port(defaultPort)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	db, err := sql.Open("postgres", fmt.Sprintf("postgres://root@%v:%v?sslmode=disable", ip, port))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = db.Ping(); err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	if _, err = db.Exec("CREATE DATABASE migrate"); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func Test(t *testing.T) {
-	mt.ParallelTest(t, versions, isReady,
-		func(t *testing.T, i mt.Instance) {
-			c := &CockroachDb{}
-			addr := fmt.Sprintf("cockroach://root@%v:%v/migrate?sslmode=disable", i.Host(), i.PortFor(26257))
-			d, err := c.Open(addr)
-			if err != nil {
-				t.Fatalf("%v", err)
-			}
-			dt.Test(t, d, []byte("SELECT 1"))
-		})
+	dktesting.ParallelTest(t, specs, func(t *testing.T, ci dktest.ContainerInfo) {
+		createDB(t, ci)
+
+		ip, port, err := ci.Port(26257)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := fmt.Sprintf("cockroach://root@%v:%v/migrate?sslmode=disable", ip, port)
+		c := &CockroachDb{}
+		d, err := c.Open(addr)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+		dt.Test(t, d, []byte("SELECT 1"))
+	})
 }
 
 func TestMultiStatement(t *testing.T) {
-	mt.ParallelTest(t, versions, isReady,
-		func(t *testing.T, i mt.Instance) {
-			c := &CockroachDb{}
-			addr := fmt.Sprintf("cockroach://root@%v:%v/migrate?sslmode=disable", i.Host(), i.Port())
-			d, err := c.Open(addr)
-			if err != nil {
-				t.Fatalf("%v", err)
-			}
-			if err := d.Run(strings.NewReader("CREATE TABLE foo (foo text); CREATE TABLE bar (bar text);")); err != nil {
-				t.Fatalf("expected err to be nil, got %v", err)
-			}
+	dktesting.ParallelTest(t, specs, func(t *testing.T, ci dktest.ContainerInfo) {
+		createDB(t, ci)
 
-			// make sure second table exists
-			var exists bool
-			if err := d.(*CockroachDb).db.QueryRow("SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'bar' AND table_schema = (SELECT current_schema()))").Scan(&exists); err != nil {
-				t.Fatal(err)
-			}
-			if !exists {
-				t.Fatalf("expected table bar to exist")
-			}
-		})
+		ip, port, err := ci.Port(26257)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := fmt.Sprintf("cockroach://root@%v:%v/migrate?sslmode=disable", ip, port)
+		c := &CockroachDb{}
+		d, err := c.Open(addr)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+		if err := d.Run(strings.NewReader("CREATE TABLE foo (foo text); CREATE TABLE bar (bar text);")); err != nil {
+			t.Fatalf("expected err to be nil, got %v", err)
+		}
+
+		// make sure second table exists
+		var exists bool
+		if err := d.(*CockroachDb).db.QueryRow("SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'bar' AND table_schema = (SELECT current_schema()))").Scan(&exists); err != nil {
+			t.Fatal(err)
+		}
+		if !exists {
+			t.Fatalf("expected table bar to exist")
+		}
+	})
 }
 
 func TestFilterCustomQuery(t *testing.T) {
-	mt.ParallelTest(t, versions, isReady,
-		func(t *testing.T, i mt.Instance) {
-			c := &CockroachDb{}
-			addr := fmt.Sprintf("cockroach://root@%v:%v/migrate?sslmode=disable&x-custom=foobar", i.Host(), i.PortFor(26257))
-			_, err := c.Open(addr)
-			if err != nil {
-				t.Fatalf("%v", err)
-			}
-		})
+	dktesting.ParallelTest(t, specs, func(t *testing.T, ci dktest.ContainerInfo) {
+		createDB(t, ci)
+
+		ip, port, err := ci.Port(26257)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := fmt.Sprintf("cockroach://root@%v:%v/migrate?sslmode=disable&x-custom=foobar", ip, port)
+		c := &CockroachDb{}
+		_, err = c.Open(addr)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+	})
 }

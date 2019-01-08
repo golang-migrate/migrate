@@ -100,3 +100,7 @@
 [prune]
   go-tests = true
   unused-packages = true
+
+[[constraint]]
+  name = "github.com/dhui/dktest"
+  version = "0.2.2"

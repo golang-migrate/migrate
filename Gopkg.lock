@@ -26,12 +26,31 @@
   version = "v0.27.0"
 
 [[projects]]
+  branch = "master"
+  digest = "1:6da51e5ec493ad2b44cb04129e2d0a068c8fb9bd6cb5739d199573558696bb94"
+  name = "github.com/Azure/go-ansiterm"
+  packages = [
+    ".",
+    "winterm",
+  ]
+  pruneopts = "UT"
+  revision = "d6e3b3328b783f23731bc4d058875b0371ff8109"
+
+[[projects]]
   digest = "1:f9ae348e1f793dcf9ed930ed47136a67343dbd6809c5c91391322267f4476892"
   name = "github.com/Microsoft/go-winio"
   packages = ["."]
   pruneopts = "UT"
   revision = "97e4973ce50b2ff5f09635a57e2b88a037aae829"
   version = "v0.4.11"
+
+[[projects]]
+  branch = "master"
+  digest = "1:3721a10686511b80c052323423f0de17a8c06d417dbdd3b392b1578432a33aae"
+  name = "github.com/Nvveen/Gotty"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "cd527374f1e5bff4938207604a14f2e38a9cf512"
 
 [[projects]]
   digest = "1:1d58a675bc7df5691f81b4a28a39d2d218f020b23644a6c7771f7ebaab272ac8"
@@ -172,6 +191,14 @@
   revision = "2533cb5b45cc6c07421468ce262899ddc9d53fb7"
 
 [[projects]]
+  digest = "1:68e57cbbbd288587542234a360b8e85203d5c401e17af111700b64c4e6fc18a0"
+  name = "github.com/dhui/dktest"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "000a05f875a42eae6ea121e1aa763d8b35944c19"
+  version = "v0.2.2"
+
+[[projects]]
   branch = "master"
   digest = "1:4ddc17aeaa82cb18c5f0a25d7c253a10682f518f4b2558a82869506eec223d76"
   name = "github.com/docker/distribution"
@@ -183,7 +210,7 @@
   revision = "1cb4180b1a5b9c029b2f2beaeb38f0b5cf64e12e"
 
 [[projects]]
-  digest = "1:47eae8fd493e859163b3cace5b72c83a7f42f7e9aad758b2c747a58331ec24ab"
+  digest = "1:8a2c57c577e78f40e2b3cd34ba1d050d9afd1060f91552ea03704324d1f50024"
   name = "github.com/docker/docker"
   packages = [
     "api",
@@ -203,6 +230,9 @@
     "api/types/versions",
     "api/types/volume",
     "client",
+    "pkg/jsonmessage",
+    "pkg/term",
+    "pkg/term/windows",
   ]
   pruneopts = "UT"
   revision = "453f2b8b40b923862ce1c08c11531ff5042770f1"
@@ -387,6 +417,14 @@
   revision = "0b12d6b5"
 
 [[projects]]
+  digest = "1:0a69a1c0db3591fcefb47f115b224592c8dfa4368b7ba9fae509d5e16cdc95c8"
+  name = "github.com/konsorten/go-windows-terminal-sequences"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "5c8c8bd35d3832f5d134ae1e1e375b69a4d25242"
+  version = "v1.0.1"
+
+[[projects]]
   digest = "1:f02dbf2124e5dfb5305a6c3c8957a41d54a89d2a3ef60f030769f86e7851d5f5"
   name = "github.com/kshvakov/clickhouse"
   packages = [
@@ -488,6 +526,14 @@
   version = "v0.8.0"
 
 [[projects]]
+  digest = "1:87c2e02fb01c27060ccc5ba7c5a407cc91147726f8f40b70cceeedbc52b1f3a8"
+  name = "github.com/sirupsen/logrus"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "e1e72e9de974bd926e5c56f83753fba2df402ce5"
+  version = "v1.3.0"
+
+[[projects]]
   branch = "master"
   digest = "1:40fdfd6ab85ca32b6935853bbba35935dcb1d796c8135efd85947566c76e662e"
   name = "github.com/xdg/scram"
@@ -528,9 +574,12 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:f92f6956e4059f6a3efc14924d2dd58ba90da25cc57fe07ae3779ef2f5e0c5f2"
+  digest = "1:9ff2b9f8d4e47013a213b9ea0d850ed787c51f5eab2038842d82397ad85a19c1"
   name = "golang.org/x/crypto"
-  packages = ["pbkdf2"]
+  packages = [
+    "pbkdf2",
+    "ssh/terminal",
+  ]
   pruneopts = "UT"
   revision = "8d7daa0c54b357f3071e11eaef7efc4e19a417e2"
 
@@ -737,6 +786,7 @@
     "github.com/aws/aws-sdk-go/service/s3/s3iface",
     "github.com/cockroachdb/cockroach-go/crdb",
     "github.com/cznic/ql/driver",
+    "github.com/dhui/dktest",
     "github.com/docker/docker/api/types",
     "github.com/docker/docker/api/types/container",
     "github.com/docker/docker/api/types/network",
@@ -750,7 +800,6 @@
     "github.com/mattn/go-sqlite3",
     "github.com/mongodb/mongo-go-driver/bson",
     "github.com/mongodb/mongo-go-driver/mongo",
-    "github.com/mongodb/mongo-go-driver/x/bsonx",
     "github.com/mongodb/mongo-go-driver/x/network/connstring",
     "golang.org/x/net/context",
     "golang.org/x/tools/godoc/vfs",

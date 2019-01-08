@@ -14,24 +14,36 @@ import (
 )
 
 import (
-	dt "github.com/golang-migrate/migrate/v4/database/testing"
-	mt "github.com/golang-migrate/migrate/v4/testing"
+	"github.com/dhui/dktest"
 )
 
-var versions = []mt.Version{
-	{Image: "postgres:10"},
-	{Image: "postgres:9.6"},
-	{Image: "postgres:9.5"},
-	{Image: "postgres:9.4"},
-	{Image: "postgres:9.3"},
+import (
+	dt "github.com/golang-migrate/migrate/v4/database/testing"
+	"github.com/golang-migrate/migrate/v4/dktesting"
+)
+
+var (
+	opts  = dktest.Options{PortRequired: true, ReadyFunc: isReady}
+	specs = []dktesting.ContainerSpec{
+		{ImageName: "postgres:10", Options: opts},
+		{ImageName: "postgres:9.6", Options: opts},
+		{ImageName: "postgres:9.5", Options: opts},
+		{ImageName: "postgres:9.4", Options: opts},
+		{ImageName: "postgres:9.3", Options: opts},
+	}
+)
+
+func pgConnectionString(host, port string) string {
+	return fmt.Sprintf("postgres://postgres@%s:%s/postgres?sslmode=disable", host, port)
 }
 
-func pgConnectionString(host string, port uint) string {
-	return fmt.Sprintf("postgres://postgres@%s:%v/postgres?sslmode=disable", host, port)
-}
+func isReady(c dktest.ContainerInfo) bool {
+	ip, port, err := c.FirstPort()
+	if err != nil {
+		return false
+	}
 
-func isReady(i mt.Instance) bool {
-	db, err := sql.Open("postgres", pgConnectionString(i.Host(), i.Port()))
+	db, err := sql.Open("postgres", pgConnectionString(ip, port))
 	if err != nil {
 		return false
 	}
@@ -50,183 +62,207 @@ func isReady(i mt.Instance) bool {
 }
 
 func Test(t *testing.T) {
-	mt.ParallelTest(t, versions, isReady,
-		func(t *testing.T, i mt.Instance) {
-			p := &Postgres{}
-			addr := pgConnectionString(i.Host(), i.Port())
-			d, err := p.Open(addr)
-			if err != nil {
-				t.Fatalf("%v", err)
-			}
-			defer d.Close()
-			dt.Test(t, d, []byte("SELECT 1"))
-		})
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := pgConnectionString(ip, port)
+		p := &Postgres{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+		defer d.Close()
+		dt.Test(t, d, []byte("SELECT 1"))
+	})
 }
 
 func TestMultiStatement(t *testing.T) {
-	mt.ParallelTest(t, versions, isReady,
-		func(t *testing.T, i mt.Instance) {
-			p := &Postgres{}
-			addr := pgConnectionString(i.Host(), i.Port())
-			d, err := p.Open(addr)
-			if err != nil {
-				t.Fatalf("%v", err)
-			}
-			defer d.Close()
-			if err := d.Run(strings.NewReader("CREATE TABLE foo (foo text); CREATE TABLE bar (bar text);")); err != nil {
-				t.Fatalf("expected err to be nil, got %v", err)
-			}
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
 
-			// make sure second table exists
-			var exists bool
-			if err := d.(*Postgres).conn.QueryRowContext(context.Background(), "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'bar' AND table_schema = (SELECT current_schema()))").Scan(&exists); err != nil {
-				t.Fatal(err)
-			}
-			if !exists {
-				t.Fatalf("expected table bar to exist")
-			}
-		})
+		addr := pgConnectionString(ip, port)
+		p := &Postgres{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+		defer d.Close()
+		if err := d.Run(strings.NewReader("CREATE TABLE foo (foo text); CREATE TABLE bar (bar text);")); err != nil {
+			t.Fatalf("expected err to be nil, got %v", err)
+		}
+
+		// make sure second table exists
+		var exists bool
+		if err := d.(*Postgres).conn.QueryRowContext(context.Background(), "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'bar' AND table_schema = (SELECT current_schema()))").Scan(&exists); err != nil {
+			t.Fatal(err)
+		}
+		if !exists {
+			t.Fatalf("expected table bar to exist")
+		}
+	})
 }
 
 func TestErrorParsing(t *testing.T) {
-	mt.ParallelTest(t, versions, isReady,
-		func(t *testing.T, i mt.Instance) {
-			p := &Postgres{}
-			addr := pgConnectionString(i.Host(), i.Port())
-			d, err := p.Open(addr)
-			if err != nil {
-				t.Fatalf("%v", err)
-			}
-			defer d.Close()
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
 
-			wantErr := `migration failed: syntax error at or near "TABLEE" (column 37) in line 1: CREATE TABLE foo ` +
-				`(foo text); CREATE TABLEE bar (bar text); (details: pq: syntax error at or near "TABLEE")`
-			if err := d.Run(strings.NewReader("CREATE TABLE foo (foo text); CREATE TABLEE bar (bar text);")); err == nil {
-				t.Fatal("expected err but got nil")
-			} else if err.Error() != wantErr {
-				t.Fatalf("expected '%s' but got '%s'", wantErr, err.Error())
-			}
-		})
+		addr := pgConnectionString(ip, port)
+		p := &Postgres{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+		defer d.Close()
+
+		wantErr := `migration failed: syntax error at or near "TABLEE" (column 37) in line 1: CREATE TABLE foo ` +
+			`(foo text); CREATE TABLEE bar (bar text); (details: pq: syntax error at or near "TABLEE")`
+		if err := d.Run(strings.NewReader("CREATE TABLE foo (foo text); CREATE TABLEE bar (bar text);")); err == nil {
+			t.Fatal("expected err but got nil")
+		} else if err.Error() != wantErr {
+			t.Fatalf("expected '%s' but got '%s'", wantErr, err.Error())
+		}
+	})
 }
 
 func TestFilterCustomQuery(t *testing.T) {
-	mt.ParallelTest(t, versions, isReady,
-		func(t *testing.T, i mt.Instance) {
-			p := &Postgres{}
-			addr := fmt.Sprintf("postgres://postgres@%v:%v/postgres?sslmode=disable&x-custom=foobar", i.Host(), i.Port())
-			d, err := p.Open(addr)
-			if err != nil {
-				t.Fatalf("%v", err)
-			}
-			defer d.Close()
-		})
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := fmt.Sprintf("postgres://postgres@%v:%v/postgres?sslmode=disable&x-custom=foobar", ip, port)
+		p := &Postgres{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+		defer d.Close()
+	})
 }
 
 func TestWithSchema(t *testing.T) {
-	mt.ParallelTest(t, versions, isReady,
-		func(t *testing.T, i mt.Instance) {
-			p := &Postgres{}
-			addr := pgConnectionString(i.Host(), i.Port())
-			d, err := p.Open(addr)
-			if err != nil {
-				t.Fatalf("%v", err)
-			}
-			defer d.Close()
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
 
-			// create foobar schema
-			if err := d.Run(strings.NewReader("CREATE SCHEMA foobar AUTHORIZATION postgres")); err != nil {
-				t.Fatal(err)
-			}
-			if err := d.SetVersion(1, false); err != nil {
-				t.Fatal(err)
-			}
+		addr := pgConnectionString(ip, port)
+		p := &Postgres{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+		defer d.Close()
 
-			// re-connect using that schema
-			d2, err := p.Open(fmt.Sprintf("postgres://postgres@%v:%v/postgres?sslmode=disable&search_path=foobar", i.Host(), i.Port()))
-			if err != nil {
-				t.Fatalf("%v", err)
-			}
-			defer d2.Close()
+		// create foobar schema
+		if err := d.Run(strings.NewReader("CREATE SCHEMA foobar AUTHORIZATION postgres")); err != nil {
+			t.Fatal(err)
+		}
+		if err := d.SetVersion(1, false); err != nil {
+			t.Fatal(err)
+		}
 
-			version, _, err := d2.Version()
-			if err != nil {
-				t.Fatal(err)
-			}
-			if version != -1 {
-				t.Fatal("expected NilVersion")
-			}
+		// re-connect using that schema
+		d2, err := p.Open(fmt.Sprintf("postgres://postgres@%v:%v/postgres?sslmode=disable&search_path=foobar", ip, port))
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+		defer d2.Close()
 
-			// now update version and compare
-			if err := d2.SetVersion(2, false); err != nil {
-				t.Fatal(err)
-			}
-			version, _, err = d2.Version()
-			if err != nil {
-				t.Fatal(err)
-			}
-			if version != 2 {
-				t.Fatal("expected version 2")
-			}
+		version, _, err := d2.Version()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if version != -1 {
+			t.Fatal("expected NilVersion")
+		}
 
-			// meanwhile, the public schema still has the other version
-			version, _, err = d.Version()
-			if err != nil {
-				t.Fatal(err)
-			}
-			if version != 1 {
-				t.Fatal("expected version 2")
-			}
-		})
+		// now update version and compare
+		if err := d2.SetVersion(2, false); err != nil {
+			t.Fatal(err)
+		}
+		version, _, err = d2.Version()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if version != 2 {
+			t.Fatal("expected version 2")
+		}
+
+		// meanwhile, the public schema still has the other version
+		version, _, err = d.Version()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if version != 1 {
+			t.Fatal("expected version 2")
+		}
+	})
 }
 
 func TestParallelSchema(t *testing.T) {
-	mt.ParallelTest(t, versions, isReady,
-		func(t *testing.T, i mt.Instance) {
-			p := &Postgres{}
-			addr := pgConnectionString(i.Host(), i.Port())
-			d, err := p.Open(addr)
-			if err != nil {
-				t.Fatalf("%v", err)
-			}
-			defer d.Close()
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
 
-			// create foo and bar schemas
-			if err := d.Run(strings.NewReader("CREATE SCHEMA foo AUTHORIZATION postgres")); err != nil {
-				t.Fatal(err)
-			}
-			if err := d.Run(strings.NewReader("CREATE SCHEMA bar AUTHORIZATION postgres")); err != nil {
-				t.Fatal(err)
-			}
+		addr := pgConnectionString(ip, port)
+		p := &Postgres{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+		defer d.Close()
 
-			// re-connect using that schemas
-			dfoo, err := p.Open(fmt.Sprintf("postgres://postgres@%v:%v/postgres?sslmode=disable&search_path=foo", i.Host(), i.Port()))
-			if err != nil {
-				t.Fatalf("%v", err)
-			}
-			defer dfoo.Close()
+		// create foo and bar schemas
+		if err := d.Run(strings.NewReader("CREATE SCHEMA foo AUTHORIZATION postgres")); err != nil {
+			t.Fatal(err)
+		}
+		if err := d.Run(strings.NewReader("CREATE SCHEMA bar AUTHORIZATION postgres")); err != nil {
+			t.Fatal(err)
+		}
 
-			dbar, err := p.Open(fmt.Sprintf("postgres://postgres@%v:%v/postgres?sslmode=disable&search_path=bar", i.Host(), i.Port()))
-			if err != nil {
-				t.Fatalf("%v", err)
-			}
-			defer dbar.Close()
+		// re-connect using that schemas
+		dfoo, err := p.Open(fmt.Sprintf("postgres://postgres@%v:%v/postgres?sslmode=disable&search_path=foo", ip, port))
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+		defer dfoo.Close()
 
-			if err := dfoo.Lock(); err != nil {
-				t.Fatal(err)
-			}
+		dbar, err := p.Open(fmt.Sprintf("postgres://postgres@%v:%v/postgres?sslmode=disable&search_path=bar", ip, port))
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+		defer dbar.Close()
 
-			if err := dbar.Lock(); err != nil {
-				t.Fatal(err)
-			}
+		if err := dfoo.Lock(); err != nil {
+			t.Fatal(err)
+		}
 
-			if err := dbar.Unlock(); err != nil {
-				t.Fatal(err)
-			}
+		if err := dbar.Lock(); err != nil {
+			t.Fatal(err)
+		}
 
-			if err := dfoo.Unlock(); err != nil {
-				t.Fatal(err)
-			}
-		})
+		if err := dbar.Unlock(); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := dfoo.Unlock(); err != nil {
+			t.Fatal(err)
+		}
+	})
 }
 
 func TestWithInstance(t *testing.T) {
@@ -234,39 +270,43 @@ func TestWithInstance(t *testing.T) {
 }
 
 func TestPostgres_Lock(t *testing.T) {
-	mt.ParallelTest(t, versions, isReady,
-		func(t *testing.T, i mt.Instance) {
-			p := &Postgres{}
-			addr := pgConnectionString(i.Host(), i.Port())
-			d, err := p.Open(addr)
-			if err != nil {
-				t.Fatalf("%v", err)
-			}
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
 
-			dt.Test(t, d, []byte("SELECT 1"))
+		addr := pgConnectionString(ip, port)
+		p := &Postgres{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
 
-			ps := d.(*Postgres)
+		dt.Test(t, d, []byte("SELECT 1"))
 
-			err = ps.Lock()
-			if err != nil {
-				t.Fatal(err)
-			}
+		ps := d.(*Postgres)
 
-			err = ps.Unlock()
-			if err != nil {
-				t.Fatal(err)
-			}
+		err = ps.Lock()
+		if err != nil {
+			t.Fatal(err)
+		}
 
-			err = ps.Lock()
-			if err != nil {
-				t.Fatal(err)
-			}
+		err = ps.Unlock()
+		if err != nil {
+			t.Fatal(err)
+		}
 
-			err = ps.Unlock()
-			if err != nil {
-				t.Fatal(err)
-			}
-		})
+		err = ps.Lock()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = ps.Unlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
 }
 
 func Test_computeLineFromPos(t *testing.T) {
