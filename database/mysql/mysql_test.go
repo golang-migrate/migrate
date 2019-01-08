@@ -18,6 +18,8 @@ import (
 	"github.com/golang-migrate/migrate/v4/dktesting"
 )
 
+const defaultPort = 3306
+
 var (
 	opts = dktest.Options{
 		Env:          map[string]string{"MYSQL_ROOT_PASSWORD": "root", "MYSQL_DATABASE": "public"},
@@ -32,7 +34,7 @@ var (
 )
 
 func isReady(c dktest.ContainerInfo) bool {
-	ip, port, err := c.FirstPort()
+	ip, port, err := c.Port(defaultPort)
 	if err != nil {
 		return false
 	}
@@ -59,7 +61,7 @@ func Test(t *testing.T) {
 	// mysql.SetLogger(mysql.Logger(log.New(ioutil.Discard, "", log.Ltime)))
 
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
-		ip, port, err := c.FirstPort()
+		ip, port, err := c.Port(defaultPort)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -86,7 +88,7 @@ func Test(t *testing.T) {
 
 func TestLockWorks(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
-		ip, port, err := c.FirstPort()
+		ip, port, err := c.Port(defaultPort)
 		if err != nil {
 			t.Fatal(err)
 		}
