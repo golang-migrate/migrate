@@ -1,6 +1,7 @@
 package dktesting_test
 
 import (
+	"context"
 	"testing"
 )
 
@@ -15,9 +16,9 @@ import (
 func ExampleParallelTest() {
 	t := &testing.T{} // Should actually be used in a Test
 
-	var isReady = func(c dktest.ContainerInfo) bool {
+	var isReady = func(ctx context.Context, c dktest.ContainerInfo) bool {
 		// Return true if the container is ready to run tests.
-		// Don't block here though.
+		// Don't block here though. Use the Context to timeout container ready checks.
 		return true
 	}
 

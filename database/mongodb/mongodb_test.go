@@ -36,18 +36,18 @@ func mongoConnectionString(host, port string) string {
 	return fmt.Sprintf("mongodb://%s:%s/testMigration?connect=single", host, port)
 }
 
-func isReady(c dktest.ContainerInfo) bool {
+func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 	ip, port, err := c.FirstPort()
 	if err != nil {
 		return false
 	}
 
-	client, err := mongo.Connect(context.TODO(), mongoConnectionString(ip, port))
+	client, err := mongo.Connect(ctx, mongoConnectionString(ip, port))
 	if err != nil {
 		return false
 	}
-	defer client.Disconnect(context.TODO())
-	if err = client.Ping(context.TODO(), nil); err != nil {
+	defer client.Disconnect(ctx)
+	if err = client.Ping(ctx, nil); err != nil {
 		switch err {
 		case io.EOF:
 			return false

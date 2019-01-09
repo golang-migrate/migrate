@@ -1,6 +1,7 @@
 package cassandra
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"testing"
@@ -24,7 +25,7 @@ var (
 	}
 )
 
-func isReady(c dktest.ContainerInfo) bool {
+func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 	// Cassandra exposes 5 ports (7000, 7001, 7199, 9042 & 9160)
 	// We only need the port bound to 9042
 	ip, portStr, err := c.Port(9042)

@@ -1,6 +1,7 @@
 package mysql
 
 import (
+	"context"
 	"database/sql"
 	sqldriver "database/sql/driver"
 	"fmt"
@@ -33,7 +34,7 @@ var (
 	}
 )
 
-func isReady(c dktest.ContainerInfo) bool {
+func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 	ip, port, err := c.Port(defaultPort)
 	if err != nil {
 		return false
@@ -44,7 +45,7 @@ func isReady(c dktest.ContainerInfo) bool {
 		return false
 	}
 	defer db.Close()
-	if err = db.Ping(); err != nil {
+	if err = db.PingContext(ctx); err != nil {
 		switch err {
 		case sqldriver.ErrBadConn, mysql.ErrInvalidConn:
 			return false

@@ -3,6 +3,7 @@ package cockroachdb
 // error codes https://github.com/lib/pq/blob/master/error.go
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"strings"
@@ -26,7 +27,7 @@ var (
 	specs = []dktesting.ContainerSpec{{ImageName: "cockroachdb/cockroach:v1.0.2", Options: opts}}
 )
 
-func isReady(c dktest.ContainerInfo) bool {
+func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 	ip, port, err := c.Port(defaultPort)
 	if err != nil {
 		fmt.Println("port error:", err)
@@ -38,7 +39,7 @@ func isReady(c dktest.ContainerInfo) bool {
 		fmt.Println("open error:", err)
 		return false
 	}
-	if err := db.Ping(); err != nil {
+	if err := db.PingContext(ctx); err != nil {
 		fmt.Println("ping error:", err)
 		return false
 	}

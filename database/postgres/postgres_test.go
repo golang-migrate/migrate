@@ -37,7 +37,7 @@ func pgConnectionString(host, port string) string {
 	return fmt.Sprintf("postgres://postgres@%s:%s/postgres?sslmode=disable", host, port)
 }
 
-func isReady(c dktest.ContainerInfo) bool {
+func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 	ip, port, err := c.FirstPort()
 	if err != nil {
 		return false
@@ -48,7 +48,7 @@ func isReady(c dktest.ContainerInfo) bool {
 		return false
 	}
 	defer db.Close()
-	if err = db.Ping(); err != nil {
+	if err = db.PingContext(ctx); err != nil {
 		switch err {
 		case sqldriver.ErrBadConn, io.EOF:
 			return false
