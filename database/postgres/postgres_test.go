@@ -327,7 +327,7 @@ func TestWithInstance_Concurrent(t *testing.T) {
 		ch := make(chan error, concurrency)
 		for i := 0; i < concurrency; i++ {
 			go func() {
-				_, err := WithInstance(db, nil)
+				_, err := WithInstance(db, &Config{})
 				ch <- err
 			}()
 		}
