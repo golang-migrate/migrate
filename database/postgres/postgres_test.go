@@ -310,6 +310,35 @@ func TestPostgres_Lock(t *testing.T) {
 	})
 }
 
+func TestWithInstance_Concurrent(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		db, err := sql.Open("postgres", pgConnectionString(ip, port))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer db.Close()
+
+		const concurrency = 30
+		ch := make(chan error, concurrency)
+		for i := 0; i < concurrency; i++ {
+			go func() {
+				_, err := WithInstance(db, nil)
+				ch <- err
+			}()
+		}
+
+		for i := 0; i < cap(ch); i++ {
+			if err := <-ch; err != nil {
+				t.Error(err)
+			}
+		}
+	})
+}
 func Test_computeLineFromPos(t *testing.T) {
 	testcases := []struct {
 		pos      int
