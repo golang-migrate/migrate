@@ -314,6 +314,9 @@ func TestWithInstance_Concurrent(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		// The number of concurrent processes running WithInstance
+		const concurrency = 30
+
 		// We can instantiate a single database handle because it is
 		// actually a connection pool, and so, each of the below go
 		// routines will have a high probability of using a separate
@@ -324,12 +327,13 @@ func TestWithInstance_Concurrent(t *testing.T) {
 		}
 		defer db.Close()
 
+		db.SetMaxIdleConns(concurrency)
+		db.SetMaxOpenConns(concurrency)
+
 		var wg sync.WaitGroup
 		defer wg.Wait()
 
-		const concurrency = 30
 		wg.Add(concurrency)
-
 		for i := 0; i < concurrency; i++ {
 			go func(i int) {
 				defer wg.Done()
