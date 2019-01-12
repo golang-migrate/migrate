@@ -340,6 +340,8 @@ func (p *Postgres) ensureVersionTable() (err error) {
 	defer func() {
 		if e := p.Unlock(); err == nil {
 			err = e
+		} else if e != nil {
+			err = &database.Error{OrigErr: err, Err: e.Error()}
 		}
 	}()
 
