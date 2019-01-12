@@ -26,11 +26,12 @@ var (
 		Env:          map[string]string{"MYSQL_ROOT_PASSWORD": "root", "MYSQL_DATABASE": "public"},
 		PortRequired: true, ReadyFunc: isReady,
 	}
+	// Supported versions: https://www.mysql.com/support/supportedplatforms/database.html
 	specs = []dktesting.ContainerSpec{
-		{ImageName: "mysql:8", Options: opts},
-		{ImageName: "mysql:5.7", Options: opts},
-		{ImageName: "mysql:5.6", Options: opts},
 		{ImageName: "mysql:5.5", Options: opts},
+		{ImageName: "mysql:5.6", Options: opts},
+		{ImageName: "mysql:5.7", Options: opts},
+		{ImageName: "mysql:8", Options: opts},
 	}
 )
 

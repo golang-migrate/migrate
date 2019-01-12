@@ -23,10 +23,12 @@ import (
 )
 
 var (
-	opts  = dktest.Options{PortRequired: true, ReadyFunc: isReady}
+	opts = dktest.Options{PortRequired: true, ReadyFunc: isReady}
+	// Supported versions: https://www.mongodb.com/support-policy
 	specs = []dktesting.ContainerSpec{
-		{ImageName: "mongo:4", Options: opts},
-		{ImageName: "mongo:3", Options: opts},
+		{ImageName: "mongo:3.4", Options: opts},
+		{ImageName: "mongo:3.6", Options: opts},
+		{ImageName: "mongo:4.0", Options: opts},
 	}
 )
 

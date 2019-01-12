@@ -23,13 +23,14 @@ import (
 )
 
 var (
-	opts  = dktest.Options{PortRequired: true, ReadyFunc: isReady}
+	opts = dktest.Options{PortRequired: true, ReadyFunc: isReady}
+	// Supported versions: https://www.postgresql.org/support/versioning/
 	specs = []dktesting.ContainerSpec{
-		{ImageName: "postgres:10", Options: opts},
-		{ImageName: "postgres:9.6", Options: opts},
-		{ImageName: "postgres:9.5", Options: opts},
 		{ImageName: "postgres:9.4", Options: opts},
-		{ImageName: "postgres:9.3", Options: opts},
+		{ImageName: "postgres:9.5", Options: opts},
+		{ImageName: "postgres:9.6", Options: opts},
+		{ImageName: "postgres:10", Options: opts},
+		{ImageName: "postgres:11", Options: opts},
 	}
 )
 

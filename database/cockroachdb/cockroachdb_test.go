@@ -23,8 +23,14 @@ import (
 const defaultPort = 26257
 
 var (
-	opts  = dktest.Options{Cmd: []string{"start", "--insecure"}, PortRequired: true, ReadyFunc: isReady}
-	specs = []dktesting.ContainerSpec{{ImageName: "cockroachdb/cockroach:v1.0.2", Options: opts}}
+	opts = dktest.Options{Cmd: []string{"start", "--insecure"}, PortRequired: true, ReadyFunc: isReady}
+	// Released versions: https://www.cockroachlabs.com/docs/releases/
+	specs = []dktesting.ContainerSpec{
+		{ImageName: "cockroachdb/cockroach:v1.0.7", Options: opts},
+		{ImageName: "cockroachdb/cockroach:v1.1.9", Options: opts},
+		{ImageName: "cockroachdb/cockroach:v2.0.7", Options: opts},
+		{ImageName: "cockroachdb/cockroach:v2.1.3", Options: opts},
+	}
 )
 
 func isReady(ctx context.Context, c dktest.ContainerInfo) bool {

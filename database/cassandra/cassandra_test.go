@@ -18,10 +18,14 @@ import (
 )
 
 var (
-	opts  = dktest.Options{PortRequired: true, ReadyFunc: isReady}
+	opts = dktest.Options{PortRequired: true, ReadyFunc: isReady}
+	// Supported versions: http://cassandra.apache.org/download/
+	// Although Cassandra 2.x is supported by the Apache Foundation,
+	// the migrate db driver only supports Cassandra 3.x since it uses
+	// the system_schema keyspace.
 	specs = []dktesting.ContainerSpec{
-		{ImageName: "cassandra:3.0.10", Options: opts},
 		{ImageName: "cassandra:3.0", Options: opts},
+		{ImageName: "cassandra:3.11", Options: opts},
 	}
 )
 
