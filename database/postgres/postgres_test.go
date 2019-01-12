@@ -314,6 +314,10 @@ func TestWithInstance_Concurrent(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		// We can instantiate a single database handle because it is
+		// actually a connection pool, and so, each of the below go
+		// routines will have a high probability of using a separate
+		// connection, which is something we want to exercise.
 		db, err := sql.Open("postgres", pgConnectionString(ip, port))
 		if err != nil {
 			t.Fatal(err)
