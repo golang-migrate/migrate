@@ -10,14 +10,11 @@ import (
 	"io"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
-)
 
-import (
 	"github.com/dhui/dktest"
-)
 
-import (
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
 	"github.com/golang-migrate/migrate/v4/dktesting"
 )
@@ -323,19 +320,20 @@ func TestWithInstance_Concurrent(t *testing.T) {
 		}
 		defer db.Close()
 
-		const concurrency = 30
-		ch := make(chan error, concurrency)
-		for i := 0; i < concurrency; i++ {
-			go func() {
-				_, err := WithInstance(db, &Config{})
-				ch <- err
-			}()
-		}
+		var wg sync.WaitGroup
+		defer wg.Wait()
 
-		for i := 0; i < cap(ch); i++ {
-			if err := <-ch; err != nil {
-				t.Error(err)
-			}
+		const concurrency = 30
+		wg.Add(concurrency)
+
+		for i := 0; i < concurrency; i++ {
+			go func(i int) {
+				defer wg.Done()
+				_, err := WithInstance(db, &Config{})
+				if err != nil {
+					t.Errorf("process %d error: %s", i, err)
+				}
+			}(i)
 		}
 	})
 }
