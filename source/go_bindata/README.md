@@ -7,7 +7,7 @@
 ### Read bindata with NewWithSourceInstance
 
 ```shell
-go get -u github.com/jteeuwen/go-bindata/...
+go get -u github.com/go-bindata/go-bindata/...
 cd examples/migrations && go-bindata -pkg migrations .
 ```
 

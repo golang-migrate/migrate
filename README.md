@@ -62,7 +62,7 @@ $
 Source drivers read migrations from local or remote sources. [Add a new source?](source/driver.go)
 
   * [Filesystem](source/file) - read from fileystem
-  * [Go-Bindata](source/go_bindata) - read from embedded binary data ([jteeuwen/go-bindata](https://github.com/jteeuwen/go-bindata))
+  * [Go-Bindata](source/go_bindata) - read from embedded binary data ([go-bindata/go-bindata](https://github.com/go-bindata/go-bindata))
   * [Github](source/github) - read from remote Github repositories
   * [AWS S3](source/aws_s3) - read from Amazon Web Services S3
   * [Google Cloud Storage](source/google_cloud_storage) - read from Google Cloud Platform Storage
