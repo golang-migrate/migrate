@@ -14,6 +14,7 @@ import (
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
+	multierror "github.com/hashicorp/go-multierror"
 	"github.com/lib/pq"
 )
 
@@ -341,7 +342,7 @@ func (p *Postgres) ensureVersionTable() (err error) {
 		if e := p.Unlock(); err == nil {
 			err = e
 		} else if e != nil {
-			err = &database.Error{OrigErr: err, Err: e.Error()}
+			err = multierror.Append(err, e)
 		}
 	}()
 
