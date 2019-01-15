@@ -339,10 +339,12 @@ func (p *Postgres) ensureVersionTable() (err error) {
 	}
 
 	defer func() {
-		if e := p.Unlock(); err == nil {
-			err = e
-		} else if e != nil {
-			err = multierror.Append(err, e)
+		if e := p.Unlock(); e != nil {
+			if err == nil {
+				err = e
+			} else {
+				err = multierror.Append(err, e)
+			}
 		}
 	}()
 
