@@ -10,14 +10,11 @@ import (
 	"io"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
-)
 
-import (
 	"github.com/dhui/dktest"
-)
 
-import (
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
 	"github.com/golang-migrate/migrate/v4/dktesting"
 )
@@ -310,6 +307,44 @@ func TestPostgres_Lock(t *testing.T) {
 	})
 }
 
+func TestWithInstance_Concurrent(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// The number of concurrent processes running WithInstance
+		const concurrency = 30
+
+		// We can instantiate a single database handle because it is
+		// actually a connection pool, and so, each of the below go
+		// routines will have a high probability of using a separate
+		// connection, which is something we want to exercise.
+		db, err := sql.Open("postgres", pgConnectionString(ip, port))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer db.Close()
+
+		db.SetMaxIdleConns(concurrency)
+		db.SetMaxOpenConns(concurrency)
+
+		var wg sync.WaitGroup
+		defer wg.Wait()
+
+		wg.Add(concurrency)
+		for i := 0; i < concurrency; i++ {
+			go func(i int) {
+				defer wg.Done()
+				_, err := WithInstance(db, &Config{})
+				if err != nil {
+					t.Errorf("process %d error: %s", i, err)
+				}
+			}(i)
+		}
+	})
+}
 func Test_computeLineFromPos(t *testing.T) {
 	testcases := []struct {
 		pos      int

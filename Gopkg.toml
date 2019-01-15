@@ -104,3 +104,7 @@
 [[constraint]]
   name = "github.com/dhui/dktest"
   version = "0.3.0"
+
+[[constraint]]
+  name = "github.com/hashicorp/go-multierror"
+  version = "1.0.0"
