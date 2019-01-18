@@ -120,17 +120,25 @@ func (c *Cassandra) Open(url string) (database.Driver, error) {
 		cluster.Timeout = timeout
 	}
 
-	if len(u.Query().Get("sslmode")) > 0 && len(u.Query().Get("sslrootcert")) > 0 && len(u.Query().Get("sslcert")) > 0 && len(u.Query().Get("sslkey")) > 0 {
-		if u.Query().Get("sslmode") != "disable" {
-			cluster.SslOpts = &gocql.SslOptions{
-				CaPath:   u.Query().Get("sslrootcert"),
-				CertPath: u.Query().Get("sslcert"),
-				KeyPath:  u.Query().Get("sslkey"),
-			}
-			if u.Query().Get("sslmode") == "verify-full" {
-				cluster.SslOpts.EnableHostVerification = true
-			}
+	if len(u.Query().Get("sslmode")) > 0 && u.Query().Get("sslmode") != "disable" {
+		var sslOpts gocql.SslOptions
+
+		switch u.Query().Get("sslmode") {
+		case "noverify":
+			// Do nothing, defaults are fine
+		case "verify-ca":
+			sslOpts.CaPath = u.Query().Get("sslrootcert")
+		case "verify-full":
+			sslOpts.CaPath = u.Query().Get("sslrootcert")
+			sslOpts.CertPath = u.Query().Get("sslcert")
+			sslOpts.KeyPath = u.Query().Get("sslkey")
+			sslOpts.EnableHostVerification = true
+		default:
+			return nil,
+				errors.New("Invalid sslmode. Use one of disable|noverify|verify-ca|verify-full")
 		}
+
+		cluster.SslOpts = &sslOpts
 	}
 
 	session, err := cluster.CreateSession()
