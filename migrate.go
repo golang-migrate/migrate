@@ -753,7 +753,7 @@ func (m *Migrate) versionExists(version uint) error {
 		return err
 	}
 
-	return os.ErrNotExist
+	return fmt.Errorf("no migration found for version %d", version)
 }
 
 // stop returns true if no more migrations should be run against the database
