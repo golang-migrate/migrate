@@ -7,7 +7,6 @@ package migrate
 import (
 	"fmt"
 	"os"
-	"strconv"
 	"sync"
 	"time"
 
@@ -754,11 +753,8 @@ func (m *Migrate) versionExists(version uint) error {
 		return err
 	}
 
-	return &os.PathError{
-		Op:   "no migration found for version",
-		Path: strconv.Itoa(int(version)),
-		Err:  os.ErrNotExist,
-	}
+	m.logPrintf("ERROR: No migration found for version %d", version)
+	return os.ErrNotExist
 }
 
 // stop returns true if no more migrations should be run against the database
