@@ -255,14 +255,14 @@ func (p *Postgres) SetVersion(version int, dirty bool) error {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
 	}
 
-	query := `TRUNCATE "` + p.config.MigrationsTable + `"`
+	query := `TRUNCATE public."` + p.config.MigrationsTable + `"`
 	if _, err := tx.Exec(query); err != nil {
 		tx.Rollback()
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 
 	if version >= 0 {
-		query = `INSERT INTO "` + p.config.MigrationsTable + `" (version, dirty) VALUES ($1, $2)`
+		query = `INSERT INTO public."` + p.config.MigrationsTable + `" (version, dirty) VALUES ($1, $2)`
 		if _, err := tx.Exec(query, version, dirty); err != nil {
 			tx.Rollback()
 			return &database.Error{OrigErr: err, Query: []byte(query)}
