@@ -118,7 +118,7 @@ func (m *Mongo) SetVersion(version int, dirty bool) error {
 
 func (m *Mongo) Version() (version int, dirty bool, err error) {
 	var versionInfo versionInfo
-	err = m.db.Collection(m.config.MigrationsCollection).FindOne(context.TODO(), nil).Decode(&versionInfo)
+	err = m.db.Collection(m.config.MigrationsCollection).FindOne(context.TODO(), bson.M{}).Decode(&versionInfo)
 	switch {
 	case err == mongo.ErrNoDocuments:
 		return database.NilVersion, false, nil
