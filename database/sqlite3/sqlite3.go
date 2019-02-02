@@ -3,13 +3,14 @@ package sqlite3
 import (
 	"database/sql"
 	"fmt"
-	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database"
-	_ "github.com/mattn/go-sqlite3"
 	"io"
 	"io/ioutil"
 	nurl "net/url"
 	"strings"
+
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 func init() {
@@ -62,7 +63,7 @@ func (m *Sqlite) ensureVersionTable() error {
 	query := fmt.Sprintf(`
 	CREATE TABLE IF NOT EXISTS %s (version uint64,dirty bool);
   CREATE UNIQUE INDEX IF NOT EXISTS version_unique ON %s (version);
-  `, DefaultMigrationsTable, DefaultMigrationsTable)
+  `, m.config.MigrationsTable, m.config.MigrationsTable)
 
 	if _, err := m.db.Exec(query); err != nil {
 		return err
