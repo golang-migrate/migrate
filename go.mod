@@ -15,6 +15,7 @@ require (
 	github.com/go-sql-driver/mysql v1.4.1
 	github.com/go-stack/stack v1.8.0 // indirect
 	github.com/gocql/gocql v0.0.0-20181124151448-70385f88b28b
+	github.com/golang-migrate/migrate v3.5.4+incompatible
 	github.com/google/go-github v17.0.0+incompatible
 	github.com/google/go-querystring v1.0.0 // indirect
 	github.com/google/martian v2.1.0+incompatible // indirect
