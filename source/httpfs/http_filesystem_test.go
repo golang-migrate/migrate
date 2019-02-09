@@ -1,3 +1,4 @@
+//go:generate esc -o escfs/escfs.go -pkg escfs -prefix escfs/ escfs/
 package httpfs
 
 import (
@@ -9,6 +10,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/golang-migrate/migrate/v4/source/httpfs/escfs"
 	st "github.com/golang-migrate/migrate/v4/source/testing"
 )
 
@@ -158,26 +160,11 @@ func mustCreateBenchmarkDir(t *testing.B) (dir string) {
 	return tmpDir
 }
 
-func BenchmarkOpen(b *testing.B) {
-	dir := mustCreateBenchmarkDir(b)
-	defer os.RemoveAll(dir)
-	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
-		WithInstance(http.Dir(dir), &Config{})
+func TestEscFilesystem(t *testing.T) {
+	d, err := WithInstance(escfs.FS(false), &Config{"/Test/"})
+	if err != nil {
+		t.Fatal(err)
 	}
-	b.StopTimer()
-}
 
-func BenchmarkNext(b *testing.B) {
-	dir := mustCreateBenchmarkDir(b)
-	defer os.RemoveAll(dir)
-	d, err := WithInstance(http.Dir(dir), &Config{})
-	b.ResetTimer()
-	v, err := d.First()
-	for n := 0; n < b.N; n++ {
-		for !os.IsNotExist(err) {
-			v, err = d.Next(v)
-		}
-	}
-	b.StopTimer()
+	st.Test(t, d)
 }
