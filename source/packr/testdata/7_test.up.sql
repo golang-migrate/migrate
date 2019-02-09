@@ -1,0 +1,1 @@
+INSERT INTO test(i) VALUES (7);
