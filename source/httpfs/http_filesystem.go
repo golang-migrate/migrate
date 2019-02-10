@@ -25,28 +25,24 @@ type HTTPFS struct {
 	migrations *source.Migrations
 }
 
-// WithInstance creates HTTPFS instance that uses provided FileSystem to source
+// Initialize initializes HTTPFS instance to use provided FileSystem to source
 // files. config argument can be used to select a subdirectory as the root for
 // sourcing all files.
-func WithInstance(fs http.FileSystem, config *Config) (source.Driver, error) {
+func (f *HTTPFS) Initialize(fs http.FileSystem, config *Config) error {
 	dir, err := fs.Open(config.Dir)
 	if err != nil {
-		return nil, fmt.Errorf("can't open directory with migrations: %s", err)
+		return fmt.Errorf("can't open directory with migrations: %s", err)
 	}
 
 	files, err := dir.Readdir(-1)
 	dir.Close()
 	if err != nil {
-		return nil, fmt.Errorf("can't read files in migrations directory: %s", err)
+		return fmt.Errorf("can't read files in migrations directory: %s", err)
 	}
 
 	sort.Slice(files, func(i, j int) bool { return files[i].Name() < files[j].Name() })
 
-	s := &HTTPFS{
-		path:       config.Dir,
-		fs:         fs,
-		migrations: source.NewMigrations(),
-	}
+	migrations := source.NewMigrations()
 
 	for _, fi := range files {
 		if fi.IsDir() {
@@ -58,23 +54,16 @@ func WithInstance(fs http.FileSystem, config *Config) (source.Driver, error) {
 			continue // ignore files that we can't parse
 		}
 
-		if !s.migrations.Append(m) {
-			return nil, fmt.Errorf("unable to parse file %v", fi.Name())
+		if !migrations.Append(m) {
+			return fmt.Errorf("unable to parse file %v", fi.Name())
 		}
 	}
 
-	return s, nil
-}
+	f.path = config.Dir
+	f.fs = fs
+	f.migrations = migrations
 
-// Open is not implemented as many FileSystems cannot be opened or have
-// custom initialization.
-//
-// Common use:
-//   plainFileSystem, err := WithInstance(http.Dir(tmpDir), &Config{})
-//
-//   escEmbeddedFileSystem, err := WithInstance(FS(false), &Config{})
-func (f *HTTPFS) Open(url string) (source.Driver, error) {
-	return nil, fmt.Errorf("not implemented")
+	return nil
 }
 
 // Close currently does not do anything, as there is no common way to release

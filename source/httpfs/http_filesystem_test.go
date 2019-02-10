@@ -1,4 +1,3 @@
-//go:generate esc -o escfs/escfs.go -pkg escfs -prefix escfs/ escfs/
 package httpfs
 
 import (
@@ -10,9 +9,21 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/golang-migrate/migrate/v4/source/httpfs/escfs"
+	"github.com/golang-migrate/migrate/v4/source"
 	st "github.com/golang-migrate/migrate/v4/source/testing"
 )
+
+type LocalFS struct {
+	HTTPFS
+}
+
+func (l *LocalFS) Open(base string) (source.Driver, error) {
+	err := l.Initialize(http.Dir(base), &Config{})
+	if err != nil {
+		return nil, err
+	}
+	return l, nil
+}
 
 func Test(t *testing.T) {
 	tmpDir, err := ioutil.TempDir("", "")
@@ -35,7 +46,8 @@ func Test(t *testing.T) {
 	mustWriteFile(t, tmpDir, "7_foobar.up.sql", "7 up")
 	mustWriteFile(t, tmpDir, "7_foobar.down.sql", "7 down")
 
-	d, err := WithInstance(http.Dir(tmpDir), &Config{})
+	l := &LocalFS{}
+	d, err := l.Open(tmpDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +69,8 @@ func TestOpen(t *testing.T) {
 		t.Fatal("expected tmpDir to be absolute path")
 	}
 
-	_, err = WithInstance(http.Dir(tmpDir), &Config{}) // absolute path
+	l := &LocalFS{}
+	_, err = l.Open(tmpDir) // absolute path
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,7 +100,8 @@ func TestOpenWithRelativePath(t *testing.T) {
 	mustWriteFile(t, filepath.Join(tmpDir, "foo"), "1_foobar.up.sql", "")
 
 	// dir: foo
-	d, err := WithInstance(http.Dir("foo"), &Config{})
+	l := &LocalFS{}
+	d, err := l.Open("foo")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,7 +111,7 @@ func TestOpenWithRelativePath(t *testing.T) {
 	}
 
 	// dir: ./foo
-	d, err = WithInstance(http.Dir("./foo"), &Config{})
+	d, err = l.Open("./foo")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +131,8 @@ func TestOpenWithDuplicateVersion(t *testing.T) {
 	mustWriteFile(t, tmpDir, "1_foo.up.sql", "") // 1 up
 	mustWriteFile(t, tmpDir, "1_bar.up.sql", "") // 1 up
 
-	_, err = WithInstance(http.Dir(tmpDir), &Config{})
+	l := &LocalFS{}
+	_, err = l.Open(tmpDir)
 	if err == nil {
 		t.Fatal("expected err")
 	}
@@ -130,7 +145,8 @@ func TestClose(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	d, err := WithInstance(http.Dir(tmpDir), &Config{})
+	l := &LocalFS{}
+	d, err := l.Open(tmpDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -158,13 +174,4 @@ func mustCreateBenchmarkDir(t *testing.B) (dir string) {
 	}
 
 	return tmpDir
-}
-
-func TestEscFilesystem(t *testing.T) {
-	d, err := WithInstance(escfs.FS(false), &Config{"/Test/"})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	st.Test(t, d)
 }
