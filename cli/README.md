@@ -32,6 +32,11 @@ $ apt-get install -y migrate
 $ go get -tags 'postgres' -u github.com/golang-migrate/migrate/cmd/migrate
 ```
 
+##### Versioned with Go Modules (go1.12)
+```
+$ GO111MODULE=on go get -tags 'postgres' -u github.com/golang-migrate/migrate/cmd/migrate@v4.2.4
+```
+
 ##### Versioned
 
 ```
