@@ -325,14 +325,14 @@ func (p *Postgres) Drop() error {
 				return &database.Error{OrigErr: err, Query: []byte(query)}
 			}
 		}
-		if err := p.ensureVersionTable(); err != nil {
-			return err
-		}
 	}
 
 	return nil
 }
 
+// ensureVersionTable checks if versions table exists and, if not, creates it.
+// Note that this function locks the database, which deviates from the usual
+// convention of "caller locks" in the Postgres type.
 func (p *Postgres) ensureVersionTable() (err error) {
 	if err = p.Lock(); err != nil {
 		return err

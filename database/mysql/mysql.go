@@ -17,6 +17,7 @@ import (
 
 import (
 	"github.com/go-sql-driver/mysql"
+	"github.com/hashicorp/go-multierror"
 )
 
 import (
@@ -342,15 +343,29 @@ func (m *Mysql) Drop() error {
 				return &database.Error{OrigErr: err, Query: []byte(query)}
 			}
 		}
-		if err := m.ensureVersionTable(); err != nil {
-			return err
-		}
 	}
 
 	return nil
 }
 
-func (m *Mysql) ensureVersionTable() error {
+// ensureVersionTable checks if versions table exists and, if not, creates it.
+// Note that this function locks the database, which deviates from the usual
+// convention of "caller locks" in the Mysql type.
+func (m *Mysql) ensureVersionTable() (err error) {
+	if err = m.Lock(); err != nil {
+		return err
+	}
+
+	defer func() {
+		if e := m.Unlock(); e != nil {
+			if err == nil {
+				err = e
+			} else {
+				err = multierror.Append(err, e)
+			}
+		}
+	}()
+
 	// check if migration table exists
 	var result string
 	query := `SHOW TABLES LIKE "` + m.config.MigrationsTable + `"`

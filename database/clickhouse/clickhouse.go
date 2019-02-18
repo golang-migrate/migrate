@@ -11,6 +11,7 @@ import (
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
+	"github.com/hashicorp/go-multierror"
 )
 
 var DefaultMigrationsTable = "schema_migrations"
@@ -159,7 +160,25 @@ func (ch *ClickHouse) SetVersion(version int, dirty bool) error {
 	return tx.Commit()
 }
 
-func (ch *ClickHouse) ensureVersionTable() error {
+
+// ensureVersionTable checks if versions table exists and, if not, creates it.
+// Note that this function locks the database, which deviates from the usual
+// convention of "caller locks" in the ClickHouse type.
+func (ch *ClickHouse) ensureVersionTable() (err error) {
+	if err = ch.Lock(); err != nil {
+		return err
+	}
+
+	defer func() {
+		if e := ch.Unlock(); e != nil {
+			if err == nil {
+				err = e
+			} else {
+				err = multierror.Append(err, e)
+			}
+		}
+	}()
+
 	var (
 		table string
 		query = "SHOW TABLES FROM " + ch.config.DatabaseName + " LIKE '" + ch.config.MigrationsTable + "'"
@@ -207,7 +226,7 @@ func (ch *ClickHouse) Drop() error {
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
 	}
-	return ch.ensureVersionTable()
+	return nil
 }
 
 func (ch *ClickHouse) Lock() error   { return nil }

@@ -17,6 +17,7 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 
+	"github.com/hashicorp/go-multierror"
 	"google.golang.org/api/iterator"
 	adminpb "google.golang.org/genproto/googleapis/spanner/admin/database/v1"
 )
@@ -255,14 +256,27 @@ func (s *Spanner) Drop() error {
 		return &database.Error{OrigErr: err, Query: []byte(strings.Join(stmts, "; "))}
 	}
 
-	if err := s.ensureVersionTable(); err != nil {
-		return err
-	}
-
 	return nil
 }
 
-func (s *Spanner) ensureVersionTable() error {
+// ensureVersionTable checks if versions table exists and, if not, creates it.
+// Note that this function locks the database, which deviates from the usual
+// convention of "caller locks" in the Spanner type.
+func (s *Spanner) ensureVersionTable() (err error) {
+	if err = s.Lock(); err != nil {
+		return err
+	}
+
+	defer func() {
+		if e := s.Unlock(); e != nil {
+			if err == nil {
+				err = e
+			} else {
+				err = multierror.Append(err, e)
+			}
+		}
+	}()
+
 	ctx := context.Background()
 	tbl := s.config.MigrationsTable
 	iter := s.db.data.Single().Read(ctx, tbl, spanner.AllKeys(), []string{"Version"})

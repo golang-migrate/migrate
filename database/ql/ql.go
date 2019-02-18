@@ -3,6 +3,7 @@ package ql
 import (
 	"database/sql"
 	"fmt"
+	"github.com/hashicorp/go-multierror"
 	"io"
 	"io/ioutil"
 	"strings"
@@ -59,7 +60,24 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	}
 	return mx, nil
 }
-func (m *Ql) ensureVersionTable() error {
+// ensureVersionTable checks if versions table exists and, if not, creates it.
+// Note that this function locks the database, which deviates from the usual
+// convention of "caller locks" in the Ql type.
+func (m *Ql) ensureVersionTable() (err error) {
+	if err = m.Lock(); err != nil {
+		return err
+	}
+
+	defer func() {
+		if e := m.Unlock(); e != nil {
+			if err == nil {
+				err = e
+			} else {
+				err = multierror.Append(err, e)
+			}
+		}
+	}()
+
 	tx, err := m.db.Begin()
 	if err != nil {
 		return err
@@ -131,9 +149,6 @@ func (m *Ql) Drop() error {
 			if err != nil {
 				return &database.Error{OrigErr: err, Query: []byte(query)}
 			}
-		}
-		if err := m.ensureVersionTable(); err != nil {
-			return err
 		}
 	}
 
