@@ -86,11 +86,12 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		config: config,
 	}
 
-	if err := px.ensureVersionTable(); err != nil {
+	// ensureVersionTable is a locking operation, so we need to ensureLockTable before we ensureVersionTable.
+	if err := px.ensureLockTable(); err != nil {
 		return nil, err
 	}
 
-	if err := px.ensureLockTable(); err != nil {
+	if err := px.ensureVersionTable(); err != nil {
 		return nil, err
 	}
 
