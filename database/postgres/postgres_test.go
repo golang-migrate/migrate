@@ -335,8 +335,8 @@ func TestDrop(t *testing.T) {
 		if err := d.(*Postgres).conn.QueryRowContext(context.Background(), "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'foo' AND table_schema = (SELECT current_schema()))").Scan(&exists); err != nil {
 			t.Fatal(err)
 		}
-		if !exists {
-			t.Fatalf("expected table foo to exist")
+		if exists {
+			t.Fatalf("expected table foo to not exist")
 		}
 
 		// make sure version table is dropped as well
