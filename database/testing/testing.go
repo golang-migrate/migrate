@@ -16,7 +16,7 @@ import (
 // Test runs tests against database implementations.
 func Test(t *testing.T, d database.Driver, migration []byte) {
 	if migration == nil {
-		panic("test must provide migration reader")
+		t.Fatal("test must provide migration reader")
 	}
 
 	TestNilVersion(t, d) // test first
@@ -46,7 +46,7 @@ func TestLockAndUnlock(t *testing.T, d database.Driver) {
 			case <-done:
 				return
 			case <-timeout:
-				panic(fmt.Sprintf("Timeout after 15 seconds. Looks like a deadlock in Lock/UnLock.\n%#v", d))
+				t.Fatal(fmt.Sprintf("Timeout after 15 seconds. Looks like a deadlock in Lock/UnLock.\n%#v", d))
 			}
 		}
 	}()
@@ -81,7 +81,7 @@ func TestLockAndUnlock(t *testing.T, d database.Driver) {
 
 func TestRun(t *testing.T, d database.Driver, migration io.Reader) {
 	if migration == nil {
-		panic("migration can't be nil")
+		t.Fatal("migration can't be nil")
 	}
 
 	if err := d.Run(migration); err != nil {

@@ -5,6 +5,7 @@
 package migrate
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"sync"
@@ -25,10 +26,11 @@ var DefaultPrefetchMigrations = uint(10)
 var DefaultLockTimeout = 15 * time.Second
 
 var (
-	ErrNoChange    = fmt.Errorf("no change")
-	ErrNilVersion  = fmt.Errorf("no migration")
-	ErrLocked      = fmt.Errorf("database locked")
-	ErrLockTimeout = fmt.Errorf("timeout: can't acquire database lock")
+	ErrNoChange       = errors.New("no change")
+	ErrNilVersion     = errors.New("no migration")
+	ErrInvalidVersion = errors.New("version must be >= -1")
+	ErrLocked         = errors.New("database locked")
+	ErrLockTimeout    = errors.New("timeout: can't acquire database lock")
 )
 
 // ErrShortLimit is an error returned when not enough migrations
@@ -357,7 +359,7 @@ func (m *Migrate) Run(migration ...*Migration) error {
 // It resets the dirty state to false.
 func (m *Migrate) Force(version int) error {
 	if version < -1 {
-		panic("version must be >= -1")
+		return ErrInvalidVersion
 	}
 
 	if err := m.lock(); err != nil {
@@ -722,7 +724,7 @@ func (m *Migrate) runMigrations(ret <-chan interface{}) error {
 			}
 
 		default:
-			panic("unknown type")
+			return fmt.Errorf("unknown type: %T with value: %+v", r, r)
 		}
 	}
 	return nil
