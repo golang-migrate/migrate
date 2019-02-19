@@ -73,29 +73,37 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 
 	config.DatabaseName = databaseName
 
-	if len(config.MigrationsTable) == 0 {
-		config.MigrationsTable = DefaultMigrationsTable
-	}
-
-	if len(config.LockTable) == 0 {
-		config.LockTable = DefaultLockTable
-	}
-
 	px := &CockroachDb{
 		db:     instance,
 		config: config,
 	}
 
-	// ensureVersionTable is a locking operation, so we need to ensureLockTable before we ensureVersionTable.
-	if err := px.ensureLockTable(); err != nil {
-		return nil, err
-	}
-
-	if err := px.ensureVersionTable(); err != nil {
+	if err := px.Initialize(); err != nil {
 		return nil, err
 	}
 
 	return px, nil
+}
+
+func (c *CockroachDb) Initialize() error {
+	if len(c.config.MigrationsTable) == 0 {
+		c.config.MigrationsTable = DefaultMigrationsTable
+	}
+
+	if len(c.config.LockTable) == 0 {
+		c.config.LockTable = DefaultLockTable
+	}
+
+	// ensureVersionTable is a locking operation, so we need to ensureLockTable before we ensureVersionTable.
+	if err := c.ensureLockTable(); err != nil {
+		return err
+	}
+
+	if err := c.ensureVersionTable(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (c *CockroachDb) Open(url string) (database.Driver, error) {

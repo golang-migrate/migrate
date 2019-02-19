@@ -25,4 +25,14 @@ func Test(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 	dt.Test(t, d, []byte("SELECT 1"))
+	// Reinitialize for new round of tests
+	err = d.Drop()
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	err = d.Initialize()
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	dt.TestMigrate(t, d, []byte("SELECT 1"))
 }

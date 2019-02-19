@@ -29,6 +29,17 @@ func Test(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
+	dt.Test(t, d, []byte("CREATE TABLE t (Qty int, Name string);"))
+	// Reinitialize for new round of tests
+	err = d.Drop()
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	err = d.Initialize()
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	dt.TestMigrate(t, d, []byte("CREATE TABLE t (Qty int, Name string);"))
 
 	db, err := sql.Open("sqlite3", filepath.Join(dir, "sqlite3.db"))
 	if err != nil {
@@ -39,7 +50,6 @@ func Test(t *testing.T) {
 			return
 		}
 	}()
-	dt.Test(t, d, []byte("CREATE TABLE t (Qty int, Name string);"))
 	driver, err := WithInstance(db, &Config{})
 	if err != nil {
 		t.Fatalf("%v", err)

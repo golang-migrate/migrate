@@ -76,6 +76,16 @@ func Test(t *testing.T) {
 		}
 		defer d.Close()
 		dt.Test(t, d, []byte("SELECT 1"))
+		// Reinitialize for new round of tests
+		err = d.Drop()
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+		err = d.Initialize()
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+		dt.TestMigrate(t, d, []byte("SELECT 1"))
 
 		// check ensureVersionTable
 		if err := d.(*Mysql).ensureVersionTable(); err != nil {

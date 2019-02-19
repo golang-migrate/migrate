@@ -42,7 +42,7 @@ func WithInstance(conn *sql.DB, config *Config) (database.Driver, error) {
 		config: config,
 	}
 
-	if err := ch.init(); err != nil {
+	if err := ch.Initialize(); err != nil {
 		return nil, err
 	}
 
@@ -75,14 +75,14 @@ func (ch *ClickHouse) Open(dsn string) (database.Driver, error) {
 		},
 	}
 
-	if err := ch.init(); err != nil {
+	if err := ch.Initialize(); err != nil {
 		return nil, err
 	}
 
 	return ch, nil
 }
 
-func (ch *ClickHouse) init() error {
+func (ch *ClickHouse) Initialize() error {
 	if len(ch.config.DatabaseName) == 0 {
 		if err := ch.conn.QueryRow("SELECT currentDatabase()").Scan(&ch.config.DatabaseName); err != nil {
 			return err

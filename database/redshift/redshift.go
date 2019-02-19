@@ -65,10 +65,6 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 
 	config.DatabaseName = databaseName
 
-	if len(config.MigrationsTable) == 0 {
-		config.MigrationsTable = DefaultMigrationsTable
-	}
-
 	conn, err := instance.Conn(context.Background())
 
 	if err != nil {
@@ -81,11 +77,19 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		config: config,
 	}
 
-	if err := px.ensureVersionTable(); err != nil {
+	if err := px.Initialize(); err != nil {
 		return nil, err
 	}
 
 	return px, nil
+}
+
+func (p *Redshift) Initialize() error {
+	if len(p.config.MigrationsTable) == 0 {
+		p.config.MigrationsTable = DefaultMigrationsTable
+	}
+
+	return p.ensureVersionTable()
 }
 
 func (p *Redshift) Open(url string) (database.Driver, error) {
@@ -101,9 +105,6 @@ func (p *Redshift) Open(url string) (database.Driver, error) {
 	}
 
 	migrationsTable := purl.Query().Get("x-migrations-table")
-	if len(migrationsTable) == 0 {
-		migrationsTable = DefaultMigrationsTable
-	}
 
 	px, err := WithInstance(db, &Config{
 		DatabaseName:    purl.Path,

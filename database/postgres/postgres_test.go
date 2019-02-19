@@ -75,6 +75,22 @@ func Test(t *testing.T) {
 		defer d.Close()
 		dt.Test(t, d, []byte("SELECT 1"))
 	})
+
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := pgConnectionString(ip, port)
+		p := &Postgres{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+		defer d.Close()
+		dt.TestMigrate(t, d, []byte("SELECT 1"))
+	})
 }
 
 func TestMultiStatement(t *testing.T) {

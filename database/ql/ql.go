@@ -47,18 +47,21 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	if err := instance.Ping(); err != nil {
 		return nil, err
 	}
-	if len(config.MigrationsTable) == 0 {
-		config.MigrationsTable = DefaultMigrationsTable
-	}
 
 	mx := &Ql{
 		db:     instance,
 		config: config,
 	}
-	if err := mx.ensureVersionTable(); err != nil {
+	if err := mx.Initialize(); err != nil {
 		return nil, err
 	}
 	return mx, nil
+}
+func (m *Ql) Initialize() error {
+	if len(m.config.MigrationsTable) == 0 {
+		m.config.MigrationsTable = DefaultMigrationsTable
+	}
+	return m.ensureVersionTable()
 }
 // ensureVersionTable checks if versions table exists and, if not, creates it.
 // Note that this function locks the database, which deviates from the usual

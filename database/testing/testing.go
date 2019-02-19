@@ -23,7 +23,7 @@ func Test(t *testing.T, d database.Driver, migration []byte) {
 	TestLockAndUnlock(t, d)
 	TestRun(t, d, bytes.NewReader(migration))
 	TestSetVersion(t, d) // also tests Version()
-	TestDrop(t, d)
+	TestDrop(t, d) // also tests Initialize()
 }
 
 func TestNilVersion(t *testing.T, d database.Driver) {
@@ -91,6 +91,13 @@ func TestRun(t *testing.T, d database.Driver, migration io.Reader) {
 
 func TestDrop(t *testing.T, d database.Driver) {
 	if err := d.Drop(); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.Initialize(); err != nil {
+		t.Fatal(err)
+	}
+	// Verify that we are still able to perform operations on the driver.
+	if err := d.SetVersion(1, true); err != nil {
 		t.Fatal(err)
 	}
 }

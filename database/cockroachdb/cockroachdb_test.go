@@ -90,6 +90,22 @@ func Test(t *testing.T) {
 		}
 		dt.Test(t, d, []byte("SELECT 1"))
 	})
+	dktesting.ParallelTest(t, specs, func(t *testing.T, ci dktest.ContainerInfo) {
+		createDB(t, ci)
+
+		ip, port, err := ci.Port(26257)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := fmt.Sprintf("cockroach://root@%v:%v/migrate?sslmode=disable", ip, port)
+		c := &CockroachDb{}
+		d, err := c.Open(addr)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+		dt.TestMigrate(t, d, []byte("SELECT 1"))
+	})
 }
 
 func TestMultiStatement(t *testing.T) {

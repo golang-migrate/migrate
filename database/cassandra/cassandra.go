@@ -54,20 +54,24 @@ func WithInstance(session *gocql.Session, config *Config) (database.Driver, erro
 		return nil, ErrClosedSession
 	}
 
-	if len(config.MigrationsTable) == 0 {
-		config.MigrationsTable = DefaultMigrationsTable
-	}
-
 	c := &Cassandra{
 		session: session,
 		config:  config,
 	}
 
-	if err := c.ensureVersionTable(); err != nil {
+	if err := c.Initialize(); err != nil {
 		return nil, err
 	}
 
 	return c, nil
+}
+
+func (c *Cassandra) Initialize() error {
+	if len(c.config.MigrationsTable) == 0 {
+		c.config.MigrationsTable = DefaultMigrationsTable
+	}
+
+	return c.ensureVersionTable()
 }
 
 func (c *Cassandra) Open(url string) (database.Driver, error) {

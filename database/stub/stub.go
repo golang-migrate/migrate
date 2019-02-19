@@ -24,6 +24,10 @@ type Stub struct {
 	Config *Config
 }
 
+func (s *Stub) Initialize() error {
+	return nil
+}
+
 func (s *Stub) Open(url string) (database.Driver, error) {
 	return &Stub{
 		Url:               url,

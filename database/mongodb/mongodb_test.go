@@ -81,6 +81,35 @@ func Test(t *testing.T) {
 		dt.TestSetVersion(t, d)
 		dt.TestDrop(t, d)
 	})
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := mongoConnectionString(ip, port)
+		p := &Mongo{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+		defer d.Close()
+		dt.TestNilVersion(t, d)
+		//TestLockAndUnlock(t, d) driver doesn't support lock on database level
+		dt.TestRun(t, d, bytes.NewReader([]byte(`[{"insert":"hello","documents":[{"wild":"world"}]}]`)))
+		dt.TestSetVersion(t, d)
+		dt.TestDrop(t, d)
+		// Reinitialize for new round of tests
+		err = d.Drop()
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+		err = d.Initialize()
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+		dt.TestMigrate(t, d, []byte(`[{"insert":"hello","documents":[{"wild":"world"}]}]`))
+	})
 }
 
 func TestWithAuth(t *testing.T) {

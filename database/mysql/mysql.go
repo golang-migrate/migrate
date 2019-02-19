@@ -76,10 +76,6 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 
 	config.DatabaseName = databaseName.String
 
-	if len(config.MigrationsTable) == 0 {
-		config.MigrationsTable = DefaultMigrationsTable
-	}
-
 	conn, err := instance.Conn(context.Background())
 	if err != nil {
 		return nil, err
@@ -91,11 +87,19 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		config: config,
 	}
 
-	if err := mx.ensureVersionTable(); err != nil {
+	if err := mx.Initialize(); err != nil {
 		return nil, err
 	}
 
 	return mx, nil
+}
+
+func (m *Mysql) Initialize() error {
+	if len(m.config.MigrationsTable) == 0 {
+		m.config.MigrationsTable = DefaultMigrationsTable
+	}
+
+	return m.ensureVersionTable()
 }
 
 // urlToMySQLConfig takes a net/url URL and returns a go-sql-driver/mysql Config.
@@ -128,9 +132,6 @@ func (m *Mysql) Open(url string) (database.Driver, error) {
 	purl.RawQuery = q.Encode()
 
 	migrationsTable := purl.Query().Get("x-migrations-table")
-	if len(migrationsTable) == 0 {
-		migrationsTable = DefaultMigrationsTable
-	}
 
 	// use custom TLS?
 	ctls := purl.Query().Get("tls")

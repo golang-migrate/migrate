@@ -45,9 +45,6 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	if err := instance.Ping(); err != nil {
 		return nil, err
 	}
-	if len(config.MigrationsTable) == 0 {
-		config.MigrationsTable = DefaultMigrationsTable
-	}
 
 	mx := &Sqlite{
 		db:     instance,
@@ -57,6 +54,14 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		return nil, err
 	}
 	return mx, nil
+}
+
+func (m *Sqlite) Initialize() error {
+	if len(m.config.MigrationsTable) == 0 {
+		m.config.MigrationsTable = DefaultMigrationsTable
+	}
+
+	return m.ensureVersionTable()
 }
 
 // ensureVersionTable checks if versions table exists and, if not, creates it.

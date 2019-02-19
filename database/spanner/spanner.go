@@ -73,10 +73,6 @@ func WithInstance(instance *DB, config *Config) (database.Driver, error) {
 		return nil, ErrNoDatabaseName
 	}
 
-	if len(config.MigrationsTable) == 0 {
-		config.MigrationsTable = DefaultMigrationsTable
-	}
-
 	sx := &Spanner{
 		db:     instance,
 		config: config,
@@ -87,6 +83,14 @@ func WithInstance(instance *DB, config *Config) (database.Driver, error) {
 	}
 
 	return sx, nil
+}
+
+func (s *Spanner) Initialize() error {
+	if len(s.config.MigrationsTable) == 0 {
+		s.config.MigrationsTable = DefaultMigrationsTable
+	}
+
+	return s.ensureVersionTable()
 }
 
 // Open implements database.Driver
@@ -109,9 +113,6 @@ func (s *Spanner) Open(url string) (database.Driver, error) {
 	}
 
 	migrationsTable := purl.Query().Get("x-migrations-table")
-	if len(migrationsTable) == 0 {
-		migrationsTable = DefaultMigrationsTable
-	}
 
 	db := &DB{admin: adminClient, data: dataClient}
 	return WithInstance(db, &Config{

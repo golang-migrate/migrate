@@ -51,15 +51,24 @@ func WithInstance(instance *mongo.Client, config *Config) (database.Driver, erro
 	if len(config.DatabaseName) == 0 {
 		return nil, ErrNoDatabaseName
 	}
-	if len(config.MigrationsCollection) == 0 {
-		config.MigrationsCollection = DefaultMigrationsCollection
-	}
 	mc := &Mongo{
 		client: instance,
 		db:     instance.Database(config.DatabaseName),
 		config: config,
 	}
+
+	if err := mc.Initialize(); err != nil {
+		return nil, err
+	}
+
 	return mc, nil
+}
+
+func (m *Mongo) Initialize() error {
+	if len(m.config.MigrationsCollection) == 0 {
+		m.config.MigrationsCollection = DefaultMigrationsCollection
+	}
+	return nil
 }
 
 func (m *Mongo) Open(dsn string) (database.Driver, error) {
@@ -77,9 +86,6 @@ func (m *Mongo) Open(dsn string) (database.Driver, error) {
 		return nil, err
 	}
 	migrationsCollection := purl.Query().Get("x-migrations-collection")
-	if len(migrationsCollection) == 0 {
-		migrationsCollection = DefaultMigrationsCollection
-	}
 
 	transactionMode, _ := strconv.ParseBool(purl.Query().Get("x-transaction-mode"))
 
