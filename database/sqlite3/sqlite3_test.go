@@ -40,6 +40,7 @@ func Test(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
+	defer d.Close()
 	dt.TestMigrate(t, d, []byte("CREATE TABLE t (Qty int, Name string);"))
 
 	db, err := sql.Open("sqlite3", filepath.Join(dir, "sqlite3.db"))
