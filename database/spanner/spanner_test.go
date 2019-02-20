@@ -30,7 +30,7 @@ func Test(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	err = d.Initialize()
+	d, err = s.Open(addr)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}

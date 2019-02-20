@@ -44,14 +44,7 @@ type Driver interface {
 	// Open returns a new driver instance configured with parameters
 	// coming from the URL string. Migrate will call this function
 	// only once per instance.
-	// This will also call Initialize().
 	Open(url string) (Driver, error)
-
-	// Initialize makes sure the database is ready for migrations, this
-	// might include creating some tables for migration/lock management
-	// or initializing some files.
-	// This assumes there is an open connection to a database.
-	Initialize() error
 
 	// Close closes the underlying database instance managed by the driver.
 	// Migrate will call this function only once per instance.
@@ -81,6 +74,8 @@ type Driver interface {
 	Version() (version int, dirty bool, err error)
 
 	// Drop deletes everything in the database.
+	// Note that this is a breaking action, a new call to Open() is necessary to
+	// ensure subsequent calls work as expected.
 	Drop() error
 }
 

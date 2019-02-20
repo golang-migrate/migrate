@@ -30,12 +30,13 @@ func Test(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 	dt.Test(t, d, []byte("CREATE TABLE t (Qty int, Name string);"))
+
 	// Reinitialize for new round of tests
 	err = d.Drop()
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	err = d.Initialize()
+	d, err = p.Open(addr)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
