@@ -94,13 +94,6 @@ func TestDrop(t *testing.T, d database.Driver) {
 	if err := d.Drop(); err != nil {
 		t.Fatal(err)
 	}
-	if err := d.Initialize(); err != nil {
-		t.Fatal(err)
-	}
-	// Verify that we are still able to perform operations on the driver.
-	if err := d.SetVersion(1, true); err != nil {
-		t.Fatal(err)
-	}
 }
 
 func TestSetVersion(t *testing.T, d database.Driver) {
