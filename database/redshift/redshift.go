@@ -71,25 +71,21 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		return nil, err
 	}
 
+	if len(config.MigrationsTable) == 0 {
+		config.MigrationsTable = DefaultMigrationsTable
+	}
+
 	px := &Redshift{
 		conn:   conn,
 		db:     instance,
 		config: config,
 	}
 
-	if err := px.Initialize(); err != nil {
+	if err := px.ensureVersionTable(); err != nil {
 		return nil, err
 	}
 
 	return px, nil
-}
-
-func (p *Redshift) Initialize() error {
-	if len(p.config.MigrationsTable) == 0 {
-		p.config.MigrationsTable = DefaultMigrationsTable
-	}
-
-	return p.ensureVersionTable()
 }
 
 func (p *Redshift) Open(url string) (database.Driver, error) {

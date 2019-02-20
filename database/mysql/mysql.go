@@ -81,25 +81,21 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		return nil, err
 	}
 
+	if len(config.MigrationsTable) == 0 {
+		config.MigrationsTable = DefaultMigrationsTable
+	}
+
 	mx := &Mysql{
 		conn:   conn,
 		db:     instance,
 		config: config,
 	}
 
-	if err := mx.Initialize(); err != nil {
+	if err := mx.ensureVersionTable(); err != nil {
 		return nil, err
 	}
 
 	return mx, nil
-}
-
-func (m *Mysql) Initialize() error {
-	if len(m.config.MigrationsTable) == 0 {
-		m.config.MigrationsTable = DefaultMigrationsTable
-	}
-
-	return m.ensureVersionTable()
 }
 
 // urlToMySQLConfig takes a net/url URL and returns a go-sql-driver/mysql Config.

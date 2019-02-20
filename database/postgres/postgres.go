@@ -92,13 +92,17 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		return nil, err
 	}
 
+	if len(config.MigrationsTable) == 0 {
+		config.MigrationsTable = DefaultMigrationsTable
+	}
+
 	px := &Postgres{
 		conn:   conn,
 		db:     instance,
 		config: config,
 	}
 
-	err = px.Initialize()
+	err = px.ensureVersionTable()
 	if err != nil {
 		return nil, err
 	}
@@ -123,19 +127,12 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 		DatabaseName:    purl.Path,
 		MigrationsTable: migrationsTable,
 	})
+
 	if err != nil {
 		return nil, err
 	}
 
 	return px, nil
-}
-
-func (p *Postgres) Initialize() error {
-	if len(p.config.MigrationsTable) == 0 {
-		p.config.MigrationsTable = DefaultMigrationsTable
-	}
-
-	return p.ensureVersionTable()
 }
 
 func (p *Postgres) Close() error {
