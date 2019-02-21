@@ -107,10 +107,9 @@ func (m *Mongo) Open(dsn string) (database.Driver, error) {
 
 func (m *Mongo) SetVersion(version int, dirty bool) error {
 	migrationsCollection := m.db.Collection(m.config.MigrationsCollection)
-	var tr *bool
-	*tr = true
+	var tr = true
 	filt := bson.D{{"version", bson.D{{"$exists", false}}}}
-	if res := migrationsCollection.FindOneAndUpdate(context.TODO(), filt, bson.M{"version": version, "dirty": dirty}, &options.FindOneAndUpdateOptions{Upsert: tr}); res.Err() != nil {
+	if res := migrationsCollection.FindOneAndUpdate(context.TODO(), filt, bson.M{"version": version, "dirty": dirty}, &options.FindOneAndUpdateOptions{Upsert: &tr}); res.Err() != nil {
 		return &database.Error{OrigErr: res.Err(), Err: "drop migrations collection failed"}
 	}
 	//if err := migrationsCollection.Drop(context.TODO()); err != nil {
