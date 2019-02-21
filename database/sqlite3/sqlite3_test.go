@@ -66,7 +66,7 @@ func TestMigrate(t *testing.T) {
 	}
 
 	m, err := migrate.NewWithDatabaseInstance(
-		"file://./migration",
+		"file://./examples/migrations",
 		"ql", driver)
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -103,7 +103,7 @@ func TestMigrationTable(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 	m, err := migrate.NewWithDatabaseInstance(
-		"file://./migration",
+		"file://./examples/migrations",
 		"ql", driver)
 	if err != nil {
 		t.Fatalf("%v", err)

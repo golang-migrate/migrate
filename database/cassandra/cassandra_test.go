@@ -89,7 +89,7 @@ func TestMigrate(t *testing.T) {
 		}
 		defer d.Close()
 
-		m, err := migrate.NewWithDatabaseInstance("file://./examples/migration", "testks", d)
+		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "testks", d)
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
