@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
-	_ "github.com/golang-migrate/migrate/v4/source/stub"
 )
 
 func Test(t *testing.T) {
