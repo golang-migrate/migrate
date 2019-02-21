@@ -12,6 +12,7 @@ import (
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/mongodb/mongo-go-driver/bson"
 	"github.com/mongodb/mongo-go-driver/mongo"
+	"github.com/mongodb/mongo-go-driver/mongo/options"
 	"github.com/mongodb/mongo-go-driver/x/network/connstring"
 )
 
@@ -106,13 +107,19 @@ func (m *Mongo) Open(dsn string) (database.Driver, error) {
 
 func (m *Mongo) SetVersion(version int, dirty bool) error {
 	migrationsCollection := m.db.Collection(m.config.MigrationsCollection)
-	if err := migrationsCollection.Drop(context.TODO()); err != nil {
-		return &database.Error{OrigErr: err, Err: "drop migrations collection failed"}
+	var tr *bool
+	*tr = true
+	filt := bson.D{{"version", bson.D{{"$exists", false}}}}
+	if res := migrationsCollection.FindOneAndUpdate(context.TODO(), filt, bson.M{"version": version, "dirty": dirty}, &options.FindOneAndUpdateOptions{Upsert: tr}); res.Err() != nil {
+		return &database.Error{OrigErr: res.Err(), Err: "drop migrations collection failed"}
 	}
-	_, err := migrationsCollection.InsertOne(context.TODO(), bson.M{"version": version, "dirty": dirty})
-	if err != nil {
-		return &database.Error{OrigErr: err, Err: "save version failed"}
-	}
+	//if err := migrationsCollection.Drop(context.TODO()); err != nil {
+	//	return &database.Error{OrigErr: err, Err: "drop migrations collection failed"}
+	//}
+	//_, err := migrationsCollection.InsertOne(context.TODO(), bson.M{"version": version, "dirty": dirty})
+	//if err != nil {
+	//	return &database.Error{OrigErr: err, Err: "save version failed"}
+	//}
 	return nil
 }
 
