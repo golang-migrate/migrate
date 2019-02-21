@@ -4,7 +4,6 @@
 package testing
 
 import (
-	"fmt"
 	"testing"
 )
 
@@ -20,10 +19,6 @@ func TestMigrate(t *testing.T, m *migrate.Migrate, migration []byte) {
 		panic("test must provide migration reader")
 	}
 
-	m, err := migrate.NewWithDatabaseInstance("stub://", "", d)
-	if err != nil {
-		panic(fmt.Sprintf("failed to create migration, due to error: %v", err))
-	}
 	TestMigrateUp(t, m)
 	TestMigrateDrop(t, m)
 }
