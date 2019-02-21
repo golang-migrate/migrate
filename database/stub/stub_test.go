@@ -24,9 +24,14 @@ func TestMigrate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	m, err := migrate.NewWithDatabaseInstance("stub://", "", d)
+	src, err := dt.GetStubSource()
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
+	m, err := migrate.NewWithInstance("stub", src, "", d)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+
 	dt.TestMigrate(t, m, []byte("/* foobar migration */"))
 }
