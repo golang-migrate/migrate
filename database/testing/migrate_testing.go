@@ -9,8 +9,6 @@ import (
 
 import (
 	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/source"
-	"github.com/golang-migrate/migrate/v4/source/stub"
 )
 
 // TestMigrate runs integration-tests between the Migrate layer and database implementations.
@@ -38,21 +36,4 @@ func TestMigrateUp(t *testing.T, m *migrate.Migrate) {
 	if err := m.Up(); err != nil {
 		t.Fatalf("%v", err)
 	}
-}
-
-func GetStubSource() (source.Driver, error) {
-	stubMigrations := source.NewMigrations()
-	stubMigrations.Append(&source.Migration{Version: 1, Direction: source.Up, Identifier: "CREATE 1"})
-	stubMigrations.Append(&source.Migration{Version: 1, Direction: source.Down, Identifier: "DROP 1"})
-	stubMigrations.Append(&source.Migration{Version: 3, Direction: source.Up, Identifier: "CREATE 3"})
-	stubMigrations.Append(&source.Migration{Version: 4, Direction: source.Up, Identifier: "CREATE 4"})
-	stubMigrations.Append(&source.Migration{Version: 4, Direction: source.Down, Identifier: "DROP 4"})
-	stubMigrations.Append(&source.Migration{Version: 5, Direction: source.Down, Identifier: "DROP 5"})
-	stubMigrations.Append(&source.Migration{Version: 7, Direction: source.Up, Identifier: "CREATE 7"})
-	stubMigrations.Append(&source.Migration{Version: 7, Direction: source.Down, Identifier: "DROP 7"})
-	s := &stub.Stub{}
-
-	d, err := s.Open("")
-	d.(*stub.Stub).Migrations = stubMigrations
-	return d, err
 }

@@ -100,11 +100,7 @@ func TestMigrate(t *testing.T) {
 			t.Fatalf("%v", err)
 		}
 		defer d.Close()
-		src, err := dt.GetStubSource()
-		if err != nil {
-			t.Fatalf("%v", err)
-		}
-		m, err := migrate.NewWithInstance("stub", src, "", d)
+		m, err := migrate.NewWithDatabaseInstance("file://./examples/migration", "postgres", d)
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
