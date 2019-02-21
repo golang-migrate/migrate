@@ -3,6 +3,7 @@ package mongodb
 import (
 	"context"
 	"fmt"
+	"github.com/mongodb/mongo-go-driver/x/bsonx"
 	"io"
 	"io/ioutil"
 	"net/url"
@@ -109,7 +110,11 @@ func (m *Mongo) SetVersion(version int, dirty bool) error {
 	migrationsCollection := m.db.Collection(m.config.MigrationsCollection)
 	var tr = true
 	filt := bson.D{{"version", bson.D{{"$exists", false}}}}
-	if res := migrationsCollection.FindOneAndUpdate(context.TODO(), filt, bson.M{"version": version, "dirty": dirty}, &options.FindOneAndUpdateOptions{Upsert: &tr}); res.Err() != nil {
+	upd := bsonx.Doc{{"$set", bsonx.Document(bsonx.Doc{
+		{"version", bsonx.Int64(int64(version))},
+		{"dirty", bsonx.Boolean(dirty)},
+	})}}
+	if res := migrationsCollection.FindOneAndUpdate(context.TODO(), filt, upd, &options.FindOneAndUpdateOptions{Upsert: &tr}); res.Err() != nil {
 		return &database.Error{OrigErr: res.Err(), Err: "drop migrations collection failed"}
 	}
 	//if err := migrationsCollection.Drop(context.TODO()); err != nil {
