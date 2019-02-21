@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/golang-migrate/migrate/v4"
 	"strings"
 	"testing"
 )
@@ -90,6 +91,9 @@ func Test(t *testing.T) {
 		}
 		dt.Test(t, d, []byte("SELECT 1"))
 	})
+}
+
+func TestMigrate(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, ci dktest.ContainerInfo) {
 		createDB(t, ci)
 
@@ -104,7 +108,12 @@ func Test(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
-		dt.TestMigrate(t, d, []byte("SELECT 1"))
+
+		m, err := migrate.NewWithDatabaseInstance("stub://", "", d)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+		dt.TestMigrate(t, m, []byte("SELECT 1"))
 	})
 }
 

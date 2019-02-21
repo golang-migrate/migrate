@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	sqldriver "database/sql/driver"
 	"fmt"
+	"github.com/golang-migrate/migrate/v4"
 	"io"
 	"strconv"
 	"strings"
@@ -75,7 +76,9 @@ func Test(t *testing.T) {
 		defer d.Close()
 		dt.Test(t, d, []byte("SELECT 1"))
 	})
+}
 
+func TestMigrate(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.FirstPort()
 		if err != nil {
@@ -89,7 +92,11 @@ func Test(t *testing.T) {
 			t.Fatalf("%v", err)
 		}
 		defer d.Close()
-		dt.TestMigrate(t, d, []byte("SELECT 1"))
+		m, err := migrate.NewWithDatabaseInstance("stub://", "", d)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+		dt.TestMigrate(t, m, []byte("SELECT 1"))
 	})
 }
 
@@ -319,49 +326,6 @@ func TestPostgres_Lock(t *testing.T) {
 		err = ps.Unlock()
 		if err != nil {
 			t.Fatal(err)
-		}
-	})
-}
-
-func TestDrop(t *testing.T) {
-	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
-		ip, port, err := c.FirstPort()
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		addr := pgConnectionString(ip, port)
-		p := &Postgres{}
-		d, err := p.Open(addr)
-		if err != nil {
-			t.Fatalf("%v", err)
-		}
-		defer d.Close()
-		if err := d.Run(strings.NewReader("CREATE TABLE foo (foo text);")); err != nil {
-			t.Fatalf("expected err to be nil, got %v", err)
-		}
-
-		// drop the table
-		if err := d.Drop(); err != nil {
-			t.Fatalf("expected err to be nil, got %v", err)
-		}
-
-		// make sure table does not exist
-		var exists bool
-		if err := d.(*Postgres).conn.QueryRowContext(context.Background(), "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'foo' AND table_schema = (SELECT current_schema()))").Scan(&exists); err != nil {
-			t.Fatal(err)
-		}
-		if exists {
-			t.Fatalf("expected table foo to not exist")
-		}
-
-		// make sure version table is dropped as well
-		version, _, err := d.Version()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if version != -1 {
-			t.Fatal("expected NilVersion")
 		}
 	})
 }

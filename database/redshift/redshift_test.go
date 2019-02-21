@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	sqldriver "database/sql/driver"
 	"fmt"
+	"github.com/golang-migrate/migrate/v4"
 	"io"
 	"strconv"
 	"strings"
@@ -82,6 +83,9 @@ func Test(t *testing.T) {
 		defer d.Close()
 		dt.Test(t, d, []byte("SELECT 1"))
 	})
+}
+
+func TestMigrate(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.FirstPort()
 		if err != nil {
@@ -95,7 +99,11 @@ func Test(t *testing.T) {
 			t.Fatalf("%v", err)
 		}
 		defer d.Close()
-		dt.TestMigrate(t, d, []byte("SELECT 1"))
+		m, err := migrate.NewWithDatabaseInstance("stub://", "", d)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+		dt.TestMigrate(t, m, []byte("SELECT 1"))
 	})
 }
 

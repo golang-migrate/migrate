@@ -3,6 +3,7 @@ package cassandra
 import (
 	"context"
 	"fmt"
+	"github.com/golang-migrate/migrate/v4"
 	"strconv"
 	"testing"
 )
@@ -70,5 +71,27 @@ func Test(t *testing.T) {
 		}
 		defer d.Close()
 		dt.Test(t, d, []byte("SELECT table_name from system_schema.tables"))
+	})
+}
+
+func TestMigrate(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.Port(9042)
+		if err != nil {
+			t.Fatal("Unable to get mapped port:", err)
+		}
+		addr := fmt.Sprintf("cassandra://%v:%v/testks", ip, port)
+		p := &Cassandra{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+		defer d.Close()
+
+		m, err := migrate.NewWithDatabaseInstance("stub://", "", d)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+		dt.TestMigrate(t, m, []byte("SELECT table_name from system_schema.tables"))
 	})
 }

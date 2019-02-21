@@ -16,7 +16,7 @@ import (
 
 // TestMigrate runs integration-tests between the Migrate layer and database implementations.
 //
-func TestMigrate(t *testing.T, d database.Driver, migration []byte) {
+func TestMigrate(t *testing.T, m *migrate.Migrate, migration []byte) {
 	if migration == nil {
 		panic("test must provide migration reader")
 	}
@@ -25,6 +25,7 @@ func TestMigrate(t *testing.T, d database.Driver, migration []byte) {
 	if err != nil {
 		panic(fmt.Sprintf("failed to create migration, due to error: %v", err))
 	}
+	TestMigrateUp(t, m)
 	TestMigrateDrop(t, m)
 }
 
@@ -34,5 +35,12 @@ func TestMigrate(t *testing.T, d database.Driver, migration []byte) {
 func TestMigrateDrop(t *testing.T, m *migrate.Migrate) {
 	if err := m.Drop(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestMigrateUp(t *testing.T, m *migrate.Migrate) {
+	t.Log("UP")
+	if err := m.Up(); err != nil {
+		t.Fatalf("%v", err)
 	}
 }

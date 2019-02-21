@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/golang-migrate/migrate/v4"
 	"io"
 	"os"
 	"strconv"
@@ -81,6 +82,9 @@ func Test(t *testing.T) {
 		dt.TestSetVersion(t, d)
 		dt.TestDrop(t, d)
 	})
+}
+
+func TestMigrate(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.FirstPort()
 		if err != nil {
@@ -94,22 +98,11 @@ func Test(t *testing.T) {
 			t.Fatalf("%v", err)
 		}
 		defer d.Close()
-		dt.TestNilVersion(t, d)
-		//TestLockAndUnlock(t, d) driver doesn't support lock on database level
-		dt.TestRun(t, d, bytes.NewReader([]byte(`[{"insert":"hello","documents":[{"wild":"world"}]}]`)))
-		dt.TestSetVersion(t, d)
-		dt.TestDrop(t, d)
-		// Reinitialize for new round of tests
-		err = d.Drop()
+		m, err := migrate.NewWithDatabaseInstance("stub://", "", d)
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
-		d, err = p.Open(addr)
-		if err != nil {
-			t.Fatalf("%v", err)
-		}
-		defer d.Close()
-		dt.TestMigrate(t, d, []byte(`[{"insert":"hello","documents":[{"wild":"world"}]}]`))
+		dt.TestMigrate(t, m, []byte(`[{"insert":"hello","documents":[{"wild":"world"}]}]`))
 	})
 }
 

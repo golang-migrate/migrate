@@ -30,18 +30,23 @@ func Test(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 	dt.Test(t, d, []byte("CREATE TABLE t (Qty int, Name string);"))
+}
 
-	// Reinitialize for new round of tests
-	err = d.Drop()
+func TestMigrate(t *testing.T) {
+	dir, err := ioutil.TempDir("", "sqlite3-driver-test")
+	if err != nil {
+		return
+	}
+	defer func() {
+		os.RemoveAll(dir)
+	}()
+	t.Logf("DB path : %s\n", filepath.Join(dir, "sqlite3.db"))
+	p := &Sqlite{}
+	addr := fmt.Sprintf("sqlite3://%s", filepath.Join(dir, "sqlite3.db"))
+	d, err := p.Open(addr)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	d, err = p.Open(addr)
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	defer d.Close()
-	dt.TestMigrate(t, d, []byte("CREATE TABLE t (Qty int, Name string);"))
 
 	db, err := sql.Open("sqlite3", filepath.Join(dir, "sqlite3.db"))
 	if err != nil {
@@ -66,11 +71,7 @@ func Test(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	t.Log("UP")
-	err = m.Up()
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
+	dt.TestMigrate(t, m, []byte("CREATE TABLE t (Qty int, Name string);"))
 }
 
 func TestMigrationTable(t *testing.T) {
