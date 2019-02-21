@@ -109,7 +109,7 @@ func (m *Mongo) Open(dsn string) (database.Driver, error) {
 func (m *Mongo) SetVersion(version int, dirty bool) error {
 	migrationsCollection := m.db.Collection(m.config.MigrationsCollection)
 	var tr = true
-	filt := bson.D{{"version", bson.D{{"$exists", false}}}}
+	filt := bson.D{{"version", bson.D{{"$exists", true}}}}
 	upd := bsonx.Doc{{"$set", bsonx.Document(bsonx.Doc{
 		{"version", bsonx.Int64(int64(version))},
 		{"dirty", bsonx.Boolean(dirty)},
