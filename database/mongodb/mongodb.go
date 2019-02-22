@@ -115,15 +115,8 @@ func (m *Mongo) SetVersion(version int, dirty bool) error {
 		{"dirty", bsonx.Boolean(dirty)},
 	})}}
 	if res := migrationsCollection.FindOneAndUpdate(context.TODO(), filt, upd, &options.FindOneAndUpdateOptions{Upsert: &tr}); res.Err() != nil {
-		return &database.Error{OrigErr: res.Err(), Err: "drop migrations collection failed"}
+		return &database.Error{OrigErr: res.Err(), Err: "FindOneAndUpdate failed"}
 	}
-	//if err := migrationsCollection.Drop(context.TODO()); err != nil {
-	//	return &database.Error{OrigErr: err, Err: "drop migrations collection failed"}
-	//}
-	//_, err := migrationsCollection.InsertOne(context.TODO(), bson.M{"version": version, "dirty": dirty})
-	//if err != nil {
-	//	return &database.Error{OrigErr: err, Err: "save version failed"}
-	//}
 	return nil
 }
 
