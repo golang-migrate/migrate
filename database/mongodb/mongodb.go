@@ -111,7 +111,7 @@ func (m *Mongo) SetVersion(version int, dirty bool) error {
 	var tr = true
 	filt := bson.D{{"version", bson.D{{"$exists", true}}}}
 	upd := bsonx.Doc{{"$set", bsonx.Document(bsonx.Doc{
-		{"version", bsonx.Int64(int64(version))},
+		{"version", bsonx.Int32(int32(version))},
 		{"dirty", bsonx.Boolean(dirty)},
 	})}}
 	if res := migrationsCollection.FindOneAndUpdate(context.TODO(), filt, upd, &options.FindOneAndUpdateOptions{Upsert: &tr}); res.Err() != nil {
