@@ -74,6 +74,8 @@ type Driver interface {
 	Version() (version int, dirty bool, err error)
 
 	// Drop deletes everything in the database.
+	// Note that this is a breaking action, a new call to Open() is necessary to
+	// ensure subsequent calls work as expected.
 	Drop() error
 }
 

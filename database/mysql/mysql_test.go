@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	sqldriver "database/sql/driver"
 	"fmt"
+	"github.com/golang-migrate/migrate/v4"
 	"net/url"
 	"testing"
 )
@@ -17,6 +18,7 @@ import (
 import (
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
 	"github.com/golang-migrate/migrate/v4/dktesting"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
 const defaultPort = 3306
@@ -76,6 +78,40 @@ func Test(t *testing.T) {
 		}
 		defer d.Close()
 		dt.Test(t, d, []byte("SELECT 1"))
+
+		// check ensureVersionTable
+		if err := d.(*Mysql).ensureVersionTable(); err != nil {
+			t.Fatal(err)
+		}
+		// check again
+		if err := d.(*Mysql).ensureVersionTable(); err != nil {
+			t.Fatal(err)
+		}
+	})
+}
+
+func TestMigrate(t *testing.T) {
+	// mysql.SetLogger(mysql.Logger(log.New(ioutil.Discard, "", log.Ltime)))
+
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.Port(defaultPort)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := fmt.Sprintf("mysql://root:root@tcp(%v:%v)/public", ip, port)
+		p := &Mysql{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+		defer d.Close()
+
+		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "public", d)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+		dt.TestMigrate(t, m, []byte("SELECT 1"))
 
 		// check ensureVersionTable
 		if err := d.(*Mysql).ensureVersionTable(); err != nil {

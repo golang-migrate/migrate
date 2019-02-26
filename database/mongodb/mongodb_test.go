@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/golang-migrate/migrate/v4"
 	"io"
 	"os"
 	"strconv"
@@ -20,6 +21,7 @@ import (
 import (
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
 	"github.com/golang-migrate/migrate/v4/dktesting"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
 var (
@@ -80,6 +82,28 @@ func Test(t *testing.T) {
 		dt.TestRun(t, d, bytes.NewReader([]byte(`[{"insert":"hello","documents":[{"wild":"world"}]}]`)))
 		dt.TestSetVersion(t, d)
 		dt.TestDrop(t, d)
+	})
+}
+
+func TestMigrate(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := mongoConnectionString(ip, port)
+		p := &Mongo{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+		defer d.Close()
+		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "", d)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+		dt.TestMigrate(t, m, []byte(`[{"insert":"hello","documents":[{"wild":"world"}]}]`))
 	})
 }
 

@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/golang-migrate/migrate/v4"
 	"strings"
 	"testing"
 )
@@ -18,6 +19,7 @@ import (
 import (
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
 	"github.com/golang-migrate/migrate/v4/dktesting"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
 const defaultPort = 26257
@@ -89,6 +91,30 @@ func Test(t *testing.T) {
 			t.Fatalf("%v", err)
 		}
 		dt.Test(t, d, []byte("SELECT 1"))
+	})
+}
+
+func TestMigrate(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, ci dktest.ContainerInfo) {
+		createDB(t, ci)
+
+		ip, port, err := ci.Port(26257)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := fmt.Sprintf("cockroach://root@%v:%v/migrate?sslmode=disable", ip, port)
+		c := &CockroachDb{}
+		d, err := c.Open(addr)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+
+		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "migrate", d)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+		dt.TestMigrate(t, m, []byte("SELECT 1"))
 	})
 }
 

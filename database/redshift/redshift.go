@@ -14,6 +14,7 @@ import (
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
+	"github.com/hashicorp/go-multierror"
 	"github.com/lib/pq"
 )
 
@@ -100,9 +101,6 @@ func (p *Redshift) Open(url string) (database.Driver, error) {
 	}
 
 	migrationsTable := purl.Query().Get("x-migrations-table")
-	if len(migrationsTable) == 0 {
-		migrationsTable = DefaultMigrationsTable
-	}
 
 	px, err := WithInstance(db, &Config{
 		DatabaseName:    purl.Path,
@@ -282,15 +280,29 @@ func (p *Redshift) Drop() error {
 				return &database.Error{OrigErr: err, Query: []byte(query)}
 			}
 		}
-		if err := p.ensureVersionTable(); err != nil {
-			return err
-		}
 	}
 
 	return nil
 }
 
-func (p *Redshift) ensureVersionTable() error {
+// ensureVersionTable checks if versions table exists and, if not, creates it.
+// Note that this function locks the database, which deviates from the usual
+// convention of "caller locks" in the Redshift type.
+func (p *Redshift) ensureVersionTable() (err error) {
+	if err = p.Lock(); err != nil {
+		return err
+	}
+
+	defer func() {
+		if e := p.Unlock(); e != nil {
+			if err == nil {
+				err = e
+			} else {
+				err = multierror.Append(err, e)
+			}
+		}
+	}()
+
 	// check if migration table exists
 	var count int
 	query := `SELECT COUNT(1) FROM information_schema.tables WHERE table_name = $1 AND table_schema = (SELECT current_schema()) LIMIT 1`

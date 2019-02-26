@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	sqldriver "database/sql/driver"
 	"fmt"
+	"github.com/golang-migrate/migrate/v4"
 	"io"
 	"strconv"
 	"strings"
@@ -21,6 +22,7 @@ import (
 import (
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
 	"github.com/golang-migrate/migrate/v4/dktesting"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
 var (
@@ -81,6 +83,28 @@ func Test(t *testing.T) {
 		}
 		defer d.Close()
 		dt.Test(t, d, []byte("SELECT 1"))
+	})
+}
+
+func TestMigrate(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := redshiftConnectionString(ip, port)
+		p := &Redshift{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+		defer d.Close()
+		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "postgres", d)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+		dt.TestMigrate(t, m, []byte("SELECT 1"))
 	})
 }
 

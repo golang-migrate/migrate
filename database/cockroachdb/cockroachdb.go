@@ -13,6 +13,7 @@ import (
 
 import (
 	"github.com/cockroachdb/cockroach-go/crdb"
+	"github.com/hashicorp/go-multierror"
 	"github.com/lib/pq"
 )
 
@@ -85,11 +86,12 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		config: config,
 	}
 
-	if err := px.ensureVersionTable(); err != nil {
+	// ensureVersionTable is a locking operation, so we need to ensureLockTable before we ensureVersionTable.
+	if err := px.ensureLockTable(); err != nil {
 		return nil, err
 	}
 
-	if err := px.ensureLockTable(); err != nil {
+	if err := px.ensureVersionTable(); err != nil {
 		return nil, err
 	}
 
@@ -294,15 +296,29 @@ func (c *CockroachDb) Drop() error {
 				return &database.Error{OrigErr: err, Query: []byte(query)}
 			}
 		}
-		if err := c.ensureVersionTable(); err != nil {
-			return err
-		}
 	}
 
 	return nil
 }
 
-func (c *CockroachDb) ensureVersionTable() error {
+// ensureVersionTable checks if versions table exists and, if not, creates it.
+// Note that this function locks the database, which deviates from the usual
+// convention of "caller locks" in the CockroachDb type.
+func (c *CockroachDb) ensureVersionTable() (err error) {
+	if err = c.Lock(); err != nil {
+		return err
+	}
+
+	defer func() {
+		if e := c.Unlock(); e != nil {
+			if err == nil {
+				err = e
+			} else {
+				err = multierror.Append(err, e)
+			}
+		}
+	}()
+
 	// check if migration table exists
 	var count int
 	query := `SELECT COUNT(1) FROM information_schema.tables WHERE table_name = $1 AND table_schema = (SELECT current_schema()) LIMIT 1`

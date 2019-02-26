@@ -22,8 +22,9 @@ func Test(t *testing.T, d database.Driver, migration []byte) {
 	TestNilVersion(t, d) // test first
 	TestLockAndUnlock(t, d)
 	TestRun(t, d, bytes.NewReader(migration))
-	TestDrop(t, d)
 	TestSetVersion(t, d) // also tests Version()
+	// Drop breaks the driver, so test it last.
+	TestDrop(t, d)
 }
 
 func TestNilVersion(t *testing.T, d database.Driver) {
