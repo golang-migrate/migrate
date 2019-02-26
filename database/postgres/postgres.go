@@ -92,18 +92,13 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		return nil, err
 	}
 
-	if len(config.MigrationsTable) == 0 {
-		config.MigrationsTable = DefaultMigrationsTable
-	}
-
 	px := &Postgres{
 		conn:   conn,
 		db:     instance,
 		config: config,
 	}
 
-	err = px.ensureVersionTable()
-	if err != nil {
+	if err = px.ensureVersionTable(); err != nil {
 		return nil, err
 	}
 

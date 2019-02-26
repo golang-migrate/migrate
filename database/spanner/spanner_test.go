@@ -21,7 +21,7 @@ func Test(t *testing.T) {
 	}
 
 	s := &Spanner{}
-	addr := fmt.Sprintf("spanner://%v", db)
+	addr := fmt.Sprintf("spanner://%s", db)
 	d, err := s.Open(addr)
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -40,7 +40,7 @@ func TestMigrate(t *testing.T) {
 	}
 
 	s := &Spanner{}
-	addr := fmt.Sprintf("spanner://%v", db)
+	addr := fmt.Sprintf("spanner://%s", db)
 	d, err := s.Open(addr)
 	if err != nil {
 		t.Fatalf("%v", err)

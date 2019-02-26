@@ -22,7 +22,7 @@ func Test(t *testing.T) {
 	defer func() {
 		os.RemoveAll(dir)
 	}()
-	fmt.Printf("DB path : %s\n", filepath.Join(dir, "ql.db"))
+	t.Logf("DB path : %s\n", filepath.Join(dir, "ql.db"))
 	p := &Ql{}
 	addr := fmt.Sprintf("ql://%s", filepath.Join(dir, "ql.db"))
 	d, err := p.Open(addr)
@@ -50,7 +50,7 @@ func TestMigrate(t *testing.T) {
 	defer func() {
 		os.RemoveAll(dir)
 	}()
-	fmt.Printf("DB path : %s\n", filepath.Join(dir, "ql.db"))
+	t.Logf("DB path : %s\n", filepath.Join(dir, "ql.db"))
 
 	db, err := sql.Open("ql", filepath.Join(dir, "ql.db"))
 	if err != nil {

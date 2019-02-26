@@ -65,14 +65,14 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 
 	config.DatabaseName = databaseName
 
+	if len(config.MigrationsTable) == 0 {
+		config.MigrationsTable = DefaultMigrationsTable
+	}
+
 	conn, err := instance.Conn(context.Background())
 
 	if err != nil {
 		return nil, err
-	}
-
-	if len(config.MigrationsTable) == 0 {
-		config.MigrationsTable = DefaultMigrationsTable
 	}
 
 	px := &Redshift{
