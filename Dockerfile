@@ -1,4 +1,4 @@
-FROM golang:1.11-alpine3.9 AS downloader
+FROM golang:1.12-alpine3.9 AS downloader
 ARG VERSION
 
 RUN apk add --no-cache git gcc musl-dev
