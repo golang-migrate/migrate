@@ -151,7 +151,7 @@ Each migration has an up and down migration. [Why?](FAQ.md#why-two-separate-file
 ## Versions
 
 Version | Supported? | Import | Notes
---------|------------|----------------|--------|------
+--------|------------|--------|------
 **master** | :white_check_mark: | `import "github.com/golang-migrate/migrate/v4"` | New features and bug fixes arrive here first |
 **v4** | :white_check_mark: | `import "github.com/golang-migrate/migrate/v4"` | Used for stable releases |
 **v3** | :x: | `import "github.com/golang-migrate/migrate"` (with package manager) or `import "gopkg.in/golang-migrate/migrate.v3"` (not recommended) | **DO NOT USE** - No longer supported |
