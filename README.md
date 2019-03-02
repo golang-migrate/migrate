@@ -86,7 +86,7 @@ $ migrate -source file://path/to/migrations -database postgres://localhost:5432/
 ### Docker usage
 
 ```
-$ docker run -v {{ migration dir }}:/migrations --network host migrate/migrate 
+$ docker run -v {{ migration dir }}:/migrations --network host migrate/migrate
     -path=/migrations/ -database postgres://localhost:5432/database up 2
 ```
 
@@ -148,13 +148,13 @@ Each migration has an up and down migration. [Why?](FAQ.md#why-two-separate-file
 
 [Best practices: How to write migrations.](MIGRATIONS.md)
 
-## Supported Major Versions
+## Versions
 
-Version | Go Modules | Min Go Version | Import | Notes
+Version | Supported? | Import | Notes
 --------|------------|----------------|--------|------
-**master** | :white_check_mark: | 1.10.3 | `import "github.com/golang-migrate/migrate/v4"` | New features and bug fixes arrive here first |
-**v4** | :white_check_mark: | 1.10.3 | `import "github.com/golang-migrate/migrate/v4"` | |
-**v3** | :x: | 1.10 | `import "github.com/golang-migrate/migrate"` (with package manager) or `import "gopkg.in/golang-migrate/migrate.v3"` (not recommended) | Only security fixes are backported. Only use if your project is not using Go modules. |
+**master** | :white_check_mark: | `import "github.com/golang-migrate/migrate/v4"` | New features and bug fixes arrive here first |
+**v4** | :white_check_mark: | `import "github.com/golang-migrate/migrate/v4"` | Used for stable releases |
+**v3** | :x: | `import "github.com/golang-migrate/migrate"` (with package manager) or `import "gopkg.in/golang-migrate/migrate.v3"` (not recommended) | **DO NOT USE** - No longer supported |
 
 ## Development and Contributing
 
