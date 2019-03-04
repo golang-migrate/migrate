@@ -16,7 +16,6 @@ require (
 	github.com/go-stack/stack v1.8.0 // indirect
 	github.com/gocql/gocql v0.0.0-20181124151448-70385f88b28b
 	github.com/google/go-github v17.0.0+incompatible
-	github.com/google/go-querystring v1.0.0 // indirect
 	github.com/google/martian v2.1.0+incompatible // indirect
 	github.com/gopherjs/gopherjs v0.0.0-20181004151105-1babbf986f6f // indirect
 	github.com/hashicorp/go-multierror v1.0.0
@@ -37,17 +36,16 @@ require (
 	github.com/smartystreets/goconvey v0.0.0-20180222194500-ef6db91d284a // indirect
 	github.com/stretchr/testify v1.3.0 // indirect
 	github.com/tidwall/pretty v0.0.0-20180105212114-65a9db5fad51 // indirect
+	github.com/xanzy/go-gitlab v0.15.0
 	github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c // indirect
 	github.com/xdg/stringprep v1.0.0 // indirect
 	golang.org/x/crypto v0.0.0-20190103213133-ff983b9c42bc // indirect
-	golang.org/x/net v0.0.0-20190108225652-1e06a53dbb7e
+	golang.org/x/net v0.0.0-20190228165749-92fc7df08ae7
 	golang.org/x/oauth2 v0.0.0-20181203162652-d668ce993890 // indirect
-	golang.org/x/sync v0.0.0-20181221193216-37e7f081c4d4 // indirect
 	golang.org/x/sys v0.0.0-20190108104531-7fbe1cd0fcc2 // indirect
-	golang.org/x/tools v0.0.0-20190108222858-421f03a57a64
+	golang.org/x/tools v0.0.0-20190226205152-f727befe758c
 	google.golang.org/api v0.0.0-20181015145326-625cd1887957
-	google.golang.org/appengine v1.4.0 // indirect
-	google.golang.org/genproto v0.0.0-20190108161440-ae2f86662275
+	google.golang.org/genproto v0.0.0-20190227213309-4f5b463f9597
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 // indirect
 	gopkg.in/ini.v1 v1.39.0 // indirect
 )
