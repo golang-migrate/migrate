@@ -1,6 +1,7 @@
 package gitlab
 
 import (
+	"encoding/base64"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -32,10 +33,11 @@ type Gitlab struct {
 	client *gitlab.Client
 	url    string
 
-	projectID  string
-	path       string
-	options    *gitlab.ListTreeOptions
-	migrations *source.Migrations
+	projectID   string
+	path        string
+	listOptions *gitlab.ListTreeOptions
+	getOptions  *gitlab.GetFileOptions
+	migrations  *source.Migrations
 }
 
 type Config struct {
@@ -63,7 +65,7 @@ func (g *Gitlab) Open(url string) (source.Driver, error) {
 	}
 
 	if u.Host != "" {
-		err = gn.client.SetBaseURL(u.Host)
+		err = gn.client.SetBaseURL("https://" + u.Host)
 		if err != nil {
 			return nil, ErrInvalidHost
 		}
@@ -78,9 +80,13 @@ func (g *Gitlab) Open(url string) (source.Driver, error) {
 		gn.path = strings.Join(pe[1:], "/")
 	}
 
-	gn.options = &gitlab.ListTreeOptions{
+	gn.listOptions = &gitlab.ListTreeOptions{
 		Path: &gn.path,
 		Ref:  &u.Fragment,
+	}
+
+	gn.getOptions = &gitlab.GetFileOptions{
+		Ref: &u.Fragment,
 	}
 
 	if err := gn.readDirectory(); err != nil {
@@ -102,7 +108,7 @@ func WithInstance(client *gitlab.Client, config *Config) (source.Driver, error) 
 }
 
 func (g *Gitlab) readDirectory() error {
-	nodes, response, err := g.client.Repositories.ListTree(g.projectID, g.options)
+	nodes, response, err := g.client.Repositories.ListTree(g.projectID, g.listOptions)
 	if err != nil {
 		return err
 	}
@@ -134,9 +140,9 @@ func (g *Gitlab) nodeToMigration(node *gitlab.TreeNode) (*source.Migration, erro
 		}
 		return &source.Migration{
 			Version:    uint(versionUint64),
-			Identifier: node.ID,
+			Identifier: m[2],
 			Direction:  source.Direction(m[3]),
-			Raw:        node.Name,
+			Raw:        g.path + "/" + node.Name,
 		}, nil
 	}
 	return nil, source.ErrParse
@@ -172,7 +178,7 @@ func (g *Gitlab) Next(version uint) (nextVersion uint, err error) {
 
 func (g *Gitlab) ReadUp(version uint) (r io.ReadCloser, identifier string, err error) {
 	if m, ok := g.migrations.Up(version); ok {
-		f, response, err := g.client.RepositoryFiles.GetFile(m.Identifier, m.Raw, nil)
+		f, response, err := g.client.RepositoryFiles.GetFile(g.projectID, m.Raw, g.getOptions)
 		if err != nil {
 			return nil, "", err
 		}
@@ -181,7 +187,12 @@ func (g *Gitlab) ReadUp(version uint) (r io.ReadCloser, identifier string, err e
 			return nil, "", ErrInvalidResponse
 		}
 
-		return ioutil.NopCloser(strings.NewReader(f.Content)), m.Identifier, nil
+		content, err := base64.StdEncoding.DecodeString(f.Content)
+		if err != nil {
+			return nil, "", err
+		}
+
+		return ioutil.NopCloser(strings.NewReader(string(content))), m.Identifier, nil
 	}
 
 	return nil, "", &os.PathError{fmt.Sprintf("read version %v", version), g.path, os.ErrNotExist}
@@ -189,7 +200,7 @@ func (g *Gitlab) ReadUp(version uint) (r io.ReadCloser, identifier string, err e
 
 func (g *Gitlab) ReadDown(version uint) (r io.ReadCloser, identifier string, err error) {
 	if m, ok := g.migrations.Down(version); ok {
-		f, response, err := g.client.RepositoryFiles.GetFile(m.Identifier, m.Raw, nil)
+		f, response, err := g.client.RepositoryFiles.GetFile(g.projectID, m.Raw, g.getOptions)
 		if err != nil {
 			return nil, "", err
 		}
@@ -198,7 +209,12 @@ func (g *Gitlab) ReadDown(version uint) (r io.ReadCloser, identifier string, err
 			return nil, "", ErrInvalidResponse
 		}
 
-		return ioutil.NopCloser(strings.NewReader(f.Content)), m.Identifier, nil
+		content, err := base64.StdEncoding.DecodeString(f.Content)
+		if err != nil {
+			return nil, "", err
+		}
+
+		return ioutil.NopCloser(strings.NewReader(string(content))), m.Identifier, nil
 	}
 
 	return nil, "", &os.PathError{fmt.Sprintf("read version %v", version), g.path, os.ErrNotExist}
