@@ -65,7 +65,12 @@ func (g *Gitlab) Open(url string) (source.Driver, error) {
 	}
 
 	if u.Host != "" {
-		err = gn.client.SetBaseURL("https://" + u.Host)
+		uri := nurl.URL{
+			Scheme: "https",
+			Host:   u.Host,
+		}
+
+		err = gn.client.SetBaseURL(uri.String())
 		if err != nil {
 			return nil, ErrInvalidHost
 		}
