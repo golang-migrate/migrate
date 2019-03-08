@@ -37,7 +37,7 @@ var (
 func mongoConnectionString(host, port string) string {
 	// there is connect option for excluding serverConnection algorithm
 	// it's let avoid errors with mongo replica set connection in docker container
-	return fmt.Sprintf("mongodb://%s:%s/testMigration?connect=single", host, port)
+	return fmt.Sprintf("mongodb://%s:%s/testMigration?connect=direct", host, port)
 }
 
 func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
@@ -265,7 +265,7 @@ func TestTransaction(t *testing.T) {
 						t.Fatalf("%v", runErr)
 					}
 				}
-				documentsCount, err := client.Database("testMigration").Collection("hello").Count(context.TODO(), nil)
+				documentsCount, err := client.Database("testMigration").Collection("hello").Count(context.TODO(), bson.M{})
 				if err != nil {
 					t.Fatalf("%v", err)
 				}
