@@ -8,11 +8,10 @@ import (
 	"net/http"
 	nurl "net/url"
 	"os"
+	"path"
 	"strconv"
 	"strings"
-)
 
-import (
 	"github.com/golang-migrate/migrate/v4/source"
 	"github.com/xanzy/go-gitlab"
 )
@@ -53,13 +52,8 @@ func (g *Gitlab) Open(url string) (source.Driver, error) {
 		return nil, ErrNoUserInfo
 	}
 
-	password, ok := u.User.Password()
-	if !ok {
-		return nil, ErrNoAccessToken
-	}
-
 	gn := &Gitlab{
-		client:     gitlab.NewClient(nil, password),
+		client:     gitlab.NewClient(nil, u.User.Username()),
 		url:        url,
 		migrations: source.NewMigrations(),
 	}
@@ -80,9 +74,10 @@ func (g *Gitlab) Open(url string) (source.Driver, error) {
 	if len(pe) < 1 {
 		return nil, ErrInvalidProjectID
 	}
-	gn.projectID = pe[0]
+
+	gn.projectID = path.Join(pe[0], pe[1])
 	if len(pe) > 1 {
-		gn.path = strings.Join(pe[1:], "/")
+		gn.path = strings.Join(pe[2:], "/")
 	}
 
 	gn.listOptions = &gitlab.ListTreeOptions{
