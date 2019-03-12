@@ -8,6 +8,8 @@ import (
 	"net/http"
 	nurl "net/url"
 	"os"
+	"path"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -81,9 +83,13 @@ func (g *Gitlab) Open(url string) (source.Driver, error) {
 		return nil, ErrInvalidProjectID
 	}
 
-	compoundRepoPathSplit := strings.Split(pe[0], "\\")
+	projectID, err := getProjectID(pe[0])
+	if err != nil {
+		return nil, err
+	}
 
-	gn.projectID = strings.Join(compoundRepoPathSplit, "/")
+	gn.projectID = *projectID
+
 	if len(pe) > 1 {
 		gn.path = strings.Join(pe[1:], "/")
 	}
@@ -137,6 +143,24 @@ func (g *Gitlab) readDirectory() error {
 	}
 
 	return nil
+}
+
+func getProjectID(pathSection string) (*string, error) {
+	r, err := regexp.Compile("(.*[^\\\\])\\\\([^\\\\].*)")
+	if err != nil {
+		return nil, err
+	}
+
+	compoundRepoPathSplitGroups := r.FindAllStringSubmatch(pathSection, -1)
+	var compoundPath string
+
+	if compoundRepoPathSplitGroups != nil && len(compoundRepoPathSplitGroups[0]) == 3 {
+		compoundPath = path.Join(compoundRepoPathSplitGroups[0][1], compoundRepoPathSplitGroups[0][2])
+	} else {
+		compoundPath = pathSection
+	}
+
+	return &compoundPath, nil
 }
 
 func (g *Gitlab) nodeToMigration(node *gitlab.TreeNode) (*source.Migration, error) {
