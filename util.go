@@ -23,7 +23,7 @@ func NewMultiError(errs ...error) MultiError {
 	return MultiError{compactErrs}
 }
 
-// Error implements error. Mulitple errors are concatenated with 'and's.
+// Error implements error. Multiple errors are concatenated with 'and's.
 func (m MultiError) Error() string {
 	var strs = make([]string, 0)
 	for _, e := range m.Errs {

@@ -1,4 +1,4 @@
-// Package vfs contains a driver that reads migrations from a virtual file
+// Package godoc_vfs contains a driver that reads migrations from a virtual file
 // system.
 //
 // Implementations of the filesystem interface that read from zip files and

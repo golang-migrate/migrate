@@ -67,7 +67,7 @@ func (i *Migrations) Append(m *Migration) (ok bool) {
 
 func (i *Migrations) buildIndex() {
 	i.index = make(uintSlice, 0)
-	for version, _ := range i.migrations {
+	for version := range i.migrations {
 		i.index = append(i.index, version)
 	}
 	sort.Sort(i.index)
