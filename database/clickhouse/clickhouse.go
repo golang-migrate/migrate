@@ -160,7 +160,6 @@ func (ch *ClickHouse) SetVersion(version int, dirty bool) error {
 	return tx.Commit()
 }
 
-
 // ensureVersionTable checks if versions table exists and, if not, creates it.
 // Note that this function locks the database, which deviates from the usual
 // convention of "caller locks" in the ClickHouse type.

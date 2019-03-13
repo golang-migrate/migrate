@@ -53,7 +53,7 @@ Commands:
   goto V       Migrate to version V
   up [N]       Apply all or N up migrations
   down [N]     Apply all or N down migrations
-  drop         Drop everyting inside database
+  drop         Drop everything inside database
   force V      Set version V but don't run migration (ignores dirty state)
   version      Print current migration version
 
