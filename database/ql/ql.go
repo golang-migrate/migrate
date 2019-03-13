@@ -61,6 +61,7 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	}
 	return mx, nil
 }
+
 // ensureVersionTable checks if versions table exists and, if not, creates it.
 // Note that this function locks the database, which deviates from the usual
 // convention of "caller locks" in the Ql type.
