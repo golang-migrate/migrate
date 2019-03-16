@@ -40,7 +40,7 @@ type Redshift struct {
 	conn     *sql.Conn
 	db       *sql.DB
 
-	// Open and WithInstance need to garantuee that config is never nil
+	// Open and WithInstance need to guarantee that config is never nil
 	config *Config
 }
 

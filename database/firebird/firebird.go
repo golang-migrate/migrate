@@ -40,7 +40,7 @@ type Firebird struct {
 	db       *sql.DB
 	isLocked bool
 
-	// Open and WithInstance need to garantuee that config is never nil
+	// Open and WithInstance need to guarantee that config is never nil
 	config *Config
 }
 
