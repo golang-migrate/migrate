@@ -13,7 +13,6 @@ import (
 	"io"
 	"io/ioutil"
 	nurl "net/url"
-	"strings"
 )
 
 func init() {
@@ -22,7 +21,7 @@ func init() {
 	database.Register("firebirdsql", &db)
 }
 
-var DefaultMigrationsTable = "SCHEMA_MIGRATIONS"
+var DefaultMigrationsTable = "schema_migrations"
 
 var (
 	ErrNilConfig = fmt.Errorf("no config")
@@ -67,8 +66,6 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		db:     instance,
 		config: config,
 	}
-
-	config.DatabaseName = strings.ToUpper(config.DatabaseName)
 
 	if err := fb.ensureVersionTable(); err != nil {
 		return nil, err
