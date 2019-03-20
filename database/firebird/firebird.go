@@ -140,9 +140,9 @@ func (f *Firebird) SetVersion(version int, dirty bool) error {
 					DELETE FROM "%v";
 					INSERT INTO "%v" (version, dirty) VALUES (%v, %v);
 				END;`,
-			f.config.MigrationsTable, f.config.MigrationsTable, version, dirty)
+			f.config.MigrationsTable, f.config.MigrationsTable, version, btoi(dirty))
 
-		if _, err := f.conn.ExecContext(context.Background(), query, version, dirty); err != nil {
+		if _, err := f.conn.ExecContext(context.Background(), query, version, btoi(dirty)); err != nil {
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
 	}
@@ -151,8 +151,9 @@ func (f *Firebird) SetVersion(version int, dirty bool) error {
 }
 
 func (f *Firebird) Version() (version int, dirty bool, err error) {
+	var d int
 	query := fmt.Sprintf(`SELECT FIRST 1 version, dirty FROM "%v"`, f.config.MigrationsTable)
-	err = f.conn.QueryRowContext(context.Background(), query).Scan(&version, &dirty)
+	err = f.conn.QueryRowContext(context.Background(), query).Scan(&version, &d)
 	switch {
 	case err == sql.ErrNoRows:
 		return database.NilVersion, false, nil
@@ -160,7 +161,7 @@ func (f *Firebird) Version() (version int, dirty bool, err error) {
 		return 0, false, &database.Error{OrigErr: err, Query: []byte(query)}
 
 	default:
-		return version, dirty, nil
+		return version, itob(d), nil
 	}
 }
 
@@ -219,7 +220,7 @@ func (f *Firebird) ensureVersionTable() (err error) {
 
 	query := fmt.Sprintf(`EXECUTE BLOCK AS BEGIN
 			if (not exists(select 1 from rdb$relations where rdb$relation_name = '%v')) then
-			execute statement 'create table "%v" (version bigint not null primary key, dirty boolean not null)';
+			execute statement 'create table "%v" (version bigint not null primary key, dirty smallint not null)';
 		END;`,
 		f.config.MigrationsTable, f.config.MigrationsTable)
 
@@ -228,4 +229,17 @@ func (f *Firebird) ensureVersionTable() (err error) {
 	}
 
 	return nil
+}
+
+// btoi converts bool to int
+func btoi(v bool) int {
+	if v {
+		return 1
+	}
+	return 0
+}
+
+// itob converts int to bool
+func itob(v int) bool {
+	return v != 0
 }
