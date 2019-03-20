@@ -30,7 +30,6 @@ var (
 type Config struct {
 	DatabaseName    string
 	MigrationsTable string
-	SchemaName      string
 }
 
 type Firebird struct {
