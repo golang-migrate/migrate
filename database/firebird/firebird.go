@@ -138,34 +138,23 @@ func (f *Firebird) Run(migration io.Reader) error {
 }
 
 func (f *Firebird) SetVersion(version int, dirty bool) error {
-	tx, err := f.conn.BeginTx(context.Background(), &sql.TxOptions{})
-	if err != nil {
-		return &database.Error{OrigErr: err, Err: "transaction start failed"}
-	}
-
-	query := `DELETE FROM "` + f.config.MigrationsTable + `"`
-	if _, err := tx.Exec(query); err != nil {
-		tx.Rollback()
-		return &database.Error{OrigErr: err, Query: []byte(query)}
-	}
-
 	if version >= 0 {
-		query = `INSERT INTO "` + f.config.MigrationsTable + `" (version, dirty) VALUES (?, ?)`
-		if _, err := tx.Exec(query, version, dirty); err != nil {
-			tx.Rollback()
+		query := fmt.Sprintf(`EXECUTE BLOCK AS BEGIN
+					DELETE FROM "%v";
+					INSERT INTO "%v" (version, dirty) VALUES (%v, %v);
+				END;`,
+			f.config.MigrationsTable, f.config.MigrationsTable, version, dirty)
+
+		if _, err := f.conn.ExecContext(context.Background(), query, version, dirty); err != nil {
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
-	}
-
-	if err := tx.Commit(); err != nil {
-		return &database.Error{OrigErr: err, Err: "transaction commit failed"}
 	}
 
 	return nil
 }
 
 func (f *Firebird) Version() (version int, dirty bool, err error) {
-	query := `SELECT FIRST 1 version, dirty FROM "` + f.config.MigrationsTable + `"`
+	query := fmt.Sprintf(`SELECT FIRST 1 version, dirty FROM "%v"`, f.config.MigrationsTable)
 	err = f.conn.QueryRowContext(context.Background(), query).Scan(&version, &dirty)
 	switch {
 	case err == sql.ErrNoRows:
@@ -199,16 +188,16 @@ func (f *Firebird) Drop() error {
 		}
 	}
 
-	if len(tableNames) > 0 {
-		// delete one by one ...
-		for _, t := range tableNames {
-			query := `EXECUTE BLOCK AS BEGIN
-							if (not exists(select 1 from rdb$relations where rdb$relation_name = '` + t + `')) then
-							execute statement 'drop table "` + t + `"';
-					  END;`
-			if _, err := f.conn.ExecContext(context.Background(), query); err != nil {
-				return &database.Error{OrigErr: err, Query: []byte(query)}
-			}
+	// delete one by one ...
+	for _, t := range tableNames {
+		query := fmt.Sprintf(`EXECUTE BLOCK AS BEGIN
+						if (not exists(select 1 from rdb$relations where rdb$relation_name = '%v')) then
+						execute statement 'drop table "%v"';
+					END;`,
+			t, t)
+
+		if _, err := f.conn.ExecContext(context.Background(), query); err != nil {
+			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
 	}
 
@@ -231,10 +220,12 @@ func (f *Firebird) ensureVersionTable() (err error) {
 		}
 	}()
 
-	query := `EXECUTE BLOCK AS BEGIN
-				if (not exists(select 1 from rdb$relations where rdb$relation_name = '` + f.config.MigrationsTable + `')) then
-				execute statement 'create table "` + f.config.MigrationsTable + `" (version bigint not null primary key, dirty boolean not null)';
-			  END;`
+	query := fmt.Sprintf(`EXECUTE BLOCK AS BEGIN
+			if (not exists(select 1 from rdb$relations where rdb$relation_name = '%v')) then
+			execute statement 'create table "%v" (version bigint not null primary key, dirty boolean not null)';
+		END;`,
+		f.config.MigrationsTable, f.config.MigrationsTable)
+
 	if _, err = f.conn.ExecContext(context.Background(), query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
