@@ -134,16 +134,18 @@ func (f *Firebird) Run(migration io.Reader) error {
 }
 
 func (f *Firebird) SetVersion(version int, dirty bool) error {
-	if version >= 0 {
-		query := fmt.Sprintf(`EXECUTE BLOCK AS BEGIN
+	if version < 0 {
+		return nil
+	}
+
+	query := fmt.Sprintf(`EXECUTE BLOCK AS BEGIN
 					DELETE FROM "%v";
 					INSERT INTO "%v" (version, dirty) VALUES (%v, %v);
 				END;`,
-			f.config.MigrationsTable, f.config.MigrationsTable, version, btoi(dirty))
+		f.config.MigrationsTable, f.config.MigrationsTable, version, btoi(dirty))
 
-		if _, err := f.conn.ExecContext(context.Background(), query, version, btoi(dirty)); err != nil {
-			return &database.Error{OrigErr: err, Query: []byte(query)}
-		}
+	if _, err := f.conn.ExecContext(context.Background(), query, version, btoi(dirty)); err != nil {
+		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 
 	return nil
