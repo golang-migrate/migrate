@@ -1,6 +1,6 @@
 # gitlab
 
-gitlab://user:personal-access-token@gitlab_url/project_id/path#ref`
+`gitlab://user:personal-access-token@gitlab_url/project_id/path#ref`
 
 | URL Query  | WithInstance Config | Description |
 |------------|---------------------|-------------|
