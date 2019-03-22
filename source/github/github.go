@@ -126,7 +126,7 @@ func (g *Github) Close() error {
 
 func (g *Github) First() (version uint, er error) {
 	if v, ok := g.migrations.First(); !ok {
-		return 0, &os.PathError{"first", g.path, os.ErrNotExist}
+		return 0, &os.PathError{Op: "first", Path: g.path, Err: os.ErrNotExist}
 	} else {
 		return v, nil
 	}
@@ -134,7 +134,7 @@ func (g *Github) First() (version uint, er error) {
 
 func (g *Github) Prev(version uint) (prevVersion uint, err error) {
 	if v, ok := g.migrations.Prev(version); !ok {
-		return 0, &os.PathError{fmt.Sprintf("prev for version %v", version), g.path, os.ErrNotExist}
+		return 0, &os.PathError{Op: fmt.Sprintf("prev for version %v", version), Path: g.path, Err: os.ErrNotExist}
 	} else {
 		return v, nil
 	}
@@ -142,7 +142,7 @@ func (g *Github) Prev(version uint) (prevVersion uint, err error) {
 
 func (g *Github) Next(version uint) (nextVersion uint, err error) {
 	if v, ok := g.migrations.Next(version); !ok {
-		return 0, &os.PathError{fmt.Sprintf("next for version %v", version), g.path, os.ErrNotExist}
+		return 0, &os.PathError{Op: fmt.Sprintf("next for version %v", version), Path: g.path, Err: os.ErrNotExist}
 	} else {
 		return v, nil
 	}
@@ -162,7 +162,7 @@ func (g *Github) ReadUp(version uint) (r io.ReadCloser, identifier string, err e
 			return ioutil.NopCloser(strings.NewReader(r)), m.Identifier, nil
 		}
 	}
-	return nil, "", &os.PathError{fmt.Sprintf("read version %v", version), g.path, os.ErrNotExist}
+	return nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: g.path, Err: os.ErrNotExist}
 }
 
 func (g *Github) ReadDown(version uint) (r io.ReadCloser, identifier string, err error) {
@@ -179,5 +179,5 @@ func (g *Github) ReadDown(version uint) (r io.ReadCloser, identifier string, err
 			return ioutil.NopCloser(strings.NewReader(r)), m.Identifier, nil
 		}
 	}
-	return nil, "", &os.PathError{fmt.Sprintf("read version %v", version), g.path, os.ErrNotExist}
+	return nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: g.path, Err: os.ErrNotExist}
 }

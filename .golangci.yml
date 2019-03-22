@@ -8,5 +8,4 @@ output:
 linters:
   disable:
     - errcheck
-    - govet
     - staticcheck
