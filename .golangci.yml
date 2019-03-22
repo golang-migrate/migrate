@@ -7,7 +7,12 @@ output:
 
 linters:
   enable:
+    - interfacer
+    - unconvert
+    - goconst
     - misspell
+    - nakedret
+    - prealloc
   disable:
     - errcheck
     - staticcheck
