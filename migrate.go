@@ -873,7 +873,7 @@ func (m *Migrate) lock() error {
 		}
 	}()
 
-	// wait until we either recieve ErrLockTimeout or error from Lock operation
+	// wait until we either receive ErrLockTimeout or error from Lock operation
 	err := <-errchan
 	if err == nil {
 		m.isLocked = true

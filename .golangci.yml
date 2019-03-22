@@ -6,6 +6,8 @@ output:
   print-issued-lines: false
 
 linters:
+  enable:
+    - misspell
   disable:
     - errcheck
     - staticcheck
