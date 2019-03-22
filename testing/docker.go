@@ -20,7 +20,7 @@ import (
 )
 
 func NewDockerContainer(t testing.TB, image string, env []string, cmd []string) (*DockerContainer, error) {
-	c, err := dockerclient.NewEnvClient()
+	c, err := dockerclient.NewClientWithOpts()
 	if err != nil {
 		return nil, err
 	}
