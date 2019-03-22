@@ -139,7 +139,7 @@ func (m *Ql) Drop() error {
 			return err
 		}
 		if len(tableName) > 0 {
-			if strings.HasPrefix(tableName, "__") == false {
+			if !strings.HasPrefix(tableName, "__") {
 				tableNames = append(tableNames, tableName)
 			}
 		}

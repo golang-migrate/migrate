@@ -9,6 +9,5 @@ linters:
   disable:
     - errcheck
     - govet
-    - gosimple
     - unused
     - staticcheck
