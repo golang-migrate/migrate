@@ -1,0 +1,14 @@
+# options for analysis running
+run:
+  tests: false
+
+output:
+  print-issued-lines: false
+
+linters:
+  disable:
+    - errcheck
+    - govet
+    - gosimple
+    - unused
+    - staticcheck
