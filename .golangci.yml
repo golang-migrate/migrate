@@ -13,6 +13,7 @@ linters:
     - misspell
     - nakedret
     - prealloc
+    - scopelint
   disable:
     - errcheck
     - staticcheck
