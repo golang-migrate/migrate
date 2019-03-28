@@ -7,13 +7,28 @@ output:
 
 linters:
   enable:
+    #- golint
     - interfacer
     - unconvert
+    #- dupl
     - goconst
+    - gofmt
     - misspell
+    #- maligned
+    - unparam
     - nakedret
     - prealloc
-    - scopelint
+    #- gosec
   disable:
     - errcheck
     - staticcheck
+linters-settings:
+  misspell:
+    locale: US
+issues:
+  max-same: 0
+  max-per-linter: 0
+  exclude-use-default: false
+  exclude:
+    # gosec: Duplicated errcheck checks
+    - G104
