@@ -159,7 +159,7 @@ func (g *Gitlab) Close() error {
 
 func (g *Gitlab) First() (version uint, er error) {
 	if v, ok := g.migrations.First(); !ok {
-		return 0, &os.PathError{"first", g.path, os.ErrNotExist}
+		return 0, &os.PathError{Op: "first", Path: g.path, Err: os.ErrNotExist}
 	} else {
 		return v, nil
 	}
@@ -167,7 +167,7 @@ func (g *Gitlab) First() (version uint, er error) {
 
 func (g *Gitlab) Prev(version uint) (prevVersion uint, err error) {
 	if v, ok := g.migrations.Prev(version); !ok {
-		return 0, &os.PathError{fmt.Sprintf("prev for version %v", version), g.path, os.ErrNotExist}
+		return 0, &os.PathError{Op: fmt.Sprintf("prev for version %v", version), Path: g.path, Err: os.ErrNotExist}
 	} else {
 		return v, nil
 	}
@@ -175,7 +175,7 @@ func (g *Gitlab) Prev(version uint) (prevVersion uint, err error) {
 
 func (g *Gitlab) Next(version uint) (nextVersion uint, err error) {
 	if v, ok := g.migrations.Next(version); !ok {
-		return 0, &os.PathError{fmt.Sprintf("next for version %v", version), g.path, os.ErrNotExist}
+		return 0, &os.PathError{Op: fmt.Sprintf("next for version %v", version), Path: g.path, Err: os.ErrNotExist}
 	} else {
 		return v, nil
 	}
@@ -200,7 +200,7 @@ func (g *Gitlab) ReadUp(version uint) (r io.ReadCloser, identifier string, err e
 		return ioutil.NopCloser(strings.NewReader(string(content))), m.Identifier, nil
 	}
 
-	return nil, "", &os.PathError{fmt.Sprintf("read version %v", version), g.path, os.ErrNotExist}
+	return nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: g.path, Err: os.ErrNotExist}
 }
 
 func (g *Gitlab) ReadDown(version uint) (r io.ReadCloser, identifier string, err error) {
@@ -222,5 +222,5 @@ func (g *Gitlab) ReadDown(version uint) (r io.ReadCloser, identifier string, err
 		return ioutil.NopCloser(strings.NewReader(string(content))), m.Identifier, nil
 	}
 
-	return nil, "", &os.PathError{fmt.Sprintf("read version %v", version), g.path, os.ErrNotExist}
+	return nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: g.path, Err: os.ErrNotExist}
 }

@@ -158,7 +158,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 		gotoCmd(migrater, uint(v))
 
 		if log.verbose {
-			log.Println("Finished after", time.Now().Sub(startTime))
+			log.Println("Finished after", time.Since(startTime))
 		}
 
 	case "up":
@@ -178,7 +178,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 		upCmd(migrater, limit)
 
 		if log.verbose {
-			log.Println("Finished after", time.Now().Sub(startTime))
+			log.Println("Finished after", time.Since(startTime))
 		}
 
 	case "down":
@@ -198,7 +198,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 		downCmd(migrater, limit)
 
 		if log.verbose {
-			log.Println("Finished after", time.Now().Sub(startTime))
+			log.Println("Finished after", time.Since(startTime))
 		}
 
 	case "drop":
@@ -209,7 +209,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 		dropCmd(migrater)
 
 		if log.verbose {
-			log.Println("Finished after", time.Now().Sub(startTime))
+			log.Println("Finished after", time.Since(startTime))
 		}
 
 	case "force":
@@ -233,7 +233,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 		forceCmd(migrater, int(v))
 
 		if log.verbose {
-			log.Println("Finished after", time.Now().Sub(startTime))
+			log.Println("Finished after", time.Since(startTime))
 		}
 
 	case "version":

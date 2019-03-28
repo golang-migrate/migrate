@@ -30,11 +30,6 @@ func (l *Log) Verbose() bool {
 	return l.verbose
 }
 
-func (l *Log) fatalf(format string, v ...interface{}) {
-	l.Printf(format, v...)
-	os.Exit(1)
-}
-
 func (l *Log) fatal(args ...interface{}) {
 	l.Println(args...)
 	os.Exit(1)

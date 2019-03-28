@@ -48,7 +48,7 @@ func (s *Stub) Close() error {
 
 func (s *Stub) First() (version uint, err error) {
 	if v, ok := s.Migrations.First(); !ok {
-		return 0, &os.PathError{"first", s.Url, os.ErrNotExist} // TODO: s.Url can be empty when called with WithInstance
+		return 0, &os.PathError{Op: "first", Path: s.Url, Err: os.ErrNotExist} // TODO: s.Url can be empty when called with WithInstance
 	} else {
 		return v, nil
 	}
@@ -56,7 +56,7 @@ func (s *Stub) First() (version uint, err error) {
 
 func (s *Stub) Prev(version uint) (prevVersion uint, err error) {
 	if v, ok := s.Migrations.Prev(version); !ok {
-		return 0, &os.PathError{fmt.Sprintf("prev for version %v", version), s.Url, os.ErrNotExist}
+		return 0, &os.PathError{Op: fmt.Sprintf("prev for version %v", version), Path: s.Url, Err: os.ErrNotExist}
 	} else {
 		return v, nil
 	}
@@ -64,7 +64,7 @@ func (s *Stub) Prev(version uint) (prevVersion uint, err error) {
 
 func (s *Stub) Next(version uint) (nextVersion uint, err error) {
 	if v, ok := s.Migrations.Next(version); !ok {
-		return 0, &os.PathError{fmt.Sprintf("next for version %v", version), s.Url, os.ErrNotExist}
+		return 0, &os.PathError{Op: fmt.Sprintf("next for version %v", version), Path: s.Url, Err: os.ErrNotExist}
 	} else {
 		return v, nil
 	}
@@ -74,12 +74,12 @@ func (s *Stub) ReadUp(version uint) (r io.ReadCloser, identifier string, err err
 	if m, ok := s.Migrations.Up(version); ok {
 		return ioutil.NopCloser(bytes.NewBufferString(m.Identifier)), fmt.Sprintf("%v.up.stub", version), nil
 	}
-	return nil, "", &os.PathError{fmt.Sprintf("read up version %v", version), s.Url, os.ErrNotExist}
+	return nil, "", &os.PathError{Op: fmt.Sprintf("read up version %v", version), Path: s.Url, Err: os.ErrNotExist}
 }
 
 func (s *Stub) ReadDown(version uint) (r io.ReadCloser, identifier string, err error) {
 	if m, ok := s.Migrations.Down(version); ok {
 		return ioutil.NopCloser(bytes.NewBufferString(m.Identifier)), fmt.Sprintf("%v.down.stub", version), nil
 	}
-	return nil, "", &os.PathError{fmt.Sprintf("read down version %v", version), s.Url, os.ErrNotExist}
+	return nil, "", &os.PathError{Op: fmt.Sprintf("read down version %v", version), Path: s.Url, Err: os.ErrNotExist}
 }

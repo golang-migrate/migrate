@@ -110,7 +110,7 @@ func (ch *ClickHouse) Run(r io.Reader) error {
 			if tq == "" {
 				continue
 			}
-			if _, err := ch.conn.Exec(string(q)); err != nil {
+			if _, err := ch.conn.Exec(q); err != nil {
 				return database.Error{OrigErr: err, Err: "migration failed", Query: []byte(q)}
 			}
 		}

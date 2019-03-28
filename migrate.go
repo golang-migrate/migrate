@@ -686,12 +686,12 @@ func (m *Migrate) runMigrations(ret <-chan interface{}) error {
 			return nil
 		}
 
-		switch r.(type) {
+		switch r := r.(type) {
 		case error:
-			return r.(error)
+			return r
 
 		case *Migration:
-			migr := r.(*Migration)
+			migr := r
 
 			// set version with dirty state
 			if err := m.databaseDrv.SetVersion(migr.TargetVersion, true); err != nil {
@@ -871,10 +871,9 @@ func (m *Migrate) lock() error {
 		} else {
 			errchan <- nil
 		}
-		return
 	}()
 
-	// wait until we either recieve ErrLockTimeout or error from Lock operation
+	// wait until we either receive ErrLockTimeout or error from Lock operation
 	err := <-errchan
 	if err == nil {
 		m.isLocked = true
