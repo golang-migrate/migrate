@@ -201,15 +201,13 @@ func (d *DockerContainer) portMapping(selectFirst bool, cPort int) (containerPor
 			// Skip ahead until we find the port we want
 			continue
 		}
-		for _, binding := range bindings {
 
-			hostPortUint, err := strconv.ParseUint(binding.HostPort, 10, 64)
-			if err != nil {
-				return 0, "", 0, err
-			}
-
-			return uint(port.Int()), binding.HostIP, uint(hostPortUint), nil
+		hostPortUint, err := strconv.ParseUint(bindings[0].HostPort, 10, 64)
+		if err != nil {
+			return 0, "", 0, err
 		}
+
+		return uint(port.Int()), bindings[0].HostIP, uint(hostPortUint), nil
 	}
 
 	if selectFirst {

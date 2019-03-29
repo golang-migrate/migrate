@@ -5,6 +5,7 @@ package testing
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"testing"
@@ -39,7 +40,9 @@ func TestNilVersion(t *testing.T, d database.Driver) {
 
 func TestLockAndUnlock(t *testing.T, d database.Driver) {
 	// add a timeout, in case there is a deadlock
-	done := make(chan bool, 1)
+	done := make(chan struct{})
+	errs := make(chan error)
+
 	go func() {
 		timeout := time.After(15 * time.Second)
 		for {
@@ -47,36 +50,52 @@ func TestLockAndUnlock(t *testing.T, d database.Driver) {
 			case <-done:
 				return
 			case <-timeout:
-				t.Fatal(fmt.Sprintf("Timeout after 15 seconds. Looks like a deadlock in Lock/UnLock.\n%#v", d))
+				errs <- fmt.Errorf("Timeout after 15 seconds. Looks like a deadlock in Lock/UnLock.\n%#v", d)
+				return
 			}
 		}
 	}()
-	defer func() {
-		done <- true
-	}()
 
 	// run the locking test ...
+	go func() {
+		if err := d.Lock(); err != nil {
+			errs <- err
+			return
+		}
 
-	if err := d.Lock(); err != nil {
-		t.Fatal(err)
-	}
+		// try to acquire lock again
+		if err := d.Lock(); err == nil {
+			errs <- errors.New("lock: expected err not to be nil")
+			return
+		}
 
-	// try to acquire lock again
-	if err := d.Lock(); err == nil {
-		t.Fatal("Lock: expected err not to be nil")
-	}
+		// unlock
+		if err := d.Unlock(); err != nil {
+			errs <- err
+			return
+		}
 
-	// unlock
-	if err := d.Unlock(); err != nil {
-		t.Fatal(err)
-	}
+		// try to lock
+		if err := d.Lock(); err != nil {
+			errs <- err
+			return
+		}
+		if err := d.Unlock(); err != nil {
+			errs <- err
+			return
+		}
+		// notify everyone
+		close(done)
+	}()
 
-	// try to lock
-	if err := d.Lock(); err != nil {
-		t.Fatal(err)
-	}
-	if err := d.Unlock(); err != nil {
-		t.Fatal(err)
+	// wait for done or any error
+	for {
+		select {
+		case <-done:
+			return
+		case err := <-errs:
+			t.Fatal(err)
+		}
 	}
 }
 

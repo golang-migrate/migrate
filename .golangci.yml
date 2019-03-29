@@ -21,7 +21,6 @@ linters:
     #- gosec
   disable:
     - errcheck
-    - staticcheck
 linters-settings:
   misspell:
     locale: US
