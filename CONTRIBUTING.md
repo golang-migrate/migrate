@@ -9,7 +9,6 @@
   1. Run the linter: `golangci-lint run`
   1. Confirm tests are working: `make test-short`
   1. Write awesome code ...
-  1.
   1. `make test` to run all tests against all database versions
   1. Push code and open Pull Request
  
