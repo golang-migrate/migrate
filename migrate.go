@@ -81,28 +81,28 @@ type Migrate struct {
 
 // New returns a new Migrate instance from a source URL and a database URL.
 // The URL scheme is defined by each driver.
-func New(sourceUrl, databaseUrl string) (*Migrate, error) {
+func New(sourceURL, databaseURL string) (*Migrate, error) {
 	m := newCommon()
 
-	sourceName, err := sourceSchemeFromUrl(sourceUrl)
+	sourceName, err := sourceSchemeFromURL(sourceURL)
 	if err != nil {
 		return nil, err
 	}
 	m.sourceName = sourceName
 
-	databaseName, err := databaseSchemeFromUrl(databaseUrl)
+	databaseName, err := databaseSchemeFromURL(databaseURL)
 	if err != nil {
 		return nil, err
 	}
 	m.databaseName = databaseName
 
-	sourceDrv, err := source.Open(sourceUrl)
+	sourceDrv, err := source.Open(sourceURL)
 	if err != nil {
 		return nil, err
 	}
 	m.sourceDrv = sourceDrv
 
-	databaseDrv, err := database.Open(databaseUrl)
+	databaseDrv, err := database.Open(databaseURL)
 	if err != nil {
 		return nil, err
 	}
@@ -115,10 +115,10 @@ func New(sourceUrl, databaseUrl string) (*Migrate, error) {
 // and an existing database instance. The source URL scheme is defined by each driver.
 // Use any string that can serve as an identifier during logging as databaseName.
 // You are responsible for closing the underlying database client if necessary.
-func NewWithDatabaseInstance(sourceUrl string, databaseName string, databaseInstance database.Driver) (*Migrate, error) {
+func NewWithDatabaseInstance(sourceURL string, databaseName string, databaseInstance database.Driver) (*Migrate, error) {
 	m := newCommon()
 
-	sourceName, err := schemeFromUrl(sourceUrl)
+	sourceName, err := schemeFromURL(sourceURL)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +126,7 @@ func NewWithDatabaseInstance(sourceUrl string, databaseName string, databaseInst
 
 	m.databaseName = databaseName
 
-	sourceDrv, err := source.Open(sourceUrl)
+	sourceDrv, err := source.Open(sourceURL)
 	if err != nil {
 		return nil, err
 	}
@@ -141,10 +141,10 @@ func NewWithDatabaseInstance(sourceUrl string, databaseName string, databaseInst
 // and a database URL. The database URL scheme is defined by each driver.
 // Use any string that can serve as an identifier during logging as sourceName.
 // You are responsible for closing the underlying source client if necessary.
-func NewWithSourceInstance(sourceName string, sourceInstance source.Driver, databaseUrl string) (*Migrate, error) {
+func NewWithSourceInstance(sourceName string, sourceInstance source.Driver, databaseURL string) (*Migrate, error) {
 	m := newCommon()
 
-	databaseName, err := schemeFromUrl(databaseUrl)
+	databaseName, err := schemeFromURL(databaseURL)
 	if err != nil {
 		return nil, err
 	}
@@ -152,7 +152,7 @@ func NewWithSourceInstance(sourceName string, sourceInstance source.Driver, data
 
 	m.sourceName = sourceName
 
-	databaseDrv, err := database.Open(databaseUrl)
+	databaseDrv, err := database.Open(databaseURL)
 	if err != nil {
 		return nil, err
 	}

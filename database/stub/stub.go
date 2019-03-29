@@ -13,7 +13,7 @@ func init() {
 }
 
 type Stub struct {
-	Url               string
+	URL               string
 	Instance          interface{}
 	CurrentVersion    int
 	MigrationSequence []string
@@ -26,7 +26,7 @@ type Stub struct {
 
 func (s *Stub) Open(url string) (database.Driver, error) {
 	return &Stub{
-		Url:               url,
+		URL:               url,
 		CurrentVersion:    -1,
 		MigrationSequence: make([]string, 0),
 		Config:            &Config{},
