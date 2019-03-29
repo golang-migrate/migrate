@@ -64,11 +64,11 @@ type Migrate struct {
 	// GracefulStop accepts `true` and will stop executing migrations
 	// as soon as possible at a safe break point, so that the database
 	// is not corrupted.
-	GracefulStop   chan bool
-	isGracefulStop bool
+	GracefulStop chan bool
+	isLockedMu   *sync.Mutex
 
-	isLockedMu *sync.Mutex
-	isLocked   bool
+	isGracefulStop bool
+	isLocked       bool
 
 	// PrefetchMigrations defaults to DefaultPrefetchMigrations,
 	// but can be set per Migrate instance.

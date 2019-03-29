@@ -14,7 +14,7 @@ linters:
     - goconst
     - gofmt
     - misspell
-    #- maligned
+    - maligned
     - unparam
     - nakedret
     - prealloc
