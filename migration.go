@@ -129,7 +129,10 @@ func (m *Migration) Buffer() error {
 
 	// start reading from body, peek won't move the read pointer though
 	// poor man's solution?
-	b.Peek(int(m.BufferSize))
+	_, err := b.Peek(int(m.BufferSize))
+	if err != nil {
+		return err
+	}
 
 	m.FinishedBuffering = time.Now()
 
@@ -145,10 +148,16 @@ func (m *Migration) Buffer() error {
 
 	// close bufferWriter so Buffer knows that there is no
 	// more data coming
-	m.bufferWriter.Close()
+	err = m.bufferWriter.Close()
+	if err != nil {
+		return err
+	}
 
 	// it's safe to close the Body too
-	m.Body.Close()
+	err = m.Body.Close()
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

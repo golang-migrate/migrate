@@ -19,8 +19,6 @@ linters:
     - nakedret
     - prealloc
     #- gosec
-  disable:
-    - errcheck
 linters-settings:
   misspell:
     locale: US

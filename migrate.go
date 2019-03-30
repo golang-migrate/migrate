@@ -7,6 +7,7 @@ package migrate
 import (
 	"errors"
 	"fmt"
+	"github.com/hashicorp/go-multierror"
 	"os"
 	"sync"
 	"time"
@@ -347,7 +348,11 @@ func (m *Migrate) Run(migration ...*Migration) error {
 			}
 
 			ret <- migr
-			go migr.Buffer()
+			go func(m *Migration) {
+				if err := m.Buffer(); err != nil {
+					ret <- err
+				}
+			}(migr)
 		}
 	}()
 
@@ -434,7 +439,11 @@ func (m *Migrate) read(from int, to int, ret chan<- interface{}) {
 			}
 
 			ret <- migr
-			go migr.Buffer()
+			go func() {
+				if err := migr.Buffer(); err != nil {
+					ret <- err
+				}
+			}()
 			from = int(firstVersion)
 		}
 
@@ -457,7 +466,11 @@ func (m *Migrate) read(from int, to int, ret chan<- interface{}) {
 			}
 
 			ret <- migr
-			go migr.Buffer()
+			go func() {
+				if err := migr.Buffer(); err != nil {
+					ret <- err
+				}
+			}()
 			from = int(next)
 		}
 
@@ -478,7 +491,11 @@ func (m *Migrate) read(from int, to int, ret chan<- interface{}) {
 					return
 				}
 				ret <- migr
-				go migr.Buffer()
+				go func() {
+					if err := migr.Buffer(); err != nil {
+						ret <- err
+					}
+				}()
 				return
 
 			} else if err != nil {
@@ -493,7 +510,11 @@ func (m *Migrate) read(from int, to int, ret chan<- interface{}) {
 			}
 
 			ret <- migr
-			go migr.Buffer()
+			go func() {
+				if err := migr.Buffer(); err != nil {
+					ret <- err
+				}
+			}()
 			from = int(prev)
 		}
 	}
@@ -541,7 +562,11 @@ func (m *Migrate) readUp(from int, limit int, ret chan<- interface{}) {
 			}
 
 			ret <- migr
-			go migr.Buffer()
+			go func() {
+				if err := migr.Buffer(); err != nil {
+					ret <- err
+				}
+			}()
 			from = int(firstVersion)
 			count++
 			continue
@@ -585,7 +610,11 @@ func (m *Migrate) readUp(from int, limit int, ret chan<- interface{}) {
 		}
 
 		ret <- migr
-		go migr.Buffer()
+		go func() {
+			if err := migr.Buffer(); err != nil {
+				ret <- err
+			}
+		}()
 		from = int(next)
 		count++
 	}
@@ -646,7 +675,11 @@ func (m *Migrate) readDown(from int, limit int, ret chan<- interface{}) {
 					return
 				}
 				ret <- migr
-				go migr.Buffer()
+				go func() {
+					if err := migr.Buffer(); err != nil {
+						ret <- err
+					}
+				}()
 				count++
 			}
 
@@ -667,7 +700,11 @@ func (m *Migrate) readDown(from int, limit int, ret chan<- interface{}) {
 		}
 
 		ret <- migr
-		go migr.Buffer()
+		go func() {
+			if err := migr.Buffer(); err != nil {
+				ret <- err
+			}
+		}()
 		from = int(prev)
 		count++
 	}
@@ -732,11 +769,13 @@ func (m *Migrate) runMigrations(ret <-chan interface{}) error {
 
 // versionExists checks the source if either the up or down migration for
 // the specified migration version exists.
-func (m *Migrate) versionExists(version uint) error {
+func (m *Migrate) versionExists(version uint) (result error) {
 	// try up migration first
 	up, _, err := m.sourceDrv.ReadUp(version)
 	if err == nil {
-		defer up.Close()
+		if errClose := up.Close(); errClose != nil {
+			result = multierror.Append(result, errClose)
+		}
 	}
 	if os.IsExist(err) {
 		return nil
@@ -747,7 +786,11 @@ func (m *Migrate) versionExists(version uint) error {
 	// then try down migration
 	down, _, err := m.sourceDrv.ReadDown(version)
 	if err == nil {
-		defer down.Close()
+		defer func() {
+			if errClose := down.Close(); errClose != nil {
+				result = multierror.Append(result, errClose)
+			}
+		}()
 	}
 	if os.IsExist(err) {
 		return nil

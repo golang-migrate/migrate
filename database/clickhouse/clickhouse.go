@@ -204,15 +204,18 @@ func (ch *ClickHouse) ensureVersionTable() (err error) {
 	return nil
 }
 
-func (ch *ClickHouse) Drop() error {
-	var (
-		query       = "SHOW TABLES FROM " + ch.config.DatabaseName
-		tables, err = ch.conn.Query(query)
-	)
+func (ch *ClickHouse) Drop() (err error) {
+	query := "SHOW TABLES FROM " + ch.config.DatabaseName
+	tables, err := ch.conn.Query(query)
+
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
-	defer tables.Close()
+	defer func() {
+		if errClose := tables.Close(); errClose != nil {
+			err = multierror.Append(err, errClose)
+		}
+	}()
 	for tables.Next() {
 		var table string
 		if err := tables.Scan(&table); err != nil {
