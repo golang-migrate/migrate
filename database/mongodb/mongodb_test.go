@@ -179,7 +179,7 @@ func TestTransaction(t *testing.T) {
 			t.Fatalf("%v", err)
 		}
 		//rs.initiate()
-		err = client.Database("admin").RunCommand(context.TODO(), bson.D{{"replSetInitiate", bson.D{}}}).Err()
+		err = client.Database("admin").RunCommand(context.TODO(), bson.D{bson.E{Key: "replSetInitiate", Value: bson.D{}}}).Err()
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
@@ -300,7 +300,7 @@ func waitForReplicaInit(client *mongo.Client) error {
 			//Check that node is primary because
 			//during replica set initialization, the first node first becomes a secondary and then becomes the primary
 			//should consider that initialization is completed only after the node has become the primary
-			result := client.Database("admin").RunCommand(context.TODO(), bson.D{{"isMaster", 1}})
+			result := client.Database("admin").RunCommand(context.TODO(), bson.D{bson.E{Key: "isMaster", Value: 1}})
 			r, err := result.DecodeBytes()
 			if err != nil {
 				return err
