@@ -51,7 +51,10 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 		fmt.Println("ping error:", err)
 		return false
 	}
-	db.Close()
+	if err := db.Close(); err != nil {
+		fmt.Println("close error:", err)
+		return false
+	}
 	return true
 }
 
@@ -68,7 +71,11 @@ func createDB(t *testing.T, c dktest.ContainerInfo) {
 	if err = db.Ping(); err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Errorf("%v", err)
+		}
+	}()
 
 	if _, err = db.Exec("CREATE DATABASE migrate"); err != nil {
 		t.Fatal(err)

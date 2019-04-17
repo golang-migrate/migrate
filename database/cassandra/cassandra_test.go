@@ -70,7 +70,11 @@ func Test(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
-		defer d.Close()
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Errorf("%v", err)
+			}
+		}()
 		dt.Test(t, d, []byte("SELECT table_name from system_schema.tables"))
 	})
 }
@@ -87,7 +91,11 @@ func TestMigrate(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
-		defer d.Close()
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Errorf("%v", err)
+			}
+		}()
 
 		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "testks", d)
 		if err != nil {

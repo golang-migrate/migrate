@@ -20,7 +20,7 @@ func Test(t *testing.T) {
 		return
 	}
 	defer func() {
-		os.RemoveAll(dir)
+		_ = os.RemoveAll(dir)
 	}()
 	t.Logf("DB path : %s\n", filepath.Join(dir, "sqlite3.db"))
 	p := &Sqlite{}
@@ -38,7 +38,7 @@ func TestMigrate(t *testing.T) {
 		return
 	}
 	defer func() {
-		os.RemoveAll(dir)
+		_ = os.RemoveAll(dir)
 	}()
 	t.Logf("DB path : %s\n", filepath.Join(dir, "sqlite3.db"))
 	p := &Sqlite{}
@@ -80,7 +80,7 @@ func TestMigrationTable(t *testing.T) {
 		return
 	}
 	defer func() {
-		os.RemoveAll(dir)
+		_ = os.RemoveAll(dir)
 	}()
 
 	t.Logf("DB path : %s\n", filepath.Join(dir, "sqlite3.db"))

@@ -108,7 +108,11 @@ func ExampleNewWithDatabaseInstance() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Fatal(err)
+		}
+	}()
 
 	// Create driver instance from db.
 	// Check each driver if it supports the WithInstance function.

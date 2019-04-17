@@ -54,9 +54,13 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 
 	db, err := sql.Open("firebirdsql", fbConnectionString(ip, port))
 	if err != nil {
+		fmt.Println("open error:", err)
 		return false
 	}
-	defer db.Close()
+	if err := db.Close(); err != nil {
+		fmt.Println("close error:", err)
+		return false
+	}
 	if err = db.PingContext(ctx); err != nil {
 		switch err {
 		case sqldriver.ErrBadConn, io.EOF:
@@ -83,7 +87,11 @@ func Test(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
-		defer d.Close()
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Errorf("%v", err)
+			}
+		}()
 		dt.Test(t, d, []byte("SELECT Count(*) FROM rdb$relations"))
 	})
 }
@@ -101,7 +109,11 @@ func TestMigrate(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
-		defer d.Close()
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Errorf("%v", err)
+			}
+		}()
 		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "firebirdsql", d)
 		if err != nil {
 			t.Fatalf("%v", err)
@@ -123,7 +135,11 @@ func TestErrorParsing(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
-		defer d.Close()
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Errorf("%v", err)
+			}
+		}()
 
 		wantErr := `migration failed in line 0: CREATE TABLEE foo (foo varchar(40)); (details: Dynamic SQL Error
 SQL error code = -104
@@ -153,7 +169,11 @@ func TestFilterCustomQuery(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
-		defer d.Close()
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Errorf("%v", err)
+			}
+		}()
 	})
 }
 
@@ -170,6 +190,11 @@ func Test_Lock(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Errorf("%v", err)
+			}
+		}()
 
 		dt.Test(t, d, []byte("SELECT Count(*) FROM rdb$relations"))
 

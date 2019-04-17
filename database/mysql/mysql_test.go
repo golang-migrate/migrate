@@ -37,7 +37,7 @@ var (
 	}
 )
 
-func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
+func isReady(ctx context.Context, c dktest.ContainerInfo) (result bool) {
 	ip, port, err := c.Port(defaultPort)
 	if err != nil {
 		return false
@@ -47,7 +47,11 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 	if err != nil {
 		return false
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			result = false
+		}
+	}()
 	if err = db.PingContext(ctx); err != nil {
 		switch err {
 		case sqldriver.ErrBadConn, mysql.ErrInvalidConn:
@@ -76,7 +80,11 @@ func Test(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
-		defer d.Close()
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Errorf("%v", err)
+			}
+		}()
 		dt.Test(t, d, []byte("SELECT 1"))
 
 		// check ensureVersionTable
@@ -105,7 +113,11 @@ func TestMigrate(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
-		defer d.Close()
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Errorf("%v", err)
+			}
+		}()
 
 		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "public", d)
 		if err != nil {

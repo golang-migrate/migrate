@@ -20,7 +20,9 @@ func Test(t *testing.T) {
 		return
 	}
 	defer func() {
-		os.RemoveAll(dir)
+		if err := os.RemoveAll(dir); err != nil {
+			t.Fatalf("%v", err)
+		}
 	}()
 	t.Logf("DB path : %s\n", filepath.Join(dir, "ql.db"))
 	p := &Ql{}
@@ -48,7 +50,7 @@ func TestMigrate(t *testing.T) {
 		return
 	}
 	defer func() {
-		os.RemoveAll(dir)
+		_ = os.RemoveAll(dir)
 	}()
 	t.Logf("DB path : %s\n", filepath.Join(dir, "ql.db"))
 

@@ -44,7 +44,7 @@ func connectionString(schema, host, port string) string {
 	return fmt.Sprintf("%s://postgres@%s:%s/postgres?sslmode=disable", schema, host, port)
 }
 
-func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
+func isReady(ctx context.Context, c dktest.ContainerInfo) (result bool) {
 	ip, port, err := c.FirstPort()
 	if err != nil {
 		return false
@@ -54,7 +54,11 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 	if err != nil {
 		return false
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			result = false
+		}
+	}()
 	if err = db.PingContext(ctx); err != nil {
 		switch err {
 		case sqldriver.ErrBadConn, io.EOF:
@@ -81,7 +85,11 @@ func Test(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
-		defer d.Close()
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Errorf("%v", err)
+			}
+		}()
 		dt.Test(t, d, []byte("SELECT 1"))
 	})
 }
@@ -99,7 +107,11 @@ func TestMigrate(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
-		defer d.Close()
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Errorf("%v", err)
+			}
+		}()
 		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "postgres", d)
 		if err != nil {
 			t.Fatalf("%v", err)
@@ -121,7 +133,11 @@ func TestMultiStatement(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
-		defer d.Close()
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Errorf("%v", err)
+			}
+		}()
 		if err := d.Run(bytes.NewReader([]byte("CREATE TABLE foo (foo text); CREATE TABLE bar (bar text);"))); err != nil {
 			t.Fatalf("expected err to be nil, got %v", err)
 		}
@@ -150,7 +166,11 @@ func TestErrorParsing(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
-		defer d.Close()
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Errorf("%v", err)
+			}
+		}()
 
 		wantErr := `migration failed: syntax error at or near "TABLEE" (column 37) in line 1: CREATE TABLE foo ` +
 			`(foo text); CREATE TABLEE bar (bar text); (details: pq: syntax error at or near "TABLEE")`
@@ -175,7 +195,11 @@ func TestFilterCustomQuery(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
-		defer d.Close()
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Errorf("%v", err)
+			}
+		}()
 	})
 }
 
@@ -192,7 +216,11 @@ func TestWithSchema(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
-		defer d.Close()
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Errorf("%v", err)
+			}
+		}()
 
 		// create foobar schema
 		if err := d.Run(bytes.NewReader([]byte("CREATE SCHEMA foobar AUTHORIZATION postgres"))); err != nil {
@@ -207,7 +235,11 @@ func TestWithSchema(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
-		defer d2.Close()
+		defer func() {
+			if err := d2.Close(); err != nil {
+				t.Errorf("%v", err)
+			}
+		}()
 
 		version, _, err := d2.Version()
 		if err != nil {

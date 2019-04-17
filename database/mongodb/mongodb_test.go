@@ -40,7 +40,7 @@ func mongoConnectionString(host, port string) string {
 	return fmt.Sprintf("mongodb://%s:%s/testMigration?connect=direct", host, port)
 }
 
-func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
+func isReady(ctx context.Context, c dktest.ContainerInfo) (result bool) {
 	ip, port, err := c.FirstPort()
 	if err != nil {
 		return false
@@ -50,7 +50,13 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 	if err != nil {
 		return false
 	}
-	defer client.Disconnect(ctx)
+	defer func() {
+		if err := client.Disconnect(ctx); err != nil {
+			fmt.Println("close error:", err)
+			result = false
+		}
+	}()
+
 	if err = client.Ping(ctx, nil); err != nil {
 		switch err {
 		case io.EOF:
@@ -76,7 +82,11 @@ func Test(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
-		defer d.Close()
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Errorf("%v", err)
+			}
+		}()
 		dt.TestNilVersion(t, d)
 		//TestLockAndUnlock(t, d) driver doesn't support lock on database level
 		dt.TestRun(t, d, bytes.NewReader([]byte(`[{"insert":"hello","documents":[{"wild":"world"}]}]`)))
@@ -98,7 +108,11 @@ func TestMigrate(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
-		defer d.Close()
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Errorf("%v", err)
+			}
+		}()
 		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "", d)
 		if err != nil {
 			t.Fatalf("%v", err)
@@ -120,7 +134,11 @@ func TestWithAuth(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
-		defer d.Close()
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Errorf("%v", err)
+			}
+		}()
 		createUserCMD := []byte(`[{"createUser":"deminem","pwd":"gogo","roles":[{"role":"readWrite","db":"testMigration"}]}]`)
 		err = d.Run(bytes.NewReader(createUserCMD))
 		if err != nil {
@@ -146,7 +164,11 @@ func TestWithAuth(t *testing.T) {
 				if err != nil {
 					t.Fatalf("%v", err)
 				}
-				defer d.Close()
+				defer func() {
+					if err := d.Close(); err != nil {
+						t.Errorf("%v", err)
+					}
+				}()
 				err = d.Run(bytes.NewReader(insertCMD))
 				switch {
 				case tcase.isErrorExpected && err == nil:
@@ -193,7 +215,11 @@ func TestTransaction(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer d.Close()
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Errorf("%v", err)
+			}
+		}()
 		//We have to create collection
 		//transactions don't support operations with creating new dbs, collections
 		//Unique index need for checking transaction aborting
@@ -261,7 +287,11 @@ func TestTransaction(t *testing.T) {
 				if err != nil {
 					t.Fatalf("%v", err)
 				}
-				defer d.Close()
+				defer func() {
+					if err := d.Close(); err != nil {
+						t.Errorf("%v", err)
+					}
+				}()
 				runErr := d.Run(bytes.NewReader(tcase.cmds))
 				if runErr != nil {
 					if !tcase.isErrorExpected {
