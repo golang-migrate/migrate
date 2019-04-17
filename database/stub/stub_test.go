@@ -30,6 +30,9 @@ func TestMigrate(t *testing.T) {
 	stubMigrations.Append(&source.Migration{Version: 1, Direction: source.Down, Identifier: "DROP 1"})
 	src := &stub.Stub{}
 	srcDrv, err := src.Open("")
+	if err != nil {
+		t.Fatal(err)
+	}
 	srcDrv.(*stub.Stub).Migrations = stubMigrations
 	m, err := migrate.NewWithInstance("stub", srcDrv, "", d)
 	if err != nil {
