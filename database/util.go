@@ -16,5 +16,5 @@ func GenerateAdvisoryLockId(databaseName string, additionalNames ...string) (str
 	}
 	sum := crc32.ChecksumIEEE([]byte(databaseName))
 	sum = sum * uint32(advisoryLockIDSalt)
-	return fmt.Sprintf("%v", sum), nil
+	return fmt.Sprint(sum), nil
 }
