@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+
+	"log"
+
 	"github.com/golang-migrate/migrate/v4"
 	"io"
 	"os"
@@ -52,7 +55,7 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) (result bool) {
 	}
 	defer func() {
 		if err := client.Disconnect(ctx); err != nil {
-			fmt.Println("close error:", err)
+			log.Println("close error:", err)
 			result = false
 		}
 	}()
@@ -62,7 +65,7 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) (result bool) {
 		case io.EOF:
 			return false
 		default:
-			fmt.Println(err)
+			log.Println(err)
 		}
 		return false
 	}

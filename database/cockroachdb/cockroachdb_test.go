@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/golang-migrate/migrate/v4"
+	"log"
 	"strings"
 	"testing"
 )
@@ -38,21 +39,21 @@ var (
 func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 	ip, port, err := c.Port(defaultPort)
 	if err != nil {
-		fmt.Println("port error:", err)
+		log.Println("port error:", err)
 		return false
 	}
 
 	db, err := sql.Open("postgres", fmt.Sprintf("postgres://root@%v:%v?sslmode=disable", ip, port))
 	if err != nil {
-		fmt.Println("open error:", err)
+		log.Println("open error:", err)
 		return false
 	}
 	if err := db.PingContext(ctx); err != nil {
-		fmt.Println("ping error:", err)
+		log.Println("ping error:", err)
 		return false
 	}
 	if err := db.Close(); err != nil {
-		fmt.Println("close error:", err)
+		log.Println("close error:", err)
 		return false
 	}
 	return true

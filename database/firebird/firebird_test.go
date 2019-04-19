@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	sqldriver "database/sql/driver"
 	"fmt"
+	"log"
+
 	"github.com/golang-migrate/migrate/v4"
 	"io"
 	"strings"
@@ -54,12 +56,12 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) (result bool) {
 
 	db, err := sql.Open("firebirdsql", fbConnectionString(ip, port))
 	if err != nil {
-		fmt.Println("open error:", err)
+		log.Println("open error:", err)
 		return false
 	}
 	defer func() {
 		if err := db.Close(); err != nil {
-			fmt.Println("close error:", err)
+			log.Println("close error:", err)
 			result = false
 		}
 	}()
@@ -68,7 +70,7 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) (result bool) {
 		case sqldriver.ErrBadConn, io.EOF:
 			return false
 		default:
-			fmt.Println(err)
+			log.Println(err)
 		}
 		return false
 	}

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	sqldriver "database/sql/driver"
 	"fmt"
+
 	"github.com/golang-migrate/migrate/v4"
 	"net/url"
 	"testing"

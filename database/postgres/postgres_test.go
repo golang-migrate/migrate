@@ -7,6 +7,8 @@ import (
 	"database/sql"
 	sqldriver "database/sql/driver"
 	"fmt"
+	"log"
+
 	"github.com/golang-migrate/migrate/v4"
 	"io"
 	"strconv"
@@ -57,7 +59,7 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) (result bool) {
 		case sqldriver.ErrBadConn, io.EOF:
 			return false
 		default:
-			fmt.Println(err)
+			log.Println(err)
 		}
 		return false
 	}
