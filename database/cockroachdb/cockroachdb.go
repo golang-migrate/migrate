@@ -151,7 +151,7 @@ func (c *CockroachDb) Close() error {
 // See: https://github.com/cockroachdb/cockroach/issues/13546
 func (c *CockroachDb) Lock() error {
 	err := crdb.ExecuteTx(context.Background(), c.db, nil, func(tx *sql.Tx) (err error) {
-		aid, err := database.GenerateAdvisoryLockID(c.config.DatabaseName)
+		aid, err := database.GenerateAdvisoryLockId(c.config.DatabaseName)
 		if err != nil {
 			return err
 		}
@@ -192,7 +192,7 @@ func (c *CockroachDb) Lock() error {
 // Locking is done manually with a separate lock table.  Implementing advisory locks in CRDB is being discussed
 // See: https://github.com/cockroachdb/cockroach/issues/13546
 func (c *CockroachDb) Unlock() error {
-	aid, err := database.GenerateAdvisoryLockID(c.config.DatabaseName)
+	aid, err := database.GenerateAdvisoryLockId(c.config.DatabaseName)
 	if err != nil {
 		return err
 	}

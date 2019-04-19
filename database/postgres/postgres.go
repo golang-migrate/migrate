@@ -145,7 +145,7 @@ func (p *Postgres) Lock() error {
 		return database.ErrLocked
 	}
 
-	aid, err := database.GenerateAdvisoryLockID(p.config.DatabaseName, p.config.SchemaName)
+	aid, err := database.GenerateAdvisoryLockId(p.config.DatabaseName, p.config.SchemaName)
 	if err != nil {
 		return err
 	}
@@ -166,7 +166,7 @@ func (p *Postgres) Unlock() error {
 		return nil
 	}
 
-	aid, err := database.GenerateAdvisoryLockID(p.config.DatabaseName, p.config.SchemaName)
+	aid, err := database.GenerateAdvisoryLockId(p.config.DatabaseName, p.config.SchemaName)
 	if err != nil {
 		return err
 	}
