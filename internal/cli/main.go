@@ -89,7 +89,9 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 	migrater, migraterErr := migrate.New(*sourcePtr, *databasePtr)
 	defer func() {
 		if migraterErr == nil {
-			_, _ = migrater.Close()
+			if _, err := migrater.Close(); err != nil {
+				log.Println(err)
+			}
 		}
 	}()
 	if migraterErr == nil {
