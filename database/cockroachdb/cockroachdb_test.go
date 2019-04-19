@@ -74,7 +74,7 @@ func createDB(t *testing.T, c dktest.ContainerInfo) {
 	}
 	defer func() {
 		if err := db.Close(); err != nil {
-			t.Errorf("%v", err)
+			t.Error(err)
 		}
 	}()
 

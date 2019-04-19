@@ -93,7 +93,7 @@ func Test(t *testing.T) {
 		}
 		defer func() {
 			if err := d.Close(); err != nil {
-				t.Errorf("%v", err)
+				t.Error(err)
 			}
 		}()
 		dt.Test(t, d, []byte("SELECT Count(*) FROM rdb$relations"))
@@ -115,7 +115,7 @@ func TestMigrate(t *testing.T) {
 		}
 		defer func() {
 			if err := d.Close(); err != nil {
-				t.Errorf("%v", err)
+				t.Error(err)
 			}
 		}()
 		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "firebirdsql", d)
@@ -141,7 +141,7 @@ func TestErrorParsing(t *testing.T) {
 		}
 		defer func() {
 			if err := d.Close(); err != nil {
-				t.Errorf("%v", err)
+				t.Error(err)
 			}
 		}()
 
@@ -175,7 +175,7 @@ func TestFilterCustomQuery(t *testing.T) {
 		}
 		defer func() {
 			if err := d.Close(); err != nil {
-				t.Errorf("%v", err)
+				t.Error(err)
 			}
 		}()
 	})
@@ -196,7 +196,7 @@ func Test_Lock(t *testing.T) {
 		}
 		defer func() {
 			if err := d.Close(); err != nil {
-				t.Errorf("%v", err)
+				t.Error(err)
 			}
 		}()
 

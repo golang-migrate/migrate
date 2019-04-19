@@ -87,7 +87,7 @@ func Test(t *testing.T) {
 		}
 		defer func() {
 			if err := d.Close(); err != nil {
-				t.Errorf("%v", err)
+				t.Error(err)
 			}
 		}()
 		dt.TestNilVersion(t, d)
@@ -113,7 +113,7 @@ func TestMigrate(t *testing.T) {
 		}
 		defer func() {
 			if err := d.Close(); err != nil {
-				t.Errorf("%v", err)
+				t.Error(err)
 			}
 		}()
 		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "", d)
@@ -139,7 +139,7 @@ func TestWithAuth(t *testing.T) {
 		}
 		defer func() {
 			if err := d.Close(); err != nil {
-				t.Errorf("%v", err)
+				t.Error(err)
 			}
 		}()
 		createUserCMD := []byte(`[{"createUser":"deminem","pwd":"gogo","roles":[{"role":"readWrite","db":"testMigration"}]}]`)
@@ -169,7 +169,7 @@ func TestWithAuth(t *testing.T) {
 				}
 				defer func() {
 					if err := d.Close(); err != nil {
-						t.Errorf("%v", err)
+						t.Error(err)
 					}
 				}()
 				err = d.Run(bytes.NewReader(insertCMD))
@@ -220,7 +220,7 @@ func TestTransaction(t *testing.T) {
 		}
 		defer func() {
 			if err := d.Close(); err != nil {
-				t.Errorf("%v", err)
+				t.Error(err)
 			}
 		}()
 		//We have to create collection
@@ -292,7 +292,7 @@ func TestTransaction(t *testing.T) {
 				}
 				defer func() {
 					if err := d.Close(); err != nil {
-						t.Errorf("%v", err)
+						t.Error(err)
 					}
 				}()
 				runErr := d.Run(bytes.NewReader(tcase.cmds))

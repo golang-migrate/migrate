@@ -82,7 +82,7 @@ func Test(t *testing.T) {
 		}
 		defer func() {
 			if err := d.Close(); err != nil {
-				t.Errorf("%v", err)
+				t.Error(err)
 			}
 		}()
 		dt.Test(t, d, []byte("SELECT 1"))
@@ -104,7 +104,7 @@ func TestMigrate(t *testing.T) {
 		}
 		defer func() {
 			if err := d.Close(); err != nil {
-				t.Errorf("%v", err)
+				t.Error(err)
 			}
 		}()
 		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "postgres", d)
@@ -130,7 +130,7 @@ func TestMultiStatement(t *testing.T) {
 		}
 		defer func() {
 			if err := d.Close(); err != nil {
-				t.Errorf("%v", err)
+				t.Error(err)
 			}
 		}()
 		if err := d.Run(strings.NewReader("CREATE TABLE foo (foo text); CREATE TABLE bar (bar text);")); err != nil {
@@ -163,7 +163,7 @@ func TestErrorParsing(t *testing.T) {
 		}
 		defer func() {
 			if err := d.Close(); err != nil {
-				t.Errorf("%v", err)
+				t.Error(err)
 			}
 		}()
 
@@ -192,7 +192,7 @@ func TestFilterCustomQuery(t *testing.T) {
 		}
 		defer func() {
 			if err := d.Close(); err != nil {
-				t.Errorf("%v", err)
+				t.Error(err)
 			}
 		}()
 	})
@@ -282,7 +282,7 @@ func TestParallelSchema(t *testing.T) {
 		}
 		defer func() {
 			if err := d.Close(); err != nil {
-				t.Errorf("%v", err)
+				t.Error(err)
 			}
 		}()
 
@@ -301,7 +301,7 @@ func TestParallelSchema(t *testing.T) {
 		}
 		defer func() {
 			if err := dfoo.Close(); err != nil {
-				t.Errorf("%v", err)
+				t.Error(err)
 			}
 		}()
 
@@ -311,7 +311,7 @@ func TestParallelSchema(t *testing.T) {
 		}
 		defer func() {
 			if err := dbar.Close(); err != nil {
-				t.Errorf("%v", err)
+				t.Error(err)
 			}
 		}()
 
@@ -397,7 +397,7 @@ func TestWithInstance_Concurrent(t *testing.T) {
 		}
 		defer func() {
 			if err := db.Close(); err != nil {
-				t.Errorf("%v", err)
+				t.Error(err)
 			}
 		}()
 

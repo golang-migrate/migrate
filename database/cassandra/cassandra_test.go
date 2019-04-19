@@ -72,7 +72,7 @@ func Test(t *testing.T) {
 		}
 		defer func() {
 			if err := d.Close(); err != nil {
-				t.Errorf("%v", err)
+				t.Error(err)
 			}
 		}()
 		dt.Test(t, d, []byte("SELECT table_name from system_schema.tables"))
@@ -93,7 +93,7 @@ func TestMigrate(t *testing.T) {
 		}
 		defer func() {
 			if err := d.Close(); err != nil {
-				t.Errorf("%v", err)
+				t.Error(err)
 			}
 		}()
 

@@ -83,7 +83,7 @@ func Test(t *testing.T) {
 		}
 		defer func() {
 			if err := d.Close(); err != nil {
-				t.Errorf("%v", err)
+				t.Error(err)
 			}
 		}()
 		dt.Test(t, d, []byte("SELECT 1"))
@@ -116,13 +116,13 @@ func TestMigrate(t *testing.T) {
 		}
 		defer func() {
 			if err := d.Close(); err != nil {
-				t.Errorf("%v", err)
+				t.Error(err)
 			}
 		}()
 
 		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "public", d)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Error(err)
 		}
 		dt.TestMigrate(t, m, []byte("SELECT 1"))
 
