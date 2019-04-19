@@ -762,8 +762,11 @@ func (m *Migrate) versionExists(version uint) (result error) {
 	// then try down migration
 	down, _, err := m.sourceDrv.ReadDown(version)
 	if err == nil {
-		// nolint: errcheck
-		defer down.Close()
+		defer func() {
+			if errClose := down.Close(); errClose != nil {
+				result = multierror.Append(result, errClose)
+			}
+		}()
 	}
 	if os.IsExist(err) {
 		return nil
