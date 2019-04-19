@@ -80,8 +80,7 @@ func createCmd(dir string, startTime time.Time, format string, name string, ext 
 		}
 	}
 
-	err := os.MkdirAll(dir, os.ModePerm)
-	if err != nil {
+	if err := os.MkdirAll(dir, os.ModePerm); err != nil {
 		log.fatalErr(err)
 	}
 
