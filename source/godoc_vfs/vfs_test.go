@@ -34,5 +34,7 @@ func TestOpen(t *testing.T) {
 		}
 	}()
 	b := &godoc_vfs.VFS{}
-	_, _ = b.Open("")
+	if _, err := b.Open(""); err != nil {
+		t.Error(err)
+	}
 }
