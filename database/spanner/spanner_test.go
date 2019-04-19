@@ -24,7 +24,7 @@ func Test(t *testing.T) {
 	addr := fmt.Sprintf("spanner://%s", db)
 	d, err := s.Open(addr)
 	if err != nil {
-		t.Fatalf("%v", err)
+		t.Fatal(err)
 	}
 	dt.Test(t, d, []byte("SELECT 1"))
 }
@@ -43,11 +43,11 @@ func TestMigrate(t *testing.T) {
 	addr := fmt.Sprintf("spanner://%s", db)
 	d, err := s.Open(addr)
 	if err != nil {
-		t.Fatalf("%v", err)
+		t.Fatal(err)
 	}
 	m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", db, d)
 	if err != nil {
-		t.Fatalf("%v", err)
+		t.Fatal(err)
 	}
 	dt.TestMigrate(t, m, []byte("SELECT 1"))
 }

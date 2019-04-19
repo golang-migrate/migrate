@@ -83,7 +83,7 @@ func Test(t *testing.T) {
 		p := &Mongo{}
 		d, err := p.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		defer func() {
 			if err := d.Close(); err != nil {
@@ -109,7 +109,7 @@ func TestMigrate(t *testing.T) {
 		p := &Mongo{}
 		d, err := p.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		defer func() {
 			if err := d.Close(); err != nil {
@@ -118,7 +118,7 @@ func TestMigrate(t *testing.T) {
 		}()
 		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "", d)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		dt.TestMigrate(t, m, []byte(`[{"insert":"hello","documents":[{"wild":"world"}]}]`))
 	})
@@ -135,7 +135,7 @@ func TestWithAuth(t *testing.T) {
 		p := &Mongo{}
 		d, err := p.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		defer func() {
 			if err := d.Close(); err != nil {
@@ -145,7 +145,7 @@ func TestWithAuth(t *testing.T) {
 		createUserCMD := []byte(`[{"createUser":"deminem","pwd":"gogo","roles":[{"role":"readWrite","db":"testMigration"}]}]`)
 		err = d.Run(bytes.NewReader(createUserCMD))
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		testcases := []struct {
 			name            string
@@ -165,7 +165,7 @@ func TestWithAuth(t *testing.T) {
 				mc := &Mongo{}
 				d, err := mc.Open(fmt.Sprintf(tcase.connectUri, ip, port))
 				if err != nil {
-					t.Fatalf("%v", err)
+					t.Fatal(err)
 				}
 				defer func() {
 					if err := d.Close(); err != nil {
@@ -197,20 +197,20 @@ func TestTransaction(t *testing.T) {
 
 		client, err := mongo.Connect(context.TODO(), mongoConnectionString(ip, port))
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		err = client.Ping(context.TODO(), nil)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		//rs.initiate()
 		err = client.Database("admin").RunCommand(context.TODO(), bson.D{bson.E{Key: "replSetInitiate", Value: bson.D{}}}).Err()
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		err = waitForReplicaInit(client)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		d, err := WithInstance(client, &Config{
 			DatabaseName: "testMigration",
@@ -240,7 +240,7 @@ func TestTransaction(t *testing.T) {
 			}]`)
 		err = d.Run(bytes.NewReader(insertCMD))
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		testcases := []struct {
 			name            string
@@ -277,18 +277,18 @@ func TestTransaction(t *testing.T) {
 			t.Run(tcase.name, func(t *testing.T) {
 				client, err := mongo.Connect(context.TODO(), mongoConnectionString(ip, port))
 				if err != nil {
-					t.Fatalf("%v", err)
+					t.Fatal(err)
 				}
 				err = client.Ping(context.TODO(), nil)
 				if err != nil {
-					t.Fatalf("%v", err)
+					t.Fatal(err)
 				}
 				d, err := WithInstance(client, &Config{
 					DatabaseName:    "testMigration",
 					TransactionMode: true,
 				})
 				if err != nil {
-					t.Fatalf("%v", err)
+					t.Fatal(err)
 				}
 				defer func() {
 					if err := d.Close(); err != nil {
@@ -298,12 +298,12 @@ func TestTransaction(t *testing.T) {
 				runErr := d.Run(bytes.NewReader(tcase.cmds))
 				if runErr != nil {
 					if !tcase.isErrorExpected {
-						t.Fatalf("%v", runErr)
+						t.Fatal(runErr)
 					}
 				}
 				documentsCount, err := client.Database("testMigration").Collection("hello").Count(context.TODO(), bson.M{})
 				if err != nil {
-					t.Fatalf("%v", err)
+					t.Fatal(err)
 				}
 				if tcase.documentsCount != documentsCount {
 					t.Fatalf("expected %d and actual %d documents count not equal. run migration error:%s", tcase.documentsCount, documentsCount, runErr)

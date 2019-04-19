@@ -89,7 +89,7 @@ func Test(t *testing.T) {
 		p := &Firebird{}
 		d, err := p.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		defer func() {
 			if err := d.Close(); err != nil {
@@ -111,7 +111,7 @@ func TestMigrate(t *testing.T) {
 		p := &Firebird{}
 		d, err := p.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		defer func() {
 			if err := d.Close(); err != nil {
@@ -120,7 +120,7 @@ func TestMigrate(t *testing.T) {
 		}()
 		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "firebirdsql", d)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		dt.TestMigrate(t, m, []byte("SELECT Count(*) FROM rdb$relations"))
 	})
@@ -137,7 +137,7 @@ func TestErrorParsing(t *testing.T) {
 		p := &Firebird{}
 		d, err := p.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		defer func() {
 			if err := d.Close(); err != nil {
@@ -171,7 +171,7 @@ func TestFilterCustomQuery(t *testing.T) {
 		p := &Firebird{}
 		d, err := p.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		defer func() {
 			if err := d.Close(); err != nil {
@@ -192,7 +192,7 @@ func Test_Lock(t *testing.T) {
 		p := &Firebird{}
 		d, err := p.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		defer func() {
 			if err := d.Close(); err != nil {

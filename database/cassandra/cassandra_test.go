@@ -68,7 +68,7 @@ func Test(t *testing.T) {
 		p := &Cassandra{}
 		d, err := p.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		defer func() {
 			if err := d.Close(); err != nil {
@@ -89,7 +89,7 @@ func TestMigrate(t *testing.T) {
 		p := &Cassandra{}
 		d, err := p.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		defer func() {
 			if err := d.Close(); err != nil {
@@ -99,7 +99,7 @@ func TestMigrate(t *testing.T) {
 
 		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "testks", d)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		dt.TestMigrate(t, m, []byte("SELECT table_name from system_schema.tables"))
 	})

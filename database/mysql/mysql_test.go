@@ -79,7 +79,7 @@ func Test(t *testing.T) {
 		p := &Mysql{}
 		d, err := p.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		defer func() {
 			if err := d.Close(); err != nil {
@@ -112,7 +112,7 @@ func TestMigrate(t *testing.T) {
 		p := &Mysql{}
 		d, err := p.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		defer func() {
 			if err := d.Close(); err != nil {
@@ -148,7 +148,7 @@ func TestLockWorks(t *testing.T) {
 		p := &Mysql{}
 		d, err := p.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		dt.Test(t, d, []byte("SELECT 1"))
 

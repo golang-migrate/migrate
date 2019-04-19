@@ -96,7 +96,7 @@ func Test(t *testing.T) {
 		c := &CockroachDb{}
 		d, err := c.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		dt.Test(t, d, []byte("SELECT 1"))
 	})
@@ -115,12 +115,12 @@ func TestMigrate(t *testing.T) {
 		c := &CockroachDb{}
 		d, err := c.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 
 		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "migrate", d)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		dt.TestMigrate(t, m, []byte("SELECT 1"))
 	})
@@ -139,7 +139,7 @@ func TestMultiStatement(t *testing.T) {
 		c := &CockroachDb{}
 		d, err := c.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		if err := d.Run(strings.NewReader("CREATE TABLE foo (foo text); CREATE TABLE bar (bar text);")); err != nil {
 			t.Fatalf("expected err to be nil, got %v", err)
@@ -169,7 +169,7 @@ func TestFilterCustomQuery(t *testing.T) {
 		c := &CockroachDb{}
 		_, err = c.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 	})
 }

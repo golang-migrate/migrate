@@ -78,7 +78,7 @@ func Test(t *testing.T) {
 		p := &Postgres{}
 		d, err := p.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		defer func() {
 			if err := d.Close(); err != nil {
@@ -100,7 +100,7 @@ func TestMigrate(t *testing.T) {
 		p := &Postgres{}
 		d, err := p.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		defer func() {
 			if err := d.Close(); err != nil {
@@ -109,7 +109,7 @@ func TestMigrate(t *testing.T) {
 		}()
 		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "postgres", d)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		dt.TestMigrate(t, m, []byte("SELECT 1"))
 	})
@@ -126,7 +126,7 @@ func TestMultiStatement(t *testing.T) {
 		p := &Postgres{}
 		d, err := p.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		defer func() {
 			if err := d.Close(); err != nil {
@@ -159,7 +159,7 @@ func TestErrorParsing(t *testing.T) {
 		p := &Postgres{}
 		d, err := p.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		defer func() {
 			if err := d.Close(); err != nil {
@@ -188,7 +188,7 @@ func TestFilterCustomQuery(t *testing.T) {
 		p := &Postgres{}
 		d, err := p.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		defer func() {
 			if err := d.Close(); err != nil {
@@ -209,11 +209,11 @@ func TestWithSchema(t *testing.T) {
 		p := &Postgres{}
 		d, err := p.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		defer func() {
 			if err := d.Close(); err != nil {
-				t.Fatalf("%v", err)
+				t.Fatal(err)
 			}
 		}()
 
@@ -228,11 +228,11 @@ func TestWithSchema(t *testing.T) {
 		// re-connect using that schema
 		d2, err := p.Open(fmt.Sprintf("postgres://postgres@%v:%v/postgres?sslmode=disable&search_path=foobar", ip, port))
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		defer func() {
 			if err := d2.Close(); err != nil {
-				t.Fatalf("%v", err)
+				t.Fatal(err)
 			}
 		}()
 
@@ -278,7 +278,7 @@ func TestParallelSchema(t *testing.T) {
 		p := &Postgres{}
 		d, err := p.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		defer func() {
 			if err := d.Close(); err != nil {
@@ -297,7 +297,7 @@ func TestParallelSchema(t *testing.T) {
 		// re-connect using that schemas
 		dfoo, err := p.Open(fmt.Sprintf("postgres://postgres@%v:%v/postgres?sslmode=disable&search_path=foo", ip, port))
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		defer func() {
 			if err := dfoo.Close(); err != nil {
@@ -307,7 +307,7 @@ func TestParallelSchema(t *testing.T) {
 
 		dbar, err := p.Open(fmt.Sprintf("postgres://postgres@%v:%v/postgres?sslmode=disable&search_path=bar", ip, port))
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		defer func() {
 			if err := dbar.Close(); err != nil {
@@ -348,7 +348,7 @@ func TestPostgres_Lock(t *testing.T) {
 		p := &Postgres{}
 		d, err := p.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 
 		dt.Test(t, d, []byte("SELECT 1"))

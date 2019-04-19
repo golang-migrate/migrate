@@ -36,7 +36,7 @@ func TestMigrate(t *testing.T) {
 	srcDrv.(*stub.Stub).Migrations = stubMigrations
 	m, err := migrate.NewWithInstance("stub", srcDrv, "", d)
 	if err != nil {
-		t.Fatalf("%v", err)
+		t.Fatal(err)
 	}
 
 	dt.TestMigrate(t, m, []byte("/* foobar migration */"))
