@@ -50,7 +50,9 @@ func TestMigrate(t *testing.T) {
 		return
 	}
 	defer func() {
-		_ = os.RemoveAll(dir)
+		if err := os.RemoveAll(dir); err != nil {
+			t.Error(err)
+		}
 	}()
 	t.Logf("DB path : %s\n", filepath.Join(dir, "ql.db"))
 

@@ -17,7 +17,9 @@ func Test(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() {
-		_ = os.RemoveAll(tmpDir)
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Error(err)
+		}
 	}()
 
 	// write files that meet driver test requirements
@@ -49,7 +51,9 @@ func TestOpen(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() {
-		_ = os.RemoveAll(tmpDir)
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Error(err)
+		}
 	}()
 
 	mustWriteFile(t, tmpDir, "1_foobar.up.sql", "")
@@ -72,7 +76,9 @@ func TestOpenWithRelativePath(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() {
-		_ = os.RemoveAll(tmpDir)
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Error(err)
+		}
 	}()
 
 	wd, err := os.Getwd()
@@ -139,7 +145,9 @@ func TestOpenWithDuplicateVersion(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() {
-		_ = os.RemoveAll(tmpDir)
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Error(err)
+		}
 	}()
 
 	mustWriteFile(t, tmpDir, "1_foo.up.sql", "") // 1 up
@@ -158,7 +166,9 @@ func TestClose(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() {
-		_ = os.RemoveAll(tmpDir)
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Error(err)
+		}
 	}()
 
 	f := &File{}
@@ -195,7 +205,9 @@ func mustCreateBenchmarkDir(t *testing.B) (dir string) {
 func BenchmarkOpen(b *testing.B) {
 	dir := mustCreateBenchmarkDir(b)
 	defer func() {
-		_ = os.RemoveAll(dir)
+		if err := os.RemoveAll(dir); err != nil {
+			b.Error(err)
+		}
 	}()
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
@@ -211,7 +223,9 @@ func BenchmarkOpen(b *testing.B) {
 func BenchmarkNext(b *testing.B) {
 	dir := mustCreateBenchmarkDir(b)
 	defer func() {
-		_ = os.RemoveAll(dir)
+		if err := os.RemoveAll(dir); err != nil {
+			b.Error(err)
+		}
 	}()
 	f := &File{}
 	d, _ := f.Open("file://" + dir)
