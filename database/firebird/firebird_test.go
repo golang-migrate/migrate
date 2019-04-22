@@ -48,7 +48,7 @@ func fbConnectionString(host, port string) string {
 	return fmt.Sprintf("firebird://%s:%s@%s:%s//firebird/data/%s", user, password, host, port, dbName)
 }
 
-func isReady(ctx context.Context, c dktest.ContainerInfo) (result bool) {
+func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 	ip, port, err := c.FirstPort()
 	if err != nil {
 		return false
@@ -62,7 +62,6 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) (result bool) {
 	defer func() {
 		if err := db.Close(); err != nil {
 			log.Println("close error:", err)
-			result = false
 		}
 	}()
 	if err = db.PingContext(ctx); err != nil {

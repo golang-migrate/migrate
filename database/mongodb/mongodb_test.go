@@ -43,7 +43,7 @@ func mongoConnectionString(host, port string) string {
 	return fmt.Sprintf("mongodb://%s:%s/testMigration?connect=direct", host, port)
 }
 
-func isReady(ctx context.Context, c dktest.ContainerInfo) (result bool) {
+func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 	ip, port, err := c.FirstPort()
 	if err != nil {
 		return false
@@ -56,7 +56,6 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) (result bool) {
 	defer func() {
 		if err := client.Disconnect(ctx); err != nil {
 			log.Println("close error:", err)
-			result = false
 		}
 	}()
 

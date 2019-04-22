@@ -39,7 +39,7 @@ func pgConnectionString(host, port string) string {
 	return fmt.Sprintf("postgres://postgres@%s:%s/postgres?sslmode=disable", host, port)
 }
 
-func isReady(ctx context.Context, c dktest.ContainerInfo) (result bool) {
+func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 	ip, port, err := c.FirstPort()
 	if err != nil {
 		return false
@@ -51,7 +51,7 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) (result bool) {
 	}
 	defer func() {
 		if err := db.Close(); err != nil {
-			result = false
+			log.Println("close error:", err)
 		}
 	}()
 	if err = db.PingContext(ctx); err != nil {

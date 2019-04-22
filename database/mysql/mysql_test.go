@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	sqldriver "database/sql/driver"
 	"fmt"
+	"log"
 
 	"github.com/golang-migrate/migrate/v4"
 	"net/url"
@@ -38,7 +39,7 @@ var (
 	}
 )
 
-func isReady(ctx context.Context, c dktest.ContainerInfo) (result bool) {
+func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 	ip, port, err := c.Port(defaultPort)
 	if err != nil {
 		return false
@@ -50,7 +51,7 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) (result bool) {
 	}
 	defer func() {
 		if err := db.Close(); err != nil {
-			result = false
+			log.Println("close error:", err)
 		}
 	}()
 	if err = db.PingContext(ctx); err != nil {
