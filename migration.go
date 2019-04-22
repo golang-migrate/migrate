@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"log"
 	"time"
 )
 
@@ -130,9 +129,7 @@ func (m *Migration) Buffer() error {
 
 	// start reading from body, peek won't move the read pointer though
 	// poor man's solution?
-	if _, err := b.Peek(int(m.BufferSize)); err != nil {
-		log.Print(err)
-	}
+	_, _ = b.Peek(int(m.BufferSize))
 
 	m.FinishedBuffering = time.Now()
 
