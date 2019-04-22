@@ -54,7 +54,6 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 	}
 	if err := db.Close(); err != nil {
 		log.Println("close error:", err)
-		return false
 	}
 	return true
 }
