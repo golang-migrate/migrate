@@ -86,7 +86,10 @@ func TestOpenWithRelativePath(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() {
-		_ = os.Chdir(wd) // rescue working dir after we are done
+		// rescue working dir after we are done
+		if err := os.Chdir(wd); err != nil {
+			t.Log(err)
+		}
 	}()
 
 	if err := os.Chdir(tmpDir); err != nil {

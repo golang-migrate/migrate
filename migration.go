@@ -148,10 +148,14 @@ func (m *Migration) Buffer() error {
 
 	// close bufferWriter so Buffer knows that there is no
 	// more data coming
-	_ = m.bufferWriter.Close()
+	if err := m.bufferWriter.Close(); err != nil {
+		return err
+	}
 
 	// it's safe to close the Body too
-	_ = m.Body.Close()
+	if err := m.Body.Close(); err != nil {
+		return err
+	}
 
 	return nil
 }
