@@ -125,13 +125,17 @@ func (m *Ql) Open(url string) (database.Driver, error) {
 func (m *Ql) Close() error {
 	return m.db.Close()
 }
-func (m *Ql) Drop() error {
+func (m *Ql) Drop() (err error) {
 	query := `SELECT Name FROM __Table`
 	tables, err := m.db.Query(query)
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
-	defer tables.Close()
+	defer func() {
+		if errClose := tables.Close(); errClose != nil {
+			err = multierror.Append(err, errClose)
+		}
+	}()
 	tableNames := make([]string, 0)
 	for tables.Next() {
 		var tableName string
@@ -185,7 +189,9 @@ func (m *Ql) executeQuery(query string) error {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
 	}
 	if _, err := tx.Exec(query); err != nil {
-		tx.Rollback()
+		if errRollback := tx.Rollback(); errRollback != nil {
+			err = multierror.Append(err, errRollback)
+		}
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 	if err := tx.Commit(); err != nil {
@@ -207,7 +213,9 @@ func (m *Ql) SetVersion(version int, dirty bool) error {
 	if version >= 0 {
 		query := fmt.Sprintf(`INSERT INTO %s (version, dirty) VALUES (%d, %t)`, m.config.MigrationsTable, version, dirty)
 		if _, err := tx.Exec(query); err != nil {
-			tx.Rollback()
+			if errRollback := tx.Rollback(); errRollback != nil {
+				err = multierror.Append(err, errRollback)
+			}
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
 	}

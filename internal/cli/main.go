@@ -89,7 +89,9 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 	migrater, migraterErr := migrate.New(*sourcePtr, *databasePtr)
 	defer func() {
 		if migraterErr == nil {
-			migrater.Close()
+			if _, err := migrater.Close(); err != nil {
+				log.Println(err)
+			}
 		}
 	}()
 	if migraterErr == nil {
@@ -123,7 +125,9 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 		formatPtr := createFlagSet.String("format", defaultTimeFormat, `The Go time format string to use. If the string "unix" or "unixNano" is specified, then the seconds or nanoseconds since January 1, 1970 UTC respectively will be used. Caution, due to the behavior of time.Time.Format(), invalid format strings will not error`)
 		createFlagSet.BoolVar(&seq, "seq", seq, "Use sequential numbers instead of timestamps (default: false)")
 		createFlagSet.IntVar(&seqDigits, "digits", seqDigits, "The number of digits to use in sequences (default: 6)")
-		createFlagSet.Parse(args)
+		if err := createFlagSet.Parse(args); err != nil {
+			log.Println(err)
+		}
 
 		if createFlagSet.NArg() == 0 {
 			log.fatal("error: please specify name")

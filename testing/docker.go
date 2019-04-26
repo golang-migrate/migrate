@@ -11,6 +11,7 @@ import (
 	dockercontainer "github.com/docker/docker/api/types/container"
 	dockernetwork "github.com/docker/docker/api/types/network"
 	dockerclient "github.com/docker/docker/client"
+	"github.com/hashicorp/go-multierror"
 	"io"
 	"math/rand"
 	"strconv"
@@ -62,7 +63,7 @@ type DockerContainer struct {
 	keepForDebugging   bool
 }
 
-func (d *DockerContainer) PullImage() error {
+func (d *DockerContainer) PullImage() (err error) {
 	if d == nil {
 		return errors.New("Cannot pull image on a nil *DockerContainer")
 	}
@@ -71,7 +72,11 @@ func (d *DockerContainer) PullImage() error {
 	if err != nil {
 		return err
 	}
-	defer r.Close()
+	defer func() {
+		if errClose := r.Close(); errClose != nil {
+			err = multierror.Append(errClose)
+		}
+	}()
 
 	// read output and log relevant lines
 	bf := bufio.NewScanner(r)
@@ -208,7 +213,7 @@ func (d *DockerContainer) portMapping(selectFirst bool, cPort int) (containerPor
 				return 0, "", 0, err
 			}
 
-			return uint(port.Int()), binding.HostIP, uint(hostPortUint), nil
+			return uint(port.Int()), binding.HostIP, uint(hostPortUint), nil // nolint: staticcheck
 		}
 	}
 

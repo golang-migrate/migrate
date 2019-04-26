@@ -36,7 +36,7 @@ func TestSourceSchemeFromUrlSuccess(t *testing.T) {
 	urlStr := "protocol://path"
 	expected := "protocol"
 
-	u, err := sourceSchemeFromUrl(urlStr)
+	u, err := sourceSchemeFromURL(urlStr)
 	if err != nil {
 		t.Fatalf("expected no error, but received %q", err)
 	}
@@ -65,7 +65,7 @@ func TestSourceSchemeFromUrlFailure(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := sourceSchemeFromUrl(tc.urlStr)
+			_, err := sourceSchemeFromURL(tc.urlStr)
 			if err.Error() != tc.expectErr.Error() {
 				t.Fatalf("expected %q, but received %q", tc.expectErr, err)
 			}
@@ -77,7 +77,7 @@ func TestDatabaseSchemeFromUrlSuccess(t *testing.T) {
 	urlStr := "protocol://path"
 	expected := "protocol"
 
-	u, err := databaseSchemeFromUrl(urlStr)
+	u, err := databaseSchemeFromURL(urlStr)
 	if err != nil {
 		t.Fatalf("expected no error, but received %q", err)
 	}
@@ -106,7 +106,7 @@ func TestDatabaseSchemeFromUrlFailure(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := databaseSchemeFromUrl(tc.urlStr)
+			_, err := databaseSchemeFromURL(tc.urlStr)
 			if err.Error() != tc.expectErr.Error() {
 				t.Fatalf("expected %q, but received %q", tc.expectErr, err)
 			}

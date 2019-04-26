@@ -166,14 +166,18 @@ func (f *Firebird) Version() (version int, dirty bool, err error) {
 	}
 }
 
-func (f *Firebird) Drop() error {
+func (f *Firebird) Drop() (err error) {
 	// select all tables
 	query := `SELECT rdb$relation_name FROM rdb$relations WHERE rdb$view_blr IS NULL AND (rdb$system_flag IS NULL OR rdb$system_flag = 0);`
 	tables, err := f.conn.QueryContext(context.Background(), query)
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
-	defer tables.Close()
+	defer func() {
+		if errClose := tables.Close(); errClose != nil {
+			err = multierror.Append(err, errClose)
+		}
+	}()
 
 	// delete one table after another
 	tableNames := make([]string, 0)

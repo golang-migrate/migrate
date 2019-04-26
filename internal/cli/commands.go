@@ -80,7 +80,10 @@ func createCmd(dir string, startTime time.Time, format string, name string, ext 
 		}
 	}
 
-	os.MkdirAll(dir, os.ModePerm)
+	if err := os.MkdirAll(dir, os.ModePerm); err != nil {
+		log.fatalErr(err)
+	}
+
 	createFile(base + "up" + ext)
 	createFile(base + "down" + ext)
 }

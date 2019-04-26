@@ -20,14 +20,16 @@ func Test(t *testing.T) {
 		return
 	}
 	defer func() {
-		os.RemoveAll(dir)
+		if err := os.RemoveAll(dir); err != nil {
+			t.Fatal(err)
+		}
 	}()
 	t.Logf("DB path : %s\n", filepath.Join(dir, "ql.db"))
 	p := &Ql{}
 	addr := fmt.Sprintf("ql://%s", filepath.Join(dir, "ql.db"))
 	d, err := p.Open(addr)
 	if err != nil {
-		t.Fatalf("%v", err)
+		t.Fatal(err)
 	}
 
 	db, err := sql.Open("ql", filepath.Join(dir, "ql.db"))
@@ -48,7 +50,9 @@ func TestMigrate(t *testing.T) {
 		return
 	}
 	defer func() {
-		os.RemoveAll(dir)
+		if err := os.RemoveAll(dir); err != nil {
+			t.Error(err)
+		}
 	}()
 	t.Logf("DB path : %s\n", filepath.Join(dir, "ql.db"))
 
@@ -64,14 +68,14 @@ func TestMigrate(t *testing.T) {
 
 	driver, err := WithInstance(db, &Config{})
 	if err != nil {
-		t.Fatalf("%v", err)
+		t.Fatal(err)
 	}
 
 	m, err := migrate.NewWithDatabaseInstance(
 		"file://./examples/migrations",
 		"ql", driver)
 	if err != nil {
-		t.Fatalf("%v", err)
+		t.Fatal(err)
 	}
 	dt.TestMigrate(t, m, []byte("CREATE TABLE t (Qty int, Name string);"))
 }

@@ -8,6 +8,8 @@ import (
 	"database/sql"
 	sqldriver "database/sql/driver"
 	"fmt"
+	"log"
+
 	"github.com/golang-migrate/migrate/v4"
 	"io"
 	"strconv"
@@ -54,13 +56,17 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 	if err != nil {
 		return false
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Println("close error:", err)
+		}
+	}()
 	if err = db.PingContext(ctx); err != nil {
 		switch err {
 		case sqldriver.ErrBadConn, io.EOF:
 			return false
 		default:
-			fmt.Println(err)
+			log.Println(err)
 		}
 		return false
 	}
@@ -79,9 +85,13 @@ func Test(t *testing.T) {
 		p := &Redshift{}
 		d, err := p.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
-		defer d.Close()
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
 		dt.Test(t, d, []byte("SELECT 1"))
 	})
 }
@@ -97,12 +107,16 @@ func TestMigrate(t *testing.T) {
 		p := &Redshift{}
 		d, err := p.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
-		defer d.Close()
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
 		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "postgres", d)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		dt.TestMigrate(t, m, []byte("SELECT 1"))
 	})
@@ -119,9 +133,13 @@ func TestMultiStatement(t *testing.T) {
 		p := &Redshift{}
 		d, err := p.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
-		defer d.Close()
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
 		if err := d.Run(bytes.NewReader([]byte("CREATE TABLE foo (foo text); CREATE TABLE bar (bar text);"))); err != nil {
 			t.Fatalf("expected err to be nil, got %v", err)
 		}
@@ -148,9 +166,13 @@ func TestErrorParsing(t *testing.T) {
 		p := &Redshift{}
 		d, err := p.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
-		defer d.Close()
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
 
 		wantErr := `migration failed: syntax error at or near "TABLEE" (column 37) in line 1: CREATE TABLE foo ` +
 			`(foo text); CREATE TABLEE bar (bar text); (details: pq: syntax error at or near "TABLEE")`
@@ -173,9 +195,13 @@ func TestFilterCustomQuery(t *testing.T) {
 		p := &Redshift{}
 		d, err := p.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
-		defer d.Close()
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
 	})
 }
 
@@ -190,9 +216,13 @@ func TestWithSchema(t *testing.T) {
 		p := &Redshift{}
 		d, err := p.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
-		defer d.Close()
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
 
 		// create foobar schema
 		if err := d.Run(bytes.NewReader([]byte("CREATE SCHEMA foobar AUTHORIZATION postgres"))); err != nil {
@@ -205,9 +235,13 @@ func TestWithSchema(t *testing.T) {
 		// re-connect using that schema
 		d2, err := p.Open(fmt.Sprintf("postgres://postgres@%v:%v/postgres?sslmode=disable&search_path=foobar", ip, port))
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
-		defer d2.Close()
+		defer func() {
+			if err := d2.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
 
 		version, _, err := d2.Version()
 		if err != nil {
@@ -255,7 +289,7 @@ func TestRedshift_Lock(t *testing.T) {
 		p := &Redshift{}
 		d, err := p.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 
 		dt.Test(t, d, []byte("SELECT 1"))

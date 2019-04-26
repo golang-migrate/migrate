@@ -255,14 +255,18 @@ func (p *Postgres) SetVersion(version int, dirty bool) error {
 
 	query := `TRUNCATE ` + pq.QuoteIdentifier(p.config.MigrationsTable)
 	if _, err := tx.Exec(query); err != nil {
-		tx.Rollback()
+		if errRollback := tx.Rollback(); errRollback != nil {
+			err = multierror.Append(err, errRollback)
+		}
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 
 	if version >= 0 {
 		query = `INSERT INTO ` + pq.QuoteIdentifier(p.config.MigrationsTable) + ` (version, dirty) VALUES ($1, $2)`
 		if _, err := tx.Exec(query, version, dirty); err != nil {
-			tx.Rollback()
+			if errRollback := tx.Rollback(); errRollback != nil {
+				err = multierror.Append(err, errRollback)
+			}
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
 	}
@@ -294,14 +298,18 @@ func (p *Postgres) Version() (version int, dirty bool, err error) {
 	}
 }
 
-func (p *Postgres) Drop() error {
+func (p *Postgres) Drop() (err error) {
 	// select all tables in current schema
 	query := `SELECT table_name FROM information_schema.tables WHERE table_schema=(SELECT current_schema()) AND table_type='BASE TABLE'`
 	tables, err := p.conn.QueryContext(context.Background(), query)
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
-	defer tables.Close()
+	defer func() {
+		if errClose := tables.Close(); errClose != nil {
+			err = multierror.Append(err, errClose)
+		}
+	}()
 
 	// delete one table after another
 	tableNames := make([]string, 0)

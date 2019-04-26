@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	sqldriver "database/sql/driver"
 	"fmt"
+	"log"
+
 	"github.com/golang-migrate/migrate/v4"
 	"io"
 	"strings"
@@ -36,7 +38,6 @@ var (
 		},
 	}
 	specs = []dktesting.ContainerSpec{
-		{ImageName: "jacobalberty/firebird:2.5-ss", Options: opts},
 		{ImageName: "jacobalberty/firebird:3.0", Options: opts},
 	}
 )
@@ -54,15 +55,20 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 
 	db, err := sql.Open("firebirdsql", fbConnectionString(ip, port))
 	if err != nil {
+		log.Println("open error:", err)
 		return false
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Println("close error:", err)
+		}
+	}()
 	if err = db.PingContext(ctx); err != nil {
 		switch err {
 		case sqldriver.ErrBadConn, io.EOF:
 			return false
 		default:
-			fmt.Println(err)
+			log.Println(err)
 		}
 		return false
 	}
@@ -81,9 +87,13 @@ func Test(t *testing.T) {
 		p := &Firebird{}
 		d, err := p.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
-		defer d.Close()
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
 		dt.Test(t, d, []byte("SELECT Count(*) FROM rdb$relations"))
 	})
 }
@@ -99,12 +109,16 @@ func TestMigrate(t *testing.T) {
 		p := &Firebird{}
 		d, err := p.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
-		defer d.Close()
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
 		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "firebirdsql", d)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		dt.TestMigrate(t, m, []byte("SELECT Count(*) FROM rdb$relations"))
 	})
@@ -121,9 +135,13 @@ func TestErrorParsing(t *testing.T) {
 		p := &Firebird{}
 		d, err := p.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
-		defer d.Close()
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
 
 		wantErr := `migration failed in line 0: CREATE TABLEE foo (foo varchar(40)); (details: Dynamic SQL Error
 SQL error code = -104
@@ -151,9 +169,13 @@ func TestFilterCustomQuery(t *testing.T) {
 		p := &Firebird{}
 		d, err := p.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
-		defer d.Close()
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
 	})
 }
 
@@ -168,8 +190,13 @@ func Test_Lock(t *testing.T) {
 		p := &Firebird{}
 		d, err := p.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
 
 		dt.Test(t, d, []byte("SELECT Count(*) FROM rdb$relations"))
 

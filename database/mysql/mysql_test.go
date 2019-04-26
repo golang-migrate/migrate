@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	sqldriver "database/sql/driver"
 	"fmt"
+	"log"
+
 	"github.com/golang-migrate/migrate/v4"
 	"net/url"
 	"testing"
@@ -47,7 +49,11 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 	if err != nil {
 		return false
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Println("close error:", err)
+		}
+	}()
 	if err = db.PingContext(ctx); err != nil {
 		switch err {
 		case sqldriver.ErrBadConn, mysql.ErrInvalidConn:
@@ -74,9 +80,13 @@ func Test(t *testing.T) {
 		p := &Mysql{}
 		d, err := p.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
-		defer d.Close()
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
 		dt.Test(t, d, []byte("SELECT 1"))
 
 		// check ensureVersionTable
@@ -103,13 +113,17 @@ func TestMigrate(t *testing.T) {
 		p := &Mysql{}
 		d, err := p.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
-		defer d.Close()
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
 
 		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "public", d)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		dt.TestMigrate(t, m, []byte("SELECT 1"))
 
@@ -135,7 +149,7 @@ func TestLockWorks(t *testing.T) {
 		p := &Mysql{}
 		d, err := p.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		dt.Test(t, d, []byte("SELECT 1"))
 

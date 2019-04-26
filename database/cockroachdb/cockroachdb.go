@@ -150,7 +150,7 @@ func (c *CockroachDb) Close() error {
 // Locking is done manually with a separate lock table.  Implementing advisory locks in CRDB is being discussed
 // See: https://github.com/cockroachdb/cockroach/issues/13546
 func (c *CockroachDb) Lock() error {
-	err := crdb.ExecuteTx(context.Background(), c.db, nil, func(tx *sql.Tx) error {
+	err := crdb.ExecuteTx(context.Background(), c.db, nil, func(tx *sql.Tx) (err error) {
 		aid, err := database.GenerateAdvisoryLockId(c.config.DatabaseName)
 		if err != nil {
 			return err
@@ -161,7 +161,11 @@ func (c *CockroachDb) Lock() error {
 		if err != nil {
 			return database.Error{OrigErr: err, Err: "failed to fetch migration lock", Query: []byte(query)}
 		}
-		defer rows.Close()
+		defer func() {
+			if errClose := rows.Close(); errClose != nil {
+				err = multierror.Append(err, errClose)
+			}
+		}()
 
 		// If row exists at all, lock is present
 		locked := rows.Next()
@@ -267,14 +271,18 @@ func (c *CockroachDb) Version() (version int, dirty bool, err error) {
 	}
 }
 
-func (c *CockroachDb) Drop() error {
+func (c *CockroachDb) Drop() (err error) {
 	// select all tables in current schema
 	query := `SELECT table_name FROM information_schema.tables WHERE table_schema=(SELECT current_schema())`
 	tables, err := c.db.Query(query)
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
-	defer tables.Close()
+	defer func() {
+		if errClose := tables.Close(); errClose != nil {
+			err = multierror.Append(err, errClose)
+		}
+	}()
 
 	// delete one table after another
 	tableNames := make([]string, 0)

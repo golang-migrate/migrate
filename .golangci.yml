@@ -1,3 +1,6 @@
+run:
+  # timeout for analysis, e.g. 30s, 5m, default is 1m
+  deadline: 2m
 linters:
   enable:
     #- golint
@@ -7,14 +10,11 @@ linters:
     - goconst
     - gofmt
     - misspell
-    #- maligned
+    - maligned
     - unparam
     - nakedret
     - prealloc
     #- gosec
-  disable:
-    - errcheck
-    - staticcheck
 linters-settings:
   misspell:
     locale: US

@@ -164,11 +164,14 @@ func (m *Mysql) Open(url string) (database.Driver, error) {
 				insecureSkipVerify = x
 			}
 
-			mysql.RegisterTLSConfig(ctls, &tls.Config{
+			err = mysql.RegisterTLSConfig(ctls, &tls.Config{
 				RootCAs:            rootCertPool,
 				Certificates:       clientCert,
 				InsecureSkipVerify: insecureSkipVerify,
 			})
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -272,14 +275,18 @@ func (m *Mysql) SetVersion(version int, dirty bool) error {
 
 	query := "TRUNCATE `" + m.config.MigrationsTable + "`"
 	if _, err := tx.ExecContext(context.Background(), query); err != nil {
-		tx.Rollback()
+		if errRollback := tx.Rollback(); errRollback != nil {
+			err = multierror.Append(err, errRollback)
+		}
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 
 	if version >= 0 {
 		query := "INSERT INTO `" + m.config.MigrationsTable + "` (version, dirty) VALUES (?, ?)"
 		if _, err := tx.ExecContext(context.Background(), query, version, dirty); err != nil {
-			tx.Rollback()
+			if errRollback := tx.Rollback(); errRollback != nil {
+				err = multierror.Append(err, errRollback)
+			}
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
 	}
@@ -311,14 +318,18 @@ func (m *Mysql) Version() (version int, dirty bool, err error) {
 	}
 }
 
-func (m *Mysql) Drop() error {
+func (m *Mysql) Drop() (err error) {
 	// select all tables
 	query := `SHOW TABLES LIKE '%'`
 	tables, err := m.conn.QueryContext(context.Background(), query)
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
-	defer tables.Close()
+	defer func() {
+		if errClose := tables.Close(); errClose != nil {
+			err = multierror.Append(err, errClose)
+		}
+	}()
 
 	// delete one table after another
 	tableNames := make([]string, 0)

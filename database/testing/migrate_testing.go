@@ -34,6 +34,6 @@ func TestMigrateDrop(t *testing.T, m *migrate.Migrate) {
 func TestMigrateUp(t *testing.T, m *migrate.Migrate) {
 	t.Log("UP")
 	if err := m.Up(); err != nil {
-		t.Fatalf("%v", err)
+		t.Fatal(err)
 	}
 }
