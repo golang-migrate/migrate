@@ -212,8 +212,8 @@ func (d *DockerContainer) portMapping(selectFirst bool, cPort int) (containerPor
 			if err != nil {
 				return 0, "", 0, err
 			}
-			// nolint: staticcheck
-			return uint(port.Int()), binding.HostIP, uint(hostPortUint), nil
+
+			return uint(port.Int()), binding.HostIP, uint(hostPortUint), nil // nolint: staticcheck
 		}
 	}
 
