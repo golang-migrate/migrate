@@ -777,9 +777,11 @@ func (m *Migrate) versionExists(version uint) (result error) {
 	// try up migration first
 	up, _, err := m.sourceDrv.ReadUp(version)
 	if err == nil {
-		if errClose := up.Close(); errClose != nil {
-			result = multierror.Append(result, errClose)
-		}
+		defer func() {
+			if errClose := up.Close(); errClose != nil {
+				result = multierror.Append(result, errClose)
+			}
+		}()
 	}
 	if os.IsExist(err) {
 		return nil

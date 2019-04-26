@@ -123,7 +123,7 @@ func TestMigrate(t *testing.T) {
 
 		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "public", d)
 		if err != nil {
-			t.Error(err)
+			t.Fatal(err)
 		}
 		dt.TestMigrate(t, m, []byte("SELECT 1"))
 

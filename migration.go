@@ -129,7 +129,9 @@ func (m *Migration) Buffer() error {
 
 	// start reading from body, peek won't move the read pointer though
 	// poor man's solution?
-	_, _ = b.Peek(int(m.BufferSize))
+	if _, err := b.Peek(int(m.BufferSize)); err != nil && err != io.EOF {
+		return err
+	}
 
 	m.FinishedBuffering = time.Now()
 

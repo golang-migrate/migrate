@@ -8,7 +8,6 @@ import (
 
 const advisoryLockIDSalt uint = 1486364155
 
-// nolint: golint
 // GenerateAdvisoryLockId inspired by rails migrations, see https://goo.gl/8o9bCT
 func GenerateAdvisoryLockId(databaseName string, additionalNames ...string) (string, error) {
 	if len(additionalNames) > 0 {
