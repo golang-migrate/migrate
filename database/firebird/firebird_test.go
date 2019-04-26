@@ -38,8 +38,8 @@ var (
 		},
 	}
 	specs = []dktesting.ContainerSpec{
-		{ImageName: "jacobalberty/firebird:2.5-ss", Options: opts},
-		{ImageName: "jacobalberty/firebird:3.0", Options: opts},
+		{ImageName: "jacobalberty/firebird:2.5.8-ss", Options: opts},
+		{ImageName: "jacobalberty/firebird:3.0.4", Options: opts},
 	}
 )
 
