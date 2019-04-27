@@ -10,14 +10,13 @@ require (
 	github.com/cznic/ql v1.2.0
 	github.com/dhui/dktest v0.3.0
 	github.com/docker/docker v0.7.3-0.20190108045446-77df18c24acf
-	github.com/fsouza/fake-gcs-server v1.5.0
+	github.com/fsouza/fake-gcs-server v1.7.0
 	github.com/go-sql-driver/mysql v1.4.1
 	github.com/gocql/gocql v0.0.0-20190301043612-f6df8288f9b4
 	github.com/gogo/protobuf v1.2.1 // indirect
 	github.com/golang/protobuf v1.3.1 // indirect
 	github.com/golang/snappy v0.0.1 // indirect
 	github.com/google/go-github v17.0.0+incompatible
-	github.com/gorilla/mux v1.7.1 // indirect
 	github.com/hashicorp/go-multierror v1.0.0
 	github.com/hashicorp/golang-lru v0.5.1 // indirect
 	github.com/jackc/fake v0.0.0-20150926172116-812a484cc733 // indirect
@@ -40,15 +39,16 @@ require (
 	github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c // indirect
 	github.com/xdg/stringprep v1.0.0 // indirect
 	gitlab.com/nyarla/go-crypt v0.0.0-20160106005555-d9a5dc2b789b // indirect
-	golang.org/x/crypto v0.0.0-20190404164418-38d8ce5564a5 // indirect
-	golang.org/x/net v0.0.0-20190404232315-eb5bcb51f2a3
+	golang.org/x/crypto v0.0.0-20190426145343-a29dc8fdc734 // indirect
+	golang.org/x/net v0.0.0-20190424112056-4829fb13d2c6
 	golang.org/x/oauth2 v0.0.0-20190402181905-9f3314589c9a // indirect
-	golang.org/x/sys v0.0.0-20190405154228-4b34438f7a67 // indirect
+	golang.org/x/sys v0.0.0-20190426135247-a129542de9ae // indirect
+	golang.org/x/text v0.3.2 // indirect
 	golang.org/x/time v0.0.0-20190308202827-9d24e82272b4 // indirect
-	golang.org/x/tools v0.0.0-20190408220357-e5b8258f4918
-	google.golang.org/api v0.3.2
+	golang.org/x/tools v0.0.0-20190425222832-ad9eeb80039a
+	google.golang.org/api v0.4.0
 	google.golang.org/appengine v1.5.0 // indirect
-	google.golang.org/genproto v0.0.0-20190404172233-64821d5d2107
-	google.golang.org/grpc v1.19.1 // indirect
+	google.golang.org/genproto v0.0.0-20190425155659-357c62f0e4bb
+	google.golang.org/grpc v1.20.1 // indirect
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 // indirect
 )
