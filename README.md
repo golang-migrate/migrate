@@ -36,7 +36,7 @@ Database drivers run migrations. [Add a new database?](database/driver.go)
   * [Google Cloud Spanner](database/spanner)
   * [CockroachDB](database/cockroachdb)
   * [ClickHouse](database/clickhouse)
-  * [Firebird](database/firebird)
+  * [Firebird](database/firebird) ([todo #49](https://github.com/golang-migrate/migrate/issues/49))
 
 ### Database URLs
 
