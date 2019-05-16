@@ -119,7 +119,7 @@ $ migrate -database "$(cat config.json | jq '.database')"
 
 ##### YAML files
 
-````
+```
 $ migrate -database "$(cat config/database.yml | ruby -ryaml -e "print YAML.load(STDIN.read)['database']")"
 $ migrate -database "$(cat config/database.yml | python -c 'import yaml,sys;print yaml.safe_load(sys.stdin)["database"]')"
 ```
