@@ -8,6 +8,7 @@ require (
 	github.com/cockroachdb/apd v1.1.0 // indirect
 	github.com/cockroachdb/cockroach-go v0.0.0-20181001143604-e0a95dfd547c
 	github.com/cznic/ql v1.2.0
+	github.com/denisenkom/go-mssqldb v0.0.0-20190121005146-b04fd42d9952
 	github.com/dhui/dktest v0.3.0
 	github.com/docker/docker v0.7.3-0.20190108045446-77df18c24acf
 	github.com/fsouza/fake-gcs-server v1.7.0
