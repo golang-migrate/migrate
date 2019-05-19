@@ -206,7 +206,7 @@ func (ss *MSSQL) Run(migration io.Reader) error {
 	// run migration
 	query := string(migr[:])
 	if _, err := ss.conn.ExecContext(context.Background(), query); err != nil {
-		if msErr, ok := err.(*mssql.Error); ok {
+		if msErr, ok := err.(mssql.Error); ok {
 			message := fmt.Sprintf("migration failed: %s", msErr.Message)
 			if msErr.ProcName != "" {
 				message = fmt.Sprintf("%s (proc name %s)", msErr.Message, msErr.ProcName)
