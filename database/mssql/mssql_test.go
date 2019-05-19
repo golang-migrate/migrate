@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	sqldriver "database/sql/driver"
 	"fmt"
+	"log"
 	"testing"
 
 	"github.com/dhui/dktest"
@@ -41,7 +42,11 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 	if err != nil {
 		return false
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Println("close error:", err)
+		}
+	}()
 	if err = db.PingContext(ctx); err != nil {
 		switch err {
 		case sqldriver.ErrBadConn:
@@ -70,7 +75,13 @@ func Test(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
-		defer d.Close()
+
+		defer func() {
+			if err := d.Close(); err != nil {
+				log.Println("close error:", err)
+			}
+		}()
+
 		dt.Test(t, d, []byte("SELECT 1"))
 
 		// check ensureVersionTable
@@ -99,7 +110,12 @@ func TestMigrate(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
-		defer d.Close()
+
+		defer func() {
+			if err := d.Close(); err != nil {
+				log.Println("close error:", err)
+			}
+		}()
 
 		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "public", d)
 		if err != nil {
