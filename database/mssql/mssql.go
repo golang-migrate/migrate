@@ -21,7 +21,7 @@ func init() {
 }
 
 // DefaultMigrationsTable is the name of the migrations table in the database
-var DefaultMigrationsTable = "SchemaMigrations"
+var DefaultMigrationsTable = "schema_migrations"
 
 var (
 	ErrNilConfig      = fmt.Errorf("no config")
