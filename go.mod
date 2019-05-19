@@ -8,7 +8,7 @@ require (
 	github.com/cockroachdb/apd v1.1.0 // indirect
 	github.com/cockroachdb/cockroach-go v0.0.0-20181001143604-e0a95dfd547c
 	github.com/cznic/ql v1.2.0
-	github.com/denisenkom/go-mssqldb v0.0.0-20190121005146-b04fd42d9952
+	github.com/denisenkom/go-mssqldb v0.0.0-20190515213511-eb9f6a1743f3
 	github.com/dhui/dktest v0.3.0
 	github.com/docker/docker v0.7.3-0.20190108045446-77df18c24acf
 	github.com/fsouza/fake-gcs-server v1.7.0
@@ -51,5 +51,4 @@ require (
 	google.golang.org/appengine v1.5.0 // indirect
 	google.golang.org/genproto v0.0.0-20190425155659-357c62f0e4bb
 	google.golang.org/grpc v1.20.1 // indirect
-	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 // indirect
 )
