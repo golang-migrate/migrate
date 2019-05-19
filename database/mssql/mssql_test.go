@@ -8,6 +8,7 @@ import (
 	"log"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dhui/dktest"
 	"github.com/golang-migrate/migrate/v4"
@@ -24,7 +25,7 @@ const saPassword = "Root1234"
 var (
 	opts = dktest.Options{
 		Env:          map[string]string{"ACCEPT_EULA": "Y", "SA_PASSWORD": saPassword, "MSSQL_PID": "Express"},
-		PortRequired: true, ReadyFunc: isReady,
+		PortRequired: true, ReadyFunc: isReady, PullTimeout: 2 * time.Minute,
 	}
 	// Supported versions: https://www.mysql.com/support/supportedplatforms/database.html
 	specs = []dktesting.ContainerSpec{
