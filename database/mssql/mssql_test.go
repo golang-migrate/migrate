@@ -27,7 +27,7 @@ var (
 		Env:          map[string]string{"ACCEPT_EULA": "Y", "SA_PASSWORD": saPassword, "MSSQL_PID": "Express"},
 		PortRequired: true, ReadyFunc: isReady, PullTimeout: 2 * time.Minute,
 	}
-	// Supported versions: https://www.mysql.com/support/supportedplatforms/database.html
+	// Container versions: https://mcr.microsoft.com/v2/mssql/server/tags/list
 	specs = []dktesting.ContainerSpec{
 		{ImageName: "mcr.microsoft.com/mssql/server:2017-latest-ubuntu", Options: opts},
 		{ImageName: "mcr.microsoft.com/mssql/server:2019-latest", Options: opts},

@@ -30,7 +30,7 @@ var (
 	ErrDatabaseDirty  = fmt.Errorf("database is dirty")
 )
 
-var lockErrorMap = map[int]string{
+var lockErrorMap = map[mssql.ReturnStatus]string{
 	-1:   "The lock request timed out.",
 	-2:   "The lock request was canceled.",
 	-3:   "The lock request was chosen as a deadlock victim.",
@@ -171,7 +171,7 @@ func (ss *MSSQL) Lock() error {
 	} else if err != nil {
 		return &database.Error{OrigErr: err, Err: "try lock failed", Query: []byte(query)}
 	} else {
-		return &database.Error{Err: fmt.Sprintf("try lock failed with error %v", lockErrorMap[int(status)]), Query: []byte(query)}
+		return &database.Error{Err: fmt.Sprintf("try lock failed with error %v: %v", status, lockErrorMap[status]), Query: []byte(query)}
 	}
 }
 
