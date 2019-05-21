@@ -209,6 +209,8 @@ func (s *Spanner) Version() (version int, dirty bool, err error) {
 	return version, dirty, nil
 }
 
+var nameMatcher = regexp.MustCompile(`(CREATE TABLE\s(\S+)\s)|(CREATE.+INDEX\s(\S+)\s)`)
+
 // Drop implements database.Driver. Retrieves the database schema first and
 // creates statements to drop the indexes and tables accordingly.
 // Note: The drop statements are created in reverse order to how they're
@@ -227,11 +229,10 @@ func (s *Spanner) Drop() error {
 		return nil
 	}
 
-	r := regexp.MustCompile(`(CREATE TABLE\s(\S+)\s)|(CREATE.+INDEX\s(\S+)\s)`)
 	stmts := make([]string, 0)
 	for i := len(res.Statements) - 1; i >= 0; i-- {
 		s := res.Statements[i]
-		m := r.FindSubmatch([]byte(s))
+		m := nameMatcher.FindSubmatch([]byte(s))
 
 		if len(m) == 0 {
 			continue
@@ -302,11 +303,15 @@ func (s *Spanner) ensureVersionTable() (err error) {
 }
 
 func migrationStatements(migration []byte) []string {
-	regex := regexp.MustCompile(";$")
 	migrationString := string(migration[:])
 	migrationString = strings.TrimSpace(migrationString)
-	migrationString = regex.ReplaceAllString(migrationString, "")
 
-	statements := strings.Split(migrationString, ";")
-	return statements
+	allStatements := strings.Split(migrationString, ";")
+	nonEmptyStatements := allStatements[:0]
+	for _, s := range allStatements {
+		if s != "" {
+			nonEmptyStatements = append(nonEmptyStatements, s)
+		}
+	}
+	return nonEmptyStatements
 }
