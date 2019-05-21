@@ -17,6 +17,7 @@ import (
 
 import (
 	"github.com/go-sql-driver/mysql"
+	"github.com/hashicorp/go-multierror"
 )
 
 import (
@@ -127,9 +128,6 @@ func (m *Mysql) Open(url string) (database.Driver, error) {
 	purl.RawQuery = q.Encode()
 
 	migrationsTable := purl.Query().Get("x-migrations-table")
-	if len(migrationsTable) == 0 {
-		migrationsTable = DefaultMigrationsTable
-	}
 
 	// use custom TLS?
 	ctls := purl.Query().Get("tls")
@@ -166,11 +164,14 @@ func (m *Mysql) Open(url string) (database.Driver, error) {
 				insecureSkipVerify = x
 			}
 
-			mysql.RegisterTLSConfig(ctls, &tls.Config{
+			err = mysql.RegisterTLSConfig(ctls, &tls.Config{
 				RootCAs:            rootCertPool,
 				Certificates:       clientCert,
 				InsecureSkipVerify: insecureSkipVerify,
 			})
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -274,14 +275,18 @@ func (m *Mysql) SetVersion(version int, dirty bool) error {
 
 	query := "TRUNCATE `" + m.config.MigrationsTable + "`"
 	if _, err := tx.ExecContext(context.Background(), query); err != nil {
-		tx.Rollback()
+		if errRollback := tx.Rollback(); errRollback != nil {
+			err = multierror.Append(err, errRollback)
+		}
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 
 	if version >= 0 {
 		query := "INSERT INTO `" + m.config.MigrationsTable + "` (version, dirty) VALUES (?, ?)"
 		if _, err := tx.ExecContext(context.Background(), query, version, dirty); err != nil {
-			tx.Rollback()
+			if errRollback := tx.Rollback(); errRollback != nil {
+				err = multierror.Append(err, errRollback)
+			}
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
 	}
@@ -313,14 +318,18 @@ func (m *Mysql) Version() (version int, dirty bool, err error) {
 	}
 }
 
-func (m *Mysql) Drop() error {
+func (m *Mysql) Drop() (err error) {
 	// select all tables
 	query := `SHOW TABLES LIKE '%'`
 	tables, err := m.conn.QueryContext(context.Background(), query)
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
-	defer tables.Close()
+	defer func() {
+		if errClose := tables.Close(); errClose != nil {
+			err = multierror.Append(err, errClose)
+		}
+	}()
 
 	// delete one table after another
 	tableNames := make([]string, 0)
@@ -342,15 +351,29 @@ func (m *Mysql) Drop() error {
 				return &database.Error{OrigErr: err, Query: []byte(query)}
 			}
 		}
-		if err := m.ensureVersionTable(); err != nil {
-			return err
-		}
 	}
 
 	return nil
 }
 
-func (m *Mysql) ensureVersionTable() error {
+// ensureVersionTable checks if versions table exists and, if not, creates it.
+// Note that this function locks the database, which deviates from the usual
+// convention of "caller locks" in the Mysql type.
+func (m *Mysql) ensureVersionTable() (err error) {
+	if err = m.Lock(); err != nil {
+		return err
+	}
+
+	defer func() {
+		if e := m.Unlock(); e != nil {
+			if err == nil {
+				err = e
+			} else {
+				err = multierror.Append(err, e)
+			}
+		}
+	}()
+
 	// check if migration table exists
 	var result string
 	query := `SHOW TABLES LIKE "` + m.config.MigrationsTable + `"`

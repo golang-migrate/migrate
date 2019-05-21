@@ -3,7 +3,7 @@
 [![Coverage Status](https://img.shields.io/coveralls/github/golang-migrate/migrate/master.svg)](https://coveralls.io/github/golang-migrate/migrate?branch=master)
 [![packagecloud.io](https://img.shields.io/badge/deb-packagecloud.io-844fec.svg)](https://packagecloud.io/golang-migrate/migrate?filter=debs)
 [![Docker Pulls](https://img.shields.io/docker/pulls/migrate/migrate.svg)](https://hub.docker.com/r/migrate/migrate/)
-![Supported Go Versions](https://img.shields.io/badge/Go-1.10%2C%201.11-lightgrey.svg)
+![Supported Go Versions](https://img.shields.io/badge/Go-1.11%2C%201.12-lightgrey.svg)
 [![GitHub Release](https://img.shields.io/github/release/golang-migrate/migrate.svg)](https://github.com/golang-migrate/migrate/releases)
 
 
@@ -36,6 +36,7 @@ Database drivers run migrations. [Add a new database?](database/driver.go)
   * [Google Cloud Spanner](database/spanner)
   * [CockroachDB](database/cockroachdb)
   * [ClickHouse](database/clickhouse)
+  * [Firebird](database/firebird) ([todo #49](https://github.com/golang-migrate/migrate/issues/49))
 
 ### Database URLs
 
@@ -64,6 +65,7 @@ Source drivers read migrations from local or remote sources. [Add a new source?]
   * [Filesystem](source/file) - read from fileystem
   * [Go-Bindata](source/go_bindata) - read from embedded binary data ([jteeuwen/go-bindata](https://github.com/jteeuwen/go-bindata))
   * [Github](source/github) - read from remote Github repositories
+  * [Gitlab](source/gitlab) - read from remote Gitlab repositories
   * [AWS S3](source/aws_s3) - read from Amazon Web Services S3
   * [Google Cloud Storage](source/google_cloud_storage) - read from Google Cloud Platform Storage
 
@@ -86,7 +88,7 @@ $ migrate -source file://path/to/migrations -database postgres://localhost:5432/
 ### Docker usage
 
 ```
-$ docker run -v {{ migration dir }}:/migrations --network host migrate/migrate 
+$ docker run -v {{ migration dir }}:/migrations --network host migrate/migrate
     -path=/migrations/ -database postgres://localhost:5432/database up 2
 ```
 
@@ -148,13 +150,13 @@ Each migration has an up and down migration. [Why?](FAQ.md#why-two-separate-file
 
 [Best practices: How to write migrations.](MIGRATIONS.md)
 
-## Supported Major Versions
+## Versions
 
-Version | Go Modules | Min Go Version | Import | Notes
---------|------------|----------------|--------|------
-**master** | :white_check_mark: | 1.10.3 | `import "github.com/golang-migrate/migrate/v4"` | New features and bug fixes arrive here first |
-**v4** | :white_check_mark: | 1.10.3 | `import "github.com/golang-migrate/migrate/v4"` | |
-**v3** | :x: | 1.10 | `import "github.com/golang-migrate/migrate"` (with package manager) or `import "gopkg.in/golang-migrate/migrate.v3"` (not recommended) | Only security fixes are backported. Only use if your project is not using Go modules. |
+Version | Supported? | Import | Notes
+--------|------------|--------|------
+**master** | :white_check_mark: | `import "github.com/golang-migrate/migrate/v4"` | New features and bug fixes arrive here first |
+**v4** | :white_check_mark: | `import "github.com/golang-migrate/migrate/v4"` | Used for stable releases |
+**v3** | :x: | `import "github.com/golang-migrate/migrate"` (with package manager) or `import "gopkg.in/golang-migrate/migrate.v3"` (not recommended) | **DO NOT USE** - No longer supported |
 
 ## Development and Contributing
 

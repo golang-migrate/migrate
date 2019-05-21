@@ -5,6 +5,9 @@ import (
 	"database/sql"
 	sqldriver "database/sql/driver"
 	"fmt"
+	"log"
+
+	"github.com/golang-migrate/migrate/v4"
 	"net/url"
 	"testing"
 )
@@ -17,6 +20,7 @@ import (
 import (
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
 	"github.com/golang-migrate/migrate/v4/dktesting"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
 const defaultPort = 3306
@@ -45,7 +49,11 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 	if err != nil {
 		return false
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Println("close error:", err)
+		}
+	}()
 	if err = db.PingContext(ctx); err != nil {
 		switch err {
 		case sqldriver.ErrBadConn, mysql.ErrInvalidConn:
@@ -72,10 +80,52 @@ func Test(t *testing.T) {
 		p := &Mysql{}
 		d, err := p.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
-		defer d.Close()
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
 		dt.Test(t, d, []byte("SELECT 1"))
+
+		// check ensureVersionTable
+		if err := d.(*Mysql).ensureVersionTable(); err != nil {
+			t.Fatal(err)
+		}
+		// check again
+		if err := d.(*Mysql).ensureVersionTable(); err != nil {
+			t.Fatal(err)
+		}
+	})
+}
+
+func TestMigrate(t *testing.T) {
+	// mysql.SetLogger(mysql.Logger(log.New(ioutil.Discard, "", log.Ltime)))
+
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.Port(defaultPort)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := fmt.Sprintf("mysql://root:root@tcp(%v:%v)/public", ip, port)
+		p := &Mysql{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
+
+		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "public", d)
+		if err != nil {
+			t.Fatal(err)
+		}
+		dt.TestMigrate(t, m, []byte("SELECT 1"))
 
 		// check ensureVersionTable
 		if err := d.(*Mysql).ensureVersionTable(); err != nil {
@@ -99,7 +149,7 @@ func TestLockWorks(t *testing.T) {
 		p := &Mysql{}
 		d, err := p.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		dt.Test(t, d, []byte("SELECT 1"))
 

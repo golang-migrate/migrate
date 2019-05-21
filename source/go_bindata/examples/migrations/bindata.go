@@ -204,9 +204,9 @@ func AssetNames() []string {
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
 	"1085649617_create_users_table.down.sql": _1085649617_create_users_tableDownSql,
-	"1085649617_create_users_table.up.sql": _1085649617_create_users_tableUpSql,
-	"1185749658_add_city_to_users.down.sql": _1185749658_add_city_to_usersDownSql,
-	"1185749658_add_city_to_users.up.sql": _1185749658_add_city_to_usersUpSql,
+	"1085649617_create_users_table.up.sql":   _1085649617_create_users_tableUpSql,
+	"1185749658_add_city_to_users.down.sql":  _1185749658_add_city_to_usersDownSql,
+	"1185749658_add_city_to_users.up.sql":    _1185749658_add_city_to_usersUpSql,
 }
 
 // AssetDir returns the file names below a certain
@@ -248,11 +248,12 @@ type bintree struct {
 	Func     func() (*asset, error)
 	Children map[string]*bintree
 }
+
 var _bintree = &bintree{nil, map[string]*bintree{
 	"1085649617_create_users_table.down.sql": &bintree{_1085649617_create_users_tableDownSql, map[string]*bintree{}},
-	"1085649617_create_users_table.up.sql": &bintree{_1085649617_create_users_tableUpSql, map[string]*bintree{}},
-	"1185749658_add_city_to_users.down.sql": &bintree{_1185749658_add_city_to_usersDownSql, map[string]*bintree{}},
-	"1185749658_add_city_to_users.up.sql": &bintree{_1185749658_add_city_to_usersUpSql, map[string]*bintree{}},
+	"1085649617_create_users_table.up.sql":   &bintree{_1085649617_create_users_tableUpSql, map[string]*bintree{}},
+	"1185749658_add_city_to_users.down.sql":  &bintree{_1185749658_add_city_to_usersDownSql, map[string]*bintree{}},
+	"1185749658_add_city_to_users.up.sql":    &bintree{_1185749658_add_city_to_usersUpSql, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory
@@ -301,4 +302,3 @@ func _filePath(dir, name string) string {
 	cannonicalName := strings.Replace(name, "\\", "/", -1)
 	return filepath.Join(append([]string{dir}, strings.Split(cannonicalName, "/")...)...)
 }
-

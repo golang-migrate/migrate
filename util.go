@@ -23,7 +23,7 @@ func NewMultiError(errs ...error) MultiError {
 	return MultiError{compactErrs}
 }
 
-// Error implements error. Mulitple errors are concatenated with 'and's.
+// Error implements error. Multiple errors are concatenated with 'and's.
 func (m MultiError) Error() string {
 	var strs = make([]string, 0)
 	for _, e := range m.Errs {
@@ -47,24 +47,24 @@ func suint(n int) uint {
 var errNoScheme = errors.New("no scheme")
 var errEmptyURL = errors.New("URL cannot be empty")
 
-func sourceSchemeFromUrl(url string) (string, error) {
-	u, err := schemeFromUrl(url)
+func sourceSchemeFromURL(url string) (string, error) {
+	u, err := schemeFromURL(url)
 	if err != nil {
 		return "", fmt.Errorf("source: %v", err)
 	}
 	return u, nil
 }
 
-func databaseSchemeFromUrl(url string) (string, error) {
-	u, err := schemeFromUrl(url)
+func databaseSchemeFromURL(url string) (string, error) {
+	u, err := schemeFromURL(url)
 	if err != nil {
 		return "", fmt.Errorf("database: %v", err)
 	}
 	return u, nil
 }
 
-// schemeFromUrl returns the scheme from a URL string
-func schemeFromUrl(url string) (string, error) {
+// schemeFromURL returns the scheme from a URL string
+func schemeFromURL(url string) (string, error) {
 	if url == "" {
 		return "", errEmptyURL
 	}

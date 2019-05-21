@@ -20,14 +20,36 @@ func Test(t *testing.T) {
 		return
 	}
 	defer func() {
-		os.RemoveAll(dir)
+		if err := os.RemoveAll(dir); err != nil {
+			t.Error(err)
+		}
 	}()
 	t.Logf("DB path : %s\n", filepath.Join(dir, "sqlite3.db"))
 	p := &Sqlite{}
 	addr := fmt.Sprintf("sqlite3://%s", filepath.Join(dir, "sqlite3.db"))
 	d, err := p.Open(addr)
 	if err != nil {
-		t.Fatalf("%v", err)
+		t.Fatal(err)
+	}
+	dt.Test(t, d, []byte("CREATE TABLE t (Qty int, Name string);"))
+}
+
+func TestMigrate(t *testing.T) {
+	dir, err := ioutil.TempDir("", "sqlite3-driver-test")
+	if err != nil {
+		return
+	}
+	defer func() {
+		if err := os.RemoveAll(dir); err != nil {
+			t.Error(err)
+		}
+	}()
+	t.Logf("DB path : %s\n", filepath.Join(dir, "sqlite3.db"))
+	p := &Sqlite{}
+	addr := fmt.Sprintf("sqlite3://%s", filepath.Join(dir, "sqlite3.db"))
+	d, err := p.Open(addr)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	db, err := sql.Open("sqlite3", filepath.Join(dir, "sqlite3.db"))
@@ -39,26 +61,21 @@ func Test(t *testing.T) {
 			return
 		}
 	}()
-	dt.Test(t, d, []byte("CREATE TABLE t (Qty int, Name string);"))
 	driver, err := WithInstance(db, &Config{})
 	if err != nil {
-		t.Fatalf("%v", err)
+		t.Fatal(err)
 	}
 	if err := d.Drop(); err != nil {
 		t.Fatal(err)
 	}
 
 	m, err := migrate.NewWithDatabaseInstance(
-		"file://./migration",
+		"file://./examples/migrations",
 		"ql", driver)
 	if err != nil {
-		t.Fatalf("%v", err)
+		t.Fatal(err)
 	}
-	t.Log("UP")
-	err = m.Up()
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
+	dt.TestMigrate(t, m, []byte("CREATE TABLE t (Qty int, Name string);"))
 }
 
 func TestMigrationTable(t *testing.T) {
@@ -67,7 +84,9 @@ func TestMigrationTable(t *testing.T) {
 		return
 	}
 	defer func() {
-		os.RemoveAll(dir)
+		if err := os.RemoveAll(dir); err != nil {
+			t.Error(err)
+		}
 	}()
 
 	t.Logf("DB path : %s\n", filepath.Join(dir, "sqlite3.db"))
@@ -87,22 +106,22 @@ func TestMigrationTable(t *testing.T) {
 	}
 	driver, err := WithInstance(db, config)
 	if err != nil {
-		t.Fatalf("%v", err)
+		t.Fatal(err)
 	}
 	m, err := migrate.NewWithDatabaseInstance(
-		"file://./migration",
+		"file://./examples/migrations",
 		"ql", driver)
 	if err != nil {
-		t.Fatalf("%v", err)
+		t.Fatal(err)
 	}
 	t.Log("UP")
 	err = m.Up()
 	if err != nil {
-		t.Fatalf("%v", err)
+		t.Fatal(err)
 	}
 
 	_, err = db.Query(fmt.Sprintf("SELECT * FROM %s", config.MigrationsTable))
 	if err != nil {
-		t.Fatalf("%v", err)
+		t.Fatal(err)
 	}
 }

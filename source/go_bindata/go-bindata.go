@@ -74,7 +74,7 @@ func (b *Bindata) Close() error {
 
 func (b *Bindata) First() (version uint, err error) {
 	if v, ok := b.migrations.First(); !ok {
-		return 0, &os.PathError{"first", b.path, os.ErrNotExist}
+		return 0, &os.PathError{Op: "first", Path: b.path, Err: os.ErrNotExist}
 	} else {
 		return v, nil
 	}
@@ -82,7 +82,7 @@ func (b *Bindata) First() (version uint, err error) {
 
 func (b *Bindata) Prev(version uint) (prevVersion uint, err error) {
 	if v, ok := b.migrations.Prev(version); !ok {
-		return 0, &os.PathError{fmt.Sprintf("prev for version %v", version), b.path, os.ErrNotExist}
+		return 0, &os.PathError{Op: fmt.Sprintf("prev for version %v", version), Path: b.path, Err: os.ErrNotExist}
 	} else {
 		return v, nil
 	}
@@ -90,7 +90,7 @@ func (b *Bindata) Prev(version uint) (prevVersion uint, err error) {
 
 func (b *Bindata) Next(version uint) (nextVersion uint, err error) {
 	if v, ok := b.migrations.Next(version); !ok {
-		return 0, &os.PathError{fmt.Sprintf("next for version %v", version), b.path, os.ErrNotExist}
+		return 0, &os.PathError{Op: fmt.Sprintf("next for version %v", version), Path: b.path, Err: os.ErrNotExist}
 	} else {
 		return v, nil
 	}
@@ -104,7 +104,7 @@ func (b *Bindata) ReadUp(version uint) (r io.ReadCloser, identifier string, err 
 		}
 		return ioutil.NopCloser(bytes.NewReader(body)), m.Identifier, nil
 	}
-	return nil, "", &os.PathError{fmt.Sprintf("read version %v", version), b.path, os.ErrNotExist}
+	return nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: b.path, Err: os.ErrNotExist}
 }
 
 func (b *Bindata) ReadDown(version uint) (r io.ReadCloser, identifier string, err error) {
@@ -115,5 +115,5 @@ func (b *Bindata) ReadDown(version uint) (r io.ReadCloser, identifier string, er
 		}
 		return ioutil.NopCloser(bytes.NewReader(body)), m.Identifier, nil
 	}
-	return nil, "", &os.PathError{fmt.Sprintf("read version %v", version), b.path, os.ErrNotExist}
+	return nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: b.path, Err: os.ErrNotExist}
 }
