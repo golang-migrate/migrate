@@ -1,4 +1,6 @@
-// Package testing is used in driver tests.
+// Package testing is used in driver tests and should only be used by migrate tests.
+//
+// Deprecated: If you'd like to test using Docker images, use package github.com/dhui/dktest instead
 package testing
 
 import (
