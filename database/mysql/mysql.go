@@ -352,11 +352,7 @@ func (m *Mysql) Drop() (err error) {
 
 		defer func() {
 			// enable foreign key checks
-			query = `SET foreign_key_checks = 1`
-			if _, errChecks := m.conn.ExecContext(context.Background(), query); errChecks != nil {
-				errChecks = &database.Error{OrigErr: errChecks, Query: []byte(query)}
-				err = multierror.Append(err, errChecks)
-			}
+			m.conn.ExecContext(context.Background(), `SET foreign_key_checks = 1`)
 		}()
 
 		// delete one by one ...
