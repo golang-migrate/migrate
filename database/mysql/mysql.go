@@ -345,14 +345,14 @@ func (m *Mysql) Drop() (err error) {
 
 	if len(tableNames) > 0 {
 		// disable checking foreign key constraints until finished
-		query = `SET FOREIGN_KEY_CHECKS = 0`
+		query = `SET foreign_key_checks = 0`
 		if _, err := m.conn.ExecContext(context.Background(), query); err != nil {
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
 
 		defer func() {
 			// enable foreign key checks
-			query = `SET FOREIGN_KEY_CHECKS = 1`
+			query = `SET foreign_key_checks = 1`
 			if _, errChecks := m.conn.ExecContext(context.Background(), query); errChecks != nil {
 				errChecks = &database.Error{OrigErr: errChecks, Query: []byte(query)}
 				err = multierror.Append(err, errChecks)
