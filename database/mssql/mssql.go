@@ -119,7 +119,7 @@ func (ss *MSSQL) Open(url string) (database.Driver, error) {
 		return nil, err
 	}
 
-	db, err := sql.Open("mssql", migrate.FilterCustomQuery(purl).String())
+	db, err := sql.Open("sqlserver", migrate.FilterCustomQuery(purl).String())
 	if err != nil {
 		return nil, err
 	}
