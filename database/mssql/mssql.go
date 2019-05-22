@@ -162,7 +162,7 @@ func (ss *MSSQL) Lock() error {
 	// This will either obtain the lock immediately and return true,
 	// or return false if the lock cannot be acquired immediately.
 	// MS Docs: sp_getapplock: https://docs.microsoft.com/en-us/sql/relational-databases/system-stored-procedures/sp-getapplock-transact-sql?view=sql-server-2017
-	query := `EXEC sp_getapplock @Resource = ?, @LockMode = 'Update', @LockOwner = 'Session', @LockTimeout = 0`
+	query := `EXEC sp_getapplock @Resource = @p1, @LockMode = 'Update', @LockOwner = 'Session', @LockTimeout = 0`
 
 	var status mssql.ReturnStatus
 	if _, err = ss.conn.ExecContext(context.Background(), query, aid, &status); err == nil && status > -1 {
@@ -187,7 +187,7 @@ func (ss *MSSQL) Unlock() error {
 	}
 
 	// MS Docs: sp_releaseapplock: https://docs.microsoft.com/en-us/sql/relational-databases/system-stored-procedures/sp-releaseapplock-transact-sql?view=sql-server-2017
-	query := `EXEC sp_releaseapplock @Resource = ?, @LockOwner = 'Session'`
+	query := `EXEC sp_releaseapplock @Resource = @p1, @LockOwner = 'Session'`
 	if _, err := ss.conn.ExecContext(context.Background(), query, aid); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
@@ -240,7 +240,7 @@ func (ss *MSSQL) SetVersion(version int, dirty bool) error {
 		if dirty {
 			dirtyBit = 1
 		}
-		query = `INSERT INTO "` + ss.config.MigrationsTable + `" (version, dirty) VALUES ($1, $2)`
+		query = `INSERT INTO "` + ss.config.MigrationsTable + `" (version, dirty) VALUES (@p1, @p2)`
 		if _, err := tx.Exec(query, version, dirtyBit); err != nil {
 			if errRollback := tx.Rollback(); errRollback != nil {
 				err = multierror.Append(err, errRollback)
@@ -300,7 +300,7 @@ func (ss *MSSQL) Drop() error {
 	}
 
 	// drop the tables
-	query = `EXEC sp_MSforeachtable 'DROP TABLE ?'`
+	query = `EXEC sp_MSforeachtable 'DROP TABLE @p1'`
 	if _, err := ss.conn.ExecContext(context.Background(), query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
