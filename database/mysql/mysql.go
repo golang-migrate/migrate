@@ -344,9 +344,20 @@ func (m *Mysql) Drop() (err error) {
 	}
 
 	if len(tableNames) > 0 {
+		// disable checking foreign key constraints until finished
+		query = `SET foreign_key_checks = 0`
+		if _, err := m.conn.ExecContext(context.Background(), query); err != nil {
+			return &database.Error{OrigErr: err, Query: []byte(query)}
+		}
+
+		defer func() {
+			// enable foreign key checks
+			_, _ = m.conn.ExecContext(context.Background(), `SET foreign_key_checks = 1`)
+		}()
+
 		// delete one by one ...
 		for _, t := range tableNames {
-			query = "DROP TABLE IF EXISTS `" + t + "` CASCADE"
+			query = "DROP TABLE IF EXISTS `" + t + "`"
 			if _, err := m.conn.ExecContext(context.Background(), query); err != nil {
 				return &database.Error{OrigErr: err, Query: []byte(query)}
 			}
