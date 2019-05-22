@@ -300,7 +300,7 @@ func (ss *MSSQL) Drop() error {
 	}
 
 	// drop the tables
-	query = `EXEC sp_MSforeachtable 'DROP TABLE @p1'`
+	query = `EXEC sp_MSforeachtable 'DROP TABLE ?'`
 	if _, err := ss.conn.ExecContext(context.Background(), query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
