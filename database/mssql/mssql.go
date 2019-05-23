@@ -16,7 +16,6 @@ import (
 
 func init() {
 	db := MSSQL{}
-	database.Register("mssql", &db)
 	database.Register("sqlserver", &db)
 }
 
@@ -55,7 +54,9 @@ type MSSQL struct {
 	config *Config
 }
 
-// WithInstance returns a database instance from an already created database connection
+// WithInstance returns a database instance from an already created database connection.
+//
+// Note that the deprecated `mssql` driver is not supported. Please use the newer `sqlserver` driver.
 func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	if config == nil {
 		return nil, ErrNilConfig
