@@ -1,3 +1,6 @@
 # google_cloud_storage
 
-`gcs://<bucket>/<prefix>`
+Available formats:
+
+- `gcs://<bucket>` - migrations in bucket's root.
+- `gcs://<bucket>/<prefix>` - migrations in a prefix.

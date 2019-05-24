@@ -33,9 +33,16 @@ func (g *gcs) Open(folder string) (source.Driver, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// prefix should be empty when working in root of the bucket
+	prefix := strings.Trim(u.Path, "/")
+	if len(prefix) > 0 {
+		prefix += "/"
+	}
+
 	driver := gcs{
 		bucket:     client.Bucket(u.Host),
-		prefix:     strings.Trim(u.Path, "/") + "/",
+		prefix:     prefix,
 		migrations: source.NewMigrations(),
 	}
 	err = driver.loadMigrations()
