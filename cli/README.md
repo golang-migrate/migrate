@@ -2,7 +2,7 @@
 
 ## Installation
 
-#### Download pre-build binary (Windows, MacOS, or Linux)
+#### Download pre-built binary (Windows, MacOS, or Linux)
 
 [Release Downloads](https://github.com/golang-migrate/migrate/releases)
 
