@@ -1,5 +1,5 @@
 SOURCE ?= file go_bindata github aws_s3 google_cloud_storage godoc_vfs gitlab
-DATABASE ?= postgres mysql redshift cassandra spanner cockroachdb clickhouse mongodb mssql
+DATABASE ?= postgres mysql redshift cassandra spanner cockroachdb clickhouse mongodb sqlserver
 VERSION ?= $(shell git describe --tags 2>/dev/null | cut -c 2-)
 TEST_FLAGS ?=
 REPO_OWNER ?= $(shell cd .. && basename "$$(pwd)")

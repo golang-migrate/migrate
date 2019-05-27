@@ -19,3 +19,7 @@
 
 See https://github.com/denisenkom/go-mssqldb for full parameter list.
 
+## Note about driver support
+
+Please note that the deprecated `mssql` driver is not supported. Please use the newer `sqlserver` driver.  
+See https://github.com/denisenkom/go-mssqldb#deprecated for more information.

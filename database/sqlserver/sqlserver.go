@@ -1,4 +1,4 @@
-package mssql
+package sqlserver
 
 import (
 	"context"
@@ -15,9 +15,7 @@ import (
 )
 
 func init() {
-	db := MSSQL{}
-	database.Register("mssql", &db)
-	database.Register("sqlserver", &db)
+	database.Register("sqlserver", &SQLServer{})
 }
 
 // DefaultMigrationsTable is the name of the migrations table in the database
@@ -44,8 +42,8 @@ type Config struct {
 	SchemaName      string
 }
 
-// MSSQL connection
-type MSSQL struct {
+// SQL Server connection
+type SQLServer struct {
 	// Locking and unlocking need to use the same connection
 	conn     *sql.Conn
 	db       *sql.DB
@@ -55,7 +53,9 @@ type MSSQL struct {
 	config *Config
 }
 
-// WithInstance returns a database instance from an already created database connection
+// WithInstance returns a database instance from an already created database connection.
+//
+// Note that the deprecated `mssql` driver is not supported. Please use the newer `sqlserver` driver.
 func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	if config == nil {
 		return nil, ErrNilConfig
@@ -99,7 +99,7 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		return nil, err
 	}
 
-	ss := &MSSQL{
+	ss := &SQLServer{
 		conn:   conn,
 		db:     instance,
 		config: config,
@@ -113,13 +113,13 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 }
 
 // Open a connection to the database
-func (ss *MSSQL) Open(url string) (database.Driver, error) {
+func (ss *SQLServer) Open(url string) (database.Driver, error) {
 	purl, err := nurl.Parse(url)
 	if err != nil {
 		return nil, err
 	}
 
-	db, err := sql.Open("mssql", migrate.FilterCustomQuery(purl).String())
+	db, err := sql.Open("sqlserver", migrate.FilterCustomQuery(purl).String())
 	if err != nil {
 		return nil, err
 	}
@@ -139,7 +139,7 @@ func (ss *MSSQL) Open(url string) (database.Driver, error) {
 }
 
 // Close the database connection
-func (ss *MSSQL) Close() error {
+func (ss *SQLServer) Close() error {
 	connErr := ss.conn.Close()
 	dbErr := ss.db.Close()
 	if connErr != nil || dbErr != nil {
@@ -149,7 +149,7 @@ func (ss *MSSQL) Close() error {
 }
 
 // Lock creates an advisory local on the database to prevent multiple migrations from running at the same time.
-func (ss *MSSQL) Lock() error {
+func (ss *SQLServer) Lock() error {
 	if ss.isLocked {
 		return database.ErrLocked
 	}
@@ -162,7 +162,7 @@ func (ss *MSSQL) Lock() error {
 	// This will either obtain the lock immediately and return true,
 	// or return false if the lock cannot be acquired immediately.
 	// MS Docs: sp_getapplock: https://docs.microsoft.com/en-us/sql/relational-databases/system-stored-procedures/sp-getapplock-transact-sql?view=sql-server-2017
-	query := `EXEC sp_getapplock @Resource = ?, @LockMode = 'Update', @LockOwner = 'Session', @LockTimeout = 0`
+	query := `EXEC sp_getapplock @Resource = @p1, @LockMode = 'Update', @LockOwner = 'Session', @LockTimeout = 0`
 
 	var status mssql.ReturnStatus
 	if _, err = ss.conn.ExecContext(context.Background(), query, aid, &status); err == nil && status > -1 {
@@ -176,7 +176,7 @@ func (ss *MSSQL) Lock() error {
 }
 
 // Unlock froms the migration lock from the database
-func (ss *MSSQL) Unlock() error {
+func (ss *SQLServer) Unlock() error {
 	if !ss.isLocked {
 		return nil
 	}
@@ -187,7 +187,7 @@ func (ss *MSSQL) Unlock() error {
 	}
 
 	// MS Docs: sp_releaseapplock: https://docs.microsoft.com/en-us/sql/relational-databases/system-stored-procedures/sp-releaseapplock-transact-sql?view=sql-server-2017
-	query := `EXEC sp_releaseapplock @Resource = ?, @LockOwner = 'Session'`
+	query := `EXEC sp_releaseapplock @Resource = @p1, @LockOwner = 'Session'`
 	if _, err := ss.conn.ExecContext(context.Background(), query, aid); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
@@ -197,7 +197,7 @@ func (ss *MSSQL) Unlock() error {
 }
 
 // Run the migrations for the database
-func (ss *MSSQL) Run(migration io.Reader) error {
+func (ss *SQLServer) Run(migration io.Reader) error {
 	migr, err := ioutil.ReadAll(migration)
 	if err != nil {
 		return err
@@ -220,7 +220,7 @@ func (ss *MSSQL) Run(migration io.Reader) error {
 }
 
 // SetVersion for the current database
-func (ss *MSSQL) SetVersion(version int, dirty bool) error {
+func (ss *SQLServer) SetVersion(version int, dirty bool) error {
 
 	tx, err := ss.conn.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
@@ -240,7 +240,7 @@ func (ss *MSSQL) SetVersion(version int, dirty bool) error {
 		if dirty {
 			dirtyBit = 1
 		}
-		query = `INSERT INTO "` + ss.config.MigrationsTable + `" (version, dirty) VALUES ($1, $2)`
+		query = `INSERT INTO "` + ss.config.MigrationsTable + `" (version, dirty) VALUES (@p1, @p2)`
 		if _, err := tx.Exec(query, version, dirtyBit); err != nil {
 			if errRollback := tx.Rollback(); errRollback != nil {
 				err = multierror.Append(err, errRollback)
@@ -257,7 +257,7 @@ func (ss *MSSQL) SetVersion(version int, dirty bool) error {
 }
 
 // Version of the current database state
-func (ss *MSSQL) Version() (version int, dirty bool, err error) {
+func (ss *SQLServer) Version() (version int, dirty bool, err error) {
 	query := `SELECT TOP 1 version, dirty FROM "` + ss.config.MigrationsTable + `"`
 	err = ss.conn.QueryRowContext(context.Background(), query).Scan(&version, &dirty)
 	switch {
@@ -274,7 +274,7 @@ func (ss *MSSQL) Version() (version int, dirty bool, err error) {
 }
 
 // Drop all tables from the database.
-func (ss *MSSQL) Drop() error {
+func (ss *SQLServer) Drop() error {
 
 	// drop all referential integrity constraints
 	query := `
@@ -308,7 +308,7 @@ func (ss *MSSQL) Drop() error {
 	return nil
 }
 
-func (ss *MSSQL) ensureVersionTable() (err error) {
+func (ss *SQLServer) ensureVersionTable() (err error) {
 	if err = ss.Lock(); err != nil {
 		return err
 	}

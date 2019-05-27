@@ -1,4 +1,4 @@
-package mssql
+package sqlserver
 
 import (
 	"context"
@@ -74,7 +74,7 @@ func Test(t *testing.T) {
 		}
 
 		addr := msConnectionString(ip, port)
-		p := &MSSQL{}
+		p := &SQLServer{}
 		d, err := p.Open(addr)
 		if err != nil {
 			t.Fatalf("%v", err)
@@ -98,7 +98,7 @@ func TestMigrate(t *testing.T) {
 		}
 
 		addr := msConnectionString(ip, port)
-		p := &MSSQL{}
+		p := &SQLServer{}
 		d, err := p.Open(addr)
 		if err != nil {
 			t.Fatalf("%v", err)
@@ -126,7 +126,7 @@ func TestMultiStatement(t *testing.T) {
 		}
 
 		addr := msConnectionString(ip, port)
-		ms := &MSSQL{}
+		ms := &SQLServer{}
 		d, err := ms.Open(addr)
 		if err != nil {
 			t.Fatal(err)
@@ -142,7 +142,7 @@ func TestMultiStatement(t *testing.T) {
 
 		// make sure second table exists
 		var exists int
-		if err := d.(*MSSQL).conn.QueryRowContext(context.Background(), "SELECT COUNT(1) FROM information_schema.tables WHERE table_name = 'bar' AND table_schema = (SELECT schema_name()) AND table_catalog = (SELECT db_name())").Scan(&exists); err != nil {
+		if err := d.(*SQLServer).conn.QueryRowContext(context.Background(), "SELECT COUNT(1) FROM information_schema.tables WHERE table_name = 'bar' AND table_schema = (SELECT schema_name()) AND table_catalog = (SELECT db_name())").Scan(&exists); err != nil {
 			t.Fatal(err)
 		}
 		if exists != 1 {
@@ -159,7 +159,7 @@ func TestErrorParsing(t *testing.T) {
 		}
 
 		addr := msConnectionString(ip, port)
-		p := &MSSQL{}
+		p := &SQLServer{}
 		d, err := p.Open(addr)
 		if err != nil {
 			t.Fatal(err)
@@ -189,14 +189,14 @@ func TestLockWorks(t *testing.T) {
 		}
 
 		addr := fmt.Sprintf("sqlserver://sa:%v@%v:%v?master", saPassword, ip, port)
-		p := &MSSQL{}
+		p := &SQLServer{}
 		d, err := p.Open(addr)
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
 		dt.Test(t, d, []byte("SELECT 1"))
 
-		ms := d.(*MSSQL)
+		ms := d.(*SQLServer)
 
 		err = ms.Lock()
 		if err != nil {
