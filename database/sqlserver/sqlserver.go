@@ -42,7 +42,7 @@ type Config struct {
 	SchemaName      string
 }
 
-// MSSQL connection
+// SQL Server connection
 type SQLServer struct {
 	// Locking and unlocking need to use the same connection
 	conn     *sql.Conn
