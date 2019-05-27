@@ -8,7 +8,7 @@ WORKDIR /go/src/github.com/golang-migrate/migrate
 COPY . ./
 
 ENV GO111MODULE=on
-ENV DATABASES="postgres mysql redshift cassandra spanner cockroachdb clickhouse mongodb mssql"
+ENV DATABASES="postgres mysql redshift cassandra spanner cockroachdb clickhouse mongodb sqlserver"
 ENV SOURCES="file go_bindata github aws_s3 google_cloud_storage godoc_vfs gitlab"
 
 RUN go build -a -o build/migrate.linux-386 -ldflags="-X main.Version=${VERSION}" -tags "$DATABASES $SOURCES" ./cmd/migrate
