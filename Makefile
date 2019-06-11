@@ -1,4 +1,4 @@
-SOURCE ?= file go_bindata github aws_s3 google_cloud_storage godoc_vfs gitlab
+SOURCE ?= file go_bindata github github_ee aws_s3 google_cloud_storage godoc_vfs gitlab
 DATABASE ?= postgres mysql redshift cassandra spanner cockroachdb clickhouse mongodb sqlserver
 VERSION ?= $(shell git describe --tags 2>/dev/null | cut -c 2-)
 TEST_FLAGS ?=
@@ -33,7 +33,7 @@ test:
 
 
 test-with-flags:
-	@echo SOURCE: $(SOURCE) 
+	@echo SOURCE: $(SOURCE)
 	@echo DATABASE: $(DATABASE)
 
 	@go test $(TEST_FLAGS) .
@@ -84,7 +84,7 @@ rewrite-import-paths:
 docs:
 	-make kill-docs
 	nohup godoc -play -http=127.0.0.1:6064 </dev/null >/dev/null 2>&1 & echo $$! > .godoc.pid
-	cat .godoc.pid  
+	cat .godoc.pid
 
 
 kill-docs:
