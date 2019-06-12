@@ -73,7 +73,7 @@ func (g *GithubEE) createGithubClient(host, username, password string) (*github.
 		Password: password,
 	}
 
-	apiHost := fmt.Sprintf("https://api.%s", host)
+	apiHost := fmt.Sprintf("https://%s/api/v3", host)
 	uploadHost := fmt.Sprintf("https://uploads.%s", host)
 
 	return github.NewEnterpriseClient(apiHost, uploadHost, tr.Client())
