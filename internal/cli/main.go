@@ -37,7 +37,7 @@ func Main(version string) {
 
 Options:
   -source          Location of the migrations (driver://url)
-  -path            Shorthand for -source=file://path 
+  -path            Shorthand for -source=file://path
   -database        Run migrations against this database (driver://url)
   -prefetch N      Number of migrations to load in advance before executing (default 10)
   -lock-timeout N  Allow N seconds to acquire database lock (default 15)
@@ -186,16 +186,33 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 			log.fatalErr(migraterErr)
 		}
 
-		limit := -1
-		if flag.Arg(1) != "" {
-			n, err := strconv.ParseUint(flag.Arg(1), 10, 64)
-			if err != nil {
-				log.fatal("error: can't read limit argument N")
-			}
-			limit = int(n)
+		downFlagSet := flag.NewFlagSet("down", flag.ExitOnError)
+		applyAll := downFlagSet.Bool("all", false, "Apply all down migrations")
+
+		args := flag.Args()[1:]
+		if err := downFlagSet.Parse(args); err != nil {
+			log.fatalErr(err)
 		}
 
-		downCmd(migrater, limit)
+		downArgs := downFlagSet.Args()
+		num, needsConfirm, err := numDownMigrationsFromArgs(*applyAll, downArgs)
+		if err != nil {
+			log.fatalErr(err)
+		}
+		if needsConfirm {
+			log.Println("Are you sure you want to apply all down migrations? [y/N]")
+			var response string
+			fmt.Scanln(&response)
+			response = strings.ToLower(strings.TrimSpace(response))
+
+			if response == "y" {
+				log.Println("Applying all down migrations")
+			} else {
+				log.fatal("Not applying all down migrations")
+			}
+		}
+
+		downCmd(migrater, num)
 
 		if log.verbose {
 			log.Println("Finished after", time.Since(startTime))
