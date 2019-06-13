@@ -1,32 +1,36 @@
 package github_ee
 
 import (
-	"bytes"
-	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
+	nurl "net/url"
+	"strings"
 	"testing"
-
-	st "github.com/golang-migrate/migrate/v4/source/testing"
 )
 
-var GithubTestSecret = "" // username:token
-
-func init() {
-	secrets, err := ioutil.ReadFile(".github_test_secrets")
-	if err == nil {
-		GithubTestSecret = string(bytes.TrimSpace(secrets)[:])
-	}
-}
-
 func Test(t *testing.T) {
-	if len(GithubTestSecret) == 0 {
-		t.Skip("test requires .github_test_secrets")
-	}
+	ts := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		p := strings.Join(strings.Split(r.URL.Path, "/")[:3], "/")
 
-	g := &GithubEE{}
-	d, err := g.Open("github-ee://" + GithubTestSecret + "@github.com/mattes/migrate_test_tmp/test#452b8003e7")
+		if p != "/api/v3" {
+			t.Fatal()
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("[]"))
+	}))
+	defer ts.Close()
+
+	u, err := nurl.Parse(ts.URL)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	st.Test(t, d)
+	g := &GithubEE{}
+	_, err = g.Open("github-ee://foo:bar@" + u.Host + "/mattes/migrate_test_tmp/test?skipSSLVerify=true#452b8003e7")
+
+	if err != nil {
+		t.Fatal(err)
+	}
 }

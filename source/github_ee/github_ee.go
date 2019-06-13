@@ -1,8 +1,11 @@
 package github_ee
 
 import (
+	"crypto/tls"
 	"fmt"
+	"net/http"
 	nurl "net/url"
+	"strconv"
 	"strings"
 
 	"github.com/golang-migrate/migrate/v4/source"
@@ -15,7 +18,7 @@ func init() {
 }
 
 type GithubEE struct {
-	gh.Github
+	source.Driver
 }
 
 func (g *GithubEE) Open(url string) (source.Driver, error) {
@@ -33,18 +36,9 @@ func (g *GithubEE) Open(url string) (source.Driver, error) {
 		return nil, gh.ErrNoUserInfo
 	}
 
-	ghc, err := g.createGithubClient(u.Host, u.User.Username(), password)
+	ghc, err := g.createGithubClient(u.Host, u.User.Username(), password, parseBool(u.Query().Get("skipSSLVerify")))
 	if err != nil {
 		return nil, err
-	}
-
-	gn := &GithubEE{
-		Github: gh.Github{
-			Client:     ghc,
-			URL:        url,
-			Migrations: source.NewMigrations(),
-			Options:    &github.RepositoryContentGetOptions{Ref: u.Fragment},
-		},
 	}
 
 	pe := strings.Split(strings.Trim(u.Path, "/"), "/")
@@ -53,28 +47,44 @@ func (g *GithubEE) Open(url string) (source.Driver, error) {
 		return nil, gh.ErrInvalidRepo
 	}
 
-	gn.PathOwner = pe[0]
-	gn.PathRepo = pe[1]
-
-	if len(pe) > 2 {
-		gn.Path = strings.Join(pe[2:], "/")
+	cfg := &gh.Config{
+		PathOwner: pe[0],
+		PathRepo:  pe[1],
+		Ref:       u.Fragment,
 	}
 
-	if err := gn.ReadDirectory(); err != nil {
+	if len(pe) > 2 {
+		cfg.Path = strings.Join(pe[2:], "/")
+	}
+
+	i, err := gh.WithInstance(ghc, cfg)
+	if err != nil {
 		return nil, err
 	}
 
-	return gn, nil
+	return &GithubEE{Driver: i}, nil
 }
 
-func (g *GithubEE) createGithubClient(host, username, password string) (*github.Client, error) {
+func (g *GithubEE) createGithubClient(host, username, password string, skipSSLVerify bool) (*github.Client, error) {
 	tr := &github.BasicAuthTransport{
 		Username: username,
 		Password: password,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: skipSSLVerify},
+		},
 	}
 
 	apiHost := fmt.Sprintf("https://%s/api/v3", host)
 	uploadHost := fmt.Sprintf("https://uploads.%s", host)
 
 	return github.NewEnterpriseClient(apiHost, uploadHost, tr.Client())
+}
+
+func parseBool(val string) bool {
+	b, err := strconv.ParseBool(val)
+	if err != nil {
+		return false
+	}
+
+	return b
 }

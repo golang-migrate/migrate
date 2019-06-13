@@ -1,12 +1,14 @@
 # github ee
 
+## Github Enterprise Edition
+
 This driver is catered for those who run Github Enterprise under private infrastructure.
 
 The below URL scheme illustrates how to source migration files from Github Enterprise.
 
 Github client for Go requires API and Uploads endpoint hosts in order to create an instance of Github Enterprise Client. We're making an assumption that the API and Uploads are available under `https://api.*` and `https://uploads.*` respectively. [Github Enterprise Installation Guide](https://help.github.com/en/enterprise/2.15/admin/installation/enabling-subdomain-isolation) recommends that you enable Subdomain isolation feature.
 
-`github-ee://user:personal-access-token@host/owner/repo/path#ref`
+`github-ee://user:personal-access-token@host/owner/repo/path?skipSSLVerify=false#ref`
 
 | URL Query  | WithInstance Config | Description |
 |------------|---------------------|-------------|
@@ -16,3 +18,4 @@ Github client for Go requires API and Uploads endpoint hosts in order to create 
 | repo | | the name of the repository |
 | path | | path in repo to migrations |
 | ref | | (optional) can be a SHA, branch, or tag |
+| skipSSLVerify | | (optional) defaults to `false` |
