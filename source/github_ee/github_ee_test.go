@@ -4,16 +4,19 @@ import (
 	"net/http"
 	"net/http/httptest"
 	nurl "net/url"
-	"strings"
 	"testing"
 )
 
 func Test(t *testing.T) {
 	ts := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		p := strings.Join(strings.Split(r.URL.Path, "/")[:3], "/")
+		if r.URL.Path != "/api/v3/repos/mattes/migrate_test_tmp/contents/test" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
 
-		if p != "/api/v3" {
-			t.Fatal()
+		if ref := r.URL.Query().Get("ref"); ref != "452b8003e7" {
+			w.WriteHeader(http.StatusNotFound)
+			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -28,7 +31,7 @@ func Test(t *testing.T) {
 	}
 
 	g := &GithubEE{}
-	_, err = g.Open("github-ee://foo:bar@" + u.Host + "/mattes/migrate_test_tmp/test?skipSSLVerify=true#452b8003e7")
+	_, err = g.Open("github-ee://foo:bar@" + u.Host + "/mattes/migrate_test_tmp/test?verify-tls=false#452b8003e7")
 
 	if err != nil {
 		t.Fatal(err)

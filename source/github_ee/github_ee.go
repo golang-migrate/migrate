@@ -22,9 +22,15 @@ type GithubEE struct {
 }
 
 func (g *GithubEE) Open(url string) (source.Driver, error) {
+	verifyTLS := true
+
 	u, err := nurl.Parse(url)
 	if err != nil {
 		return nil, err
+	}
+
+	if o := u.Query().Get("verify-tls"); o != "" {
+		verifyTLS = parseBool(o)
 	}
 
 	if u.User == nil {
@@ -36,7 +42,7 @@ func (g *GithubEE) Open(url string) (source.Driver, error) {
 		return nil, gh.ErrNoUserInfo
 	}
 
-	ghc, err := g.createGithubClient(u.Host, u.User.Username(), password, parseBool(u.Query().Get("skipSSLVerify")))
+	ghc, err := g.createGithubClient(u.Host, u.User.Username(), password, verifyTLS)
 	if err != nil {
 		return nil, err
 	}
@@ -65,12 +71,12 @@ func (g *GithubEE) Open(url string) (source.Driver, error) {
 	return &GithubEE{Driver: i}, nil
 }
 
-func (g *GithubEE) createGithubClient(host, username, password string, skipSSLVerify bool) (*github.Client, error) {
+func (g *GithubEE) createGithubClient(host, username, password string, verifyTLS bool) (*github.Client, error) {
 	tr := &github.BasicAuthTransport{
 		Username: username,
 		Password: password,
 		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: skipSSLVerify},
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: !verifyTLS},
 		},
 	}
 
