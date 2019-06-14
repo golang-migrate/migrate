@@ -29,17 +29,14 @@ var (
 )
 
 type Github struct {
-	client *github.Client
-	url    string
-
-	pathOwner  string
-	pathRepo   string
-	path       string
+	config     *Config
+	client     *github.Client
 	options    *github.RepositoryContentGetOptions
 	migrations *source.Migrations
 }
 
 type Config struct {
+	URL       string
 	PathOwner string
 	PathRepo  string
 	Path      string
@@ -68,20 +65,23 @@ func (g *Github) Open(url string) (source.Driver, error) {
 
 	gn := &Github{
 		client:     github.NewClient(tr.Client()),
-		url:        url,
 		migrations: source.NewMigrations(),
 		options:    &github.RepositoryContentGetOptions{Ref: u.Fragment},
 	}
 
+	gn.ensureFields()
+
+	gn.config.URL = url
+
 	// set owner, repo and path in repo
-	gn.pathOwner = u.Host
+	gn.config.PathOwner = u.Host
 	pe := strings.Split(strings.Trim(u.Path, "/"), "/")
 	if len(pe) < 1 {
 		return nil, ErrInvalidRepo
 	}
-	gn.pathRepo = pe[0]
+	gn.config.PathRepo = pe[0]
 	if len(pe) > 1 {
-		gn.path = strings.Join(pe[1:], "/")
+		gn.config.Path = strings.Join(pe[1:], "/")
 	}
 
 	if err := gn.readDirectory(); err != nil {
@@ -94,13 +94,10 @@ func (g *Github) Open(url string) (source.Driver, error) {
 func WithInstance(client *github.Client, config *Config) (source.Driver, error) {
 	gn := &Github{
 		client:     client,
+		config:     config,
 		migrations: source.NewMigrations(),
 		options:    &github.RepositoryContentGetOptions{Ref: config.Ref},
 	}
-
-	gn.pathOwner = config.PathOwner
-	gn.pathRepo = config.PathRepo
-	gn.path = config.Path
 
 	if err := gn.readDirectory(); err != nil {
 		return nil, err
@@ -110,7 +107,16 @@ func WithInstance(client *github.Client, config *Config) (source.Driver, error) 
 }
 
 func (g *Github) readDirectory() error {
-	fileContent, dirContents, _, err := g.client.Repositories.GetContents(context.Background(), g.pathOwner, g.pathRepo, g.path, g.options)
+	g.ensureFields()
+
+	fileContent, dirContents, _, err := g.client.Repositories.GetContents(
+		context.Background(),
+		g.config.PathOwner,
+		g.config.PathRepo,
+		g.config.Path,
+		g.options,
+	)
+
 	if err != nil {
 		return err
 	}
@@ -131,37 +137,58 @@ func (g *Github) readDirectory() error {
 	return nil
 }
 
+func (g *Github) ensureFields() {
+	if g.config == nil {
+		g.config = &Config{}
+	}
+}
+
 func (g *Github) Close() error {
 	return nil
 }
 
 func (g *Github) First() (version uint, er error) {
+	g.ensureFields()
+
 	if v, ok := g.migrations.First(); !ok {
-		return 0, &os.PathError{Op: "first", Path: g.path, Err: os.ErrNotExist}
+		return 0, &os.PathError{Op: "first", Path: g.config.Path, Err: os.ErrNotExist}
 	} else {
 		return v, nil
 	}
 }
 
 func (g *Github) Prev(version uint) (prevVersion uint, err error) {
+	g.ensureFields()
+
 	if v, ok := g.migrations.Prev(version); !ok {
-		return 0, &os.PathError{Op: fmt.Sprintf("prev for version %v", version), Path: g.path, Err: os.ErrNotExist}
+		return 0, &os.PathError{Op: fmt.Sprintf("prev for version %v", version), Path: g.config.Path, Err: os.ErrNotExist}
 	} else {
 		return v, nil
 	}
 }
 
 func (g *Github) Next(version uint) (nextVersion uint, err error) {
+	g.ensureFields()
+
 	if v, ok := g.migrations.Next(version); !ok {
-		return 0, &os.PathError{Op: fmt.Sprintf("next for version %v", version), Path: g.path, Err: os.ErrNotExist}
+		return 0, &os.PathError{Op: fmt.Sprintf("next for version %v", version), Path: g.config.Path, Err: os.ErrNotExist}
 	} else {
 		return v, nil
 	}
 }
 
 func (g *Github) ReadUp(version uint) (r io.ReadCloser, identifier string, err error) {
+	g.ensureFields()
+
 	if m, ok := g.migrations.Up(version); ok {
-		file, _, _, err := g.client.Repositories.GetContents(context.Background(), g.pathOwner, g.pathRepo, path.Join(g.path, m.Raw), g.options)
+		file, _, _, err := g.client.Repositories.GetContents(
+			context.Background(),
+			g.config.PathOwner,
+			g.config.PathRepo,
+			path.Join(g.config.Path, m.Raw),
+			g.options,
+		)
+
 		if err != nil {
 			return nil, "", err
 		}
@@ -173,12 +200,21 @@ func (g *Github) ReadUp(version uint) (r io.ReadCloser, identifier string, err e
 			return ioutil.NopCloser(strings.NewReader(r)), m.Identifier, nil
 		}
 	}
-	return nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: g.path, Err: os.ErrNotExist}
+	return nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: g.config.Path, Err: os.ErrNotExist}
 }
 
 func (g *Github) ReadDown(version uint) (r io.ReadCloser, identifier string, err error) {
+	g.ensureFields()
+
 	if m, ok := g.migrations.Down(version); ok {
-		file, _, _, err := g.client.Repositories.GetContents(context.Background(), g.pathOwner, g.pathRepo, path.Join(g.path, m.Raw), g.options)
+		file, _, _, err := g.client.Repositories.GetContents(
+			context.Background(),
+			g.config.PathOwner,
+			g.config.PathRepo,
+			path.Join(g.config.Path, m.Raw),
+			g.options,
+		)
+
 		if err != nil {
 			return nil, "", err
 		}
@@ -190,5 +226,5 @@ func (g *Github) ReadDown(version uint) (r io.ReadCloser, identifier string, err
 			return ioutil.NopCloser(strings.NewReader(r)), m.Identifier, nil
 		}
 	}
-	return nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: g.path, Err: os.ErrNotExist}
+	return nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: g.config.Path, Err: os.ErrNotExist}
 }
