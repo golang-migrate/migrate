@@ -30,7 +30,7 @@ func (g *GithubEE) Open(url string) (source.Driver, error) {
 	}
 
 	if o := u.Query().Get("verify-tls"); o != "" {
-		verifyTLS = parseBool(o)
+		verifyTLS = parseBool(o, verifyTLS)
 	}
 
 	if u.User == nil {
@@ -86,10 +86,10 @@ func (g *GithubEE) createGithubClient(host, username, password string, verifyTLS
 	return github.NewEnterpriseClient(apiHost, uploadHost, tr.Client())
 }
 
-func parseBool(val string) bool {
+func parseBool(val string, fallback bool) bool {
 	b, err := strconv.ParseBool(val)
 	if err != nil {
-		return false
+		return fallback
 	}
 
 	return b
