@@ -54,10 +54,9 @@ func (g *GithubEE) Open(url string) (source.Driver, error) {
 	}
 
 	cfg := &gh.Config{
-		URL:       url,
-		PathOwner: pe[0],
-		PathRepo:  pe[1],
-		Ref:       u.Fragment,
+		Owner: pe[0],
+		Repo:  pe[1],
+		Ref:   u.Fragment,
 	}
 
 	if len(pe) > 2 {

@@ -36,11 +36,10 @@ type Github struct {
 }
 
 type Config struct {
-	URL       string
-	PathOwner string
-	PathRepo  string
-	Path      string
-	Ref       string
+	Owner string
+	Repo  string
+	Path  string
+	Ref   string
 }
 
 func (g *Github) Open(url string) (source.Driver, error) {
@@ -71,15 +70,13 @@ func (g *Github) Open(url string) (source.Driver, error) {
 
 	gn.ensureFields()
 
-	gn.config.URL = url
-
 	// set owner, repo and path in repo
-	gn.config.PathOwner = u.Host
+	gn.config.Owner = u.Host
 	pe := strings.Split(strings.Trim(u.Path, "/"), "/")
 	if len(pe) < 1 {
 		return nil, ErrInvalidRepo
 	}
-	gn.config.PathRepo = pe[0]
+	gn.config.Repo = pe[0]
 	if len(pe) > 1 {
 		gn.config.Path = strings.Join(pe[1:], "/")
 	}
@@ -111,8 +108,8 @@ func (g *Github) readDirectory() error {
 
 	fileContent, dirContents, _, err := g.client.Repositories.GetContents(
 		context.Background(),
-		g.config.PathOwner,
-		g.config.PathRepo,
+		g.config.Owner,
+		g.config.Repo,
 		g.config.Path,
 		g.options,
 	)
@@ -183,8 +180,8 @@ func (g *Github) ReadUp(version uint) (r io.ReadCloser, identifier string, err e
 	if m, ok := g.migrations.Up(version); ok {
 		file, _, _, err := g.client.Repositories.GetContents(
 			context.Background(),
-			g.config.PathOwner,
-			g.config.PathRepo,
+			g.config.Owner,
+			g.config.Repo,
 			path.Join(g.config.Path, m.Raw),
 			g.options,
 		)
@@ -209,8 +206,8 @@ func (g *Github) ReadDown(version uint) (r io.ReadCloser, identifier string, err
 	if m, ok := g.migrations.Down(version); ok {
 		file, _, _, err := g.client.Repositories.GetContents(
 			context.Background(),
-			g.config.PathOwner,
-			g.config.PathRepo,
+			g.config.Owner,
+			g.config.Repo,
 			path.Join(g.config.Path, m.Raw),
 			g.options,
 		)
