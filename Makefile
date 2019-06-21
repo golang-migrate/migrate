@@ -27,27 +27,14 @@ test-short:
 test:
 	@-rm -r $(COVERAGE_DIR)
 	@mkdir $(COVERAGE_DIR)
-	make test-with-flags TEST_FLAGS='-v -race -covermode atomic -coverprofile $$(COVERAGE_DIR)/_$$(RAND).txt -bench=. -benchmem -timeout 20m'
-	@echo 'mode: atomic' > $(COVERAGE_DIR)/combined.txt
-	@cat $(COVERAGE_DIR)/_*.txt | grep -v 'mode: atomic' >> $(COVERAGE_DIR)/combined.txt
+	make test-with-flags TEST_FLAGS='-v -race -covermode atomic -coverprofile $$(COVERAGE_DIR)/combined.txt -bench=. -benchmem -timeout 20m'
 
 
 test-with-flags:
 	@echo SOURCE: $(SOURCE)
 	@echo DATABASE: $(DATABASE)
 
-	@go test $(TEST_FLAGS) .
-	@go test $(TEST_FLAGS) ./cli/...
-	@go test $(TEST_FLAGS) ./database
-	@go test $(TEST_FLAGS) ./testing/...
-
-	@echo -n '$(SOURCE)' | tr -s ' ' '\n' | xargs -I{} go test $(TEST_FLAGS) ./source/{}
-	@go test $(TEST_FLAGS) ./source/testing/...
-	@go test $(TEST_FLAGS) ./source/stub/...
-
-	@echo -n '$(DATABASE)' | tr -s ' ' '\n' | xargs -I{} go test $(TEST_FLAGS) ./database/{}
-	@go test $(TEST_FLAGS) ./database/testing/...
-	@go test $(TEST_FLAGS) ./database/stub/...
+	@go test $(TEST_FLAGS) ./...
 
 
 kill-orphaned-docker-containers:
