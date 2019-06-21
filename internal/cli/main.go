@@ -139,10 +139,6 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 		}
 		*extPtr = "." + strings.TrimPrefix(*extPtr, ".")
 
-		if *dirPtr != "" {
-			*dirPtr = strings.Trim(*dirPtr, "/") + "/"
-		}
-
 		createCmd(*dirPtr, startTime, *formatPtr, name, *extPtr, seq, seqDigits)
 
 	case "goto":

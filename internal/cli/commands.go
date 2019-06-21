@@ -49,7 +49,22 @@ func nextSeq(matches []string, dir string, seqDigits int) (string, error) {
 	return nextSeqStr, nil
 }
 
+// cleanDir normalizes the provided directory
+func cleanDir(dir string) string {
+	dir = filepath.Clean(dir)
+	switch dir {
+	case ".":
+		return ""
+	case "/":
+		return dir
+	default:
+		return dir + "/"
+	}
+}
+
+// createCmd (meant to be called via a CLI command) creates a new migration
 func createCmd(dir string, startTime time.Time, format string, name string, ext string, seq bool, seqDigits int) {
+	dir = cleanDir(dir)
 	var base string
 	if seq && format != defaultTimeFormat {
 		log.fatalErr(errors.New("The seq and format options are mutually exclusive"))
