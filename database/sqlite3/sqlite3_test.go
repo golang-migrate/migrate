@@ -45,12 +45,6 @@ func TestMigrate(t *testing.T) {
 		}
 	}()
 	t.Logf("DB path : %s\n", filepath.Join(dir, "sqlite3.db"))
-	p := &Sqlite{}
-	addr := fmt.Sprintf("sqlite3://%s", filepath.Join(dir, "sqlite3.db"))
-	d, err := p.Open(addr)
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	db, err := sql.Open("sqlite3", filepath.Join(dir, "sqlite3.db"))
 	if err != nil {
@@ -63,9 +57,6 @@ func TestMigrate(t *testing.T) {
 	}()
 	driver, err := WithInstance(db, &Config{})
 	if err != nil {
-		t.Fatal(err)
-	}
-	if err := d.Drop(); err != nil {
 		t.Fatal(err)
 	}
 
