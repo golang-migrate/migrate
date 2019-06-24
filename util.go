@@ -8,11 +8,16 @@ import (
 )
 
 // MultiError holds multiple errors.
+//
+// Deprecated: Use github.com/hashicorp/go-multierror instead
 type MultiError struct {
 	Errs []error
 }
 
 // NewMultiError returns an error type holding multiple errors.
+//
+// Deprecated: Use github.com/hashicorp/go-multierror instead
+//
 func NewMultiError(errs ...error) MultiError {
 	compactErrs := make([]error, 0)
 	for _, e := range errs {

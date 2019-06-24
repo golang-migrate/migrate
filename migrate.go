@@ -950,7 +950,7 @@ func (m *Migrate) unlock() error {
 // if a prevErr is not nil.
 func (m *Migrate) unlockErr(prevErr error) error {
 	if err := m.unlock(); err != nil {
-		return NewMultiError(prevErr, err)
+		return multierror.Append(prevErr, err)
 	}
 	return prevErr
 }
