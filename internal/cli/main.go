@@ -111,7 +111,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 		}()
 	}
 
-	startTime := time.Now()
+	startTime := time.Now().UTC()
 
 	switch flag.Arg(0) {
 	case "create":
