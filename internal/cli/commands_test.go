@@ -78,3 +78,41 @@ func TestNextSeq(t *testing.T) {
 		})
 	}
 }
+
+func TestNumDownFromArgs(t *testing.T) {
+	cases := []struct {
+		name                string
+		args                []string
+		applyAll            bool
+		expectedNeedConfirm bool
+		expectedNum         int
+		expectedErrStr      string
+	}{
+		{"no args", []string{}, false, true, -1, ""},
+		{"down all", []string{}, true, false, -1, ""},
+		{"down 5", []string{"5"}, false, false, 5, ""},
+		{"down N", []string{"N"}, false, false, 0, "can't read limit argument N"},
+		{"extra arg after -all", []string{"5"}, true, false, 0, "-all cannot be used with other arguments"},
+		{"extra arg before -all", []string{"5", "-all"}, false, false, 0, "too many arguments"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			num, needsConfirm, err := numDownMigrationsFromArgs(c.applyAll, c.args)
+			if needsConfirm != c.expectedNeedConfirm {
+				t.Errorf("Incorrect needsConfirm was: %v wanted %v", needsConfirm, c.expectedNeedConfirm)
+			}
+
+			if num != c.expectedNum {
+				t.Errorf("Incorrect num was: %v wanted %v", num, c.expectedNum)
+			}
+
+			if err != nil {
+				if err.Error() != c.expectedErrStr {
+					t.Error("Incorrect error: " + err.Error() + " != " + c.expectedErrStr)
+				}
+			} else if c.expectedErrStr != "" {
+				t.Error("Expected error: " + c.expectedErrStr + " but got nil instead")
+			}
+		})
+	}
+}
