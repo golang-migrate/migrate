@@ -1,4 +1,4 @@
-SOURCE ?= file go_bindata github github_ee aws_s3 google_cloud_storage godoc_vfs gitlab
+SOURCE ?= file go_bindata github github_ee aws_s3 google_cloud_storage godoc_vfs gitlab packr
 DATABASE ?= postgres mysql redshift cassandra spanner cockroachdb clickhouse mongodb sqlserver
 VERSION ?= $(shell git describe --tags 2>/dev/null | cut -c 2-)
 TEST_FLAGS ?=
