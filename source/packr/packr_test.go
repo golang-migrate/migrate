@@ -12,12 +12,12 @@ import (
 
 func TestPackr(t *testing.T) {
 	testBox := packr.New("migrations", "|")
-	testBox.AddBytes("0001_first.up.sql", []byte("1 up"))
-	testBox.AddBytes("0001_first.down.sql", []byte("1 down"))
-	testBox.AddBytes("0002_second.up.sql", []byte("2 up"))
-	testBox.AddBytes("0002_second.down.sql", []byte("2 down"))
-	testBox.AddBytes("0003_third.up.sql", []byte("3 up"))
-	testBox.AddBytes("0003_third.down.sql", []byte("3 down"))
+	boxMustAdd(t, testBox, "0001_first.up.sql", []byte("1 up"))
+	boxMustAdd(t, testBox, "0001_first.down.sql", []byte("1 down"))
+	boxMustAdd(t, testBox, "0002_second.up.sql", []byte("2 up"))
+	boxMustAdd(t, testBox, "0002_second.down.sql", []byte("2 down"))
+	boxMustAdd(t, testBox, "0003_third.up.sql", []byte("3 up"))
+	boxMustAdd(t, testBox, "0003_third.down.sql", []byte("3 down"))
 
 	ps, err := WithInstance(testBox)
 	if err != nil {
@@ -54,13 +54,23 @@ func TestPackr(t *testing.T) {
 
 	testMigration(t, ps, v, "second")
 
-	v, err = ps.Next(v)
-	v, err = ps.Next(v)
+	_, err = ps.Next(v)
+	if err != nil {
+		t.Fatal()
+	}
+	_, err = ps.Next(v)
 	if err == nil {
 		t.Fatal("Expected error")
 	}
 	if _, ok := err.(*os.PathError); !ok {
 		t.Fatal("Expected the error to be a path error")
+	}
+}
+
+func boxMustAdd(t *testing.T, box *packr.Box, name string, content []byte) {
+	err := box.AddBytes(name, content)
+	if err != nil {
+		t.Fatalf("Failed to add testdata to box: %s", err)
 	}
 }
 
@@ -88,6 +98,9 @@ func testMigration(t *testing.T, ps source.Driver, v uint, expectedIdentifier st
 	}
 
 	r, i, err = ps.ReadDown(v)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if r == nil {
 		t.Fatal("Migration ReadCloser was nil")
 	}
@@ -105,5 +118,4 @@ func testMigration(t *testing.T, ps source.Driver, v uint, expectedIdentifier st
 	if string(migrationData) != expectedData {
 		t.Fatalf("Failed to read correct migration data, expected %s, got %s", expectedData, string(migrationData))
 	}
-
 }

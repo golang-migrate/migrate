@@ -15,7 +15,6 @@ import (
 )
 
 type Packr struct {
-	url        string
 	box        *packr.Box
 	migrations *source.Migrations
 }
