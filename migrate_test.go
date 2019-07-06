@@ -64,13 +64,13 @@ func TestNew(t *testing.T) {
 
 func ExampleNew() {
 	// Read migrations from /home/mattes/migrations and connect to a local postgres database.
-	m, err := New("file:///home/mattes/migrations", "postgres://mattes:secret@localhost:5432/database?sslmode=disable")
+	m, err := migrate.New("file:///home/mattes/migrations", "postgres://mattes:secret@localhost:5432/database?sslmode=disable")
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// Migrate all the way up ...
-	if err := m.Up(); err != nil {
+	if err := m.Up(); err != migrate.ErrNoChange {
 		log.Fatal(err)
 	}
 }
