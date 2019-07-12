@@ -44,9 +44,14 @@ It is suggested that the version number of corresponding `up` and `down` migrati
 files be equivalent for clarity, but they are allowed to differ so long as the
 relative ordering of the migrations is preserved.
 
-The migration files are permitted to be empty, so in the event that a migration
-is a no-op or is irreversible, it is recommended to still include both migration
-files, and either leaving them empty or adding a comment as appropriate.
+The migration files are permitted to be "empty", in the event that a migration
+is a no-op or is irreversible. It is recommended to still include both migration
+files by making the whole migration file consist of a comment.
+If your database does not support comments, then deleting the migration file will also work.
+Note, an actual empty file (e.g. a 0 byte file) may cause issues with your database since migrate
+will attempt to run an empty query. In this case, deleting the migration file will also work.
+For the rational of this behavior see:
+[#244 (comment)](https://github.com/golang-migrate/migrate/issues/244#issuecomment-510758270)
 
 ## Migration Content Format
 
