@@ -3,14 +3,15 @@ package cli
 import (
 	"errors"
 	"fmt"
-	"github.com/golang-migrate/migrate/v4"
-	_ "github.com/golang-migrate/migrate/v4/database/stub" // TODO remove again
-	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/stub" // TODO remove again
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
 func nextSeq(matches []string, dir string, seqDigits int) (string, error) {
@@ -52,14 +53,10 @@ func nextSeq(matches []string, dir string, seqDigits int) (string, error) {
 // cleanDir normalizes the provided directory
 func cleanDir(dir string) string {
 	dir = filepath.Clean(dir)
-	switch dir {
-	case ".":
+	if dir == "." {
 		return ""
-	case "/":
-		return dir
-	default:
-		return dir + "/"
 	}
+	return dir
 }
 
 // createCmd (meant to be called via a CLI command) creates a new migration
@@ -73,7 +70,7 @@ func createCmd(dir string, startTime time.Time, format string, name string, ext 
 		if seqDigits <= 0 {
 			log.fatalErr(errors.New("Digits must be positive"))
 		}
-		matches, err := filepath.Glob(dir + "*" + ext)
+		matches, err := filepath.Glob(filepath.Join(dir, "*"+ext))
 		if err != nil {
 			log.fatalErr(err)
 		}
