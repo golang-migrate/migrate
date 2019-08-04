@@ -27,19 +27,8 @@ $ apt-get install -y migrate
 
 ### With Go toolchain
 
-#### Versioned
-
 ```bash
-$ go get -u -d github.com/golang-migrate/migrate/cmd/migrate
-$ cd $GOPATH/src/github.com/golang-migrate/migrate/cmd/migrate
-$ git checkout $TAG  # e.g. v4.1.0
-$ go build -tags 'postgres' -ldflags="-X main.Version=$(git describe --tags)" -o $GOPATH/bin/migrate github.com/golang-migrate/migrate/cmd/migrate
-```
-
-#### Unversioned
-
-```bash
-$ go get -tags 'postgres' -u github.com/golang-migrate/migrate/cmd/migrate
+$ go get -tags 'postgres' -u github.com/golang-migrate/migrate/v4/cmd/migrate
 ```
 
 #### Notes
