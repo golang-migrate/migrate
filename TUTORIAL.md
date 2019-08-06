@@ -1,0 +1,102 @@
+# Getting started
+Before you start, make sure you understand the concept or database migration and rollback.
+
+Create new Go project and configure a database for it. Make sure that your database is supported [here](README.md#databases)
+For the purpose of this tutorial let's create PostgreSQL database called `example`.
+Our user here is `postgres`, and host is `localhost`.
+```
+psql -h localhost -U postgres -w -c "create database example;"
+```
+When using Migrate CLI we need to pass to database URL. Let's export it to a variable for convienience:
+```
+export POSTGRESQL_URL=postgres://postgres:postgres@localhost:5432/example?sslmode=disable
+```
+`sslmode=disable` means that the connection with out database will not be encrypted. Enabling it is left as an exercise.
+
+You can find further description of database URLs [here](README.md#database-urls).
+## Create migrations
+Let's create table called `users`:
+```
+migrate create -ext sql -dir db/migrations create_users_table
+```
+If there were no errors, we should have two files available under `db/migrations` folder. Note the `sql` extension that we provided.
+In the `.up.sql` file we are going to create table:
+```
+CREATE TABLE users(
+   user_id serial PRIMARY KEY,
+   username VARCHAR (50) UNIQUE NOT NULL,
+   password VARCHAR (50) NOT NULL,
+   email VARCHAR (300) UNIQUE NOT NULL
+);
+```
+And in the `.down.sql` we are going to delete it:
+```
+DROP TABLE users;
+```
+
+## Run migrations
+```
+migrate -database ${POSTGRESQL_URL} -path db/migrations up
+```
+Let's check if the table was created properly by running `psql example -c "\d users"`.
+The output you are supposed to see:
+```
+                                    Table "public.users"
+  Column  |          Type          |                        Modifiers                        
+----------+------------------------+---------------------------------------------------------
+ user_id  | integer                | not null default nextval('users_user_id_seq'::regclass)
+ username | character varying(50)  | not null
+ password | character varying(50)  | not null
+ email    | character varying(300) | not null
+Indexes:
+    "users_pkey" PRIMARY KEY, btree (user_id)
+    "users_email_key" UNIQUE CONSTRAINT, btree (email)
+    "users_username_key" UNIQUE CONSTRAINT, btree (username)
+```
+Great! Now let's check if rollback also works:
+```
+migrate -database ${POSTGRESQL_URL} -path db/migrations down
+```
+Make sure to check if your database changed as expected on rollback.
+
+**Before commiting your migrations:** You should run your migrations, rollback them, and then run them again to see if migrations are working properly both ways.
+(e.g. if you created a table in a migration but rollback did not delete it, you will encounter an error when running the migration again)
+It's also worth checking your migrations in a separate, containerized environment. You can find some tools in the end of this tutorial.
+
+**Hint:** Most probably you are going to use to the above commands often, it's worth putting them in a Makefile of your project.
+
+## Optional: Run migrations within your Go app
+Here is a very simple app running migrations for the above configuration:
+```
+import (
+	"log"
+
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
+)
+
+func main() {
+	m, err := migrate.New(
+		"file://db/migrations",
+		"postgres://postgres:postgres@localhost:5432/example?sslmode=disable")
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := m.Up(); err != nil {
+		log.Fatal(err)
+	}
+}
+```
+You can find details [here](README.md#use-in-your-go-project)
+
+Just add the code to your app and you're ready to go!
+
+**In both of the above cases, you do not need to create the table used to track the currently applied migration. It will be created automatically.**
+
+## Further reading:
+- [Best practices](MIGRATIONS.md)
+- [FAQ](FAQ.md)
+- Tools for testing your migrations in a container:
+	- https://github.com/dhui/dktest
+	- https://github.com/ory/dockertest
