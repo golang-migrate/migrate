@@ -92,8 +92,6 @@ You can find details [here](README.md#use-in-your-go-project)
 
 Just add the code to your app and you're ready to go!
 
-**In both of the above cases, you do not need to create the table used to track the currently applied migration. It will be created automatically.**
-
 ## Further reading:
 - [Best practices](MIGRATIONS.md)
 - [FAQ](FAQ.md)
