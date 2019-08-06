@@ -68,3 +68,6 @@
 Database-specific locking features are used by *some* database drivers to prevent multiple instances of migrate from running migrations at the same time
   the same database at the same time. For example, the MySQL driver uses the `GET_LOCK` function, while the Postgres driver uses
   the `pg_advisory_lock` function.
+
+#### Do I need to create a table for tracking migration version used?
+No, it is done automatically. This information will be kept in the table `schema_migrations` in the database that you have configured.
