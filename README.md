@@ -140,6 +140,10 @@ func main() {
 }
 ```
 
+## Getting started
+
+Go to [tutorial](TUTORIAL.md)
+
 ## Migration files
 
 Each migration has an up and down migration. [Why?](FAQ.md#why-two-separate-files-up-and-down-for-a-migration)
