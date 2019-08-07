@@ -70,4 +70,4 @@ Database-specific locking features are used by *some* database drivers to preven
   the `pg_advisory_lock` function.
 
 #### Do I need to create a table for tracking migration version used?
-No, it is done automatically. This information will be kept in the table `schema_migrations` in the database that you have configured.
+No, it is done automatically.
