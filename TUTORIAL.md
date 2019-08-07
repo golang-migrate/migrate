@@ -1,5 +1,5 @@
 # Getting started
-Before you start, make sure you understand the concept or database migration and rollback.
+Before you start, you should understand the concept of forward/up and reverse/down database migrations.
 
 Create new Go project and configure a database for it. Make sure that your database is supported [here](README.md#databases)
 For the purpose of this tutorial let's create PostgreSQL database called `example`.
@@ -53,14 +53,14 @@ Indexes:
     "users_email_key" UNIQUE CONSTRAINT, btree (email)
     "users_username_key" UNIQUE CONSTRAINT, btree (username)
 ```
-Great! Now let's check if rollback also works:
+Great! Now let's check if running reverse migration also works:
 ```
 migrate -database ${POSTGRESQL_URL} -path db/migrations down
 ```
-Make sure to check if your database changed as expected on rollback.
+Make sure to check if your database changed as expected in this case as well.
 
-**Before commiting your migrations:** You should run your migrations, rollback them, and then run them again to see if migrations are working properly both ways.
-(e.g. if you created a table in a migration but rollback did not delete it, you will encounter an error when running the migration again)
+**Before commiting your migrations:** You should run your migrations up, down, and then up again to see if migrations are working properly both ways.
+(e.g. if you created a table in a migration but reverse migration did not delete it, you will encounter an error when running the forward migration again)
 It's also worth checking your migrations in a separate, containerized environment. You can find some tools in the end of this tutorial.
 
 **Hint:** Most probably you are going to use to the above commands often, it's worth putting them in a Makefile of your project.
