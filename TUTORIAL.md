@@ -3,13 +3,13 @@ Before you start, you should understand the concept of forward/up and reverse/do
 
 Configure a database for your application. Make sure that your database driver is supported [here](README.md#databases)
 For the purpose of this tutorial let's create PostgreSQL database called `example`.
-Our user here is `postgres`, and host is `localhost`.
+Our user here is `postgres`, password `password`, and host is `localhost`.
 ```
 psql -h localhost -U postgres -w -c "create database example;"
 ```
 When using Migrate CLI we need to pass to database URL. Let's export it to a variable for convienience:
 ```
-export POSTGRESQL_URL=postgres://postgres:postgres@localhost:5432/example?sslmode=disable
+export POSTGRESQL_URL=postgres://postgres:password@localhost:5432/example?sslmode=disable
 ```
 `sslmode=disable` means that the connection with out database will not be encrypted. Enabling it is left as an exercise.
 
