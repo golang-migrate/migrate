@@ -1,7 +1,7 @@
 # Getting started
 Before you start, you should understand the concept of forward/up and reverse/down database migrations.
 
-Create new Go project and configure a database for it. Make sure that your database is supported [here](README.md#databases)
+Configure a database for your application. Make sure that your database driver is supported [here](README.md#databases)
 For the purpose of this tutorial let's create PostgreSQL database called `example`.
 Our user here is `postgres`, and host is `localhost`.
 ```
@@ -19,8 +19,11 @@ Let's create table called `users`:
 ```
 migrate create -ext sql -dir db/migrations create_users_table
 ```
-If there were no errors, we should have two files available under `db/migrations` folder. Note the `sql` extension that we provided.
-In the `.up.sql` file we are going to create table:
+If there were no errors, we should have two files available under `db/migrations` folder:
+- 20190805172551_create_users_table.down.sql
+- 20190805172551_create_users_table.up.sql
+Note the `sql` extension that we provided.
+In the `.up.sql` file let's create the table:
 ```
 CREATE TABLE users(
    user_id serial PRIMARY KEY,
@@ -29,7 +32,7 @@ CREATE TABLE users(
    email VARCHAR (300) UNIQUE NOT NULL
 );
 ```
-And in the `.down.sql` we are going to delete it:
+And in the `.down.sql` let's delete it:
 ```
 DROP TABLE users;
 ```
