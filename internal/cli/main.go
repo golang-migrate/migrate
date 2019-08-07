@@ -262,6 +262,6 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 
 	default:
 		flag.Usage()
-		os.Exit(0)
+		os.Exit(2)
 	}
 }
