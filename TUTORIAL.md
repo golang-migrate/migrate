@@ -11,18 +11,21 @@ When using Migrate CLI we need to pass to database URL. Let's export it to a var
 ```
 export POSTGRESQL_URL=postgres://postgres:password@localhost:5432/example?sslmode=disable
 ```
-`sslmode=disable` means that the connection with out database will not be encrypted. Enabling it is left as an exercise.
+`sslmode=disable` means that the connection with our database will not be encrypted. Enabling it is left as an exercise.
 
 You can find further description of database URLs [here](README.md#database-urls).
 ## Create migrations
 Let's create table called `users`:
 ```
-migrate create -ext sql -dir db/migrations create_users_table
+migrate create -ext sql -dir db/migrations -seq create_users_table
 ```
 If there were no errors, we should have two files available under `db/migrations` folder:
-- 20190805172551_create_users_table.down.sql
-- 20190805172551_create_users_table.up.sql
+- 000001_create_users_table.down.sql
+- 000001_create_users_table.up.sql
 Note the `sql` extension that we provided.
+**IMPORTANT:** In a project developed by more than one person there is a small probability of migrations incosistency - e.g. two developers can create conflicting migrations, and the developer that created his migration later gets it merged to the repository first.
+Keep an eye on such cases (and be even more careful when cherry picking).
+
 In the `.up.sql` file let's create the table:
 ```
 CREATE TABLE users(
