@@ -28,7 +28,7 @@ Keep an eye on such cases (and be even more careful when cherry picking).
 
 In the `.up.sql` file let's create the table:
 ```
-CREATE TABLE users(
+CREATE TABLE IF NOT EXISTS users(
    user_id serial PRIMARY KEY,
    username VARCHAR (50) UNIQUE NOT NULL,
    password VARCHAR (50) NOT NULL,
@@ -37,8 +37,9 @@ CREATE TABLE users(
 ```
 And in the `.down.sql` let's delete it:
 ```
-DROP TABLE users;
+DROP TABLE IF EXISTS users;
 ```
+By adding `IF EXISTS/IF NOT EXISTS` we are making migrations idempotent - we can run the same sql code twice in a row with the same result. This makes our migrations more robust. On the other hand, it causes slightly less control over database schema - e.g. let's say you forgot to drop the table in down migration. You run down migration - the table is still there. When you run up migration again - `CREATE TABLE` would return an error, helping you find an issue in down migration, while `CREATE TABLE IF NOT EXISTS` would not. Use those conditions wisely.
 
 ## Run migrations
 ```
