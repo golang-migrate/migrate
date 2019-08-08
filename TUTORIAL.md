@@ -23,6 +23,7 @@ If there were no errors, we should have two files available under `db/migrations
 - 000001_create_users_table.down.sql
 - 000001_create_users_table.up.sql
 Note the `sql` extension that we provided.
+
 **IMPORTANT:** In a project developed by more than one person there is a small probability of migrations incosistency - e.g. two developers can create conflicting migrations, and the developer that created his migration later gets it merged to the repository first.
 Keep an eye on such cases (and be even more careful when cherry picking).
 
@@ -66,7 +67,7 @@ migrate -database ${POSTGRESQL_URL} -path db/migrations down
 ```
 Make sure to check if your database changed as expected in this case as well.
 
-**Before commiting your migrations:** You should run your migrations up, down, and then up again to see if migrations are working properly both ways.
+**IMPORTANT:** Before commiting your migrations you should run your migrations up, down, and then up again to see if migrations are working properly both ways.
 (e.g. if you created a table in a migration but reverse migration did not delete it, you will encounter an error when running the forward migration again)
 It's also worth checking your migrations in a separate, containerized environment. You can find some tools in the end of this tutorial.
 
