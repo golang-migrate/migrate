@@ -99,6 +99,8 @@ You can find details [here](README.md#use-in-your-go-project)
 
 Just add the code to your app and you're ready to go!
 
+**IMPORTANT:** If you would like to run multiple instances of your app on different machines be sure to use a database that supports locking when running migrations. Otherwise you may encounter issues.
+
 ## Further reading:
 - [Best practices](MIGRATIONS.md)
 - [FAQ](FAQ.md)
