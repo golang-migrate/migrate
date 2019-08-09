@@ -42,6 +42,22 @@ DROP TABLE IF EXISTS users;
 ```
 By adding `IF EXISTS/IF NOT EXISTS` we are making migrations idempotent - we can run the same sql code twice in a row with the same result. This makes our migrations more robust. On the other hand, it causes slightly less control over database schema - e.g. let's say you forgot to drop the table in down migration. You run down migration - the table is still there. When you run up migration again - `CREATE TABLE` would return an error, helping you find an issue in down migration, while `CREATE TABLE IF NOT EXISTS` would not. Use those conditions wisely.
 
+In case you would like to run several commands/queries in one migration, you should wrap them in a transaction (if your database supports it).
+In our postgres example it would be (migration up):
+```
+BEGIN;
+
+CREATE TYPE enum_mood AS ENUM (
+	'happy',
+	'sad',
+	'neutral'
+);
+ALTER TABLE users ADD COLUMN mood enum_mood;
+
+COMMIT;
+```
+This way if one of commands fails, our database will remain unchanged.
+
 ## Run migrations
 ```
 migrate -database ${POSTGRESQL_URL} -path db/migrations up
