@@ -87,8 +87,6 @@ Make sure to check if your database changed as expected in this case as well.
 (e.g. if you created a table in a migration but reverse migration did not delete it, you will encounter an error when running the forward migration again)
 It's also worth checking your migrations in a separate, containerized environment. You can find some tools in the end of this tutorial.
 
-**Hint:** Most probably you are going to use to the above commands often, it's worth putting them in a Makefile of your project.
-
 ## Optional: Run migrations within your Go app
 Here is a very simple app running migrations for the above configuration:
 ```
