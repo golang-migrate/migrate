@@ -262,6 +262,9 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 
 	default:
 		flag.Usage()
-		os.Exit(0)
+
+		// If a command is not found we exit with a status 2 to match the behavior
+		// of flag.Parse() with flag.ExitOnError when parsing an invalid flag.
+		os.Exit(2)
 	}
 }
