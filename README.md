@@ -142,7 +142,13 @@ func main() {
 
 ## Getting started
 
-Go to [tutorial](TUTORIAL.md)
+Go to [getting started](GETTING_STARTED.md)
+
+## Tutorials
+
+- [PostgreSQL](database/postgres/TUTORIAL.md)
+
+(more tutorials to come)
 
 ## Migration files
 
