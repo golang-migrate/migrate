@@ -10,7 +10,7 @@ migrate create -ext sql -dir db/migrations -seq create_users_table
 ```
 Once you create your files, you should fill them.
 
-**IMPORTANT:** In a project developed by more than one person there is a probability of migrations inconsistency - e.g. two developers can create conflicting migrations, and the developer that created his migration later gets it merged to the repository first.
+**IMPORTANT:** In a project developed by more than one person there is a chance of migrations inconsistency - e.g. two developers can create conflicting migrations, and the developer that created his migration later gets it merged to the repository first.
 Developers and Teams should keep an eye on such cases (especially during code review).
 [Here](https://github.com/golang-migrate/migrate/issues/179#issuecomment-475821264) is the issue summary if you would like to read more.
 
