@@ -140,6 +140,16 @@ func main() {
 }
 ```
 
+## Getting started
+
+Go to [getting started](GETTING_STARTED.md)
+
+## Tutorials
+
+- [PostgreSQL](database/postgres/TUTORIAL.md)
+
+(more tutorials to come)
+
 ## Migration files
 
 Each migration has an up and down migration. [Why?](FAQ.md#why-two-separate-files-up-and-down-for-a-migration)
