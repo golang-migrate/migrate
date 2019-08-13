@@ -10,8 +10,9 @@ migrate create -ext sql -dir db/migrations -seq create_users_table
 ```
 Once you create your files, you should fill them.
 
-**IMPORTANT:** In a project developed by more than one person there is a small probability of migrations incosistency - e.g. two developers can create conflicting migrations, and the developer that created his migration later gets it merged to the repository first.
-Keep an eye on such cases (and be even more careful when cherry picking).
+**IMPORTANT:** In a project developed by more than one person there is a probability of migrations inconsistency - e.g. two developers can create conflicting migrations, and the developer that created his migration later gets it merged to the repository first.
+Developers and Teams should keep an eye on such cases (especially during code review).
+[Here](https://github.com/golang-migrate/migrate/issues/179#issuecomment-475821264) is the issue summary if you would like to read more.
 
 Consider making your migrations idempotent - we can run the same sql code twice in a row with the same result. This makes our migrations more robust. On the other hand, it causes slightly less control over database schema - e.g. let's say you forgot to drop the table in down migration. You run down migration - the table is still there. When you run up migration again - `CREATE TABLE` would return an error, helping you find an issue in down migration, while `CREATE TABLE IF NOT EXISTS` would not. Use those conditions wisely.
 
