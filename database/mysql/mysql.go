@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	nurl "net/url"
 	"strconv"
 	"strings"
 )
@@ -103,6 +104,21 @@ func (m *Mysql) Open(url string) (database.Driver, error) {
 	}
 
 	config.MultiStatements = true
+
+	// Keep backwards compatibility from when we used net/url.Parse() to parse the DSN.
+	// net/url.Parese() would automatically unescape it for us.
+	// See: https://play.golang.org/p/q9j1io-YICQ
+	user, err := nurl.QueryUnescape(config.User)
+	if err != nil {
+		return nil, err
+	}
+	config.User = user
+
+	password, err := nurl.QueryUnescape(config.Passwd)
+	if err != nil {
+		return nil, err
+	}
+	config.Passwd = password
 
 	migrationsTable := config.Params["x-migrations-table"]
 
