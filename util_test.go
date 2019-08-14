@@ -86,6 +86,19 @@ func TestDatabaseSchemeFromUrlSuccess(t *testing.T) {
 	}
 }
 
+func TestDatabaseSchemeFromUrlIssue264(t *testing.T) {
+	urlStr := "mysql://user:pass@tcp(host:1337)/db"
+	expected := "mysql"
+
+	u, err := databaseSchemeFromURL(urlStr)
+	if err != nil {
+		t.Fatalf("expected no error, but received %q", err)
+	}
+	if u != expected {
+		t.Fatalf("expected %q, but received %q", expected, u)
+	}
+}
+
 func TestDatabaseSchemeFromUrlFailure(t *testing.T) {
 	cases := []struct {
 		name      string
