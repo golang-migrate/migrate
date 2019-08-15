@@ -1,0 +1,23 @@
+[
+    {
+        "aggregate": "users",
+        "pipeline": [
+            {
+                "$project": {
+                    "_id": 1,
+                    "firstname": 1,
+                    "lastname": 1,
+                    "username": 1,
+                    "password": 1,
+                    "email": 1,
+                    "active": 1,
+                    "fullname": { "$concat": ["$firstname", " ", "$lastname"] }
+                }
+            },
+            {
+                "$out": "users"
+            }
+        ],
+        "cursor": {}
+    }
+]

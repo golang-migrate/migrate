@@ -1,0 +1,14 @@
+[
+    {
+        "update": "users",
+        "updates": [
+            {
+                "q": {},
+                "u": {
+                    "fullname": ""
+                },
+                "multi": true
+            }
+        ]
+    }
+]
