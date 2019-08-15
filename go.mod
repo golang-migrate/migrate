@@ -28,7 +28,6 @@ require (
 	github.com/kshvakov/clickhouse v1.3.5
 	github.com/lib/pq v1.0.0
 	github.com/mattn/go-sqlite3 v1.10.0
-	github.com/mongodb/mongo-go-driver v0.3.0
 	github.com/nakagami/firebirdsql v0.0.0-20190310045651-3c02a58cfed8
 	github.com/pkg/errors v0.8.1 // indirect
 	github.com/satori/go.uuid v1.2.0 // indirect
@@ -40,6 +39,7 @@ require (
 	github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c // indirect
 	github.com/xdg/stringprep v1.0.0 // indirect
 	gitlab.com/nyarla/go-crypt v0.0.0-20160106005555-d9a5dc2b789b // indirect
+	go.mongodb.org/mongo-driver v1.1.0
 	golang.org/x/crypto v0.0.0-20190426145343-a29dc8fdc734 // indirect
 	golang.org/x/net v0.0.0-20190424112056-4829fb13d2c6
 	golang.org/x/oauth2 v0.0.0-20190402181905-9f3314589c9a // indirect
