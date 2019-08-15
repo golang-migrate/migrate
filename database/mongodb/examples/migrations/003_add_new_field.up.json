@@ -1,0 +1,16 @@
+[
+    {
+        "update": "users",
+        "updates": [
+            {
+                "q": {},
+                "u": {
+                    "$set": {
+                        "status": "active"
+                    }
+                },
+                "multi": true
+            }
+        ]
+    }
+]
