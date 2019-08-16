@@ -97,7 +97,7 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	return mx, nil
 }
 
-func (m *Mysql) Open(url string) (database.Driver, error) {
+func (m *Mysql) getConfig(url string) (*mysql.Config, error) {
 	config, err := mysql.ParseDSN(strings.TrimPrefix(url, "mysql://"))
 	if err != nil {
 		return nil, err
@@ -106,7 +106,7 @@ func (m *Mysql) Open(url string) (database.Driver, error) {
 	config.MultiStatements = true
 
 	// Keep backwards compatibility from when we used net/url.Parse() to parse the DSN.
-	// net/url.Parese() would automatically unescape it for us.
+	// net/url.Parse() would automatically unescape it for us.
 	// See: https://play.golang.org/p/q9j1io-YICQ
 	user, err := nurl.QueryUnescape(config.User)
 	if err != nil {
@@ -119,8 +119,6 @@ func (m *Mysql) Open(url string) (database.Driver, error) {
 		return nil, err
 	}
 	config.Passwd = password
-
-	migrationsTable := config.Params["x-migrations-table"]
 
 	// use custom TLS?
 	ctls := config.TLSConfig
@@ -168,6 +166,15 @@ func (m *Mysql) Open(url string) (database.Driver, error) {
 		}
 	}
 
+	return config, nil
+}
+
+func (m *Mysql) Open(url string) (database.Driver, error) {
+	config, err := m.getConfig(url)
+	if err != nil {
+		return nil, err
+	}
+
 	db, err := sql.Open("mysql", config.FormatDSN())
 	if err != nil {
 		return nil, err
@@ -175,7 +182,7 @@ func (m *Mysql) Open(url string) (database.Driver, error) {
 
 	mx, err := WithInstance(db, &Config{
 		DatabaseName:    config.DBName,
-		MigrationsTable: migrationsTable,
+		MigrationsTable: config.Params["x-migrations-table"],
 	})
 	if err != nil {
 		return nil, err

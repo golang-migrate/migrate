@@ -174,3 +174,50 @@ func TestLockWorks(t *testing.T) {
 		}
 	})
 }
+
+func TestURLToMySQLConfig(t *testing.T) {
+	testcases := []struct {
+		name        string
+		urlStr      string
+		expectedDSN string // empty string signifies that an error is expected
+	}{
+		{name: "no user/password", urlStr: "mysql://tcp(127.0.0.1:3306)/myDB?multiStatements=true",
+			expectedDSN: "tcp(127.0.0.1:3306)/myDB?multiStatements=true"},
+		{name: "only user", urlStr: "mysql://username@tcp(127.0.0.1:3306)/myDB?multiStatements=true",
+			expectedDSN: "username@tcp(127.0.0.1:3306)/myDB?multiStatements=true"},
+		{name: "only user - with encoded :",
+			urlStr:      "mysql://username%3A@tcp(127.0.0.1:3306)/myDB?multiStatements=true",
+			expectedDSN: "username:@tcp(127.0.0.1:3306)/myDB?multiStatements=true"},
+		{name: "only user - with encoded @",
+			urlStr:      "mysql://username%40@tcp(127.0.0.1:3306)/myDB?multiStatements=true",
+			expectedDSN: "username@@tcp(127.0.0.1:3306)/myDB?multiStatements=true"},
+		{name: "user/password", urlStr: "mysql://username:password@tcp(127.0.0.1:3306)/myDB?multiStatements=true",
+			expectedDSN: "username:password@tcp(127.0.0.1:3306)/myDB?multiStatements=true"},
+		// Not supported yet: https://github.com/go-sql-driver/mysql/issues/591
+		// {name: "user/password - user with encoded :",
+		// 	urlStr:      "mysql://username%3A:password@tcp(127.0.0.1:3306)/myDB?multiStatements=true",
+		// 	expectedDSN: "username::pasword@tcp(127.0.0.1:3306)/myDB?multiStatements=true"},
+		{name: "user/password - user with encoded @",
+			urlStr:      "mysql://username%40:password@tcp(127.0.0.1:3306)/myDB?multiStatements=true",
+			expectedDSN: "username@:password@tcp(127.0.0.1:3306)/myDB?multiStatements=true"},
+		{name: "user/password - password with encoded :",
+			urlStr:      "mysql://username:password%3A@tcp(127.0.0.1:3306)/myDB?multiStatements=true",
+			expectedDSN: "username:password:@tcp(127.0.0.1:3306)/myDB?multiStatements=true"},
+		{name: "user/password - password with encoded @",
+			urlStr:      "mysql://username:password%40@tcp(127.0.0.1:3306)/myDB?multiStatements=true",
+			expectedDSN: "username:password@@tcp(127.0.0.1:3306)/myDB?multiStatements=true"},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			m := &Mysql{}
+			config, err := m.getConfig(tc.urlStr)
+			if err != nil {
+				t.Fatal("Failed to parse url string:", tc.urlStr, "error:", err)
+			}
+			dsn := config.FormatDSN()
+			if dsn != tc.expectedDSN {
+				t.Error("Got unexpected DSN:", dsn, "!=", tc.expectedDSN)
+			}
+		})
+	}
+}
