@@ -97,7 +97,7 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	return mx, nil
 }
 
-func (m *Mysql) getConfig(url string) (*mysql.Config, error) {
+func urlToMySQLConfig(url string) (*mysql.Config, error) {
 	config, err := mysql.ParseDSN(strings.TrimPrefix(url, "mysql://"))
 	if err != nil {
 		return nil, err
@@ -170,7 +170,7 @@ func (m *Mysql) getConfig(url string) (*mysql.Config, error) {
 }
 
 func (m *Mysql) Open(url string) (database.Driver, error) {
-	config, err := m.getConfig(url)
+	config, err := urlToMySQLConfig(url)
 	if err != nil {
 		return nil, err
 	}

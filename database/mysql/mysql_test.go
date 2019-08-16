@@ -209,8 +209,7 @@ func TestURLToMySQLConfig(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			m := &Mysql{}
-			config, err := m.getConfig(tc.urlStr)
+			config, err := urlToMySQLConfig(tc.urlStr)
 			if err != nil {
 				t.Fatal("Failed to parse url string:", tc.urlStr, "error:", err)
 			}
