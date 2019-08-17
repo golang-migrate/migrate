@@ -74,15 +74,14 @@ func schemeFromURL(url string) (string, error) {
 		return "", errEmptyURL
 	}
 
-	u, err := nurl.Parse(url)
-	if err != nil {
-		return "", err
-	}
-	if len(u.Scheme) == 0 {
+	i := strings.Index(url, ":")
+
+	// No : or : is the first character.
+	if i < 1 {
 		return "", errNoScheme
 	}
 
-	return u.Scheme, nil
+	return url[0:i], nil
 }
 
 // FilterCustomQuery filters all query values starting with `x-`
