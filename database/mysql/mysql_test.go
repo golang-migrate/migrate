@@ -8,7 +8,6 @@ import (
 	"log"
 
 	"github.com/golang-migrate/migrate/v4"
-	"net/url"
 	"testing"
 )
 
@@ -210,19 +209,13 @@ func TestURLToMySQLConfig(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			u, err := url.Parse(tc.urlStr)
+			config, err := urlToMySQLConfig(tc.urlStr)
 			if err != nil {
 				t.Fatal("Failed to parse url string:", tc.urlStr, "error:", err)
 			}
-			if config, err := urlToMySQLConfig(*u); err == nil {
-				dsn := config.FormatDSN()
-				if dsn != tc.expectedDSN {
-					t.Error("Got unexpected DSN:", dsn, "!=", tc.expectedDSN)
-				}
-			} else {
-				if tc.expectedDSN != "" {
-					t.Error("Got unexpected error:", err, "urlStr:", tc.urlStr)
-				}
+			dsn := config.FormatDSN()
+			if dsn != tc.expectedDSN {
+				t.Error("Got unexpected DSN:", dsn, "!=", tc.expectedDSN)
 			}
 		})
 	}
