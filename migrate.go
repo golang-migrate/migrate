@@ -85,13 +85,13 @@ type Migrate struct {
 func New(sourceURL, databaseURL string) (*Migrate, error) {
 	m := newCommon()
 
-	sourceName, err := sourceSchemeFromURL(sourceURL)
+	sourceName, err := database.SchemeFromURL(sourceURL)
 	if err != nil {
 		return nil, err
 	}
 	m.sourceName = sourceName
 
-	databaseName, err := databaseSchemeFromURL(databaseURL)
+	databaseName, err := database.SchemeFromURL(databaseURL)
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +119,7 @@ func New(sourceURL, databaseURL string) (*Migrate, error) {
 func NewWithDatabaseInstance(sourceURL string, databaseName string, databaseInstance database.Driver) (*Migrate, error) {
 	m := newCommon()
 
-	sourceName, err := schemeFromURL(sourceURL)
+	sourceName, err := database.SchemeFromURL(sourceURL)
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +145,7 @@ func NewWithDatabaseInstance(sourceURL string, databaseName string, databaseInst
 func NewWithSourceInstance(sourceName string, sourceInstance source.Driver, databaseURL string) (*Migrate, error) {
 	m := newCommon()
 
-	databaseName, err := schemeFromURL(databaseURL)
+	databaseName, err := database.SchemeFromURL(databaseURL)
 	if err != nil {
 		return nil, err
 	}
