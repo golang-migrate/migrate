@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"io"
 	"sync"
+
+	iurl "github.com/golang-migrate/migrate/v4/internal/url"
 )
 
 var (
@@ -80,7 +82,7 @@ type Driver interface {
 
 // Open returns a new driver instance.
 func Open(url string) (Driver, error) {
-	scheme, err := SchemeFromURL(url)
+	scheme, err := iurl.SchemeFromURL(url)
 	if err != nil {
 		return nil, err
 	}

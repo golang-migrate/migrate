@@ -1,7 +1,6 @@
 package database
 
 import (
-	"errors"
 	"fmt"
 	"hash/crc32"
 	"strings"
@@ -17,23 +16,4 @@ func GenerateAdvisoryLockId(databaseName string, additionalNames ...string) (str
 	sum := crc32.ChecksumIEEE([]byte(databaseName))
 	sum = sum * uint32(advisoryLockIDSalt)
 	return fmt.Sprint(sum), nil
-}
-
-var errNoScheme = errors.New("no scheme")
-var errEmptyURL = errors.New("URL cannot be empty")
-
-// schemeFromURL returns the scheme from a URL string
-func SchemeFromURL(url string) (string, error) {
-	if url == "" {
-		return "", errEmptyURL
-	}
-
-	i := strings.Index(url, ":")
-
-	// No : or : is the first character.
-	if i < 1 {
-		return "", errNoScheme
-	}
-
-	return url[0:i], nil
 }
