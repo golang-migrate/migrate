@@ -79,17 +79,37 @@ func TestOpen(t *testing.T) {
 		Register("mock", &mockDriver{})
 	}()
 
-	u := "mock://user:pass@tcp(host:1337)/db"
-
-	if d, err := Open(u); err != nil {
-		t.Fatalf("did not expect %q", err)
-	} else if md, ok := d.(*mockDriver); !ok {
-		t.Fatalf("expected *stub.Stub got %T", d)
-	} else if md.url != u {
-		t.Fatalf("expected %q got %q", u, md.url)
+	cases := []struct {
+		url string
+		err bool
+	}{
+		{
+			"mock://user:pass@tcp(host:1337)/db",
+			false,
+		},
+		{
+			"unknown://bla",
+			true,
+		},
 	}
 
-	if _, err := Open("unknown://bla"); err == nil {
-		t.Fatal("expected an error for an unknown driver")
+	for _, c := range cases {
+		t.Run(c.url, func(t *testing.T) {
+			d, err := Open(c.url)
+
+			if err == nil {
+				if c.err {
+					t.Fatal("expected an error for an unknown driver")
+				} else {
+					if md, ok := d.(*mockDriver); !ok {
+						t.Fatalf("expected *mockDriver got %T", d)
+					} else if md.url != c.url {
+						t.Fatalf("expected %q got %q", c.url, md.url)
+					}
+				}
+			} else if !c.err {
+				t.Fatalf("did not expect %q", err)
+			}
+		})
 	}
 }

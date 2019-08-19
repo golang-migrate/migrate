@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/golang-migrate/migrate/v4/database"
-	"github.com/golang-migrate/migrate/v4/internal/url"
+	iurl "github.com/golang-migrate/migrate/v4/internal/url"
 	"github.com/golang-migrate/migrate/v4/source"
 )
 
@@ -86,13 +86,13 @@ type Migrate struct {
 func New(sourceURL, databaseURL string) (*Migrate, error) {
 	m := newCommon()
 
-	sourceName, err := url.SchemeFromURL(sourceURL)
+	sourceName, err := iurl.SchemeFromURL(sourceURL)
 	if err != nil {
 		return nil, err
 	}
 	m.sourceName = sourceName
 
-	databaseName, err := url.SchemeFromURL(databaseURL)
+	databaseName, err := iurl.SchemeFromURL(databaseURL)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +120,7 @@ func New(sourceURL, databaseURL string) (*Migrate, error) {
 func NewWithDatabaseInstance(sourceURL string, databaseName string, databaseInstance database.Driver) (*Migrate, error) {
 	m := newCommon()
 
-	sourceName, err := url.SchemeFromURL(sourceURL)
+	sourceName, err := iurl.SchemeFromURL(sourceURL)
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +146,7 @@ func NewWithDatabaseInstance(sourceURL string, databaseName string, databaseInst
 func NewWithSourceInstance(sourceName string, sourceInstance source.Driver, databaseURL string) (*Migrate, error) {
 	m := newCommon()
 
-	databaseName, err := url.SchemeFromURL(databaseURL)
+	databaseName, err := iurl.SchemeFromURL(databaseURL)
 	if err != nil {
 		return nil, err
 	}
