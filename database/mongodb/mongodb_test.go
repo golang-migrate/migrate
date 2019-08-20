@@ -17,8 +17,9 @@ import (
 
 import (
 	"github.com/dhui/dktest"
-	"github.com/mongodb/mongo-go-driver/bson"
-	"github.com/mongodb/mongo-go-driver/mongo"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 import (
@@ -34,6 +35,7 @@ var (
 		{ImageName: "mongo:3.4", Options: opts},
 		{ImageName: "mongo:3.6", Options: opts},
 		{ImageName: "mongo:4.0", Options: opts},
+		{ImageName: "mongo:4.2", Options: opts},
 	}
 )
 
@@ -49,7 +51,7 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 		return false
 	}
 
-	client, err := mongo.Connect(ctx, mongoConnectionString(ip, port))
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoConnectionString(ip, port)))
 	if err != nil {
 		return false
 	}
@@ -154,24 +156,19 @@ func TestWithAuth(t *testing.T) {
 			{"right auth data", "mongodb://deminem:gogo@%s:%v/testMigration", false},
 			{"wrong auth data", "mongodb://wrong:auth@%s:%v/testMigration", true},
 		}
-		insertCMD := []byte(`[{"insert":"hello","documents":[{"wild":"world"}]}]`)
 
 		for _, tcase := range testcases {
-			//With wrong authenticate `Open` func doesn't return auth error
-			//Because at the moment golang mongo driver doesn't support auth during connection
-			//For getting auth error we should execute database command
 			t.Run(tcase.name, func(t *testing.T) {
 				mc := &Mongo{}
 				d, err := mc.Open(fmt.Sprintf(tcase.connectUri, ip, port))
-				if err != nil {
-					t.Fatal(err)
+				if err == nil {
+					defer func() {
+						if err := d.Close(); err != nil {
+							t.Error(err)
+						}
+					}()
 				}
-				defer func() {
-					if err := d.Close(); err != nil {
-						t.Error(err)
-					}
-				}()
-				err = d.Run(bytes.NewReader(insertCMD))
+
 				switch {
 				case tcase.isErrorExpected && err == nil:
 					t.Fatalf("no error when expected")
@@ -194,7 +191,7 @@ func TestTransaction(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		client, err := mongo.Connect(context.TODO(), mongoConnectionString(ip, port))
+		client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(mongoConnectionString(ip, port)))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -274,7 +271,7 @@ func TestTransaction(t *testing.T) {
 		}
 		for _, tcase := range testcases {
 			t.Run(tcase.name, func(t *testing.T) {
-				client, err := mongo.Connect(context.TODO(), mongoConnectionString(ip, port))
+				client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(mongoConnectionString(ip, port)))
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -300,7 +297,7 @@ func TestTransaction(t *testing.T) {
 						t.Fatal(runErr)
 					}
 				}
-				documentsCount, err := client.Database("testMigration").Collection("hello").Count(context.TODO(), bson.M{})
+				documentsCount, err := client.Database("testMigration").Collection("hello").CountDocuments(context.TODO(), bson.M{})
 				if err != nil {
 					t.Fatal(err)
 				}

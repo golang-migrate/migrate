@@ -19,7 +19,14 @@
 
 See https://github.com/denisenkom/go-mssqldb for full parameter list.
 
-## Note about driver support
+## Driver Support
+
+### Which go-mssqldb driver to us?
 
 Please note that the deprecated `mssql` driver is not supported. Please use the newer `sqlserver` driver.  
 See https://github.com/denisenkom/go-mssqldb#deprecated for more information.
+
+### Official Support by migrate
+
+Versions of MS SQL Server 2019 newer than CTP3.1 are not officially supported since there are issues testing against the Docker image.
+For more info, see: https://github.com/golang-migrate/migrate/issues/160#issuecomment-522433269
