@@ -1,7 +1,6 @@
 package migrate
 
 import (
-	"errors"
 	nurl "net/url"
 	"testing"
 )
@@ -29,106 +28,5 @@ func TestFilterCustomQuery(t *testing.T) {
 	nx := FilterCustomQuery(n).Query()
 	if nx.Get("x-custom") != "" {
 		t.Fatalf("didn't expect x-custom")
-	}
-}
-
-func TestSourceSchemeFromUrlSuccess(t *testing.T) {
-	urlStr := "protocol://path"
-	expected := "protocol"
-
-	u, err := sourceSchemeFromURL(urlStr)
-	if err != nil {
-		t.Fatalf("expected no error, but received %q", err)
-	}
-	if u != expected {
-		t.Fatalf("expected %q, but received %q", expected, u)
-	}
-}
-
-func TestSourceSchemeFromUrlFailure(t *testing.T) {
-	cases := []struct {
-		name      string
-		urlStr    string
-		expectErr error
-	}{
-		{
-			name:      "Empty",
-			urlStr:    "",
-			expectErr: errors.New("source: URL cannot be empty"),
-		},
-		{
-			name:      "NoScheme",
-			urlStr:    "hello",
-			expectErr: errors.New("source: no scheme"),
-		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			_, err := sourceSchemeFromURL(tc.urlStr)
-			if err.Error() != tc.expectErr.Error() {
-				t.Fatalf("expected %q, but received %q", tc.expectErr, err)
-			}
-		})
-	}
-}
-
-func TestDatabaseSchemeFromUrlSuccess(t *testing.T) {
-	cases := []struct {
-		name     string
-		urlStr   string
-		expected string
-	}{
-		{
-			name:     "Simple",
-			urlStr:   "protocol://path",
-			expected: "protocol",
-		},
-		{
-			// See issue #264
-			name:     "MySQLWithPort",
-			urlStr:   "mysql://user:pass@tcp(host:1337)/db",
-			expected: "mysql",
-		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			u, err := databaseSchemeFromURL(tc.urlStr)
-			if err != nil {
-				t.Fatalf("expected no error, but received %q", err)
-			}
-			if u != tc.expected {
-				t.Fatalf("expected %q, but received %q", tc.expected, u)
-			}
-		})
-	}
-}
-
-func TestDatabaseSchemeFromUrlFailure(t *testing.T) {
-	cases := []struct {
-		name      string
-		urlStr    string
-		expectErr error
-	}{
-		{
-			name:      "Empty",
-			urlStr:    "",
-			expectErr: errors.New("database: URL cannot be empty"),
-		},
-		{
-			name:      "NoScheme",
-			urlStr:    "hello",
-			expectErr: errors.New("database: no scheme"),
-		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			_, err := databaseSchemeFromURL(tc.urlStr)
-			if err.Error() != tc.expectErr.Error() {
-				t.Fatalf("expected %q, but received %q", tc.expectErr, err)
-			}
-		})
 	}
 }

@@ -1,7 +1,6 @@
 package migrate
 
 import (
-	"errors"
 	"fmt"
 	nurl "net/url"
 	"strings"
@@ -47,41 +46,6 @@ func suint(n int) uint {
 		panic(fmt.Sprintf("suint(%v) expects input >= 0", n))
 	}
 	return uint(n)
-}
-
-var errNoScheme = errors.New("no scheme")
-var errEmptyURL = errors.New("URL cannot be empty")
-
-func sourceSchemeFromURL(url string) (string, error) {
-	u, err := schemeFromURL(url)
-	if err != nil {
-		return "", fmt.Errorf("source: %v", err)
-	}
-	return u, nil
-}
-
-func databaseSchemeFromURL(url string) (string, error) {
-	u, err := schemeFromURL(url)
-	if err != nil {
-		return "", fmt.Errorf("database: %v", err)
-	}
-	return u, nil
-}
-
-// schemeFromURL returns the scheme from a URL string
-func schemeFromURL(url string) (string, error) {
-	if url == "" {
-		return "", errEmptyURL
-	}
-
-	i := strings.Index(url, ":")
-
-	// No : or : is the first character.
-	if i < 1 {
-		return "", errNoScheme
-	}
-
-	return url[0:i], nil
 }
 
 // FilterCustomQuery filters all query values starting with `x-`
