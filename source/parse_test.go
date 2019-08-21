@@ -90,6 +90,21 @@ func TestParse(t *testing.T) {
 			expectErr:       ErrParse,
 			expectMigration: nil,
 		},
+		{
+			name:            "1_foobar.down.",
+			expectErr:       ErrParse,
+			expectMigration: nil,
+		},
+		{
+			name:            "1_foobar.down.sql.",
+			expectErr:       ErrParse,
+			expectMigration: nil,
+		},
+		{
+			name:            "1_foobar.down.sql.tar",
+			expectErr:       ErrParse,
+			expectMigration: nil,
+		},
 	}
 
 	for i, v := range tt {
