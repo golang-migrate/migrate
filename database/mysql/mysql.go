@@ -97,6 +97,23 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	return mx, nil
 }
 
+// extractCustomQueryParams extracts the custom query params (ones that start with "x-") from
+// mysql.Config.Params (connection parameters) as to not interfere with connecting to MySQL
+func extractCustomQueryParams(c *mysql.Config) (map[string]string, error) {
+	if c == nil {
+		return nil, ErrNilConfig
+	}
+	customQueryParams := map[string]string{}
+
+	for k, v := range c.Params {
+		if strings.HasPrefix(k, "x-") {
+			customQueryParams[k] = v
+			delete(c.Params, k)
+		}
+	}
+	return customQueryParams, nil
+}
+
 func urlToMySQLConfig(url string) (*mysql.Config, error) {
 	config, err := mysql.ParseDSN(strings.TrimPrefix(url, "mysql://"))
 	if err != nil {
@@ -174,6 +191,13 @@ func (m *Mysql) Open(url string) (database.Driver, error) {
 	if err != nil {
 		return nil, err
 	}
+	fmt.Printf("config: %+v\n", config)
+
+	customParams, err := extractCustomQueryParams(config)
+	if err != nil {
+		return nil, err
+	}
+	fmt.Printf("config: %+v\n", config)
 
 	db, err := sql.Open("mysql", config.FormatDSN())
 	if err != nil {
@@ -182,7 +206,7 @@ func (m *Mysql) Open(url string) (database.Driver, error) {
 
 	mx, err := WithInstance(db, &Config{
 		DatabaseName:    config.DBName,
-		MigrationsTable: config.Params["x-migrations-table"],
+		MigrationsTable: customParams["x-migrations-table"],
 	})
 	if err != nil {
 		return nil, err
