@@ -1,18 +1,22 @@
 package migrate
 
 import (
-	"errors"
 	"fmt"
 	nurl "net/url"
 	"strings"
 )
 
 // MultiError holds multiple errors.
+//
+// Deprecated: Use github.com/hashicorp/go-multierror instead
 type MultiError struct {
 	Errs []error
 }
 
 // NewMultiError returns an error type holding multiple errors.
+//
+// Deprecated: Use github.com/hashicorp/go-multierror instead
+//
 func NewMultiError(errs ...error) MultiError {
 	compactErrs := make([]error, 0)
 	for _, e := range errs {
@@ -23,7 +27,7 @@ func NewMultiError(errs ...error) MultiError {
 	return MultiError{compactErrs}
 }
 
-// Error implements error. Mulitple errors are concatenated with 'and's.
+// Error implements error. Multiple errors are concatenated with 'and's.
 func (m MultiError) Error() string {
 	var strs = make([]string, 0)
 	for _, e := range m.Errs {
@@ -42,42 +46,6 @@ func suint(n int) uint {
 		panic(fmt.Sprintf("suint(%v) expects input >= 0", n))
 	}
 	return uint(n)
-}
-
-var errNoScheme = errors.New("no scheme")
-var errEmptyURL = errors.New("URL cannot be empty")
-
-func sourceSchemeFromUrl(url string) (string, error) {
-	u, err := schemeFromUrl(url)
-	if err != nil {
-		return "", fmt.Errorf("source: %v", err)
-	}
-	return u, nil
-}
-
-func databaseSchemeFromUrl(url string) (string, error) {
-	u, err := schemeFromUrl(url)
-	if err != nil {
-		return "", fmt.Errorf("database: %v", err)
-	}
-	return u, nil
-}
-
-// schemeFromUrl returns the scheme from a URL string
-func schemeFromUrl(url string) (string, error) {
-	if url == "" {
-		return "", errEmptyURL
-	}
-
-	u, err := nurl.Parse(url)
-	if err != nil {
-		return "", err
-	}
-	if len(u.Scheme) == 0 {
-		return "", errNoScheme
-	}
-
-	return u.Scheme, nil
 }
 
 // FilterCustomQuery filters all query values starting with `x-`

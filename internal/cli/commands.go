@@ -49,7 +49,22 @@ func nextSeq(matches []string, dir string, seqDigits int) (string, error) {
 	return nextSeqStr, nil
 }
 
+// cleanDir normalizes the provided directory
+func cleanDir(dir string) string {
+	dir = filepath.Clean(dir)
+	switch dir {
+	case ".":
+		return ""
+	case "/":
+		return dir
+	default:
+		return dir + "/"
+	}
+}
+
+// createCmd (meant to be called via a CLI command) creates a new migration
 func createCmd(dir string, startTime time.Time, format string, name string, ext string, seq bool, seqDigits int) {
+	dir = cleanDir(dir)
 	var base string
 	if seq && format != defaultTimeFormat {
 		log.fatalErr(errors.New("The seq and format options are mutually exclusive"))
@@ -80,7 +95,10 @@ func createCmd(dir string, startTime time.Time, format string, name string, ext 
 		}
 	}
 
-	os.MkdirAll(dir, os.ModePerm)
+	if err := os.MkdirAll(dir, os.ModePerm); err != nil {
+		log.fatalErr(err)
+	}
+
 	createFile(base + "up" + ext)
 	createFile(base + "down" + ext)
 }
@@ -162,5 +180,30 @@ func versionCmd(m *migrate.Migrate) {
 		log.Printf("%v (dirty)\n", v)
 	} else {
 		log.Println(v)
+	}
+}
+
+// numDownMigrationsFromArgs returns an int for number of migrations to apply
+// and a bool indicating if we need a confirm before applying
+func numDownMigrationsFromArgs(applyAll bool, args []string) (int, bool, error) {
+	if applyAll {
+		if len(args) > 0 {
+			return 0, false, errors.New("-all cannot be used with other arguments")
+		}
+		return -1, false, nil
+	}
+
+	switch len(args) {
+	case 0:
+		return -1, true, nil
+	case 1:
+		downValue := args[0]
+		n, err := strconv.ParseUint(downValue, 10, 64)
+		if err != nil {
+			return 0, false, errors.New("can't read limit argument N")
+		}
+		return int(n), false, nil
+	default:
+		return 0, false, errors.New("too many arguments")
 	}
 }

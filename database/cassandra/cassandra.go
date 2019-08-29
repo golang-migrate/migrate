@@ -12,6 +12,7 @@ import (
 
 	"github.com/gocql/gocql"
 	"github.com/golang-migrate/migrate/v4/database"
+	"github.com/hashicorp/go-multierror"
 )
 
 func init() {
@@ -240,13 +241,29 @@ func (c *Cassandra) Drop() error {
 			return err
 		}
 	}
-	// Re-create the version table
-	return c.ensureVersionTable()
+
+	return nil
 }
 
-// Ensure version table exists
-func (c *Cassandra) ensureVersionTable() error {
-	err := c.session.Query(fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (version bigint, dirty boolean, PRIMARY KEY(version))", c.config.MigrationsTable)).Exec()
+// ensureVersionTable checks if versions table exists and, if not, creates it.
+// Note that this function locks the database, which deviates from the usual
+// convention of "caller locks" in the Cassandra type.
+func (c *Cassandra) ensureVersionTable() (err error) {
+	if err = c.Lock(); err != nil {
+		return err
+	}
+
+	defer func() {
+		if e := c.Unlock(); e != nil {
+			if err == nil {
+				err = e
+			} else {
+				err = multierror.Append(err, e)
+			}
+		}
+	}()
+
+	err = c.session.Query(fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (version bigint, dirty boolean, PRIMARY KEY(version))", c.config.MigrationsTable)).Exec()
 	if err != nil {
 		return err
 	}
