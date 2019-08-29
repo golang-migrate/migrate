@@ -7,10 +7,11 @@ package migrate
 import (
 	"errors"
 	"fmt"
-	"github.com/hashicorp/go-multierror"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/hashicorp/go-multierror"
 
 	"github.com/golang-migrate/migrate/v4/database"
 	iurl "github.com/golang-migrate/migrate/v4/internal/url"
@@ -805,7 +806,7 @@ func (m *Migrate) versionExists(version uint) (result error) {
 		return err
 	}
 
-	m.logPrintf("ERROR: No migration found for version %d", version)
+	m.logErr(fmt.Errorf("no migration found for version %d", version))
 	return os.ErrNotExist
 }
 
