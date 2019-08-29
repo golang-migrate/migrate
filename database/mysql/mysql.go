@@ -191,13 +191,11 @@ func (m *Mysql) Open(url string) (database.Driver, error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Printf("config: %+v\n", config)
 
 	customParams, err := extractCustomQueryParams(config)
 	if err != nil {
 		return nil, err
 	}
-	fmt.Printf("config: %+v\n", config)
 
 	db, err := sql.Open("mysql", config.FormatDSN())
 	if err != nil {
