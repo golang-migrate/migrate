@@ -10,3 +10,9 @@
 | `role` | | Role name |
 | `tzname` | | Time Zone name. (For Firebird 4.0+) |
 | `wire_crypt` | | Enable wire data encryption or not. For Firebird 3.0+ (default is true) |
+
+## Not officially supported
+
+If you need a `migrate` CLI that supports Firebird, you'll need need to build it yourself. There are also no guarantees that the integration will work since we're not testing with Firebird.
+
+For more info, see: https://github.com/golang-migrate/migrate/issues/49#issuecomment-487193672
