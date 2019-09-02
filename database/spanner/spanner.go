@@ -17,6 +17,7 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 
+	"github.com/hashicorp/go-multierror"
 	"google.golang.org/api/iterator"
 	adminpb "google.golang.org/genproto/googleapis/spanner/admin/database/v1"
 )
@@ -108,9 +109,6 @@ func (s *Spanner) Open(url string) (database.Driver, error) {
 	}
 
 	migrationsTable := purl.Query().Get("x-migrations-table")
-	if len(migrationsTable) == 0 {
-		migrationsTable = DefaultMigrationsTable
-	}
 
 	db := &DB{admin: adminClient, data: dataClient}
 	return WithInstance(db, &Config{
@@ -211,6 +209,8 @@ func (s *Spanner) Version() (version int, dirty bool, err error) {
 	return version, dirty, nil
 }
 
+var nameMatcher = regexp.MustCompile(`(CREATE TABLE\s(\S+)\s)|(CREATE.+INDEX\s(\S+)\s)`)
+
 // Drop implements database.Driver. Retrieves the database schema first and
 // creates statements to drop the indexes and tables accordingly.
 // Note: The drop statements are created in reverse order to how they're
@@ -229,11 +229,10 @@ func (s *Spanner) Drop() error {
 		return nil
 	}
 
-	r := regexp.MustCompile(`(CREATE TABLE\s(\S+)\s)|(CREATE.+INDEX\s(\S+)\s)`)
 	stmts := make([]string, 0)
 	for i := len(res.Statements) - 1; i >= 0; i-- {
 		s := res.Statements[i]
-		m := r.FindSubmatch([]byte(s))
+		m := nameMatcher.FindSubmatch([]byte(s))
 
 		if len(m) == 0 {
 			continue
@@ -255,14 +254,27 @@ func (s *Spanner) Drop() error {
 		return &database.Error{OrigErr: err, Query: []byte(strings.Join(stmts, "; "))}
 	}
 
-	if err := s.ensureVersionTable(); err != nil {
-		return err
-	}
-
 	return nil
 }
 
-func (s *Spanner) ensureVersionTable() error {
+// ensureVersionTable checks if versions table exists and, if not, creates it.
+// Note that this function locks the database, which deviates from the usual
+// convention of "caller locks" in the Spanner type.
+func (s *Spanner) ensureVersionTable() (err error) {
+	if err = s.Lock(); err != nil {
+		return err
+	}
+
+	defer func() {
+		if e := s.Unlock(); e != nil {
+			if err == nil {
+				err = e
+			} else {
+				err = multierror.Append(err, e)
+			}
+		}
+	}()
+
 	ctx := context.Background()
 	tbl := s.config.MigrationsTable
 	iter := s.db.data.Single().Read(ctx, tbl, spanner.AllKeys(), []string{"Version"})
@@ -291,11 +303,15 @@ func (s *Spanner) ensureVersionTable() error {
 }
 
 func migrationStatements(migration []byte) []string {
-	regex := regexp.MustCompile(";$")
 	migrationString := string(migration[:])
 	migrationString = strings.TrimSpace(migrationString)
-	migrationString = regex.ReplaceAllString(migrationString, "")
 
-	statements := strings.Split(migrationString, ";")
-	return statements
+	allStatements := strings.Split(migrationString, ";")
+	nonEmptyStatements := allStatements[:0]
+	for _, s := range allStatements {
+		if s != "" {
+			nonEmptyStatements = append(nonEmptyStatements, s)
+		}
+	}
+	return nonEmptyStatements
 }

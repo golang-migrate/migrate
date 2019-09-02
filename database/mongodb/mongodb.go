@@ -9,12 +9,11 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
-	"github.com/mongodb/mongo-go-driver/bson"
-	"github.com/mongodb/mongo-go-driver/mongo"
-	"github.com/mongodb/mongo-go-driver/mongo/options"
-	"github.com/mongodb/mongo-go-driver/x/network/connstring"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/connstring"
 )
 
 func init() {
@@ -61,6 +60,7 @@ func WithInstance(instance *mongo.Client, config *Config) (database.Driver, erro
 		db:     instance.Database(config.DatabaseName),
 		config: config,
 	}
+
 	return mc, nil
 }
 
@@ -74,21 +74,12 @@ func (m *Mongo) Open(dsn string) (database.Driver, error) {
 		return nil, ErrNoDatabaseName
 	}
 
-	purl, err := url.Parse(dsn)
-	if err != nil {
-		return nil, err
-	}
-	migrationsCollection := purl.Query().Get("x-migrations-collection")
-	if len(migrationsCollection) == 0 {
-		migrationsCollection = DefaultMigrationsCollection
-	}
+	unknown := url.Values(uri.UnknownOptions)
 
-	transactionMode, _ := strconv.ParseBool(purl.Query().Get("x-transaction-mode"))
+	migrationsCollection := unknown.Get("x-migrations-collection")
+	transactionMode, _ := strconv.ParseBool(unknown.Get("x-transaction-mode"))
 
-	q := migrate.FilterCustomQuery(purl)
-	q.Scheme = "mongodb"
-
-	client, err := mongo.Connect(context.TODO(), q.String())
+	client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(dsn))
 	if err != nil {
 		return nil, err
 	}

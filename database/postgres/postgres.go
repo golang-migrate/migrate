@@ -45,7 +45,7 @@ type Postgres struct {
 	db       *sql.DB
 	isLocked bool
 
-	// Open and WithInstance need to garantuee that config is never nil
+	// Open and WithInstance need to guarantee that config is never nil
 	config *Config
 }
 
@@ -117,14 +117,12 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 	}
 
 	migrationsTable := purl.Query().Get("x-migrations-table")
-	if len(migrationsTable) == 0 {
-		migrationsTable = DefaultMigrationsTable
-	}
 
 	px, err := WithInstance(db, &Config{
 		DatabaseName:    purl.Path,
 		MigrationsTable: migrationsTable,
 	})
+
 	if err != nil {
 		return nil, err
 	}
@@ -257,14 +255,18 @@ func (p *Postgres) SetVersion(version int, dirty bool) error {
 
 	query := `TRUNCATE ` + pq.QuoteIdentifier(p.config.MigrationsTable)
 	if _, err := tx.Exec(query); err != nil {
-		tx.Rollback()
+		if errRollback := tx.Rollback(); errRollback != nil {
+			err = multierror.Append(err, errRollback)
+		}
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 
 	if version >= 0 {
 		query = `INSERT INTO ` + pq.QuoteIdentifier(p.config.MigrationsTable) + ` (version, dirty) VALUES ($1, $2)`
 		if _, err := tx.Exec(query, version, dirty); err != nil {
-			tx.Rollback()
+			if errRollback := tx.Rollback(); errRollback != nil {
+				err = multierror.Append(err, errRollback)
+			}
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
 	}
@@ -296,14 +298,18 @@ func (p *Postgres) Version() (version int, dirty bool, err error) {
 	}
 }
 
-func (p *Postgres) Drop() error {
+func (p *Postgres) Drop() (err error) {
 	// select all tables in current schema
 	query := `SELECT table_name FROM information_schema.tables WHERE table_schema=(SELECT current_schema()) AND table_type='BASE TABLE'`
 	tables, err := p.conn.QueryContext(context.Background(), query)
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
-	defer tables.Close()
+	defer func() {
+		if errClose := tables.Close(); errClose != nil {
+			err = multierror.Append(err, errClose)
+		}
+	}()
 
 	// delete one table after another
 	tableNames := make([]string, 0)
@@ -325,14 +331,14 @@ func (p *Postgres) Drop() error {
 				return &database.Error{OrigErr: err, Query: []byte(query)}
 			}
 		}
-		if err := p.ensureVersionTable(); err != nil {
-			return err
-		}
 	}
 
 	return nil
 }
 
+// ensureVersionTable checks if versions table exists and, if not, creates it.
+// Note that this function locks the database, which deviates from the usual
+// convention of "caller locks" in the Postgres type.
 func (p *Postgres) ensureVersionTable() (err error) {
 	if err = p.Lock(); err != nil {
 		return err

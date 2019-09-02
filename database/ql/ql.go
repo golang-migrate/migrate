@@ -3,6 +3,7 @@ package ql
 import (
 	"database/sql"
 	"fmt"
+	"github.com/hashicorp/go-multierror"
 	"io"
 	"io/ioutil"
 	"strings"
@@ -46,6 +47,7 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	if err := instance.Ping(); err != nil {
 		return nil, err
 	}
+
 	if len(config.MigrationsTable) == 0 {
 		config.MigrationsTable = DefaultMigrationsTable
 	}
@@ -59,7 +61,25 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	}
 	return mx, nil
 }
-func (m *Ql) ensureVersionTable() error {
+
+// ensureVersionTable checks if versions table exists and, if not, creates it.
+// Note that this function locks the database, which deviates from the usual
+// convention of "caller locks" in the Ql type.
+func (m *Ql) ensureVersionTable() (err error) {
+	if err = m.Lock(); err != nil {
+		return err
+	}
+
+	defer func() {
+		if e := m.Unlock(); e != nil {
+			if err == nil {
+				err = e
+			} else {
+				err = multierror.Append(err, e)
+			}
+		}
+	}()
+
 	tx, err := m.db.Begin()
 	if err != nil {
 		return err
@@ -105,13 +125,17 @@ func (m *Ql) Open(url string) (database.Driver, error) {
 func (m *Ql) Close() error {
 	return m.db.Close()
 }
-func (m *Ql) Drop() error {
+func (m *Ql) Drop() (err error) {
 	query := `SELECT Name FROM __Table`
 	tables, err := m.db.Query(query)
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
-	defer tables.Close()
+	defer func() {
+		if errClose := tables.Close(); errClose != nil {
+			err = multierror.Append(err, errClose)
+		}
+	}()
 	tableNames := make([]string, 0)
 	for tables.Next() {
 		var tableName string
@@ -119,7 +143,7 @@ func (m *Ql) Drop() error {
 			return err
 		}
 		if len(tableName) > 0 {
-			if strings.HasPrefix(tableName, "__") == false {
+			if !strings.HasPrefix(tableName, "__") {
 				tableNames = append(tableNames, tableName)
 			}
 		}
@@ -131,9 +155,6 @@ func (m *Ql) Drop() error {
 			if err != nil {
 				return &database.Error{OrigErr: err, Query: []byte(query)}
 			}
-		}
-		if err := m.ensureVersionTable(); err != nil {
-			return err
 		}
 	}
 
@@ -168,7 +189,9 @@ func (m *Ql) executeQuery(query string) error {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
 	}
 	if _, err := tx.Exec(query); err != nil {
-		tx.Rollback()
+		if errRollback := tx.Rollback(); errRollback != nil {
+			err = multierror.Append(err, errRollback)
+		}
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 	if err := tx.Commit(); err != nil {
@@ -190,7 +213,9 @@ func (m *Ql) SetVersion(version int, dirty bool) error {
 	if version >= 0 {
 		query := fmt.Sprintf(`INSERT INTO %s (version, dirty) VALUES (%d, %t)`, m.config.MigrationsTable, version, dirty)
 		if _, err := tx.Exec(query); err != nil {
-			tx.Rollback()
+			if errRollback := tx.Rollback(); errRollback != nil {
+				err = multierror.Append(err, errRollback)
+			}
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
 	}

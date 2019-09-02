@@ -37,7 +37,7 @@ func Main(version string) {
 
 Options:
   -source          Location of the migrations (driver://url)
-  -path            Shorthand for -source=file://path 
+  -path            Shorthand for -source=file://path
   -database        Run migrations against this database (driver://url)
   -prefetch N      Number of migrations to load in advance before executing (default 10)
   -lock-timeout N  Allow N seconds to acquire database lock (default 15)
@@ -53,7 +53,7 @@ Commands:
   goto V       Migrate to version V
   up [N]       Apply all or N up migrations
   down [N]     Apply all or N down migrations
-  drop         Drop everyting inside database
+  drop         Drop everything inside database
   force V      Set version V but don't run migration (ignores dirty state)
   version      Print current migration version
 
@@ -89,7 +89,9 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 	migrater, migraterErr := migrate.New(*sourcePtr, *databasePtr)
 	defer func() {
 		if migraterErr == nil {
-			migrater.Close()
+			if _, err := migrater.Close(); err != nil {
+				log.Println(err)
+			}
 		}
 	}()
 	if migraterErr == nil {
@@ -123,7 +125,9 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 		formatPtr := createFlagSet.String("format", defaultTimeFormat, `The Go time format string to use. If the string "unix" or "unixNano" is specified, then the seconds or nanoseconds since January 1, 1970 UTC respectively will be used. Caution, due to the behavior of time.Time.Format(), invalid format strings will not error`)
 		createFlagSet.BoolVar(&seq, "seq", seq, "Use sequential numbers instead of timestamps (default: false)")
 		createFlagSet.IntVar(&seqDigits, "digits", seqDigits, "The number of digits to use in sequences (default: 6)")
-		createFlagSet.Parse(args)
+		if err := createFlagSet.Parse(args); err != nil {
+			log.Println(err)
+		}
 
 		if createFlagSet.NArg() == 0 {
 			log.fatal("error: please specify name")
@@ -134,10 +138,6 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 			log.fatal("error: -ext flag must be specified")
 		}
 		*extPtr = "." + strings.TrimPrefix(*extPtr, ".")
-
-		if *dirPtr != "" {
-			*dirPtr = strings.Trim(*dirPtr, "/") + "/"
-		}
 
 		createCmd(*dirPtr, startTime, *formatPtr, name, *extPtr, seq, seqDigits)
 
@@ -158,7 +158,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 		gotoCmd(migrater, uint(v))
 
 		if log.verbose {
-			log.Println("Finished after", time.Now().Sub(startTime))
+			log.Println("Finished after", time.Since(startTime))
 		}
 
 	case "up":
@@ -178,7 +178,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 		upCmd(migrater, limit)
 
 		if log.verbose {
-			log.Println("Finished after", time.Now().Sub(startTime))
+			log.Println("Finished after", time.Since(startTime))
 		}
 
 	case "down":
@@ -186,19 +186,36 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 			log.fatalErr(migraterErr)
 		}
 
-		limit := -1
-		if flag.Arg(1) != "" {
-			n, err := strconv.ParseUint(flag.Arg(1), 10, 64)
-			if err != nil {
-				log.fatal("error: can't read limit argument N")
-			}
-			limit = int(n)
+		downFlagSet := flag.NewFlagSet("down", flag.ExitOnError)
+		applyAll := downFlagSet.Bool("all", false, "Apply all down migrations")
+
+		args := flag.Args()[1:]
+		if err := downFlagSet.Parse(args); err != nil {
+			log.fatalErr(err)
 		}
 
-		downCmd(migrater, limit)
+		downArgs := downFlagSet.Args()
+		num, needsConfirm, err := numDownMigrationsFromArgs(*applyAll, downArgs)
+		if err != nil {
+			log.fatalErr(err)
+		}
+		if needsConfirm {
+			log.Println("Are you sure you want to apply all down migrations? [y/N]")
+			var response string
+			fmt.Scanln(&response)
+			response = strings.ToLower(strings.TrimSpace(response))
+
+			if response == "y" {
+				log.Println("Applying all down migrations")
+			} else {
+				log.fatal("Not applying all down migrations")
+			}
+		}
+
+		downCmd(migrater, num)
 
 		if log.verbose {
-			log.Println("Finished after", time.Now().Sub(startTime))
+			log.Println("Finished after", time.Since(startTime))
 		}
 
 	case "drop":
@@ -209,7 +226,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 		dropCmd(migrater)
 
 		if log.verbose {
-			log.Println("Finished after", time.Now().Sub(startTime))
+			log.Println("Finished after", time.Since(startTime))
 		}
 
 	case "force":
@@ -233,7 +250,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 		forceCmd(migrater, int(v))
 
 		if log.verbose {
-			log.Println("Finished after", time.Now().Sub(startTime))
+			log.Println("Finished after", time.Since(startTime))
 		}
 
 	case "version":
@@ -245,6 +262,9 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 
 	default:
 		flag.Usage()
-		os.Exit(0)
+
+		// If a command is not found we exit with a status 2 to match the behavior
+		// of flag.Parse() with flag.ExitOnError when parsing an invalid flag.
+		os.Exit(2)
 	}
 }

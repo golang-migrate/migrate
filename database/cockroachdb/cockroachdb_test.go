@@ -6,6 +6,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/golang-migrate/migrate/v4"
+	"log"
 	"strings"
 	"testing"
 )
@@ -18,6 +20,7 @@ import (
 import (
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
 	"github.com/golang-migrate/migrate/v4/dktesting"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
 const defaultPort = 26257
@@ -36,20 +39,22 @@ var (
 func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 	ip, port, err := c.Port(defaultPort)
 	if err != nil {
-		fmt.Println("port error:", err)
+		log.Println("port error:", err)
 		return false
 	}
 
 	db, err := sql.Open("postgres", fmt.Sprintf("postgres://root@%v:%v?sslmode=disable", ip, port))
 	if err != nil {
-		fmt.Println("open error:", err)
+		log.Println("open error:", err)
 		return false
 	}
 	if err := db.PingContext(ctx); err != nil {
-		fmt.Println("ping error:", err)
+		log.Println("ping error:", err)
 		return false
 	}
-	db.Close()
+	if err := db.Close(); err != nil {
+		log.Println("close error:", err)
+	}
 	return true
 }
 
@@ -66,7 +71,11 @@ func createDB(t *testing.T, c dktest.ContainerInfo) {
 	if err = db.Ping(); err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	if _, err = db.Exec("CREATE DATABASE migrate"); err != nil {
 		t.Fatal(err)
@@ -86,9 +95,33 @@ func Test(t *testing.T) {
 		c := &CockroachDb{}
 		d, err := c.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		dt.Test(t, d, []byte("SELECT 1"))
+	})
+}
+
+func TestMigrate(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, ci dktest.ContainerInfo) {
+		createDB(t, ci)
+
+		ip, port, err := ci.Port(26257)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := fmt.Sprintf("cockroach://root@%v:%v/migrate?sslmode=disable", ip, port)
+		c := &CockroachDb{}
+		d, err := c.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "migrate", d)
+		if err != nil {
+			t.Fatal(err)
+		}
+		dt.TestMigrate(t, m, []byte("SELECT 1"))
 	})
 }
 
@@ -105,7 +138,7 @@ func TestMultiStatement(t *testing.T) {
 		c := &CockroachDb{}
 		d, err := c.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		if err := d.Run(strings.NewReader("CREATE TABLE foo (foo text); CREATE TABLE bar (bar text);")); err != nil {
 			t.Fatalf("expected err to be nil, got %v", err)
@@ -135,7 +168,7 @@ func TestFilterCustomQuery(t *testing.T) {
 		c := &CockroachDb{}
 		_, err = c.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 	})
 }

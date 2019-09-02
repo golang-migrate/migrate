@@ -9,11 +9,12 @@ import (
 
 const reservedChars = "!#$%&'()*+,/:;=?@[]"
 
+const baseUsername = "username"
+
 // TestUserUnencodedReservedURLChars documents the behavior of using unencoded reserved characters in usernames with
 // net/url Parse()
 func TestUserUnencodedReservedURLChars(t *testing.T) {
 	scheme := "database://"
-	baseUsername := "username"
 	urlSuffix := "password@localhost:12345/myDB?someParam=true"
 	urlSuffixAndSep := ":" + urlSuffix
 
@@ -46,7 +47,7 @@ func TestUserUnencodedReservedURLChars(t *testing.T) {
 			encodedURL: scheme + baseUsername + "," + urlSuffixAndSep},
 		{char: "/", parses: true, expectedUsername: "",
 			encodedURL: scheme + baseUsername + "/" + urlSuffixAndSep},
-		{char: ":", parses: true, expectedUsername: "username",
+		{char: ":", parses: true, expectedUsername: baseUsername,
 			encodedURL: scheme + baseUsername + ":%3A" + urlSuffix},
 		{char: ";", parses: true, expectedUsername: "username;",
 			encodedURL: scheme + baseUsername + ";" + urlSuffixAndSep},
@@ -98,7 +99,6 @@ func TestUserUnencodedReservedURLChars(t *testing.T) {
 
 func TestUserEncodedReservedURLChars(t *testing.T) {
 	scheme := "database://"
-	baseUsername := "username"
 	urlSuffix := "password@localhost:12345/myDB?someParam=true"
 	urlSuffixAndSep := ":" + urlSuffix
 
@@ -125,7 +125,7 @@ func TestUserEncodedReservedURLChars(t *testing.T) {
 // TestPasswordUnencodedReservedURLChars documents the behavior of using unencoded reserved characters in passwords
 // with net/url Parse()
 func TestPasswordUnencodedReservedURLChars(t *testing.T) {
-	username := "username"
+	username := baseUsername
 	schemeAndUsernameAndSep := "database://" + username + ":"
 	basePassword := "password"
 	urlSuffixAndSep := "@localhost:12345/myDB?someParam=true"
@@ -139,8 +139,7 @@ func TestPasswordUnencodedReservedURLChars(t *testing.T) {
 	}{
 		{char: "!", parses: true, expectedUsername: username, expectedPassword: basePassword + "!",
 			encodedURL: schemeAndUsernameAndSep + basePassword + "%21" + urlSuffixAndSep},
-		{char: "#", parses: true, expectedUsername: "", expectedPassword: "",
-			encodedURL: schemeAndUsernameAndSep + basePassword + "#" + urlSuffixAndSep},
+		{char: "#", parses: false},
 		{char: "$", parses: true, expectedUsername: username, expectedPassword: basePassword + "$",
 			encodedURL: schemeAndUsernameAndSep + basePassword + "$" + urlSuffixAndSep},
 		{char: "%", parses: false},
@@ -158,16 +157,14 @@ func TestPasswordUnencodedReservedURLChars(t *testing.T) {
 			encodedURL: schemeAndUsernameAndSep + basePassword + "+" + urlSuffixAndSep},
 		{char: ",", parses: true, expectedUsername: username, expectedPassword: "password,",
 			encodedURL: schemeAndUsernameAndSep + basePassword + "," + urlSuffixAndSep},
-		{char: "/", parses: true, expectedUsername: "", expectedPassword: "",
-			encodedURL: schemeAndUsernameAndSep + basePassword + "/" + urlSuffixAndSep},
+		{char: "/", parses: false},
 		{char: ":", parses: true, expectedUsername: username, expectedPassword: "password:",
 			encodedURL: schemeAndUsernameAndSep + basePassword + "%3A" + urlSuffixAndSep},
 		{char: ";", parses: true, expectedUsername: username, expectedPassword: "password;",
 			encodedURL: schemeAndUsernameAndSep + basePassword + ";" + urlSuffixAndSep},
 		{char: "=", parses: true, expectedUsername: username, expectedPassword: "password=",
 			encodedURL: schemeAndUsernameAndSep + basePassword + "=" + urlSuffixAndSep},
-		{char: "?", parses: true, expectedUsername: "", expectedPassword: "",
-			encodedURL: schemeAndUsernameAndSep + basePassword + "?" + urlSuffixAndSep},
+		{char: "?", parses: false},
 		{char: "@", parses: true, expectedUsername: username, expectedPassword: "password@",
 			encodedURL: schemeAndUsernameAndSep + basePassword + "%40" + urlSuffixAndSep},
 		{char: "[", parses: false},
@@ -215,7 +212,7 @@ func TestPasswordUnencodedReservedURLChars(t *testing.T) {
 }
 
 func TestPasswordEncodedReservedURLChars(t *testing.T) {
-	username := "username"
+	username := baseUsername
 	schemeAndUsernameAndSep := "database://" + username + ":"
 	basePassword := "password"
 	urlSuffixAndSep := "@localhost:12345/myDB?someParam=true"
