@@ -29,7 +29,6 @@ require (
 	github.com/kshvakov/clickhouse v1.3.5
 	github.com/lib/pq v1.0.0
 	github.com/mattn/go-sqlite3 v1.10.0
-	github.com/mongodb/mongo-go-driver v1.1.0
 	github.com/morikuni/aec v0.0.0-20170113033406-39771216ff4c // indirect
 	github.com/nakagami/firebirdsql v0.0.0-20190310045651-3c02a58cfed8
 	github.com/pkg/errors v0.8.1 // indirect
