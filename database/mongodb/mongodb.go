@@ -105,7 +105,9 @@ func (m *Mongo) SetVersion(version int, dirty bool) error {
 	}}}
 	var tr = true
 	if res := migrationsCollection.FindOneAndUpdate(context.TODO(), filt, upd, &options.FindOneAndUpdateOptions{Upsert: &tr}); res.Err() != nil {
-		return &database.Error{OrigErr: res.Err(), Err: "FindOneAndUpdate failed"}
+		if res.Err() != mongo.ErrNoDocuments {
+			return &database.Error{OrigErr: res.Err(), Err: "FindOneAndUpdate failed"}
+		}
 	}
 	return nil
 }
