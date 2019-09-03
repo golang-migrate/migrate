@@ -3,5 +3,5 @@
 package cli
 
 import (
-	_ "github.com/golang-migrate/migrate/v4/source/aws_s3"
+	_ "github.com/mrqzzz/migrate/source/aws_s3"
 )

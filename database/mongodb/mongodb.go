@@ -3,13 +3,12 @@ package mongodb
 import (
 	"context"
 	"fmt"
-	"github.com/mongodb/mongo-go-driver/x/bsonx"
 	"io"
 	"io/ioutil"
 	"net/url"
 	"strconv"
 
-	"github.com/golang-migrate/migrate/v4/database"
+	"github.com/mrqzzz/migrate/database"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -99,12 +98,12 @@ func (m *Mongo) Open(dsn string) (database.Driver, error) {
 
 func (m *Mongo) SetVersion(version int, dirty bool) error {
 	migrationsCollection := m.db.Collection(m.config.MigrationsCollection)
-	var tr = true
 	filt := bson.D{{"version", bson.D{{"$exists", true}}}}
-	upd := bsonx.Doc{{"$set", bsonx.Document(bsonx.Doc{
-		{"version", bsonx.Int32(int32(version))},
-		{"dirty", bsonx.Boolean(dirty)},
-	})}}
+	upd := bson.D{{"$set", bson.D{
+		{"version", int32(version)},
+		{"dirty", dirty},
+	}}}
+	var tr = true
 	if res := migrationsCollection.FindOneAndUpdate(context.TODO(), filt, upd, &options.FindOneAndUpdateOptions{Upsert: &tr}); res.Err() != nil {
 		return &database.Error{OrigErr: res.Err(), Err: "FindOneAndUpdate failed"}
 	}
