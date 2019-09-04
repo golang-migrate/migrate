@@ -4,6 +4,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+
+	"log"
+
+	"github.com/mrqzzz/migrate"
 	"io"
 	"os"
 	"strconv"
@@ -13,13 +17,15 @@ import (
 
 import (
 	"github.com/dhui/dktest"
-	"github.com/mongodb/mongo-go-driver/bson"
-	"github.com/mongodb/mongo-go-driver/mongo"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 import (
-	dt "github.com/golang-migrate/migrate/v4/database/testing"
-	"github.com/golang-migrate/migrate/v4/dktesting"
+	dt "github.com/mrqzzz/migrate/database/testing"
+	"github.com/mrqzzz/migrate/dktesting"
+	_ "github.com/mrqzzz/migrate/source/file"
 )
 
 var (
@@ -29,13 +35,14 @@ var (
 		{ImageName: "mongo:3.4", Options: opts},
 		{ImageName: "mongo:3.6", Options: opts},
 		{ImageName: "mongo:4.0", Options: opts},
+		{ImageName: "mongo:4.2", Options: opts},
 	}
 )
 
 func mongoConnectionString(host, port string) string {
 	// there is connect option for excluding serverConnection algorithm
 	// it's let avoid errors with mongo replica set connection in docker container
-	return fmt.Sprintf("mongodb://%s:%s/testMigration?connect=single", host, port)
+	return fmt.Sprintf("mongodb://%s:%s/testMigration?connect=direct", host, port)
 }
 
 func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
@@ -44,17 +51,22 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 		return false
 	}
 
-	client, err := mongo.Connect(ctx, mongoConnectionString(ip, port))
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoConnectionString(ip, port)))
 	if err != nil {
 		return false
 	}
-	defer client.Disconnect(ctx)
+	defer func() {
+		if err := client.Disconnect(ctx); err != nil {
+			log.Println("close error:", err)
+		}
+	}()
+
 	if err = client.Ping(ctx, nil); err != nil {
 		switch err {
 		case io.EOF:
 			return false
 		default:
-			fmt.Println(err)
+			log.Println(err)
 		}
 		return false
 	}
@@ -72,14 +84,44 @@ func Test(t *testing.T) {
 		p := &Mongo{}
 		d, err := p.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
-		defer d.Close()
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
 		dt.TestNilVersion(t, d)
 		//TestLockAndUnlock(t, d) driver doesn't support lock on database level
 		dt.TestRun(t, d, bytes.NewReader([]byte(`[{"insert":"hello","documents":[{"wild":"world"}]}]`)))
 		dt.TestSetVersion(t, d)
 		dt.TestDrop(t, d)
+	})
+}
+
+func TestMigrate(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := mongoConnectionString(ip, port)
+		p := &Mongo{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
+		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "", d)
+		if err != nil {
+			t.Fatal(err)
+		}
+		dt.TestMigrate(t, m, []byte(`[{"insert":"hello","documents":[{"wild":"world"}]}]`))
 	})
 }
 
@@ -94,13 +136,17 @@ func TestWithAuth(t *testing.T) {
 		p := &Mongo{}
 		d, err := p.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
-		defer d.Close()
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
 		createUserCMD := []byte(`[{"createUser":"deminem","pwd":"gogo","roles":[{"role":"readWrite","db":"testMigration"}]}]`)
 		err = d.Run(bytes.NewReader(createUserCMD))
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		testcases := []struct {
 			name            string
@@ -110,20 +156,19 @@ func TestWithAuth(t *testing.T) {
 			{"right auth data", "mongodb://deminem:gogo@%s:%v/testMigration", false},
 			{"wrong auth data", "mongodb://wrong:auth@%s:%v/testMigration", true},
 		}
-		insertCMD := []byte(`[{"insert":"hello","documents":[{"wild":"world"}]}]`)
 
 		for _, tcase := range testcases {
-			//With wrong authenticate `Open` func doesn't return auth error
-			//Because at the moment golang mongo driver doesn't support auth during connection
-			//For getting auth error we should execute database command
 			t.Run(tcase.name, func(t *testing.T) {
 				mc := &Mongo{}
 				d, err := mc.Open(fmt.Sprintf(tcase.connectUri, ip, port))
-				if err != nil {
-					t.Fatalf("%v", err)
+				if err == nil {
+					defer func() {
+						if err := d.Close(); err != nil {
+							t.Error(err)
+						}
+					}()
 				}
-				defer d.Close()
-				err = d.Run(bytes.NewReader(insertCMD))
+
 				switch {
 				case tcase.isErrorExpected && err == nil:
 					t.Fatalf("no error when expected")
@@ -146,27 +191,34 @@ func TestTransaction(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		client, err := mongo.Connect(context.TODO(), mongoConnectionString(ip, port))
+		client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(mongoConnectionString(ip, port)))
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		err = client.Ping(context.TODO(), nil)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		//rs.initiate()
-		err = client.Database("admin").RunCommand(context.TODO(), bson.D{{"replSetInitiate", bson.D{}}}).Err()
+		err = client.Database("admin").RunCommand(context.TODO(), bson.D{bson.E{Key: "replSetInitiate", Value: bson.D{}}}).Err()
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		err = waitForReplicaInit(client)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		d, err := WithInstance(client, &Config{
 			DatabaseName: "testMigration",
 		})
-		defer d.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
 		//We have to create collection
 		//transactions don't support operations with creating new dbs, collections
 		//Unique index need for checking transaction aborting
@@ -184,7 +236,7 @@ func TestTransaction(t *testing.T) {
 			}]`)
 		err = d.Run(bytes.NewReader(insertCMD))
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		testcases := []struct {
 			name            string
@@ -219,31 +271,35 @@ func TestTransaction(t *testing.T) {
 		}
 		for _, tcase := range testcases {
 			t.Run(tcase.name, func(t *testing.T) {
-				client, err := mongo.Connect(context.TODO(), mongoConnectionString(ip, port))
+				client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(mongoConnectionString(ip, port)))
 				if err != nil {
-					t.Fatalf("%v", err)
+					t.Fatal(err)
 				}
 				err = client.Ping(context.TODO(), nil)
 				if err != nil {
-					t.Fatalf("%v", err)
+					t.Fatal(err)
 				}
 				d, err := WithInstance(client, &Config{
 					DatabaseName:    "testMigration",
 					TransactionMode: true,
 				})
 				if err != nil {
-					t.Fatalf("%v", err)
+					t.Fatal(err)
 				}
-				defer d.Close()
+				defer func() {
+					if err := d.Close(); err != nil {
+						t.Error(err)
+					}
+				}()
 				runErr := d.Run(bytes.NewReader(tcase.cmds))
 				if runErr != nil {
 					if !tcase.isErrorExpected {
-						t.Fatalf("%v", runErr)
+						t.Fatal(runErr)
 					}
 				}
-				documentsCount, err := client.Database("testMigration").Collection("hello").Count(context.TODO(), nil)
+				documentsCount, err := client.Database("testMigration").Collection("hello").CountDocuments(context.TODO(), bson.M{})
 				if err != nil {
-					t.Fatalf("%v", err)
+					t.Fatal(err)
 				}
 				if tcase.documentsCount != documentsCount {
 					t.Fatalf("expected %d and actual %d documents count not equal. run migration error:%s", tcase.documentsCount, documentsCount, runErr)
@@ -273,7 +329,7 @@ func waitForReplicaInit(client *mongo.Client) error {
 			//Check that node is primary because
 			//during replica set initialization, the first node first becomes a secondary and then becomes the primary
 			//should consider that initialization is completed only after the node has become the primary
-			result := client.Database("admin").RunCommand(context.TODO(), bson.D{{"isMaster", 1}})
+			result := client.Database("admin").RunCommand(context.TODO(), bson.D{bson.E{Key: "isMaster", Value: 1}})
 			r, err := result.DecodeBytes()
 			if err != nil {
 				return err

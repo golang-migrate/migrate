@@ -1,4 +1,4 @@
-// Package vfs contains a driver that reads migrations from a virtual file
+// Package godoc_vfs contains a driver that reads migrations from a virtual file
 // system.
 //
 // Implementations of the filesystem interface that read from zip files and
@@ -14,7 +14,7 @@ import (
 	"os"
 	"path"
 
-	"github.com/golang-migrate/migrate/v4/source"
+	"github.com/mrqzzz/migrate/source"
 	"golang.org/x/tools/godoc/vfs"
 )
 
@@ -83,7 +83,7 @@ func (b *VFS) Close() error {
 func (b *VFS) First() (version uint, err error) {
 	v, ok := b.migrations.First()
 	if !ok {
-		return 0, &os.PathError{"first", "<vfs>://" + b.path, os.ErrNotExist}
+		return 0, &os.PathError{Op: "first", Path: "<vfs>://" + b.path, Err: os.ErrNotExist}
 	}
 	return v, nil
 }
@@ -93,7 +93,7 @@ func (b *VFS) First() (version uint, err error) {
 func (b *VFS) Prev(version uint) (prevVersion uint, err error) {
 	v, ok := b.migrations.Prev(version)
 	if !ok {
-		return 0, &os.PathError{fmt.Sprintf("prev for version %v", version), "<vfs>://" + b.path, os.ErrNotExist}
+		return 0, &os.PathError{Op: fmt.Sprintf("prev for version %v", version), Path: "<vfs>://" + b.path, Err: os.ErrNotExist}
 	}
 	return v, nil
 }
@@ -103,7 +103,7 @@ func (b *VFS) Prev(version uint) (prevVersion uint, err error) {
 func (b *VFS) Next(version uint) (nextVersion uint, err error) {
 	v, ok := b.migrations.Next(version)
 	if !ok {
-		return 0, &os.PathError{fmt.Sprintf("next for version %v", version), "<vfs>://" + b.path, os.ErrNotExist}
+		return 0, &os.PathError{Op: fmt.Sprintf("next for version %v", version), Path: "<vfs>://" + b.path, Err: os.ErrNotExist}
 	}
 	return v, nil
 }
@@ -120,7 +120,7 @@ func (b *VFS) ReadUp(version uint) (r io.ReadCloser, identifier string, err erro
 		}
 		return ioutil.NopCloser(bytes.NewReader(body)), m.Identifier, nil
 	}
-	return nil, "", &os.PathError{fmt.Sprintf("read version %v", version), "<vfs>://" + b.path, os.ErrNotExist}
+	return nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: "<vfs>://" + b.path, Err: os.ErrNotExist}
 }
 
 // ReadDown returns the down migration body and an identifier that helps with
@@ -133,5 +133,5 @@ func (b *VFS) ReadDown(version uint) (r io.ReadCloser, identifier string, err er
 		}
 		return ioutil.NopCloser(bytes.NewReader(body)), m.Identifier, nil
 	}
-	return nil, "", &os.PathError{fmt.Sprintf("read version %v", version), "<vfs>://" + b.path, os.ErrNotExist}
+	return nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: "<vfs>://" + b.path, Err: os.ErrNotExist}
 }

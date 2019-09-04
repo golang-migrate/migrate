@@ -3,6 +3,7 @@ package cassandra
 import (
 	"context"
 	"fmt"
+	"github.com/mrqzzz/migrate"
 	"strconv"
 	"testing"
 )
@@ -13,8 +14,9 @@ import (
 )
 
 import (
-	dt "github.com/golang-migrate/migrate/v4/database/testing"
-	"github.com/golang-migrate/migrate/v4/dktesting"
+	dt "github.com/mrqzzz/migrate/database/testing"
+	"github.com/mrqzzz/migrate/dktesting"
+	_ "github.com/mrqzzz/migrate/source/file"
 )
 
 var (
@@ -66,9 +68,39 @@ func Test(t *testing.T) {
 		p := &Cassandra{}
 		d, err := p.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
-		defer d.Close()
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
 		dt.Test(t, d, []byte("SELECT table_name from system_schema.tables"))
+	})
+}
+
+func TestMigrate(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.Port(9042)
+		if err != nil {
+			t.Fatal("Unable to get mapped port:", err)
+		}
+		addr := fmt.Sprintf("cassandra://%v:%v/testks", ip, port)
+		p := &Cassandra{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
+
+		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "testks", d)
+		if err != nil {
+			t.Fatal(err)
+		}
+		dt.TestMigrate(t, m, []byte("SELECT table_name from system_schema.tables"))
 	})
 }

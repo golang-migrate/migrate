@@ -9,8 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database"
+	"github.com/hashicorp/go-multierror"
+	"github.com/mrqzzz/migrate"
+	"github.com/mrqzzz/migrate/database"
 )
 
 var DefaultMigrationsTable = "schema_migrations"
@@ -109,7 +110,7 @@ func (ch *ClickHouse) Run(r io.Reader) error {
 			if tq == "" {
 				continue
 			}
-			if _, err := ch.conn.Exec(string(q)); err != nil {
+			if _, err := ch.conn.Exec(q); err != nil {
 				return database.Error{OrigErr: err, Err: "migration failed", Query: []byte(q)}
 			}
 		}
@@ -159,7 +160,24 @@ func (ch *ClickHouse) SetVersion(version int, dirty bool) error {
 	return tx.Commit()
 }
 
-func (ch *ClickHouse) ensureVersionTable() error {
+// ensureVersionTable checks if versions table exists and, if not, creates it.
+// Note that this function locks the database, which deviates from the usual
+// convention of "caller locks" in the ClickHouse type.
+func (ch *ClickHouse) ensureVersionTable() (err error) {
+	if err = ch.Lock(); err != nil {
+		return err
+	}
+
+	defer func() {
+		if e := ch.Unlock(); e != nil {
+			if err == nil {
+				err = e
+			} else {
+				err = multierror.Append(err, e)
+			}
+		}
+	}()
+
 	var (
 		table string
 		query = "SHOW TABLES FROM " + ch.config.DatabaseName + " LIKE '" + ch.config.MigrationsTable + "'"
@@ -186,15 +204,18 @@ func (ch *ClickHouse) ensureVersionTable() error {
 	return nil
 }
 
-func (ch *ClickHouse) Drop() error {
-	var (
-		query       = "SHOW TABLES FROM " + ch.config.DatabaseName
-		tables, err = ch.conn.Query(query)
-	)
+func (ch *ClickHouse) Drop() (err error) {
+	query := "SHOW TABLES FROM " + ch.config.DatabaseName
+	tables, err := ch.conn.Query(query)
+
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
-	defer tables.Close()
+	defer func() {
+		if errClose := tables.Close(); errClose != nil {
+			err = multierror.Append(err, errClose)
+		}
+	}()
 	for tables.Next() {
 		var table string
 		if err := tables.Scan(&table); err != nil {
@@ -207,7 +228,7 @@ func (ch *ClickHouse) Drop() error {
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
 	}
-	return ch.ensureVersionTable()
+	return nil
 }
 
 func (ch *ClickHouse) Lock() error   { return nil }

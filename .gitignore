@@ -5,3 +5,4 @@ cli/migrate
 .coverage
 .godoc.pid
 vendor/
+.vscode/

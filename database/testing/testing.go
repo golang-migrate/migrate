@@ -5,12 +5,13 @@ package testing
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"testing"
 	"time"
 
-	"github.com/golang-migrate/migrate/v4/database"
+	"github.com/mrqzzz/migrate/database"
 )
 
 // Test runs tests against database implementations.
@@ -22,8 +23,9 @@ func Test(t *testing.T, d database.Driver, migration []byte) {
 	TestNilVersion(t, d) // test first
 	TestLockAndUnlock(t, d)
 	TestRun(t, d, bytes.NewReader(migration))
-	TestDrop(t, d)
 	TestSetVersion(t, d) // also tests Version()
+	// Drop breaks the driver, so test it last.
+	TestDrop(t, d)
 }
 
 func TestNilVersion(t *testing.T, d database.Driver) {
@@ -38,7 +40,9 @@ func TestNilVersion(t *testing.T, d database.Driver) {
 
 func TestLockAndUnlock(t *testing.T, d database.Driver) {
 	// add a timeout, in case there is a deadlock
-	done := make(chan bool, 1)
+	done := make(chan struct{})
+	errs := make(chan error)
+
 	go func() {
 		timeout := time.After(15 * time.Second)
 		for {
@@ -46,36 +50,52 @@ func TestLockAndUnlock(t *testing.T, d database.Driver) {
 			case <-done:
 				return
 			case <-timeout:
-				t.Fatal(fmt.Sprintf("Timeout after 15 seconds. Looks like a deadlock in Lock/UnLock.\n%#v", d))
+				errs <- fmt.Errorf("Timeout after 15 seconds. Looks like a deadlock in Lock/UnLock.\n%#v", d)
+				return
 			}
 		}
 	}()
-	defer func() {
-		done <- true
-	}()
 
 	// run the locking test ...
+	go func() {
+		if err := d.Lock(); err != nil {
+			errs <- err
+			return
+		}
 
-	if err := d.Lock(); err != nil {
-		t.Fatal(err)
-	}
+		// try to acquire lock again
+		if err := d.Lock(); err == nil {
+			errs <- errors.New("lock: expected err not to be nil")
+			return
+		}
 
-	// try to acquire lock again
-	if err := d.Lock(); err == nil {
-		t.Fatal("Lock: expected err not to be nil")
-	}
+		// unlock
+		if err := d.Unlock(); err != nil {
+			errs <- err
+			return
+		}
 
-	// unlock
-	if err := d.Unlock(); err != nil {
-		t.Fatal(err)
-	}
+		// try to lock
+		if err := d.Lock(); err != nil {
+			errs <- err
+			return
+		}
+		if err := d.Unlock(); err != nil {
+			errs <- err
+			return
+		}
+		// notify everyone
+		close(done)
+	}()
 
-	// try to lock
-	if err := d.Lock(); err != nil {
-		t.Fatal(err)
-	}
-	if err := d.Unlock(); err != nil {
-		t.Fatal(err)
+	// wait for done or any error
+	for {
+		select {
+		case <-done:
+			return
+		case err := <-errs:
+			t.Fatal(err)
+		}
 	}
 }
 

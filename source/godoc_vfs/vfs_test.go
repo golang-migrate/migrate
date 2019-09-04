@@ -3,8 +3,8 @@ package godoc_vfs_test
 import (
 	"testing"
 
-	"github.com/golang-migrate/migrate/v4/source/godoc_vfs"
-	st "github.com/golang-migrate/migrate/v4/source/testing"
+	"github.com/mrqzzz/migrate/source/godoc_vfs"
+	st "github.com/mrqzzz/migrate/source/testing"
 	"golang.org/x/tools/godoc/vfs/mapfs"
 )
 
@@ -34,5 +34,7 @@ func TestOpen(t *testing.T) {
 		}
 	}()
 	b := &godoc_vfs.VFS{}
-	b.Open("")
+	if _, err := b.Open(""); err != nil {
+		t.Error(err)
+	}
 }

@@ -11,9 +11,9 @@ import (
 )
 
 import (
-	dStub "github.com/golang-migrate/migrate/v4/database/stub"
-	"github.com/golang-migrate/migrate/v4/source"
-	sStub "github.com/golang-migrate/migrate/v4/source/stub"
+	dStub "github.com/mrqzzz/migrate/database/stub"
+	"github.com/mrqzzz/migrate/source"
+	sStub "github.com/mrqzzz/migrate/source/stub"
 )
 
 // sourceStubMigrations hold the following migrations:
@@ -21,6 +21,11 @@ import (
 //  |  1  |  -  |  3  |  4  |  5  |  -  |  7  |
 //  | u d |  -  | u   | u d |   d |  -  | u d |
 var sourceStubMigrations *source.Migrations
+
+const (
+	srcDrvNameStub = "stub"
+	dbDrvNameStub  = "stub"
+)
 
 func init() {
 	sourceStubMigrations = source.NewMigrations()
@@ -42,14 +47,14 @@ func TestNew(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if m.sourceName != "stub" {
+	if m.sourceName != srcDrvNameStub {
 		t.Errorf("expected stub, got %v", m.sourceName)
 	}
 	if m.sourceDrv == nil {
 		t.Error("expected sourceDrv not to be nil")
 	}
 
-	if m.databaseName != "stub" {
+	if m.databaseName != dbDrvNameStub {
 		t.Errorf("expected stub, got %v", m.databaseName)
 	}
 	if m.databaseDrv == nil {
@@ -77,19 +82,19 @@ func TestNewWithDatabaseInstance(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	m, err := NewWithDatabaseInstance("stub://", "stub", dbInst)
+	m, err := NewWithDatabaseInstance("stub://", dbDrvNameStub, dbInst)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if m.sourceName != "stub" {
+	if m.sourceName != srcDrvNameStub {
 		t.Errorf("expected stub, got %v", m.sourceName)
 	}
 	if m.sourceDrv == nil {
 		t.Error("expected sourceDrv not to be nil")
 	}
 
-	if m.databaseName != "stub" {
+	if m.databaseName != dbDrvNameStub {
 		t.Errorf("expected stub, got %v", m.databaseName)
 	}
 	if m.databaseDrv == nil {
@@ -103,11 +108,15 @@ func ExampleNewWithDatabaseInstance() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Fatal(err)
+		}
+	}()
 
 	// Create driver instance from db.
 	// Check each driver if it supports the WithInstance function.
-	// `import "github.com/golang-migrate/migrate/v4/database/postgres"`
+	// `import "github.com/mrqzzz/migrate/database/postgres"`
 	instance, err := dStub.WithInstance(db, &dStub.Config{})
 	if err != nil {
 		log.Fatal(err)
@@ -132,19 +141,19 @@ func TestNewWithSourceInstance(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	m, err := NewWithSourceInstance("stub", sInst, "stub://")
+	m, err := NewWithSourceInstance(srcDrvNameStub, sInst, "stub://")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if m.sourceName != "stub" {
+	if m.sourceName != srcDrvNameStub {
 		t.Errorf("expected stub, got %v", m.sourceName)
 	}
 	if m.sourceDrv == nil {
 		t.Error("expected sourceDrv not to be nil")
 	}
 
-	if m.databaseName != "stub" {
+	if m.databaseName != dbDrvNameStub {
 		t.Errorf("expected stub, got %v", m.databaseName)
 	}
 	if m.databaseDrv == nil {
@@ -157,14 +166,14 @@ func ExampleNewWithSourceInstance() {
 
 	// Create driver instance from DummyInstance di.
 	// Check each driver if it support the WithInstance function.
-	// `import "github.com/golang-migrate/migrate/v4/source/stub"`
+	// `import "github.com/mrqzzz/migrate/source/stub"`
 	instance, err := sStub.WithInstance(di, &sStub.Config{})
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// Read migrations from Stub and connect to a local postgres database.
-	m, err := NewWithSourceInstance("stub", instance, "postgres://mattes:secret@localhost:5432/database?sslmode=disable")
+	m, err := NewWithSourceInstance(srcDrvNameStub, instance, "postgres://mattes:secret@localhost:5432/database?sslmode=disable")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -188,19 +197,19 @@ func TestNewWithInstance(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	m, err := NewWithInstance("stub", sInst, "stub", dbInst)
+	m, err := NewWithInstance(srcDrvNameStub, sInst, dbDrvNameStub, dbInst)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if m.sourceName != "stub" {
+	if m.sourceName != srcDrvNameStub {
 		t.Errorf("expected stub, got %v", m.sourceName)
 	}
 	if m.sourceDrv == nil {
 		t.Error("expected sourceDrv not to be nil")
 	}
 
-	if m.databaseName != "stub" {
+	if m.databaseName != dbDrvNameStub {
 		t.Errorf("expected stub, got %v", m.databaseName)
 	}
 	if m.databaseDrv == nil {
@@ -1313,12 +1322,12 @@ func TestLock(t *testing.T) {
 func migrationsFromChannel(ret chan interface{}) ([]*Migration, error) {
 	slice := make([]*Migration, 0)
 	for r := range ret {
-		switch r.(type) {
+		switch t := r.(type) {
 		case error:
-			return slice, r.(error)
+			return slice, t
 
 		case *Migration:
-			slice = append(slice, r.(*Migration))
+			slice = append(slice, t)
 		}
 	}
 	return slice, nil
@@ -1330,7 +1339,7 @@ func newMigSeq(migr ...*Migration) migrationSequence {
 	return migr
 }
 
-func (m *migrationSequence) add(migr ...*Migration) migrationSequence {
+func (m *migrationSequence) add(migr ...*Migration) migrationSequence { // nolint:unused
 	*m = append(*m, migr...)
 	return *m
 }

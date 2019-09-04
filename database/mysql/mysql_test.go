@@ -5,18 +5,21 @@ import (
 	"database/sql"
 	sqldriver "database/sql/driver"
 	"fmt"
-	"net/url"
+	"log"
 	"testing"
 )
 
 import (
 	"github.com/dhui/dktest"
 	"github.com/go-sql-driver/mysql"
+	"github.com/stretchr/testify/assert"
 )
 
 import (
-	dt "github.com/golang-migrate/migrate/v4/database/testing"
-	"github.com/golang-migrate/migrate/v4/dktesting"
+	"github.com/mrqzzz/migrate"
+	dt "github.com/mrqzzz/migrate/database/testing"
+	"github.com/mrqzzz/migrate/dktesting"
+	_ "github.com/mrqzzz/migrate/source/file"
 )
 
 const defaultPort = 3306
@@ -45,7 +48,11 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 	if err != nil {
 		return false
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Println("close error:", err)
+		}
+	}()
 	if err = db.PingContext(ctx); err != nil {
 		switch err {
 		case sqldriver.ErrBadConn, mysql.ErrInvalidConn:
@@ -72,10 +79,52 @@ func Test(t *testing.T) {
 		p := &Mysql{}
 		d, err := p.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
-		defer d.Close()
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
 		dt.Test(t, d, []byte("SELECT 1"))
+
+		// check ensureVersionTable
+		if err := d.(*Mysql).ensureVersionTable(); err != nil {
+			t.Fatal(err)
+		}
+		// check again
+		if err := d.(*Mysql).ensureVersionTable(); err != nil {
+			t.Fatal(err)
+		}
+	})
+}
+
+func TestMigrate(t *testing.T) {
+	// mysql.SetLogger(mysql.Logger(log.New(ioutil.Discard, "", log.Ltime)))
+
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.Port(defaultPort)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := fmt.Sprintf("mysql://root:root@tcp(%v:%v)/public", ip, port)
+		p := &Mysql{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
+
+		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "public", d)
+		if err != nil {
+			t.Fatal(err)
+		}
+		dt.TestMigrate(t, m, []byte("SELECT 1"))
 
 		// check ensureVersionTable
 		if err := d.(*Mysql).ensureVersionTable(); err != nil {
@@ -99,7 +148,7 @@ func TestLockWorks(t *testing.T) {
 		p := &Mysql{}
 		d, err := p.Open(addr)
 		if err != nil {
-			t.Fatalf("%v", err)
+			t.Fatal(err)
 		}
 		dt.Test(t, d, []byte("SELECT 1"))
 
@@ -124,6 +173,62 @@ func TestLockWorks(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
+}
+
+func TestExtractCustomQueryParams(t *testing.T) {
+	testcases := []struct {
+		name                 string
+		config               *mysql.Config
+		expectedParams       map[string]string
+		expectedCustomParams map[string]string
+		expectedErr          error
+	}{
+		{name: "nil config", expectedErr: ErrNilConfig},
+		{
+			name:                 "no params",
+			config:               mysql.NewConfig(),
+			expectedCustomParams: map[string]string{},
+		},
+		{
+			name:                 "no custom params",
+			config:               &mysql.Config{Params: map[string]string{"hello": "world"}},
+			expectedParams:       map[string]string{"hello": "world"},
+			expectedCustomParams: map[string]string{},
+		},
+		{
+			name: "one param, one custom param",
+			config: &mysql.Config{
+				Params: map[string]string{"hello": "world", "x-foo": "bar"},
+			},
+			expectedParams:       map[string]string{"hello": "world"},
+			expectedCustomParams: map[string]string{"x-foo": "bar"},
+		},
+		{
+			name: "multiple params, multiple custom params",
+			config: &mysql.Config{
+				Params: map[string]string{
+					"hello": "world",
+					"x-foo": "bar",
+					"dead":  "beef",
+					"x-cat": "hat",
+				},
+			},
+			expectedParams:       map[string]string{"hello": "world", "dead": "beef"},
+			expectedCustomParams: map[string]string{"x-foo": "bar", "x-cat": "hat"},
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			customParams, err := extractCustomQueryParams(tc.config)
+			if tc.config != nil {
+				assert.Equal(t, tc.expectedParams, tc.config.Params,
+					"Expected config params have custom params properly removed")
+			}
+			assert.Equal(t, tc.expectedErr, err, "Expected errors to match")
+			assert.Equal(t, tc.expectedCustomParams, customParams,
+				"Expected custom params to be properly extracted")
+		})
+	}
 }
 
 func TestURLToMySQLConfig(t *testing.T) {
@@ -160,19 +265,13 @@ func TestURLToMySQLConfig(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			u, err := url.Parse(tc.urlStr)
+			config, err := urlToMySQLConfig(tc.urlStr)
 			if err != nil {
 				t.Fatal("Failed to parse url string:", tc.urlStr, "error:", err)
 			}
-			if config, err := urlToMySQLConfig(*u); err == nil {
-				dsn := config.FormatDSN()
-				if dsn != tc.expectedDSN {
-					t.Error("Got unexpected DSN:", dsn, "!=", tc.expectedDSN)
-				}
-			} else {
-				if tc.expectedDSN != "" {
-					t.Error("Got unexpected error:", err, "urlStr:", tc.urlStr)
-				}
+			dsn := config.FormatDSN()
+			if dsn != tc.expectedDSN {
+				t.Error("Got unexpected DSN:", dsn, "!=", tc.expectedDSN)
 			}
 		})
 	}

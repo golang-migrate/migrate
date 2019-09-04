@@ -11,7 +11,7 @@
 
 | URL Query  | WithInstance Config | Description |
 |------------|---------------------|-------------|
-| `x-migrations-table` | `MigrationsTable` | Name of the migrations table |
+| `x-migrations-collection` | `MigrationsCollection` | Name of the migrations collection |
 | `x-transaction-mode` | `TransactionMode` | If set to `true` wrap commands in [transaction](https://docs.mongodb.com/manual/core/transactions). Available only for replica set. Driver is using [strconv.ParseBool](https://golang.org/pkg/strconv/#ParseBool) for parsing|
 | `dbname` | `DatabaseName` | The name of the database to connect to |
 | `user` | | The user to sign in as. Can be omitted |
