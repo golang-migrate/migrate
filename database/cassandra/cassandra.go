@@ -197,12 +197,9 @@ func (c *Cassandra) Run(migration io.Reader) error {
 }
 
 func (c *Cassandra) SetVersion(version int, dirty bool) error {
-	query := `TRUNCATE "` + c.config.MigrationsTable + `"`
-	if err := c.session.Query(query).Exec(); err != nil {
-		return &database.Error{OrigErr: err, Query: []byte(query)}
-	}
+
 	if version >= 0 {
-		query = `INSERT INTO "` + c.config.MigrationsTable + `" (version, dirty) VALUES (?, ?)`
+		query := `INSERT INTO "` + c.config.MigrationsTable + `" (version, dirty) VALUES (?, ?)`
 		if err := c.session.Query(query, version, dirty).Exec(); err != nil {
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
