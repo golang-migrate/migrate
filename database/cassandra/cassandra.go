@@ -197,14 +197,6 @@ func (c *Cassandra) Run(migration io.Reader) error {
 }
 
 func (c *Cassandra) SetVersion(version int, dirty bool) error {
-	query := `DROP TABLE "` + c.config.MigrationsTable + `"`
-	if err := c.session.Query(query).Exec(); err != nil {
-		return &database.Error{OrigErr: err, Query: []byte(query)}
-	}
-
-	if err := c.createMigrationTable(); err != nil {
-		return &database.Error{OrigErr: err, Query: []byte(query)}
-	}
 
 	if version >= 0 {
 		query := `INSERT INTO "` + c.config.MigrationsTable + `" (version, dirty) VALUES (?, ?)`
@@ -268,7 +260,7 @@ func (c *Cassandra) ensureVersionTable() (err error) {
 		}
 	}()
 
-	err = c.createMigrationTable()
+	err = c.session.Query(fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (version bigint, dirty boolean, PRIMARY KEY(version))", c.config.MigrationsTable)).Exec()
 	if err != nil {
 		return err
 	}
@@ -293,9 +285,4 @@ func parseConsistency(consistencyStr string) (consistency gocql.Consistency, err
 	consistency = gocql.ParseConsistency(consistencyStr)
 
 	return consistency, nil
-}
-
-// createMigrationTable creates migration table
-func (c *Cassandra) createMigrationTable() error {
-	return c.session.Query(fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (version bigint, dirty boolean, PRIMARY KEY(version))", c.config.MigrationsTable)).Exec()
 }
