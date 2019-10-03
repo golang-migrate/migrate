@@ -102,7 +102,7 @@ func TestMultistatementSplit(t *testing.T) {
 CREATE INDEX table_name_id_idx ON table_name (id);`,
 			expected: []string{`CREATE TABLE table_name (
 	id STRING(255) NOT NULL,
-) PRIMARY KEY(id)`, "\n\nCREATE INDEX table_name_id_idx ON table_name (id)"},
+) PRIMARY KEY(id)`, "CREATE INDEX table_name_id_idx ON table_name (id)"},
 		},
 		{
 			name: "multi statement, no trailing semicolon",
@@ -114,7 +114,7 @@ CREATE INDEX table_name_id_idx ON table_name (id);`,
 CREATE INDEX table_name_id_idx ON table_name (id)`,
 			expected: []string{`CREATE TABLE table_name (
 	id STRING(255) NOT NULL,
-) PRIMARY KEY(id)`, "\n\nCREATE INDEX table_name_id_idx ON table_name (id)"},
+) PRIMARY KEY(id)`, "CREATE INDEX table_name_id_idx ON table_name (id)"},
 		},
 	}
 
