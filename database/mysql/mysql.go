@@ -63,17 +63,19 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		return nil, err
 	}
 
-	query := `SELECT DATABASE()`
-	var databaseName sql.NullString
-	if err := instance.QueryRow(query).Scan(&databaseName); err != nil {
-		return nil, &database.Error{OrigErr: err, Query: []byte(query)}
-	}
+	if config.DatabaseName == "" {
+		query := `SELECT DATABASE()`
+		var databaseName sql.NullString
+		if err := instance.QueryRow(query).Scan(&databaseName); err != nil {
+			return nil, &database.Error{OrigErr: err, Query: []byte(query)}
+		}
 
-	if len(databaseName.String) == 0 {
-		return nil, ErrNoDatabaseName
-	}
+		if len(databaseName.String) == 0 {
+			return nil, ErrNoDatabaseName
+		}
 
-	config.DatabaseName = databaseName.String
+		config.DatabaseName = databaseName.String
+	}
 
 	if len(config.MigrationsTable) == 0 {
 		config.MigrationsTable = DefaultMigrationsTable
