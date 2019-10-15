@@ -309,6 +309,7 @@ func migrationStatements(migration []byte) []string {
 	allStatements := strings.Split(migrationString, ";")
 	nonEmptyStatements := allStatements[:0]
 	for _, s := range allStatements {
+		s = strings.TrimSpace(s)
 		if s != "" {
 			nonEmptyStatements = append(nonEmptyStatements, s)
 		}
