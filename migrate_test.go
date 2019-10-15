@@ -64,7 +64,7 @@ func TestNew(t *testing.T) {
 
 func ExampleNew() {
 	// Read migrations from /home/mattes/migrations and connect to a local postgres database.
-	m, err := migrate.New("file:///home/mattes/migrations", "postgres://mattes:secret@localhost:5432/database?sslmode=disable")
+	m, err := New("file:///home/mattes/migrations", "postgres://mattes:secret@localhost:5432/database?sslmode=disable")
 	if err != nil {
 		log.Fatal(err)
 	}
