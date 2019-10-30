@@ -1,0 +1,3 @@
+# packr
+
+`packr://box/path`
