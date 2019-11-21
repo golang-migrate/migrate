@@ -2,6 +2,7 @@ module github.com/golang-migrate/migrate/v4
 
 require (
 	cloud.google.com/go v0.37.4
+	github.com/ClickHouse/clickhouse-go v1.3.12
 	github.com/aws/aws-sdk-go v1.17.7
 	github.com/bitly/go-hostpool v0.0.0-20171023180738-a3a6125de932 // indirect
 	github.com/bmizerany/assert v0.0.0-20160611221934-b7ed37b82869 // indirect
@@ -26,7 +27,6 @@ require (
 	github.com/kardianos/osext v0.0.0-20190222173326-2bc1f35cddc0 // indirect
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/kr/pretty v0.1.0 // indirect
-	github.com/kshvakov/clickhouse v1.3.5
 	github.com/lib/pq v1.0.0
 	github.com/mattn/go-sqlite3 v1.10.0
 	github.com/morikuni/aec v0.0.0-20170113033406-39771216ff4c // indirect
