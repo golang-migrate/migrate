@@ -1,13 +1,81 @@
 package cli
 
 import (
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/suite"
 )
 
-func TestNextSeqVersion(t *testing.T) {
+type CreateCmdSuite struct {
+	suite.Suite
+}
+
+func TestCreateCmdSuite(t *testing.T) {
+	suite.Run(t, &CreateCmdSuite{})
+}
+
+func (s *CreateCmdSuite) mustCreateTempDir() string {
+	tmpDir, err := ioutil.TempDir("", "")
+
+	if err != nil {
+		s.FailNow(err.Error())
+	}
+
+	return tmpDir
+}
+
+func (s *CreateCmdSuite) mustCreateDir(dir string) {
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		s.FailNow(err.Error())
+	}
+}
+
+func (s *CreateCmdSuite) mustRemoveDir(dir string) {
+	if err := os.RemoveAll(dir); err != nil {
+		s.FailNow(err.Error())
+	}
+}
+
+func (s *CreateCmdSuite) mustWriteFile(dir, file, body string) {
+	if err := ioutil.WriteFile(filepath.Join(dir, file), []byte(body), 0644); err != nil {
+		s.FailNow(err.Error())
+	}
+}
+
+func (s *CreateCmdSuite) mustGetwd() string {
+	cwd, err := os.Getwd()
+
+	if err != nil {
+		s.FailNow(err.Error())
+	}
+
+	return cwd
+}
+
+func (s *CreateCmdSuite) mustChdir(dir string) {
+	if err := os.Chdir(dir); err != nil {
+		s.FailNow(err.Error())
+	}
+}
+
+func (s *CreateCmdSuite) assertEmptyDir(dir string) bool {
+	fis, err := ioutil.ReadDir(dir)
+
+	if err != nil {
+		return s.Fail(err.Error())
+	}
+
+	return s.Empty(fis)
+}
+
+func (s *CreateCmdSuite) TestNextSeqVersion() {
 	cases := []struct {
-		name        string
+		tid         string
 		matches     []string
 		seqDigits   int
 		expected    string
@@ -34,59 +102,148 @@ func TestNextSeqVersion(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
+		s.Run(c.tid, func() {
 			v, err := nextSeqVersion(c.matches, c.seqDigits)
 
-			if err == nil {
-				if c.expectedErr != "" {
-					t.Errorf("Expected error: %q, but got nil instead.", c.expectedErr)
-				} else {
-					if v != c.expected {
-						t.Errorf("Incorrect version %q. Expected %q.", v, c.expected)
-					}
-				}
+			if c.expectedErr != "" {
+				s.EqualError(err, c.expectedErr)
 			} else {
-				if err.Error() != c.expectedErr {
-					t.Errorf("Incorrect error %q. Expected: %q.", err.Error(), c.expectedErr)
-				}
+				s.NoError(err)
+				s.Equal(c.expected, v)
 			}
 		})
 	}
 }
 
-func TestTimeVersion(t *testing.T) {
+func (s *CreateCmdSuite) TestTimeVersion() {
 	ts := time.Date(2000, 12, 25, 00, 01, 02, 3456789, time.UTC)
+	tsUnixStr := strconv.FormatInt(ts.Unix(), 10)
+	tsUnixNanoStr := strconv.FormatInt(ts.UnixNano(), 10)
 
 	cases := []struct {
-		name        string
+		tid         string
 		time        time.Time
 		format      string
 		expected    string
 		expectedErr string
 	}{
 		{"Bad format", ts, "", "", errInvalidTimeFormat.Error()},
-		{"unix", ts, "unix", "977702462", ""},
-		{"unixNano", ts, "unixNano", "977702462003456789", ""},
+		{"unix", ts, "unix", tsUnixStr, ""},
+		{"unixNano", ts, "unixNano", tsUnixNanoStr, ""},
 		{"custom ymthms", ts, "20060102150405", "20001225000102", ""},
 	}
 
 	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
+		s.Run(c.tid, func() {
 			v, err := timeVersion(c.time, c.format)
 
-			if err == nil {
-				if c.expectedErr != "" {
-					t.Errorf("Expected error: %q, but got nil instead.", c.expectedErr)
-				} else {
-					if v != c.expected {
-						t.Errorf("Incorrect version %q. Expected %q.", v, c.expected)
-					}
-				}
+			if c.expectedErr != "" {
+				s.EqualError(err, c.expectedErr)
 			} else {
-				if err.Error() != c.expectedErr {
-					t.Errorf("Incorrect error %q. Expected: %q.", err.Error(), c.expectedErr)
+				s.NoError(err)
+				s.Equal(c.expected, v)
+			}
+		})
+	}
+}
+
+// TestCreateCmd tests function createCmd.
+//
+// For each test case, it creates a temp dir as "sandbox" (called `baseDir`) and
+// all path manipulations are relative to `baseDir`.
+func (s *CreateCmdSuite) TestCreateCmd() {
+	ts := time.Date(2000, 12, 25, 00, 01, 02, 3456789, time.UTC)
+	tsUnixStr := strconv.FormatInt(ts.Unix(), 10)
+	tsUnixNanoStr := strconv.FormatInt(ts.UnixNano(), 10)
+	testCwd := s.mustGetwd()
+
+	cases := []struct {
+		tid           string
+		existingDirs  []string // directory paths to create before test. relative to baseDir.
+		cwd           string   // path to chdir to before test. relative to baseDir.
+		existingFiles []string // file paths created before test. relative to baseDir.
+		expectedFiles []string // file paths expected to exist after test. paths relative to baseDir.
+		expectedErr   string
+		dir           string // `dir` parameter. if absolute path, will be converted to baseDir/dir.
+		startTime     time.Time
+		format        string
+		seq           bool
+		seqDigits     int
+		ext           string
+		name          string
+	}{
+		{"seq and format", nil, "", nil, nil, errIncompatibleSeqAndFormat.Error(), ".", ts, "unix", true, 4, "sql", "name"},
+		{"seq init dir dot", nil, "", nil, []string{"0001_name.up.sql", "0001_name.down.sql"}, "", ".", ts, defaultTimeFormat, true, 4, "sql", "name"},
+		{"seq init dir dot trailing slash", nil, "", nil, []string{"0001_name.up.sql", "0001_name.down.sql"}, "", "./", ts, defaultTimeFormat, true, 4, "sql", "name"},
+		{"seq init dir double dot", []string{"subdir"}, "subdir", nil, []string{"0001_name.up.sql", "0001_name.down.sql"}, "", "..", ts, defaultTimeFormat, true, 4, "sql", "name"},
+		{"seq init dir double dot trailing slash", []string{"subdir"}, "subdir", nil, []string{"0001_name.up.sql", "0001_name.down.sql"}, "", "../", ts, defaultTimeFormat, true, 4, "sql", "name"},
+		{"seq init dir absolute", []string{"subdir"}, "", nil, []string{"subdir/0001_name.up.sql", "subdir/0001_name.down.sql"}, "", "/subdir", ts, defaultTimeFormat, true, 4, "sql", "name"},
+		{"seq init dir absolute trailing slash", []string{"subdir"}, "", nil, []string{"subdir/0001_name.up.sql", "subdir/0001_name.down.sql"}, "", "/subdir/", ts, defaultTimeFormat, true, 4, "sql", "name"},
+		{"seq init dir relative", []string{"subdir"}, "", nil, []string{"subdir/0001_name.up.sql", "subdir/0001_name.down.sql"}, "", "subdir", ts, defaultTimeFormat, true, 4, "sql", "name"},
+		{"seq init dir relative trailing slash", []string{"subdir"}, "", nil, []string{"subdir/0001_name.up.sql", "subdir/0001_name.down.sql"}, "", "subdir/", ts, defaultTimeFormat, true, 4, "sql", "name"},
+		{"seq init dir dot relative", []string{"subdir"}, "", nil, []string{"subdir/0001_name.up.sql", "subdir/0001_name.down.sql"}, "", "./subdir", ts, defaultTimeFormat, true, 4, "sql", "name"},
+		{"seq init dir dot relative trailing slash", []string{"subdir"}, "", nil, []string{"subdir/0001_name.up.sql", "subdir/0001_name.down.sql"}, "", "./subdir/", ts, defaultTimeFormat, true, 4, "sql", "name"},
+		{"seq init dir double dot relative", []string{"subdir"}, "subdir", nil, []string{"subdir/0001_name.up.sql", "subdir/0001_name.down.sql"}, "", "../subdir", ts, defaultTimeFormat, true, 4, "sql", "name"},
+		{"seq init dir double dot relative trailing slash", []string{"subdir"}, "subdir", nil, []string{"subdir/0001_name.up.sql", "subdir/0001_name.down.sql"}, "", "../subdir/", ts, defaultTimeFormat, true, 4, "sql", "name"},
+		{"seq init dir maze", []string{"subdir"}, "subdir", nil, []string{"0001_name.up.sql", "0001_name.down.sql"}, "", "..//subdir/./.././/subdir/..", ts, defaultTimeFormat, true, 4, "sql", "name"},
+		{"seq width invalid", nil, "", nil, nil, errInvalidSequenceWidth.Error(), ".", ts, defaultTimeFormat, true, 0, "sql", "name"},
+		{"seq malformed", nil, "", []string{"bad.sql"}, []string{"bad.sql"}, "Malformed migration filename: bad.sql", ".", ts, defaultTimeFormat, true, 4, "sql", "name"},
+		{"seq not int", nil, "", []string{"bad_bad.sql"}, []string{"bad_bad.sql"}, `strconv.ParseUint: parsing "bad": invalid syntax`, ".", ts, defaultTimeFormat, true, 4, "sql", "name"},
+		{"seq negative", nil, "", []string{"-5_negative.sql"}, []string{"-5_negative.sql"}, `strconv.ParseUint: parsing "-5": invalid syntax`, ".", ts, defaultTimeFormat, true, 4, "sql", "name"},
+		{"seq increment", nil, "", []string{"3_three.sql", "4_four.sql"}, []string{"3_three.sql", "4_four.sql", "0005_five.up.sql", "0005_five.down.sql"}, "", ".", ts, defaultTimeFormat, true, 4, "sql", "five"},
+		{"seq overflow", nil, "", []string{"9_nine.sql"}, []string{"9_nine.sql"}, `Next sequence number 10 too large. At most 1 digits are allowed`, ".", ts, defaultTimeFormat, true, 1, "sql", "ten"},
+		{"time empty format", nil, "", nil, nil, errInvalidTimeFormat.Error(), ".", ts, "", false, 0, "sql", "name"},
+		{"time unix", nil, "", nil, []string{tsUnixStr + "_name.up.sql", tsUnixStr + "_name.down.sql"}, "", ".", ts, "unix", false, 0, "sql", "name"},
+		{"time unixNano", nil, "", nil, []string{tsUnixNanoStr + "_name.up.sql", tsUnixNanoStr + "_name.down.sql"}, "", ".", ts, "unixNano", false, 0, "sql", "name"},
+		{"time custom format", nil, "", nil, []string{"20001225000102_name.up.sql", "20001225000102_name.down.sql"}, "", ".", ts, "20060102150405", false, 0, "sql", "name"},
+		{"time version collision", nil, "", []string{"20001225_name.up.sql", "20001225_name.down.sql"}, []string{"20001225_name.up.sql", "20001225_name.down.sql"}, "duplicate migration version: 20001225", ".", ts, "20060102", false, 0, "sql", "name"},
+		{"dir invalid", nil, "", []string{"file"}, []string{"file"}, "", "mkdir file: not a directory", ts, "unix", false, 0, "sql", "name"},
+	}
+
+	for _, c := range cases {
+		s.Run(c.tid, func() {
+			baseDir := s.mustCreateTempDir()
+
+			for _, d := range c.existingDirs {
+				s.mustCreateDir(filepath.Join(baseDir, d))
+			}
+
+			cwd := baseDir
+
+			if c.cwd != "" {
+				cwd = filepath.Join(baseDir, c.cwd)
+			}
+
+			s.mustChdir(cwd)
+
+			for _, f := range c.existingFiles {
+				s.mustWriteFile(baseDir, f, "")
+			}
+
+			dir := c.dir
+
+			if filepath.IsAbs(dir) {
+				dir = filepath.Join(baseDir, dir)
+			}
+
+			err := createCmd(dir, c.startTime, c.format, c.name, c.ext, c.seq, c.seqDigits, false)
+
+			if c.expectedErr != "" {
+				s.EqualError(err, c.expectedErr)
+			} else {
+				s.NoError(err)
+			}
+
+			if len(c.expectedFiles) == 0 {
+				s.assertEmptyDir(baseDir)
+			} else {
+				for _, f := range c.expectedFiles {
+					s.FileExists(filepath.Join(baseDir, f))
 				}
 			}
+
+			s.mustChdir(testCwd)
+			s.mustRemoveDir(baseDir)
 		})
 	}
 }

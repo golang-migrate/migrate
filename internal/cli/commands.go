@@ -3,14 +3,15 @@ package cli
 import (
 	"errors"
 	"fmt"
-	"github.com/golang-migrate/migrate/v4"
-	_ "github.com/golang-migrate/migrate/v4/database/stub" // TODO remove again
-	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/stub" // TODO remove again
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
 var (
@@ -71,33 +72,34 @@ func timeVersion(startTime time.Time, format string) (version string, err error)
 }
 
 // createCmd (meant to be called via a CLI command) creates a new migration
-func createCmd(dir string, startTime time.Time, format string, name string, ext string, seq bool, seqDigits int) {
+func createCmd(dir string, startTime time.Time, format string, name string, ext string, seq bool, seqDigits int, print bool) error {
 	if seq && format != defaultTimeFormat {
-		log.fatalErr(errIncompatibleSeqAndFormat)
+		return errIncompatibleSeqAndFormat
 	}
 
 	var version string
 	var err error
 
 	dir = filepath.Clean(dir)
+	ext = "." + strings.TrimPrefix(ext, ".")
 
 	if seq {
 		matches, err := filepath.Glob(filepath.Join(dir, "*"+ext))
 
 		if err != nil {
-			log.fatalErr(err)
+			return err
 		}
 
 		version, err = nextSeqVersion(matches, seqDigits)
 
 		if err != nil {
-			log.fatalErr(err)
+			return err
 		}
 	} else {
 		version, err = timeVersion(startTime, format)
 
 		if err != nil {
-			log.fatalErr(err)
+			return err
 		}
 	}
 
@@ -105,15 +107,15 @@ func createCmd(dir string, startTime time.Time, format string, name string, ext 
 	matches, err := filepath.Glob(versionGlob)
 
 	if err != nil {
-		log.fatalErr(err)
+		return err
 	}
 
 	if len(matches) > 0 {
-		log.fatalErr(fmt.Errorf("duplicate migration version: %s", version))
+		return fmt.Errorf("duplicate migration version: %s", version)
 	}
 
 	if err = os.MkdirAll(dir, os.ModePerm); err != nil {
-		log.fatalErr(err)
+		return err
 	}
 
 	for _, direction := range []string{"up", "down"} {
@@ -121,11 +123,15 @@ func createCmd(dir string, startTime time.Time, format string, name string, ext 
 		filename := filepath.Join(dir, basename)
 
 		if err = createFile(filename); err != nil {
-			log.fatalErr(err)
+			return err
 		}
 
-		log.Println(filename)
+		if print {
+			log.Println(filename)
+		}
 	}
+
+	return nil
 }
 
 func createFile(filename string) error {

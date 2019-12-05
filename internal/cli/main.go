@@ -137,9 +137,10 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 		if *extPtr == "" {
 			log.fatal("error: -ext flag must be specified")
 		}
-		*extPtr = "." + strings.TrimPrefix(*extPtr, ".")
 
-		createCmd(*dirPtr, startTime, *formatPtr, name, *extPtr, seq, seqDigits)
+		if err := createCmd(*dirPtr, startTime, *formatPtr, name, *extPtr, seq, seqDigits, true); err != nil {
+			log.fatalErr(err)
+		}
 
 	case "goto":
 		if migraterErr != nil {
