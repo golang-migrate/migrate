@@ -65,29 +65,33 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		return nil, err
 	}
 
-	query := `SELECT DB_NAME()`
-	var databaseName string
-	if err := instance.QueryRow(query).Scan(&databaseName); err != nil {
-		return nil, &database.Error{OrigErr: err, Query: []byte(query)}
+	if config.DatabaseName == "" {
+		query := `SELECT DB_NAME()`
+		var databaseName string
+		if err := instance.QueryRow(query).Scan(&databaseName); err != nil {
+			return nil, &database.Error{OrigErr: err, Query: []byte(query)}
+		}
+
+		if len(databaseName) == 0 {
+			return nil, ErrNoDatabaseName
+		}
+
+		config.DatabaseName = databaseName
 	}
 
-	if len(databaseName) == 0 {
-		return nil, ErrNoDatabaseName
+	if config.SchemaName == "" {
+		query := `SELECT SCHEMA_NAME()`
+		var schemaName string
+		if err := instance.QueryRow(query).Scan(&schemaName); err != nil {
+			return nil, &database.Error{OrigErr: err, Query: []byte(query)}
+		}
+
+		if len(schemaName) == 0 {
+			return nil, ErrNoSchema
+		}
+
+		config.SchemaName = schemaName
 	}
-
-	config.DatabaseName = databaseName
-
-	query = `SELECT SCHEMA_NAME()`
-	var schemaName string
-	if err := instance.QueryRow(query).Scan(&schemaName); err != nil {
-		return nil, &database.Error{OrigErr: err, Query: []byte(query)}
-	}
-
-	if len(schemaName) == 0 {
-		return nil, ErrNoSchema
-	}
-
-	config.SchemaName = schemaName
 
 	if len(config.MigrationsTable) == 0 {
 		config.MigrationsTable = DefaultMigrationsTable

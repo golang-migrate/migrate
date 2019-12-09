@@ -199,7 +199,7 @@ func (d *DockerContainer) Logs() (io.ReadCloser, error) {
 	})
 }
 
-func (d *DockerContainer) portMapping(selectFirst bool, cPort int) (containerPort uint, hostIP string, hostPort uint, err error) {
+func (d *DockerContainer) portMapping(selectFirst bool, cPort int) (containerPort uint, hostIP string, hostPort uint, err error) { // nolint:unparam
 	if !d.containerInspected {
 		if err := d.Inspect(); err != nil {
 			d.t.Fatal(err)
