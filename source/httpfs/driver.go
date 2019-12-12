@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"strconv"
 
 	"github.com/golang-migrate/migrate/v4/source"
 )
@@ -18,7 +19,7 @@ type ErrDuplicateMigration struct {
 
 // Error implements error interface.
 func (e ErrDuplicateMigration) Error() string {
-	return fmt.Sprintf("duplicate migration file: %s", e.Filename)
+	return "duplicate migration file: " + e.Filename
 }
 
 // Driver is a migration source driver for reading migrations from
@@ -116,7 +117,7 @@ func (h *Driver) Prev(version uint) (prevVersion uint, err error) {
 		return version, nil
 	}
 	return 0, &os.PathError{
-		Op:   fmt.Sprintf("prev for version %v", version),
+		Op:   "prev for version " + strconv.FormatUint(uint64(version), 10),
 		Path: h.path,
 		Err:  os.ErrNotExist,
 	}
@@ -128,7 +129,7 @@ func (h *Driver) Next(version uint) (nextVersion uint, err error) {
 		return version, nil
 	}
 	return 0, &os.PathError{
-		Op:   fmt.Sprintf("next for version %v", version),
+		Op:   "next for version " + strconv.FormatUint(uint64(version), 10),
 		Path: h.path,
 		Err:  os.ErrNotExist,
 	}
@@ -144,7 +145,7 @@ func (h *Driver) ReadUp(version uint) (r io.ReadCloser, identifier string, err e
 		return body, m.Identifier, nil
 	}
 	return nil, "", &os.PathError{
-		Op:   fmt.Sprintf("read version %v", version),
+		Op:   "read up for version " + strconv.FormatUint(uint64(version), 10),
 		Path: h.path,
 		Err:  os.ErrNotExist,
 	}
@@ -160,7 +161,7 @@ func (h *Driver) ReadDown(version uint) (r io.ReadCloser, identifier string, err
 		return body, m.Identifier, nil
 	}
 	return nil, "", &os.PathError{
-		Op:   fmt.Sprintf("read version %v", version),
+		Op:   "read down for version " + strconv.FormatUint(uint64(version), 10),
 		Path: h.path,
 		Err:  os.ErrNotExist,
 	}
