@@ -40,13 +40,14 @@ func TestWithInstanceAndNew(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run("WithInstance "+test.name, func(t *testing.T) {
-			d, err := WithInstance(test.fs, test.path)
+		t.Run("Init "+test.name, func(t *testing.T) {
+			var d Driver
+			err := d.Init(test.fs, test.path)
 			if test.ok {
 				if err != nil {
 					t.Errorf("WithInstance() returned error %s", err)
 				}
-				st.Test(t, d)
+				st.Test(t, &d)
 				if err = d.Close(); err != nil {
 					t.Errorf("WithInstance().Close() returned error %s", err)
 				}
@@ -94,7 +95,7 @@ func TestWithInstanceAndNew(t *testing.T) {
 }
 
 func TestOpen(t *testing.T) {
-	b := &driver{}
+	b := &Driver{}
 	d, err := b.Open("")
 	if d != nil {
 		t.Error("Expected Open to return nil driver")
