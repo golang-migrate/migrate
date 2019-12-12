@@ -54,8 +54,7 @@ func TestWithInstanceAndNew(t *testing.T) {
 				if err = d.Close(); err != nil {
 					t.Errorf("WithInstance().Close() returned error %s", err)
 				}
-			}
-			if !test.ok {
+			} else {
 				if err == nil {
 					t.Errorf("WithInstance() expected error but did not get one")
 				}
@@ -68,8 +67,7 @@ func TestWithInstanceAndNew(t *testing.T) {
 			d := httpfs.New(test.fs, test.path)
 			if test.ok {
 				st.Test(t, d)
-			}
-			if !test.ok {
+			} else {
 				if _, err := d.Open(""); err == nil {
 					t.Errorf("Open() expected error but did not get one")
 				}
