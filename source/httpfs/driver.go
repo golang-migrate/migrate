@@ -79,11 +79,9 @@ func (h *Driver) Init(fs http.FileSystem, path string) error {
 		}
 	}
 
-	*h = Driver{
-		fs:         fs,
-		path:       path,
-		migrations: ms,
-	}
+	h.fs = fs
+	h.path = path
+	h.migrations = ms
 	return nil
 }
 
