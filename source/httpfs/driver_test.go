@@ -1,7 +1,9 @@
 package httpfs_test
 
 import (
+	"errors"
 	"net/http"
+	"os"
 	"testing"
 
 	"github.com/golang-migrate/migrate/v4/source/httpfs"
@@ -92,7 +94,19 @@ func TestWithInstanceAndNew(t *testing.T) {
 			}
 		})
 	}
+}
 
+func TestFirstWithNoMigrations(t *testing.T) {
+	var d httpfs.Driver
+	fs := http.Dir("testdata/no-migrations")
+
+	if err := d.Init(fs, ""); err != nil {
+		t.Errorf("No error on Init() expected, got: %v", err)
+	}
+
+	if _, err := d.First(); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("Expected os.ErrNotExist error on First(), got: %v", err)
+	}
 }
 
 func TestOpen(t *testing.T) {
