@@ -126,34 +126,32 @@ func (h *driver) Next(version uint) (nextVersion uint, err error) {
 
 // ReadUp is part of source.Driver interface implementation.
 func (h *driver) ReadUp(version uint) (r io.ReadCloser, identifier string, err error) {
-	m, ok := h.migrations.Up(version)
-	if !ok {
-		return nil, "", &os.PathError{
-			Op:   fmt.Sprintf("read version %v", version),
-			Path: h.path,
-			Err:  os.ErrNotExist,
+	if m, ok := h.migrations.Up(version); ok {
+		body, err := h.fs.Open(path.Join(h.path, m.Raw))
+		if err != nil {
+			return nil, "", err
 		}
+		return body, m.Identifier, nil
 	}
-	body, err := h.fs.Open(path.Join(h.path, m.Raw))
-	if err != nil {
-		return nil, "", err
+	return nil, "", &os.PathError{
+		Op:   fmt.Sprintf("read version %v", version),
+		Path: h.path,
+		Err:  os.ErrNotExist,
 	}
-	return body, m.Identifier, nil
 }
 
 // ReadDown is part of source.Driver interface implementation.
 func (h *driver) ReadDown(version uint) (r io.ReadCloser, identifier string, err error) {
-	m, ok := h.migrations.Down(version)
-	if !ok {
-		return nil, "", &os.PathError{
-			Op:   fmt.Sprintf("read version %v", version),
-			Path: h.path,
-			Err:  os.ErrNotExist,
+	if m, ok := h.migrations.Down(version); ok {
+		body, err := h.fs.Open(path.Join(h.path, m.Raw))
+		if err != nil {
+			return nil, "", err
 		}
+		return body, m.Identifier, nil
 	}
-	body, err := h.fs.Open(path.Join(h.path, m.Raw))
-	if err != nil {
-		return nil, "", err
+	return nil, "", &os.PathError{
+		Op:   fmt.Sprintf("read version %v", version),
+		Path: h.path,
+		Err:  os.ErrNotExist,
 	}
-	return body, m.Identifier, nil
 }
