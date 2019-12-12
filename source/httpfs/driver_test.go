@@ -1,9 +1,10 @@
-package httpfs
+package httpfs_test
 
 import (
 	"net/http"
 	"testing"
 
+	"github.com/golang-migrate/migrate/v4/source/httpfs"
 	st "github.com/golang-migrate/migrate/v4/source/testing"
 )
 
@@ -41,7 +42,7 @@ func TestWithInstanceAndNew(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run("Init "+test.name, func(t *testing.T) {
-			var d Driver
+			var d httpfs.Driver
 			err := d.Init(test.fs, test.path)
 			if test.ok {
 				if err != nil {
@@ -62,7 +63,7 @@ func TestWithInstanceAndNew(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run("New "+test.name, func(t *testing.T) {
-			d := New(test.fs, test.path)
+			d := httpfs.New(test.fs, test.path)
 			if test.ok {
 				st.Test(t, d)
 			}
@@ -95,7 +96,7 @@ func TestWithInstanceAndNew(t *testing.T) {
 }
 
 func TestOpen(t *testing.T) {
-	b := &Driver{}
+	b := &httpfs.Driver{}
 	d, err := b.Open("")
 	if d != nil {
 		t.Error("Expected Open to return nil driver")
