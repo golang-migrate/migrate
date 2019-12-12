@@ -11,17 +11,6 @@ import (
 	"github.com/golang-migrate/migrate/v4/source"
 )
 
-// ErrDuplicateMigration is an error type for reporting duplicate migration
-// files.
-type ErrDuplicateMigration struct {
-	Filename string
-}
-
-// Error implements error interface.
-func (e ErrDuplicateMigration) Error() string {
-	return "duplicate migration file: " + e.Filename
-}
-
 // Driver is a migration source driver for reading migrations from
 // http.FileSystem instances. It implements source.Driver interface and can be
 // used as a migration source for the main migrate library.
@@ -73,7 +62,7 @@ func (h *Driver) Init(fs http.FileSystem, path string) error {
 		}
 
 		if !ms.Append(m) {
-			return ErrDuplicateMigration{
+			return source.ErrDuplicateMigration{
 				Filename: file.Name(),
 			}
 		}
