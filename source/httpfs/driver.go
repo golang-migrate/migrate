@@ -19,10 +19,8 @@ type driver struct {
 }
 
 // New creates a new migrate source driver from a http.FileSystem instance and a
-// relative path to migration files within the virtual FS. It is identical to
-// the WithInstance() function except it will delay any errors on fist usage of
-// this driver. This reduces the number of error handling branches in clients of
-// this package without compromising on correctness.
+// relative path to migration files within the virtual FS. It will delay any
+// errors until fist usage of this driver.
 func New(fs http.FileSystem, path string) source.Driver {
 	var d driver
 	if err := d.Init(fs, path); err != nil {
@@ -31,9 +29,8 @@ func New(fs http.FileSystem, path string) source.Driver {
 	return &d
 }
 
-// Open is part of source.Driver interface implementation. It always returns
-// error because http.FileSystem must be provided by the user of this package
-// and created using WithInstance() function.
+// Open completes the implementetion of source.Driver interface. Other methods
+// are implemented by the embedded Migrator struct.
 func (d *driver) Open(url string) (source.Driver, error) {
 	return nil, errors.New("not implemented")
 }
