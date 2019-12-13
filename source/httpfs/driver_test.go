@@ -6,9 +6,14 @@ import (
 	"os"
 	"testing"
 
+	"github.com/golang-migrate/migrate/v4/source"
 	"github.com/golang-migrate/migrate/v4/source/httpfs"
 	st "github.com/golang-migrate/migrate/v4/source/testing"
 )
+
+type driver struct{ httpfs.Migrator }
+
+func (d *driver) Open(url string) (source.Driver, error) { return nil, errors.New("X") }
 
 func TestWithInstanceAndNew(t *testing.T) {
 	tests := []struct {
@@ -44,7 +49,7 @@ func TestWithInstanceAndNew(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run("Init "+test.name, func(t *testing.T) {
-			var d httpfs.Driver
+			var d driver
 			err := d.Init(test.fs, test.path)
 			if test.ok {
 				if err != nil {
@@ -95,7 +100,7 @@ func TestWithInstanceAndNew(t *testing.T) {
 }
 
 func TestFirstWithNoMigrations(t *testing.T) {
-	var d httpfs.Driver
+	var d driver
 	fs := http.Dir("testdata/no-migrations")
 
 	if err := d.Init(fs, ""); err != nil {
@@ -108,8 +113,8 @@ func TestFirstWithNoMigrations(t *testing.T) {
 }
 
 func TestOpen(t *testing.T) {
-	b := &httpfs.Driver{}
-	d, err := b.Open("")
+	d := httpfs.New(http.Dir("testdata/sql"), "")
+	d, err := d.Open("")
 	if d != nil {
 		t.Error("Expected Open to return nil driver")
 	}

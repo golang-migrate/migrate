@@ -1,7 +1,7 @@
 package httpfs
 
 import (
-	"fmt"
+	"errors"
 	"io"
 	"net/http"
 	"os"
@@ -11,13 +11,11 @@ import (
 	"github.com/golang-migrate/migrate/v4/source"
 )
 
-// Driver is a migration source driver for reading migrations from
+// driver is a migration source driver for reading migrations from
 // http.FileSystem instances. It implements source.Driver interface and can be
 // used as a migration source for the main migrate library.
-type Driver struct {
-	migrations *source.Migrations
-	fs         http.FileSystem
-	path       string
+type driver struct {
+	Migrator
 }
 
 // New creates a new migrate source driver from a http.FileSystem instance and a
@@ -26,16 +24,35 @@ type Driver struct {
 // this driver. This reduces the number of error handling branches in clients of
 // this package without compromising on correctness.
 func New(fs http.FileSystem, path string) source.Driver {
-	var d Driver
+	var d driver
 	if err := d.Init(fs, path); err != nil {
 		return &failedDriver{err}
 	}
 	return &d
 }
 
-// Init prepares not initialized Driver instance to read migrations from a
+// Open is part of source.Driver interface implementation. It always returns
+// error because http.FileSystem must be provided by the user of this package
+// and created using WithInstance() function.
+func (d *driver) Open(url string) (source.Driver, error) {
+	return nil, errors.New("not implemented")
+}
+
+// Migrator is a helper service for creating new source drivers working with
+// http.FileSystem instances. It implements all source.Driver interface methods
+// except for Open(). New driver could embed this struct and add missing Open()
+// method.
+//
+// To prepare Migrator for use Init() function.
+type Migrator struct {
+	migrations *source.Migrations
+	fs         http.FileSystem
+	path       string
+}
+
+// Init prepares not initialized Migrator instance to read migrations from a
 // http.FileSystem instance and a relative path.
-func (h *Driver) Init(fs http.FileSystem, path string) error {
+func (h *Migrator) Init(fs http.FileSystem, path string) error {
 	root, err := fs.Open(path)
 	if err != nil {
 		return err
@@ -74,20 +91,13 @@ func (h *Driver) Init(fs http.FileSystem, path string) error {
 	return nil
 }
 
-// Open is part of source.Driver interface implementation. It always returns
-// error because http.FileSystem must be provided by the user of this package
-// and created using WithInstance() function.
-func (h *Driver) Open(url string) (source.Driver, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-
 // Close is part of source.Driver interface implementation. This is a no-op.
-func (h *Driver) Close() error {
+func (h *Migrator) Close() error {
 	return nil
 }
 
 // First is part of source.Driver interface implementation.
-func (h *Driver) First() (version uint, err error) {
+func (h *Migrator) First() (version uint, err error) {
 	if version, ok := h.migrations.First(); ok {
 		return version, nil
 	}
@@ -99,7 +109,7 @@ func (h *Driver) First() (version uint, err error) {
 }
 
 // Prev is part of source.Driver interface implementation.
-func (h *Driver) Prev(version uint) (prevVersion uint, err error) {
+func (h *Migrator) Prev(version uint) (prevVersion uint, err error) {
 	if version, ok := h.migrations.Prev(version); ok {
 		return version, nil
 	}
@@ -111,7 +121,7 @@ func (h *Driver) Prev(version uint) (prevVersion uint, err error) {
 }
 
 // Next is part of source.Driver interface implementation.
-func (h *Driver) Next(version uint) (nextVersion uint, err error) {
+func (h *Migrator) Next(version uint) (nextVersion uint, err error) {
 	if version, ok := h.migrations.Next(version); ok {
 		return version, nil
 	}
@@ -123,7 +133,7 @@ func (h *Driver) Next(version uint) (nextVersion uint, err error) {
 }
 
 // ReadUp is part of source.Driver interface implementation.
-func (h *Driver) ReadUp(version uint) (r io.ReadCloser, identifier string, err error) {
+func (h *Migrator) ReadUp(version uint) (r io.ReadCloser, identifier string, err error) {
 	if m, ok := h.migrations.Up(version); ok {
 		body, err := h.fs.Open(path.Join(h.path, m.Raw))
 		if err != nil {
@@ -139,7 +149,7 @@ func (h *Driver) ReadUp(version uint) (r io.ReadCloser, identifier string, err e
 }
 
 // ReadDown is part of source.Driver interface implementation.
-func (h *Driver) ReadDown(version uint) (r io.ReadCloser, identifier string, err error) {
+func (h *Migrator) ReadDown(version uint) (r io.ReadCloser, identifier string, err error) {
 	if m, ok := h.migrations.Down(version); ok {
 		body, err := h.fs.Open(path.Join(h.path, m.Raw))
 		if err != nil {

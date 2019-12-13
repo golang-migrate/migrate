@@ -2,35 +2,46 @@
 
 ## Usage
 
-To create migration data source from `http.FileSystem` instance use
-`Init()` or `New()` functions. Users of this package are responsible for
-getting `http.FileSystem` instance. It is not possible to create httpfs instance
-from URL.
+This package could be used to create new migration source drivers that uses
+`http.FileSystem` to read migration files.
+
+Struct `httpfs.Migrator` partly implements `source.Driver` interface, it has all
+the methods except for Open(). Embedding this struct and adding `Open()` method
+allows users of this package to create new migration sources. Example:
+
+```go
+struct mydriver {
+        httpfs.Migrator
+}
+
+func (d *mydriver) Open(url string) (source.Driver, error) {
+	var fs http.FileSystem
+	var path string
+
+	// acquire fs and path from url
+
+        if err := d.Init(fs, path); err != nil {
+                return nil, err
+        }
+        return d, nil
+}
+```
+
+This package also provides a simple `source.Driver` implementation that works
+with `http.FileSystem` provided by the user of this package. It is created with
+`httpfs.New()` call.
 
 Example of using `http.Dir()` to read migrations from `sql` directory:
 
 ```go
-	var d httpfs.Driver
-	if err := d.Init(http.Dir("sql"), ""); err != nil {
-		// do something
-	}
-	m, err := migrate.NewWithSourceInstance("httpfs", src, "database://url")
+	m, err := migrate.NewWithSourceInstance(
+		"httpfs",
+		httpfs.New(http.Dir("sql"), ""),
+		"database://url",
+	)
 	if err != nil {
 		// do something
 	}
         err = m.Up()
 	...
 ```
-
-Using `New()` instead of `WithInstance()` reduces the number of errors that
-needs to be handled, example:
-
-```go
-	m, err := migrate.NewWithSourceInstance("httpfs", httpfs.New(http.Dir("sql"), ""), "database://url")
-	if err != nil {
-		// do something
-	}
-        err = m.Up()
-	...
-```
-
