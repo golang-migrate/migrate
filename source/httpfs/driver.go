@@ -16,7 +16,7 @@ type driver struct {
 
 // New creates a new migrate source driver from a http.FileSystem instance and a
 // relative path to migration files within the virtual FS. It will delay any
-// errors until fist usage of this driver.
+// errors until first usage of this driver.
 func New(fs http.FileSystem, path string) source.Driver {
 	var d driver
 	if err := d.Init(fs, path); err != nil {

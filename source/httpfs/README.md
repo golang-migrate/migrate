@@ -17,13 +17,15 @@ struct mydriver {
 func (d *mydriver) Open(url string) (source.Driver, error) {
 	var fs http.FileSystem
 	var path string
+	var ds mydriver
 
 	// acquire fs and path from url
+	// set-up ds if necessary
 
-        if err := d.Init(fs, path); err != nil {
-                return nil, err
-        }
-        return d, nil
+	if err := ds.Init(fs, path); err != nil {
+		return nil, err
+	}
+	return &ds, nil
 }
 ```
 
