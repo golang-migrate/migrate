@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/golang-migrate/migrate/v4/source"
@@ -14,6 +15,30 @@ import (
 type driver struct{ httpfs.Migrator }
 
 func (d *driver) Open(url string) (source.Driver, error) { return nil, errors.New("X") }
+
+type driverExample struct {
+	httpfs.Migrator
+}
+
+func (d *driverExample) Open(url string) (source.Driver, error) {
+	parts := strings.Split(url, ":")
+	dir := parts[0]
+	path := ""
+	if len(parts) >= 2 {
+		path = parts[1]
+	}
+
+	var de driverExample
+	return &de, de.Init(http.Dir(dir), path)
+}
+
+func TestDriverExample(t *testing.T) {
+	d, err := (*driverExample)(nil).Open("testdata:sql")
+	if err != nil {
+		t.Errorf("Open() returned error: %s", err)
+	}
+	st.Test(t, d)
+}
 
 func TestMigratorInit(t *testing.T) {
 	tests := []struct {
