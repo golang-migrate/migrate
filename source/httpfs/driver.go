@@ -28,5 +28,5 @@ func New(fs http.FileSystem, path string) source.Driver {
 // Open completes the implementetion of source.Driver interface. Other methods
 // are implemented by the embedded Migrator struct.
 func (d *driver) Open(url string) (source.Driver, error) {
-	return nil, errors.New("not implemented")
+	return nil, errors.New("Open() cannot be called on the httpfs passthrough driver")
 }
