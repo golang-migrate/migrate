@@ -12,12 +12,12 @@ import (
 	st "github.com/golang-migrate/migrate/v4/source/testing"
 )
 
-type driver struct{ httpfs.Migrator }
+type driver struct{ httpfs.PartialDriver }
 
 func (d *driver) Open(url string) (source.Driver, error) { return nil, errors.New("X") }
 
 type driverExample struct {
-	httpfs.Migrator
+	httpfs.PartialDriver
 }
 
 func (d *driverExample) Open(url string) (source.Driver, error) {
@@ -40,7 +40,7 @@ func TestDriverExample(t *testing.T) {
 	st.Test(t, d)
 }
 
-func TestMigratorInit(t *testing.T) {
+func TestPartialDriverInit(t *testing.T) {
 	tests := []struct {
 		name string
 		fs   http.FileSystem

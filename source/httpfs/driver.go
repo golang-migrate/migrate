@@ -11,7 +11,7 @@ import (
 // http.FileSystem instances. It implements source.Driver interface and can be
 // used as a migration source for the main migrate library.
 type driver struct {
-	Migrator
+	PartialDriver
 }
 
 // New creates a new migrate source driver from a http.FileSystem instance and a
@@ -26,7 +26,7 @@ func New(fs http.FileSystem, path string) source.Driver {
 }
 
 // Open completes the implementetion of source.Driver interface. Other methods
-// are implemented by the embedded Migrator struct.
+// are implemented by the embedded PartialDriver struct.
 func (d *driver) Open(url string) (source.Driver, error) {
 	return nil, errors.New("Open() cannot be called on the httpfs passthrough driver")
 }
