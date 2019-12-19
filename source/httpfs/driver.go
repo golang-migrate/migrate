@@ -15,14 +15,13 @@ type driver struct {
 }
 
 // New creates a new migrate source driver from a http.FileSystem instance and a
-// relative path to migration files within the virtual FS. It will delay any
-// errors until first usage of this driver.
-func New(fs http.FileSystem, path string) source.Driver {
+// relative path to migration files within the virtual FS.
+func New(fs http.FileSystem, path string) (source.Driver, error) {
 	var d driver
 	if err := d.Init(fs, path); err != nil {
-		return &failedDriver{err}
+		return nil, err
 	}
-	return &d
+	return &d, nil
 }
 
 // Open completes the implementetion of source.Driver interface. Other methods

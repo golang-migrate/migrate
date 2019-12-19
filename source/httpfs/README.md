@@ -36,11 +36,11 @@ with `http.FileSystem` provided by the user of this package. It is created with
 Example of using `http.Dir()` to read migrations from `sql` directory:
 
 ```go
-	m, err := migrate.NewWithSourceInstance(
-		"httpfs",
-		httpfs.New(http.Dir("sql"), ""),
-		"database://url",
-	)
+	src, err := httpfs.New(http.Dir("sql")
+	if err != nil {
+		// do something
+	}
+	m, err := migrate.NewWithSourceInstance("httpfs", src, "database://url")
 	if err != nil {
 		// do something
 	}

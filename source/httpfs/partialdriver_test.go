@@ -106,14 +106,3 @@ func TestFirstWithNoMigrations(t *testing.T) {
 		t.Errorf("Expected os.ErrNotExist error on First(), got: %v", err)
 	}
 }
-
-func TestOpen(t *testing.T) {
-	d := httpfs.New(http.Dir("testdata/sql"), "")
-	d, err := d.Open("")
-	if d != nil {
-		t.Error("Expected Open to return nil driver")
-	}
-	if err == nil {
-		t.Error("Expected Open to return error")
-	}
-}
