@@ -24,7 +24,7 @@ type PartialDriver struct {
 
 // Init prepares not initialized PartialDriver instance to read migrations from a
 // http.FileSystem instance and a relative path.
-func (h *PartialDriver) Init(fs http.FileSystem, path string) error {
+func (p *PartialDriver) Init(fs http.FileSystem, path string) error {
 	root, err := fs.Open(path)
 	if err != nil {
 		return err
@@ -57,57 +57,57 @@ func (h *PartialDriver) Init(fs http.FileSystem, path string) error {
 		}
 	}
 
-	h.fs = fs
-	h.path = path
-	h.migrations = ms
+	p.fs = fs
+	p.path = path
+	p.migrations = ms
 	return nil
 }
 
 // Close is part of source.Driver interface implementation. This is a no-op.
-func (h *PartialDriver) Close() error {
+func (p *PartialDriver) Close() error {
 	return nil
 }
 
 // First is part of source.Driver interface implementation.
-func (h *PartialDriver) First() (version uint, err error) {
-	if version, ok := h.migrations.First(); ok {
+func (p *PartialDriver) First() (version uint, err error) {
+	if version, ok := p.migrations.First(); ok {
 		return version, nil
 	}
 	return 0, &os.PathError{
 		Op:   "first",
-		Path: h.path,
+		Path: p.path,
 		Err:  os.ErrNotExist,
 	}
 }
 
 // Prev is part of source.Driver interface implementation.
-func (h *PartialDriver) Prev(version uint) (prevVersion uint, err error) {
-	if version, ok := h.migrations.Prev(version); ok {
+func (p *PartialDriver) Prev(version uint) (prevVersion uint, err error) {
+	if version, ok := p.migrations.Prev(version); ok {
 		return version, nil
 	}
 	return 0, &os.PathError{
 		Op:   "prev for version " + strconv.FormatUint(uint64(version), 10),
-		Path: h.path,
+		Path: p.path,
 		Err:  os.ErrNotExist,
 	}
 }
 
 // Next is part of source.Driver interface implementation.
-func (h *PartialDriver) Next(version uint) (nextVersion uint, err error) {
-	if version, ok := h.migrations.Next(version); ok {
+func (p *PartialDriver) Next(version uint) (nextVersion uint, err error) {
+	if version, ok := p.migrations.Next(version); ok {
 		return version, nil
 	}
 	return 0, &os.PathError{
 		Op:   "next for version " + strconv.FormatUint(uint64(version), 10),
-		Path: h.path,
+		Path: p.path,
 		Err:  os.ErrNotExist,
 	}
 }
 
 // ReadUp is part of source.Driver interface implementation.
-func (h *PartialDriver) ReadUp(version uint) (r io.ReadCloser, identifier string, err error) {
-	if m, ok := h.migrations.Up(version); ok {
-		body, err := h.fs.Open(path.Join(h.path, m.Raw))
+func (p *PartialDriver) ReadUp(version uint) (r io.ReadCloser, identifier string, err error) {
+	if m, ok := p.migrations.Up(version); ok {
+		body, err := p.fs.Open(path.Join(p.path, m.Raw))
 		if err != nil {
 			return nil, "", err
 		}
@@ -115,15 +115,15 @@ func (h *PartialDriver) ReadUp(version uint) (r io.ReadCloser, identifier string
 	}
 	return nil, "", &os.PathError{
 		Op:   "read up for version " + strconv.FormatUint(uint64(version), 10),
-		Path: h.path,
+		Path: p.path,
 		Err:  os.ErrNotExist,
 	}
 }
 
 // ReadDown is part of source.Driver interface implementation.
-func (h *PartialDriver) ReadDown(version uint) (r io.ReadCloser, identifier string, err error) {
-	if m, ok := h.migrations.Down(version); ok {
-		body, err := h.fs.Open(path.Join(h.path, m.Raw))
+func (p *PartialDriver) ReadDown(version uint) (r io.ReadCloser, identifier string, err error) {
+	if m, ok := p.migrations.Down(version); ok {
+		body, err := p.fs.Open(path.Join(p.path, m.Raw))
 		if err != nil {
 			return nil, "", err
 		}
@@ -131,7 +131,7 @@ func (h *PartialDriver) ReadDown(version uint) (r io.ReadCloser, identifier stri
 	}
 	return nil, "", &os.PathError{
 		Op:   "read down for version " + strconv.FormatUint(uint64(version), 10),
-		Path: h.path,
+		Path: p.path,
 		Err:  os.ErrNotExist,
 	}
 }
