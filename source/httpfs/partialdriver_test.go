@@ -3,7 +3,6 @@ package httpfs_test
 import (
 	"errors"
 	"net/http"
-	"os"
 	"strings"
 	"testing"
 
@@ -102,7 +101,7 @@ func TestFirstWithNoMigrations(t *testing.T) {
 		t.Errorf("No error on Init() expected, got: %v", err)
 	}
 
-	if _, err := d.First(); !errors.Is(err, os.ErrNotExist) {
-		t.Errorf("Expected os.ErrNotExist error on First(), got: %v", err)
+	if _, err := d.First(); err == nil {
+		t.Errorf("Expected error on First(), got: %v", err)
 	}
 }
