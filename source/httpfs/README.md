@@ -5,8 +5,8 @@
 This package could be used to create new migration source drivers that uses
 `http.FileSystem` to read migration files.
 
-Struct `httpfs.PartialDriver` partly implements `source.Driver` interface, it has all
-the methods except for Open(). Embedding this struct and adding `Open()` method
+Struct `httpfs.PartialDriver` partly implements the `source.Driver` interface. It has all
+the methods except for `Open()`. Embedding this struct and adding `Open()` method
 allows users of this package to create new migration sources. Example:
 
 ```go
