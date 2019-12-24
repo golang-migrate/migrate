@@ -52,7 +52,8 @@ func (p *PartialDriver) Init(fs http.FileSystem, path string) error {
 
 		if !ms.Append(m) {
 			return source.ErrDuplicateMigration{
-				Filename: file.Name(),
+				Migration: *m,
+				FileInfo:  file,
 			}
 		}
 	}
