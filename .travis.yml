@@ -62,6 +62,8 @@ deploy:
       tags: true
     file:
       - cli/build/migrate.linux-amd64.tar.gz
+      - cli/build/migrate.linux-armv7.tar.gz
+      - cli/build/migrate.linux-arm64.tar.gz
       - cli/build/migrate.darwin-amd64.tar.gz
       - cli/build/migrate.windows-amd64.exe.tar.gz
       - cli/build/sha256sum.txt
