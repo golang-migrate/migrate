@@ -11,7 +11,7 @@ require (
 	github.com/containerd/containerd v1.2.7 // indirect
 	github.com/cznic/ql v1.2.0
 	github.com/denisenkom/go-mssqldb v0.0.0-20190515213511-eb9f6a1743f3
-	github.com/dhui/dktest v0.3.0
+	github.com/dhui/dktest v0.3.1
 	github.com/docker/docker v0.7.3-0.20190817195342-4760db040282
 	github.com/fsouza/fake-gcs-server v1.7.0
 	github.com/go-sql-driver/mysql v1.4.1
