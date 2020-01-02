@@ -17,7 +17,7 @@ GRANT ALL ON DATABASE example TO cockroach;
 
 When using Migrate CLI we need to pass to database URL. Let's export it to a variable for convienience:
 ```
-export COCKROACHDB_URL=cockroachdb://cockroach:@localhost:26257/example?sslmode=disable
+export COCKROACHDB_URL='cockroachdb://cockroach:@localhost:26257/example?sslmode=disable'
 ```
 `sslmode=disable` means that the connection with our database will not be encrypted. This is needed to connect to an insecure node.
 
