@@ -6,18 +6,17 @@ import (
 	sqldriver "database/sql/driver"
 	"fmt"
 	"log"
-
-	"github.com/golang-migrate/migrate/v4"
-	"net/url"
 	"testing"
 )
 
 import (
 	"github.com/dhui/dktest"
 	"github.com/go-sql-driver/mysql"
+	"github.com/stretchr/testify/assert"
 )
 
 import (
+	"github.com/golang-migrate/migrate/v4"
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
 	"github.com/golang-migrate/migrate/v4/dktesting"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
@@ -176,6 +175,62 @@ func TestLockWorks(t *testing.T) {
 	})
 }
 
+func TestExtractCustomQueryParams(t *testing.T) {
+	testcases := []struct {
+		name                 string
+		config               *mysql.Config
+		expectedParams       map[string]string
+		expectedCustomParams map[string]string
+		expectedErr          error
+	}{
+		{name: "nil config", expectedErr: ErrNilConfig},
+		{
+			name:                 "no params",
+			config:               mysql.NewConfig(),
+			expectedCustomParams: map[string]string{},
+		},
+		{
+			name:                 "no custom params",
+			config:               &mysql.Config{Params: map[string]string{"hello": "world"}},
+			expectedParams:       map[string]string{"hello": "world"},
+			expectedCustomParams: map[string]string{},
+		},
+		{
+			name: "one param, one custom param",
+			config: &mysql.Config{
+				Params: map[string]string{"hello": "world", "x-foo": "bar"},
+			},
+			expectedParams:       map[string]string{"hello": "world"},
+			expectedCustomParams: map[string]string{"x-foo": "bar"},
+		},
+		{
+			name: "multiple params, multiple custom params",
+			config: &mysql.Config{
+				Params: map[string]string{
+					"hello": "world",
+					"x-foo": "bar",
+					"dead":  "beef",
+					"x-cat": "hat",
+				},
+			},
+			expectedParams:       map[string]string{"hello": "world", "dead": "beef"},
+			expectedCustomParams: map[string]string{"x-foo": "bar", "x-cat": "hat"},
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			customParams, err := extractCustomQueryParams(tc.config)
+			if tc.config != nil {
+				assert.Equal(t, tc.expectedParams, tc.config.Params,
+					"Expected config params have custom params properly removed")
+			}
+			assert.Equal(t, tc.expectedErr, err, "Expected errors to match")
+			assert.Equal(t, tc.expectedCustomParams, customParams,
+				"Expected custom params to be properly extracted")
+		})
+	}
+}
+
 func TestURLToMySQLConfig(t *testing.T) {
 	testcases := []struct {
 		name        string
@@ -210,19 +265,13 @@ func TestURLToMySQLConfig(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			u, err := url.Parse(tc.urlStr)
+			config, err := urlToMySQLConfig(tc.urlStr)
 			if err != nil {
 				t.Fatal("Failed to parse url string:", tc.urlStr, "error:", err)
 			}
-			if config, err := urlToMySQLConfig(*u); err == nil {
-				dsn := config.FormatDSN()
-				if dsn != tc.expectedDSN {
-					t.Error("Got unexpected DSN:", dsn, "!=", tc.expectedDSN)
-				}
-			} else {
-				if tc.expectedDSN != "" {
-					t.Error("Got unexpected error:", err, "urlStr:", tc.urlStr)
-				}
+			dsn := config.FormatDSN()
+			if dsn != tc.expectedDSN {
+				t.Error("Got unexpected DSN:", dsn, "!=", tc.expectedDSN)
 			}
 		})
 	}

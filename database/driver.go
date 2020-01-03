@@ -7,8 +7,9 @@ package database
 import (
 	"fmt"
 	"io"
-	nurl "net/url"
 	"sync"
+
+	iurl "github.com/golang-migrate/migrate/v4/internal/url"
 )
 
 var (
@@ -81,21 +82,16 @@ type Driver interface {
 
 // Open returns a new driver instance.
 func Open(url string) (Driver, error) {
-	u, err := nurl.Parse(url)
+	scheme, err := iurl.SchemeFromURL(url)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to parse URL. Did you escape all reserved URL characters? "+
-			"See: https://github.com/golang-migrate/migrate#database-urls Error: %v", err)
-	}
-
-	if u.Scheme == "" {
-		return nil, fmt.Errorf("database driver: invalid URL scheme")
+		return nil, err
 	}
 
 	driversMu.RLock()
-	d, ok := drivers[u.Scheme]
+	d, ok := drivers[scheme]
 	driversMu.RUnlock()
 	if !ok {
-		return nil, fmt.Errorf("database driver: unknown driver %v (forgotten import?)", u.Scheme)
+		return nil, fmt.Errorf("database driver: unknown driver %v (forgotten import?)", scheme)
 	}
 
 	return d.Open(url)

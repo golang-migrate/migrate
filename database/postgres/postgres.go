@@ -58,29 +58,33 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		return nil, err
 	}
 
-	query := `SELECT CURRENT_DATABASE()`
-	var databaseName string
-	if err := instance.QueryRow(query).Scan(&databaseName); err != nil {
-		return nil, &database.Error{OrigErr: err, Query: []byte(query)}
+	if config.DatabaseName == "" {
+		query := `SELECT CURRENT_DATABASE()`
+		var databaseName string
+		if err := instance.QueryRow(query).Scan(&databaseName); err != nil {
+			return nil, &database.Error{OrigErr: err, Query: []byte(query)}
+		}
+
+		if len(databaseName) == 0 {
+			return nil, ErrNoDatabaseName
+		}
+
+		config.DatabaseName = databaseName
 	}
 
-	if len(databaseName) == 0 {
-		return nil, ErrNoDatabaseName
+	if config.SchemaName == "" {
+		query := `SELECT CURRENT_SCHEMA()`
+		var schemaName string
+		if err := instance.QueryRow(query).Scan(&schemaName); err != nil {
+			return nil, &database.Error{OrigErr: err, Query: []byte(query)}
+		}
+
+		if len(schemaName) == 0 {
+			return nil, ErrNoSchema
+		}
+
+		config.SchemaName = schemaName
 	}
-
-	config.DatabaseName = databaseName
-
-	query = `SELECT CURRENT_SCHEMA()`
-	var schemaName string
-	if err := instance.QueryRow(query).Scan(&schemaName); err != nil {
-		return nil, &database.Error{OrigErr: err, Query: []byte(query)}
-	}
-
-	if len(schemaName) == 0 {
-		return nil, ErrNoSchema
-	}
-
-	config.SchemaName = schemaName
 
 	if len(config.MigrationsTable) == 0 {
 		config.MigrationsTable = DefaultMigrationsTable
@@ -150,8 +154,7 @@ func (p *Postgres) Lock() error {
 		return err
 	}
 
-	// This will either obtain the lock immediately and return true,
-	// or return false if the lock cannot be acquired immediately.
+	// This will wait indefinitely until the lock can be acquired.
 	query := `SELECT pg_advisory_lock($1)`
 	if _, err := p.conn.ExecContext(context.Background(), query, aid); err != nil {
 		return &database.Error{OrigErr: err, Err: "try lock failed", Query: []byte(query)}

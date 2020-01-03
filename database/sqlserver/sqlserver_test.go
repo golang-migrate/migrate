@@ -29,7 +29,7 @@ var (
 	}
 	// Container versions: https://mcr.microsoft.com/v2/mssql/server/tags/list
 	specs = []dktesting.ContainerSpec{
-		{ImageName: "mcr.microsoft.com/mssql/server:2017-latest-ubuntu", Options: opts},
+		{ImageName: "mcr.microsoft.com/mssql/server:2017-latest", Options: opts},
 		{ImageName: "mcr.microsoft.com/mssql/server:2019-latest", Options: opts},
 	}
 )

@@ -3,7 +3,7 @@
 [![Coverage Status](https://img.shields.io/coveralls/github/golang-migrate/migrate/master.svg)](https://coveralls.io/github/golang-migrate/migrate?branch=master)
 [![packagecloud.io](https://img.shields.io/badge/deb-packagecloud.io-844fec.svg)](https://packagecloud.io/golang-migrate/migrate?filter=debs)
 [![Docker Pulls](https://img.shields.io/docker/pulls/migrate/migrate.svg)](https://hub.docker.com/r/migrate/migrate/)
-![Supported Go Versions](https://img.shields.io/badge/Go-1.11%2C%201.12-lightgrey.svg)
+![Supported Go Versions](https://img.shields.io/badge/Go-1.12%2C%201.13-lightgrey.svg)
 [![GitHub Release](https://img.shields.io/github/release/golang-migrate/migrate.svg)](https://github.com/golang-migrate/migrate/releases)
 [![Go Report Card](https://goreportcard.com/badge/github.com/golang-migrate/migrate)](https://goreportcard.com/report/github.com/golang-migrate/migrate) 
 
@@ -36,7 +36,7 @@ Database drivers run migrations. [Add a new database?](database/driver.go)
 * [Google Cloud Spanner](database/spanner)
 * [CockroachDB](database/cockroachdb)
 * [ClickHouse](database/clickhouse)
-* [Firebird](database/firebird) ([todo #49](https://github.com/golang-migrate/migrate/issues/49))
+* [Firebird](database/firebird)
 * [MS SQL Server](database/sqlserver)
 
 ### Database URLs
@@ -146,6 +146,7 @@ Go to [getting started](GETTING_STARTED.md)
 
 ## Tutorials
 
+- [CockroachDB](database/cockroachdb/TUTORIAL.md)
 - [PostgreSQL](database/postgres/TUTORIAL.md)
 
 (more tutorials to come)

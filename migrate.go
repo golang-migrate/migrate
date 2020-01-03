@@ -7,12 +7,14 @@ package migrate
 import (
 	"errors"
 	"fmt"
-	"github.com/hashicorp/go-multierror"
 	"os"
 	"sync"
 	"time"
 
+	"github.com/hashicorp/go-multierror"
+
 	"github.com/golang-migrate/migrate/v4/database"
+	iurl "github.com/golang-migrate/migrate/v4/internal/url"
 	"github.com/golang-migrate/migrate/v4/source"
 )
 
@@ -85,13 +87,13 @@ type Migrate struct {
 func New(sourceURL, databaseURL string) (*Migrate, error) {
 	m := newCommon()
 
-	sourceName, err := sourceSchemeFromURL(sourceURL)
+	sourceName, err := iurl.SchemeFromURL(sourceURL)
 	if err != nil {
 		return nil, err
 	}
 	m.sourceName = sourceName
 
-	databaseName, err := databaseSchemeFromURL(databaseURL)
+	databaseName, err := iurl.SchemeFromURL(databaseURL)
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +121,7 @@ func New(sourceURL, databaseURL string) (*Migrate, error) {
 func NewWithDatabaseInstance(sourceURL string, databaseName string, databaseInstance database.Driver) (*Migrate, error) {
 	m := newCommon()
 
-	sourceName, err := schemeFromURL(sourceURL)
+	sourceName, err := iurl.SchemeFromURL(sourceURL)
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +147,7 @@ func NewWithDatabaseInstance(sourceURL string, databaseName string, databaseInst
 func NewWithSourceInstance(sourceName string, sourceInstance source.Driver, databaseURL string) (*Migrate, error) {
 	m := newCommon()
 
-	databaseName, err := schemeFromURL(databaseURL)
+	databaseName, err := iurl.SchemeFromURL(databaseURL)
 	if err != nil {
 		return nil, err
 	}
@@ -804,6 +806,7 @@ func (m *Migrate) versionExists(version uint) (result error) {
 		return err
 	}
 
+	m.logErr(fmt.Errorf("no migration found for version %d", version))
 	return os.ErrNotExist
 }
 
