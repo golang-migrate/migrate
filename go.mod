@@ -9,10 +9,11 @@ require (
 	github.com/cockroachdb/apd v1.1.0 // indirect
 	github.com/cockroachdb/cockroach-go v0.0.0-20181001143604-e0a95dfd547c
 	github.com/containerd/containerd v1.2.7 // indirect
-	github.com/cznic/ql v1.2.0
+	github.com/cznic/mathutil v0.0.0-20180504122225-ca4c9f2c1369 // indirect
 	github.com/denisenkom/go-mssqldb v0.0.0-20190515213511-eb9f6a1743f3
 	github.com/dhui/dktest v0.3.1
 	github.com/docker/docker v0.7.3-0.20190817195342-4760db040282
+	github.com/edsrzf/mmap-go v0.0.0-20170320065105-0bce6a688712 // indirect
 	github.com/fsouza/fake-gcs-server v1.7.0
 	github.com/go-sql-driver/mysql v1.4.1
 	github.com/gocql/gocql v0.0.0-20190301043612-f6df8288f9b4
@@ -53,6 +54,17 @@ require (
 	google.golang.org/appengine v1.5.0 // indirect
 	google.golang.org/genproto v0.0.0-20190425155659-357c62f0e4bb
 	google.golang.org/grpc v1.20.1 // indirect
+	modernc.org/b v1.0.0 // indirect
+	modernc.org/db v1.0.0 // indirect
+	modernc.org/file v1.0.0 // indirect
+	modernc.org/fileutil v1.0.0 // indirect
+	modernc.org/golex v1.0.0 // indirect
+	modernc.org/internal v1.0.0 // indirect
+	modernc.org/lldb v1.0.0 // indirect
+	modernc.org/ql v1.0.0
+	modernc.org/sortutil v1.1.0 // indirect
+	modernc.org/strutil v1.1.0 // indirect
+	modernc.org/zappy v1.0.0 // indirect
 )
 
 go 1.12
