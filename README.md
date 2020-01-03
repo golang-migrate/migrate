@@ -146,6 +146,7 @@ Go to [getting started](GETTING_STARTED.md)
 
 ## Tutorials
 
+- [CockroachDB](database/cockroachdb/TUTORIAL.md)
 - [PostgreSQL](database/postgres/TUTORIAL.md)
 
 (more tutorials to come)

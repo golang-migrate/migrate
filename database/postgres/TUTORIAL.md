@@ -9,7 +9,7 @@ psql -h localhost -U postgres -w -c "create database example;"
 ```
 When using Migrate CLI we need to pass to database URL. Let's export it to a variable for convienience:
 ```
-export POSTGRESQL_URL=postgres://postgres:password@localhost:5432/example?sslmode=disable
+export POSTGRESQL_URL='postgres://postgres:password@localhost:5432/example?sslmode=disable'
 ```
 `sslmode=disable` means that the connection with our database will not be encrypted. Enabling it is left as an exercise.
 
