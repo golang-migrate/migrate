@@ -33,7 +33,7 @@ var drivers = make(map[string]Driver)
 //      All other functions are tested by tests in database/testing.
 //      Saves you some time and makes sure all database drivers behave the same way.
 //   5. Call Register in init().
-//   6. Create a migrate/cli/build_<driver-name>.go file
+//   6. Create a internal/cli/build_<driver-name>.go file
 //   7. Add driver name in 'DATABASE' variable in Makefile
 //
 // Guidelines:
