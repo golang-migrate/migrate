@@ -21,14 +21,14 @@ const defaultTimeFormat = "20060102150405"
 var log = &Log{}
 
 func Main(version string) {
-	helpPtr := flag.Bool("help", false, "")
-	versionPtr := flag.Bool("version", false, "")
-	verbosePtr := flag.Bool("verbose", false, "")
-	prefetchPtr := flag.Uint("prefetch", 10, "")
-	lockTimeoutPtr := flag.Uint("lock-timeout", 15, "")
-	pathPtr := flag.String("path", "", "")
-	databasePtr := flag.String("database", "", "")
-	sourcePtr := flag.String("source", "", "")
+	helpPtr := flag.Bool("help", DefaultFlags.Help, "")
+	versionPtr := flag.Bool("version", DefaultFlags.Version, "")
+	verbosePtr := flag.Bool("verbose", DefaultFlags.Verbose, "")
+	prefetchPtr := flag.Uint("prefetch", DefaultFlags.Prefetch, "")
+	lockTimeoutPtr := flag.Uint("lock-timeout", DefaultFlags.LockTimeout, "")
+	pathPtr := flag.String("path", DefaultFlags.Path, "")
+	databasePtr := flag.String("database", DefaultFlags.Database, "")
+	sourcePtr := flag.String("source", DefaultFlags.Source, "")
 
 	flag.Usage = func() {
 		fmt.Fprint(os.Stderr,
