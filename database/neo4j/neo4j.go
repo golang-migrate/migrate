@@ -5,6 +5,7 @@ import (
 	"io"
 	"io/ioutil"
 	neturl "net/url"
+	"sync/atomic"
 
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/neo4j/neo4j-go-driver/neo4j"
@@ -19,17 +20,18 @@ func init() {
 var DefaultMigrationsLabel = "SchemaMigration"
 
 var (
-	ErrNilConfig      = fmt.Errorf("no config")
+	ErrNilConfig = fmt.Errorf("no config")
 )
 
 type Config struct {
-	AuthToken neo4j.AuthToken
-	URL string
+	AuthToken       neo4j.AuthToken
+	URL             string
 	MigrationsLabel string
 }
 
 type Neo4j struct {
 	driver neo4j.Driver
+	lock   uint32
 
 	// Open and WithInstance need to guarantee that config is never nil
 	config *Config
@@ -76,11 +78,17 @@ func (n *Neo4j) Close() error {
 	return n.driver.Close()
 }
 
+// local locking in order to pass tests, Neo doesn't support database locking
 func (n *Neo4j) Lock() error {
+	if !atomic.CompareAndSwapUint32(&n.lock, 0, 1) {
+		return database.ErrLocked
+	}
+
 	return nil
 }
 
 func (n *Neo4j) Unlock() error {
+	atomic.StoreUint32(&n.lock, 0)
 	return nil
 }
 
@@ -96,8 +104,11 @@ func (n *Neo4j) Run(migration io.Reader) error {
 	}
 	defer session.Close()
 
-	_, err = session.Run(string(body[:]), nil)
-	return err
+	result, err := session.Run(string(body[:]), nil)
+	if err != nil {
+		return err
+	}
+	return result.Err()
 }
 
 func (n *Neo4j) SetVersion(version int, dirty bool) error {
@@ -107,9 +118,18 @@ func (n *Neo4j) SetVersion(version int, dirty bool) error {
 	}
 	defer session.Close()
 
-	_, err = session.Run("MERGE (sm:$migration {version: $version, dirty: $dirty})",
-			map[string]interface{}{"migration": n.config.MigrationsLabel, "version": version, "dirty": dirty})
-	return err
+	query := fmt.Sprintf("MERGE (sm:%s {version: $version, dirty: $dirty})",
+		n.config.MigrationsLabel)
+	result, err := session.Run(query, map[string]interface{}{"version": version, "dirty": dirty})
+	if err != nil {
+		return err
+	}
+	return result.Err()
+}
+
+type MigrationRecord struct {
+	Version int
+	Dirty bool
 }
 
 func (n *Neo4j) Version() (version int, dirty bool, err error) {
@@ -119,27 +139,45 @@ func (n *Neo4j) Version() (version int, dirty bool, err error) {
 	}
 	defer session.Close()
 
-	result, err := session.Run("MATCH (sm:$migration) RETURN sm.version, sm.dirty ORDER BY sm.version DESC LIMIT 1",
-			map[string]interface{}{"migration": n.config.MigrationsLabel})
+	query := fmt.Sprintf("MATCH (sm:%s) RETURN sm.version AS version, sm.dirty AS dirty ORDER BY sm.version DESC LIMIT 1",
+		n.config.MigrationsLabel)
+	result, err := session.ReadTransaction(func(transaction neo4j.Transaction) (interface{}, error) {
+		result, err := transaction.Run(query, nil)
+		if err != nil {
+			return nil, err
+		}
+		if result.Next() {
+			record := result.Record()
+			mr := MigrationRecord{}
+			versionResult, ok := record.Get("version")
+			if !ok {
+				mr.Version = -1
+			} else {
+				mr.Version = int(versionResult.(int64))
+			}
+
+			dirtyResult, ok := record.Get("dirty")
+			if ok {
+				mr.Dirty = dirtyResult.(bool)
+			}
+
+			return mr, nil
+		}
+		return nil, result.Err()
+	})
 	if err != nil {
 		return -1, false, err
 	}
-	if result.Next() {
-		versionResult, ok := result.Record().Get("version")
-		if !ok {
-			version = -1
-		} else {
-			version = versionResult.(int)
-		}
-	} else {
-		version = -1
+	if result == nil {
+		return -1, false, nil
 	}
-
-	return version, dirty, nil
+	mr := result.(MigrationRecord)
+	return mr.Version, mr.Dirty, nil
 }
 
 func (n *Neo4j) Drop() error {
-	session, err := n.driver.Session(neo4j.AccessModeWrite); if err != nil {
+	session, err := n.driver.Session(neo4j.AccessModeWrite);
+	if err != nil {
 		return err
 	}
 	defer session.Close()
@@ -149,13 +187,16 @@ func (n *Neo4j) Drop() error {
 }
 
 func (n *Neo4j) ensureVersionConstraint() (err error) {
-	session, err := n.driver.Session(neo4j.AccessModeWrite); if err != nil {
+	session, err := n.driver.Session(neo4j.AccessModeWrite);
+	if err != nil {
 		return err
 	}
 	defer session.Close()
 
-	_, err = session.Run("CREATE CONSTRAINT ON (a:$migration) ASSERT a.version IS UNIQUE",
-		map[string]interface{}{"migration": n.config.MigrationsLabel})
-	return err
+	query := fmt.Sprintf("CREATE CONSTRAINT ON (a:%s) ASSERT a.version IS UNIQUE", n.config.MigrationsLabel)
+	result, err := session.Run(query, nil)
+	if err != nil {
+		return err
+	}
+	return result.Err()
 }
-
