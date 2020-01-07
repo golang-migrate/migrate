@@ -212,8 +212,8 @@ func (m *Sqlite) SetVersion(version int, dirty bool) error {
 	}
 
 	if version >= 0 {
-		query := fmt.Sprintf(`INSERT INTO %s (version, dirty) VALUES (%d, '%t')`, m.config.MigrationsTable, version, dirty)
-		if _, err := tx.Exec(query); err != nil {
+		query := fmt.Sprintf(`INSERT INTO %s (version, dirty) VALUES (?, ?)`, m.config.MigrationsTable)
+		if _, err := tx.Exec(query, version, dirty); err != nil {
 			if errRollback := tx.Rollback(); errRollback != nil {
 				err = multierror.Append(err, errRollback)
 			}

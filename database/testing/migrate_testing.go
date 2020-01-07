@@ -12,12 +12,7 @@ import (
 )
 
 // TestMigrate runs integration-tests between the Migrate layer and database implementations.
-//
-func TestMigrate(t *testing.T, m *migrate.Migrate, migration []byte) {
-	if migration == nil {
-		panic("test must provide migration reader")
-	}
-
+func TestMigrate(t *testing.T, m *migrate.Migrate) {
 	TestMigrateUp(t, m)
 	TestMigrateDrop(t, m)
 }

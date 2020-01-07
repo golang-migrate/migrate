@@ -121,7 +121,7 @@ func TestMigrate(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		dt.TestMigrate(t, m, []byte("SELECT Count(*) FROM rdb$relations"))
+		dt.TestMigrate(t, m)
 	})
 }
 
