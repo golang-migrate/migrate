@@ -3,14 +3,6 @@ ARG VERSION
 
 RUN apk add --no-cache git gcc musl-dev
 
-# dependencies
-RUN apk add --update --no-cache ca-certificates cmake make g++ openssl-dev git curl pkgconfig
-
-# build seabolt
-RUN git clone -b 1.7 https://github.com/neo4j-drivers/seabolt.git /seabolt
-WORKDIR /seabolt/build
-RUN cmake -D CMAKE_BUILD_TYPE=Release -D CMAKE_INSTALL_LIBDIR=lib .. && cmake --build . --target install
-
 WORKDIR /go/src/github.com/golang-migrate/migrate
 
 COPY . ./
