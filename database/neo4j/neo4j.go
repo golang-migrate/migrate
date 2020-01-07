@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	db := Neo4J{}
+	db := Neo4j{}
 	database.Register("bolt", &db)
 	database.Register("neo4j", &db)
 }
@@ -28,7 +28,7 @@ type Config struct {
 	MigrationsLabel string
 }
 
-type Neo4J struct {
+type Neo4j struct {
 	driver neo4j.Driver
 
 	// Open and WithInstance need to guarantee that config is never nil
@@ -45,7 +45,7 @@ func WithInstance(config *Config) (database.Driver, error) {
 		return nil, err
 	}
 
-	driver := &Neo4J{
+	driver := &Neo4j{
 		driver: neoDriver,
 		config: config,
 	}
@@ -57,7 +57,7 @@ func WithInstance(config *Config) (database.Driver, error) {
 	return driver, nil
 }
 
-func (n *Neo4J) Open(url string) (database.Driver, error) {
+func (n *Neo4j) Open(url string) (database.Driver, error) {
 	uri, err := neturl.Parse(url)
 	if err != nil {
 		return nil, err
@@ -72,19 +72,19 @@ func (n *Neo4J) Open(url string) (database.Driver, error) {
 	})
 }
 
-func (n *Neo4J) Close() error {
+func (n *Neo4j) Close() error {
 	return n.driver.Close()
 }
 
-func (n *Neo4J) Lock() error {
+func (n *Neo4j) Lock() error {
 	return nil
 }
 
-func (n *Neo4J) Unlock() error {
+func (n *Neo4j) Unlock() error {
 	return nil
 }
 
-func (n *Neo4J) Run(migration io.Reader) error {
+func (n *Neo4j) Run(migration io.Reader) error {
 	body, err := ioutil.ReadAll(migration)
 	if err != nil {
 		return err
@@ -100,7 +100,7 @@ func (n *Neo4J) Run(migration io.Reader) error {
 	return err
 }
 
-func (n *Neo4J) SetVersion(version int, dirty bool) error {
+func (n *Neo4j) SetVersion(version int, dirty bool) error {
 	session, err := n.driver.Session(neo4j.AccessModeRead)
 	if err != nil {
 		return err
@@ -112,7 +112,7 @@ func (n *Neo4J) SetVersion(version int, dirty bool) error {
 	return err
 }
 
-func (n *Neo4J) Version() (version int, dirty bool, err error) {
+func (n *Neo4j) Version() (version int, dirty bool, err error) {
 	session, err := n.driver.Session(neo4j.AccessModeRead)
 	if err != nil {
 		return -1, false, err
@@ -138,7 +138,7 @@ func (n *Neo4J) Version() (version int, dirty bool, err error) {
 	return
 }
 
-func (n *Neo4J) Drop() error {
+func (n *Neo4j) Drop() error {
 	session, err := n.driver.Session(neo4j.AccessModeWrite); if err != nil {
 		return err
 	}
@@ -148,7 +148,7 @@ func (n *Neo4J) Drop() error {
 	return err
 }
 
-func (n *Neo4J) ensureVersionConstraint() (err error) {
+func (n *Neo4j) ensureVersionConstraint() (err error) {
 	session, err := n.driver.Session(neo4j.AccessModeWrite); if err != nil {
 		return err
 	}

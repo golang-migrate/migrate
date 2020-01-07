@@ -60,7 +60,7 @@ func Test(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		n := &Neo4J{}
+		n := &Neo4j{}
 		d, err := n.Open(neoConnectionString(ip, port))
 		if err != nil {
 			t.Fatal(err)
