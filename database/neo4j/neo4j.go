@@ -135,7 +135,7 @@ func (n *Neo4j) Version() (version int, dirty bool, err error) {
 		version = -1
 	}
 
-	return
+	return version, dirty, nil
 }
 
 func (n *Neo4j) Drop() error {
