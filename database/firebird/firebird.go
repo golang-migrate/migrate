@@ -138,13 +138,16 @@ func (f *Firebird) SetVersion(version int, dirty bool) error {
 		return nil
 	}
 
+	// TODO: parameterize this SQL statement
+	//       https://firebirdsql.org/refdocs/langrefupd20-execblock.html
+	//       VALUES (?, ?) doesn't work
 	query := fmt.Sprintf(`EXECUTE BLOCK AS BEGIN
 					DELETE FROM "%v";
 					INSERT INTO "%v" (version, dirty) VALUES (%v, %v);
 				END;`,
 		f.config.MigrationsTable, f.config.MigrationsTable, version, btoi(dirty))
 
-	if _, err := f.conn.ExecContext(context.Background(), query, version, btoi(dirty)); err != nil {
+	if _, err := f.conn.ExecContext(context.Background(), query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 

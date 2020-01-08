@@ -29,8 +29,8 @@ var (
 	}
 	// Container versions: https://mcr.microsoft.com/v2/mssql/server/tags/list
 	specs = []dktesting.ContainerSpec{
-		{ImageName: "mcr.microsoft.com/mssql/server:2017-latest-ubuntu", Options: opts},
-		{ImageName: "mcr.microsoft.com/mssql/server:2019-CTP3.1-ubuntu", Options: opts},
+		{ImageName: "mcr.microsoft.com/mssql/server:2017-latest", Options: opts},
+		{ImageName: "mcr.microsoft.com/mssql/server:2019-latest", Options: opts},
 	}
 )
 
@@ -114,7 +114,7 @@ func TestMigrate(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		dt.TestMigrate(t, m, []byte("SELECT 1"))
+		dt.TestMigrate(t, m)
 	})
 }
 

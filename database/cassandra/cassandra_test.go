@@ -101,6 +101,6 @@ func TestMigrate(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		dt.TestMigrate(t, m, []byte("SELECT table_name from system_schema.tables"))
+		dt.TestMigrate(t, m)
 	})
 }

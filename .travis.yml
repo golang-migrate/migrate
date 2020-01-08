@@ -34,7 +34,7 @@ before_install:
   - sudo apt-get update
   - sudo apt-get -y -o Dpkg::Options::="--force-confnew" install docker-ce
   # Install golangci-lint
-  - curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $(go env GOPATH)/bin v1.20.0
+  - curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $(go env GOPATH)/bin v1.22.2
   - echo "TRAVIS_GO_VERSION=${TRAVIS_GO_VERSION}"
 
 install:
@@ -62,6 +62,8 @@ deploy:
       tags: true
     file:
       - cli/build/migrate.linux-amd64.tar.gz
+      - cli/build/migrate.linux-armv7.tar.gz
+      - cli/build/migrate.linux-arm64.tar.gz
       - cli/build/migrate.darwin-amd64.tar.gz
       - cli/build/migrate.windows-amd64.exe.tar.gz
       - cli/build/sha256sum.txt
