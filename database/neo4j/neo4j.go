@@ -1,3 +1,5 @@
+// +build cgo
+
 package neo4j
 
 import (
@@ -24,7 +26,7 @@ var (
 
 type Config struct {
 	AuthToken       neo4j.AuthToken
-	URL             string
+	URL             string // if using WithInstance, don't provide auth in the URL, it will be ignored
 	MigrationsLabel string
 }
 
@@ -182,7 +184,7 @@ func (n *Neo4j) Drop() error {
 	}
 	defer session.Close()
 
-	_, err = session.Run("MATCH (n) DETACH DELETE n", map[string]interface{}{})
+	_, err = session.Run("MATCH (n) DETACH DELETE n", nil)
 	return err
 }
 

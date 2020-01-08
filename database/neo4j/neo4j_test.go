@@ -1,3 +1,5 @@
+// +build cgo
+
 package neo4j
 
 import (
@@ -101,6 +103,6 @@ func TestMigrate(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		dt.TestMigrate(t, m, []byte("MATCH a RETURN a"))
+		dt.TestMigrate(t, m)
 	})
 }
