@@ -1,9 +1,8 @@
-// +build cgo
-
 package neo4j
 
 import (
 	"fmt"
+	"github.com/prometheus/common/log"
 	"io"
 	"io/ioutil"
 	neturl "net/url"
@@ -107,7 +106,12 @@ func (n *Neo4j) Run(migration io.Reader) error {
 	if err != nil {
 		return err
 	}
-	defer session.Close()
+	defer func() {
+		err := session.Close()
+		if err != nil {
+			log.Error(err)
+		}
+	}()
 
 	result, err := session.Run(string(body[:]), nil)
 	if err != nil {
@@ -121,7 +125,12 @@ func (n *Neo4j) SetVersion(version int, dirty bool) error {
 	if err != nil {
 		return err
 	}
-	defer session.Close()
+	defer func() {
+		err := session.Close()
+		if err != nil {
+			log.Error(err)
+		}
+	}()
 
 	query := fmt.Sprintf("MERGE (sm:%s {version: $version, dirty: $dirty})",
 		n.config.MigrationsLabel)
@@ -134,7 +143,7 @@ func (n *Neo4j) SetVersion(version int, dirty bool) error {
 
 type MigrationRecord struct {
 	Version int
-	Dirty bool
+	Dirty   bool
 }
 
 func (n *Neo4j) Version() (version int, dirty bool, err error) {
@@ -142,7 +151,12 @@ func (n *Neo4j) Version() (version int, dirty bool, err error) {
 	if err != nil {
 		return -1, false, err
 	}
-	defer session.Close()
+	defer func() {
+		err := session.Close()
+		if err != nil {
+			log.Error(err)
+		}
+	}()
 
 	query := fmt.Sprintf("MATCH (sm:%s) RETURN sm.version AS version, sm.dirty AS dirty ORDER BY sm.version DESC LIMIT 1",
 		n.config.MigrationsLabel)
@@ -181,22 +195,32 @@ func (n *Neo4j) Version() (version int, dirty bool, err error) {
 }
 
 func (n *Neo4j) Drop() error {
-	session, err := n.driver.Session(neo4j.AccessModeWrite);
+	session, err := n.driver.Session(neo4j.AccessModeWrite)
 	if err != nil {
 		return err
 	}
-	defer session.Close()
+	defer func() {
+		err := session.Close()
+		if err != nil {
+			log.Error(err)
+		}
+	}()
 
 	_, err = session.Run("MATCH (n) DETACH DELETE n", nil)
 	return err
 }
 
 func (n *Neo4j) ensureVersionConstraint() (err error) {
-	session, err := n.driver.Session(neo4j.AccessModeWrite);
+	session, err := n.driver.Session(neo4j.AccessModeWrite)
 	if err != nil {
 		return err
 	}
-	defer session.Close()
+	defer func() {
+		err := session.Close()
+		if err != nil {
+			log.Error(err)
+		}
+	}()
 
 	query := fmt.Sprintf("CREATE CONSTRAINT ON (a:%s) ASSERT a.version IS UNIQUE", n.config.MigrationsLabel)
 	result, err := session.Run(query, nil)

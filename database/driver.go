@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	ErrLocked = fmt.Errorf("can't acquire lock")
+	ErrLocked    = fmt.Errorf("can't acquire lock")
 	ErrNotLocked = fmt.Errorf("can't unlock, as not currently locked")
 )
 
