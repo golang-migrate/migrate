@@ -2,9 +2,9 @@ package neo4j
 
 import (
 	"fmt"
-	"github.com/prometheus/common/log"
 	"io"
 	"io/ioutil"
+	"log"
 	neturl "net/url"
 	"sync/atomic"
 
@@ -109,7 +109,7 @@ func (n *Neo4j) Run(migration io.Reader) error {
 	defer func() {
 		err := session.Close()
 		if err != nil {
-			log.Error(err)
+			log.Printf("error: %s", err)
 		}
 	}()
 
@@ -128,7 +128,7 @@ func (n *Neo4j) SetVersion(version int, dirty bool) error {
 	defer func() {
 		err := session.Close()
 		if err != nil {
-			log.Error(err)
+			log.Printf("error: %s", err)
 		}
 	}()
 
@@ -154,7 +154,7 @@ func (n *Neo4j) Version() (version int, dirty bool, err error) {
 	defer func() {
 		err := session.Close()
 		if err != nil {
-			log.Error(err)
+			log.Printf("error: %s", err)
 		}
 	}()
 
@@ -202,7 +202,7 @@ func (n *Neo4j) Drop() error {
 	defer func() {
 		err := session.Close()
 		if err != nil {
-			log.Error(err)
+			log.Printf("error: %s", err)
 		}
 	}()
 
@@ -218,7 +218,7 @@ func (n *Neo4j) ensureVersionConstraint() (err error) {
 	defer func() {
 		err := session.Close()
 		if err != nil {
-			log.Error(err)
+			log.Printf("error: %s", err)
 		}
 	}()
 
