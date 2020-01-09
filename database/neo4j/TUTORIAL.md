@@ -86,7 +86,7 @@ import (
 func main() {
 	m, err := migrate.New(
 		"file://db/migrations",
-		"bolt://neo4j:password@localhost:7687/")
+		"neo4j://neo4j:password@localhost:7687/")
 	if err != nil {
 		log.Fatal(err)
 	}

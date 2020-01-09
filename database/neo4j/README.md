@@ -1,6 +1,6 @@
 # neo4j
 
-`bolt://user:password@host:port/`
+`neo4j://user:password@host:port/`
 
 | URL Query  | WithInstance Config | Description |
 |------------|---------------------|-------------|
