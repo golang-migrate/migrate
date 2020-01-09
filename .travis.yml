@@ -39,7 +39,7 @@ before_install:
   # Install seabolt for Neo4j
   - sudo apt-get install -y libssl1.0.0
   - wget https://github.com/neo4j-drivers/seabolt/releases/download/v1.7.4/seabolt-1.7.4-Linux-ubuntu-$(lsb_release -rs).deb
-  - dpkg -i seabolt-1.7.3-Linux-ubuntu-$(lsb_release -rs).deb
+  - sudo dpkg -i seabolt-1.7.3-Linux-ubuntu-$(lsb_release -rs).deb
   - rm seabolt-1.7.3-Linux-ubuntu-$(lsb_release -rs).deb
 
 install:
