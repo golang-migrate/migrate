@@ -90,7 +90,9 @@ func (n *Neo4j) Lock() error {
 }
 
 func (n *Neo4j) Unlock() error {
-	atomic.StoreUint32(&n.lock, 0)
+	if !atomic.CompareAndSwapUint32(&n.lock, 1, 0) {
+		return database.ErrNotLocked
+	}
 	return nil
 }
 

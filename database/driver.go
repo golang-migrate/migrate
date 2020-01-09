@@ -14,6 +14,7 @@ import (
 
 var (
 	ErrLocked = fmt.Errorf("can't acquire lock")
+	ErrNotLocked = fmt.Errorf("can't unlock, as not currently locked")
 )
 
 const NilVersion int = -1
