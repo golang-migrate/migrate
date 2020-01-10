@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	neturl "net/url"
 	"sync/atomic"
 
@@ -97,7 +96,7 @@ func (n *Neo4j) Unlock() error {
 	return nil
 }
 
-func (n *Neo4j) Run(migration io.Reader) error {
+func (n *Neo4j) Run(migration io.Reader) (err error) {
 	body, err := ioutil.ReadAll(migration)
 	if err != nil {
 		return err
@@ -108,9 +107,8 @@ func (n *Neo4j) Run(migration io.Reader) error {
 		return err
 	}
 	defer func() {
-		err := session.Close()
-		if err != nil {
-			log.Printf("error: %s", err)
+		if cerr := session.Close(); cerr != nil {
+			err = cerr
 		}
 	}()
 
@@ -118,18 +116,20 @@ func (n *Neo4j) Run(migration io.Reader) error {
 	if err != nil {
 		return err
 	}
-	return result.Err()
+	if result.Err() != nil {
+		err = result.Err()
+	}
+	return err
 }
 
-func (n *Neo4j) SetVersion(version int, dirty bool) error {
+func (n *Neo4j) SetVersion(version int, dirty bool) (err error) {
 	session, err := n.driver.Session(neo4j.AccessModeRead)
 	if err != nil {
 		return err
 	}
 	defer func() {
-		err := session.Close()
-		if err != nil {
-			log.Printf("error: %s", err)
+		if cerr := session.Close(); cerr != nil {
+			err = cerr
 		}
 	}()
 
@@ -139,7 +139,10 @@ func (n *Neo4j) SetVersion(version int, dirty bool) error {
 	if err != nil {
 		return err
 	}
-	return result.Err()
+	if result.Err() != nil {
+		err = result.Err()
+	}
+	return err
 }
 
 type MigrationRecord struct {
@@ -153,9 +156,8 @@ func (n *Neo4j) Version() (version int, dirty bool, err error) {
 		return -1, false, err
 	}
 	defer func() {
-		err := session.Close()
-		if err != nil {
-			log.Printf("error: %s", err)
+		if cerr := session.Close(); cerr != nil {
+			err = cerr
 		}
 	}()
 
@@ -189,21 +191,20 @@ func (n *Neo4j) Version() (version int, dirty bool, err error) {
 		return -1, false, err
 	}
 	if result == nil {
-		return -1, false, nil
+		return -1, false, err
 	}
 	mr := result.(MigrationRecord)
-	return mr.Version, mr.Dirty, nil
+	return mr.Version, mr.Dirty, err
 }
 
-func (n *Neo4j) Drop() error {
+func (n *Neo4j) Drop() (err error) {
 	session, err := n.driver.Session(neo4j.AccessModeWrite)
 	if err != nil {
 		return err
 	}
 	defer func() {
-		err := session.Close()
-		if err != nil {
-			log.Printf("error: %s", err)
+		if cerr := session.Close(); cerr != nil {
+			err = cerr
 		}
 	}()
 
@@ -217,9 +218,8 @@ func (n *Neo4j) ensureVersionConstraint() (err error) {
 		return err
 	}
 	defer func() {
-		err := session.Close()
-		if err != nil {
-			log.Printf("error: %s", err)
+		if cerr := session.Close(); cerr != nil {
+			err = cerr
 		}
 	}()
 
@@ -228,5 +228,8 @@ func (n *Neo4j) ensureVersionConstraint() (err error) {
 	if err != nil {
 		return err
 	}
-	return result.Err()
+	if result.Err() != nil {
+		err = result.Err()
+	}
+	return err
 }
