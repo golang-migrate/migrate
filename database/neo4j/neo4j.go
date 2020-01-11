@@ -3,6 +3,7 @@ package neo4j
 import (
 	"C" // import C so that we can't compile with CGO_ENABLED=0
 	"fmt"
+	"github.com/hashicorp/go-multierror"
 	"io"
 	"io/ioutil"
 	neturl "net/url"
@@ -108,7 +109,7 @@ func (n *Neo4j) Run(migration io.Reader) (err error) {
 	}
 	defer func() {
 		if cerr := session.Close(); cerr != nil {
-			err = cerr
+			err = multierror.Append(err, cerr)
 		}
 	}()
 
@@ -116,10 +117,10 @@ func (n *Neo4j) Run(migration io.Reader) (err error) {
 	if err != nil {
 		return err
 	}
-	if result.Err() != nil {
-		err = result.Err()
+	if err = result.Err(); err != nil {
+		return err
 	}
-	return err
+	return nil
 }
 
 func (n *Neo4j) SetVersion(version int, dirty bool) (err error) {
@@ -129,7 +130,7 @@ func (n *Neo4j) SetVersion(version int, dirty bool) (err error) {
 	}
 	defer func() {
 		if cerr := session.Close(); cerr != nil {
-			err = cerr
+			err = multierror.Append(err, cerr)
 		}
 	}()
 
@@ -139,10 +140,10 @@ func (n *Neo4j) SetVersion(version int, dirty bool) (err error) {
 	if err != nil {
 		return err
 	}
-	if result.Err() != nil {
-		err = result.Err()
+	if err = result.Err(); err != nil {
+		return err
 	}
-	return err
+	return nil
 }
 
 type MigrationRecord struct {
@@ -157,7 +158,7 @@ func (n *Neo4j) Version() (version int, dirty bool, err error) {
 	}
 	defer func() {
 		if cerr := session.Close(); cerr != nil {
-			err = cerr
+			err = multierror.Append(err, cerr)
 		}
 	}()
 
@@ -204,7 +205,7 @@ func (n *Neo4j) Drop() (err error) {
 	}
 	defer func() {
 		if cerr := session.Close(); cerr != nil {
-			err = cerr
+			err = multierror.Append(err, cerr)
 		}
 	}()
 
@@ -219,7 +220,7 @@ func (n *Neo4j) ensureVersionConstraint() (err error) {
 	}
 	defer func() {
 		if cerr := session.Close(); cerr != nil {
-			err = cerr
+			err = multierror.Append(err, cerr)
 		}
 	}()
 
@@ -228,8 +229,8 @@ func (n *Neo4j) ensureVersionConstraint() (err error) {
 	if err != nil {
 		return err
 	}
-	if result.Err() != nil {
-		err = result.Err()
+	if err = result.Err(); err != nil {
+		return err
 	}
-	return err
+	return nil
 }
