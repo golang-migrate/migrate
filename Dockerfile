@@ -4,7 +4,7 @@ ARG VERSION
 RUN apk add --no-cache git gcc musl-dev
 
 # dependencies for neo4j
-RUN apk add --update --no-cache ca-certificates cmake make g++ libressl-dev openssl-dev git curl pkgconfig
+RUN apk add --update --no-cache ca-certificates cmake make g++ openssl-libs-static openssl-dev git curl pkgconfig
 
 # build seabolt for neo4j driver
 RUN git clone -b 1.7 https://github.com/neo4j-drivers/seabolt.git /seabolt
