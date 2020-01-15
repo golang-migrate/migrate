@@ -32,7 +32,10 @@ require (
 	github.com/mattn/go-sqlite3 v1.10.0
 	github.com/morikuni/aec v0.0.0-20170113033406-39771216ff4c // indirect
 	github.com/nakagami/firebirdsql v0.0.0-20190310045651-3c02a58cfed8
+	github.com/neo4j-drivers/gobolt v1.7.4 // indirect
+	github.com/neo4j/neo4j-go-driver v1.7.4
 	github.com/pkg/errors v0.8.1 // indirect
+	github.com/prometheus/common v0.2.0
 	github.com/satori/go.uuid v1.2.0 // indirect
 	github.com/shopspring/decimal v0.0.0-20180709203117-cd690d0c9e24 // indirect
 	github.com/sirupsen/logrus v1.4.1 // indirect
