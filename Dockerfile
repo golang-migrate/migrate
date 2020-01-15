@@ -13,11 +13,15 @@ RUN cmake -D CMAKE_BUILD_TYPE=Release -D CMAKE_INSTALL_LIBDIR=lib .. && cmake --
 
 WORKDIR /go/src/github.com/golang-migrate/migrate
 
-COPY . ./
-
 ENV GO111MODULE=on
 ENV DATABASES="postgres mysql redshift cassandra spanner cockroachdb clickhouse mongodb sqlserver firebird sqlite3 neo4j"
 ENV SOURCES="file go_bindata github github_ee aws_s3 google_cloud_storage godoc_vfs gitlab"
+
+COPY go.mod go.sum ./
+
+RUN go mod download
+
+COPY . ./
 
 RUN go build -a -o build/migrate.linux-386 -ldflags="-s -w -X main.Version=${VERSION}" -tags "$DATABASES $SOURCES" ./cmd/migrate
 
