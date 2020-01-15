@@ -1,4 +1,4 @@
-FROM golang:1.13-alpine3.11 AS downloader
+FROM golang:1.13-alpine3.11 AS builder
 ARG VERSION
 
 RUN apk add --no-cache git gcc musl-dev
@@ -29,9 +29,9 @@ FROM alpine:3.11
 
 RUN apk add --no-cache ca-certificates
 
-COPY --from=downloader /usr/local/lib/libseabolt* /lib/
+COPY --from=builder /usr/local/lib/libseabolt* /lib/
 
-COPY --from=downloader /go/src/github.com/golang-migrate/migrate/build/migrate.linux-386 /migrate
+COPY --from=builder /go/src/github.com/golang-migrate/migrate/build/migrate.linux-386 /migrate
 
 ENTRYPOINT ["/migrate"]
 CMD ["--help"]
