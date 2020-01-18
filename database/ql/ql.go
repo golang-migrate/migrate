@@ -160,6 +160,9 @@ func (m *Ql) Drop() (err error) {
 
 	return nil
 }
+func (m *Ql) Transactional() bool {
+	return false
+}
 func (m *Ql) Lock() error {
 	if m.isLocked {
 		return database.ErrLocked
@@ -174,7 +177,7 @@ func (m *Ql) Unlock() error {
 	m.isLocked = false
 	return nil
 }
-func (m *Ql) Run(migration io.Reader) error {
+func (m *Ql) Run(migration io.Reader, version int) error {
 	migr, err := ioutil.ReadAll(migration)
 	if err != nil {
 		return err

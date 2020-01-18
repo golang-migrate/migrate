@@ -201,7 +201,7 @@ func (ss *SQLServer) Unlock() error {
 }
 
 // Run the migrations for the database
-func (ss *SQLServer) Run(migration io.Reader) error {
+func (ss *SQLServer) Run(migration io.Reader, version int) error {
 	migr, err := ioutil.ReadAll(migration)
 	if err != nil {
 		return err
@@ -310,6 +310,10 @@ func (ss *SQLServer) Drop() error {
 	}
 
 	return nil
+}
+
+func (ss *SQLServer) Transactional() bool {
+	return false
 }
 
 func (ss *SQLServer) ensureVersionTable() (err error) {

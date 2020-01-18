@@ -135,7 +135,7 @@ func (s *Spanner) Unlock() error {
 }
 
 // Run implements database.Driver
-func (s *Spanner) Run(migration io.Reader) error {
+func (s *Spanner) Run(migration io.Reader, version int) error {
 	migr, err := ioutil.ReadAll(migration)
 	if err != nil {
 		return err
@@ -255,6 +255,10 @@ func (s *Spanner) Drop() error {
 	}
 
 	return nil
+}
+
+func (s *Spanner) Transactional() bool {
+	return false
 }
 
 // ensureVersionTable checks if versions table exists and, if not, creates it.

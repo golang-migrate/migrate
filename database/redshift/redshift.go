@@ -138,7 +138,7 @@ func (p *Redshift) Unlock() error {
 	return nil
 }
 
-func (p *Redshift) Run(migration io.Reader) error {
+func (p *Redshift) Run(migration io.Reader, version int) error {
 	migr, err := ioutil.ReadAll(migration)
 	if err != nil {
 		return err
@@ -293,6 +293,10 @@ func (p *Redshift) Drop() (err error) {
 	}
 
 	return nil
+}
+
+func (p *Redshift) Transactional() bool {
+	return false
 }
 
 // ensureVersionTable checks if versions table exists and, if not, creates it.

@@ -157,6 +157,10 @@ func (m *Sqlite) Drop() (err error) {
 	return nil
 }
 
+func (m *Sqlite) Transactional() bool {
+	return false
+}
+
 func (m *Sqlite) Lock() error {
 	if m.isLocked {
 		return database.ErrLocked
@@ -173,7 +177,7 @@ func (m *Sqlite) Unlock() error {
 	return nil
 }
 
-func (m *Sqlite) Run(migration io.Reader) error {
+func (m *Sqlite) Run(migration io.Reader, version int) error {
 	migr, err := ioutil.ReadAll(migration)
 	if err != nil {
 		return err

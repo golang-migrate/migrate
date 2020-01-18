@@ -121,7 +121,7 @@ func (m *Mongo) Version() (version int, dirty bool, err error) {
 	}
 }
 
-func (m *Mongo) Run(migration io.Reader) error {
+func (m *Mongo) Run(migration io.Reader, version int) error {
 	migr, err := ioutil.ReadAll(migration)
 	if err != nil {
 		return err
@@ -180,6 +180,10 @@ func (m *Mongo) Close() error {
 
 func (m *Mongo) Drop() error {
 	return m.db.Drop(context.TODO())
+}
+
+func (m *Mongo) Transactional() bool {
+	return false
 }
 
 func (m *Mongo) Lock() error {

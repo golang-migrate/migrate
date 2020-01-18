@@ -61,7 +61,7 @@ func (s *Stub) Unlock() error {
 	return nil
 }
 
-func (s *Stub) Run(migration io.Reader) error {
+func (s *Stub) Run(migration io.Reader, version int) error {
 	m, err := ioutil.ReadAll(migration)
 	if err != nil {
 		return err
@@ -88,6 +88,10 @@ func (s *Stub) Drop() error {
 	s.LastRunMigration = nil
 	s.MigrationSequence = append(s.MigrationSequence, DROP)
 	return nil
+}
+
+func (s *Stub) Transactional() bool {
+	return false
 }
 
 func (s *Stub) EqualSequence(seq []string) bool {

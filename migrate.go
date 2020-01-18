@@ -316,6 +316,10 @@ func (m *Migrate) Drop() error {
 	return m.unlock()
 }
 
+func (m *Migrate) Transactional() bool {
+	return false
+}
+
 // Run runs any migration provided by you against the database.
 // It does not check any currently active version in database.
 // Usually you don't need this function at all. Use Migrate,
@@ -737,20 +741,24 @@ func (m *Migrate) runMigrations(ret <-chan interface{}) error {
 			migr := r
 
 			// set version with dirty state
-			if err := m.databaseDrv.SetVersion(migr.TargetVersion, true); err != nil {
-				return err
+			if !m.databaseDrv.Transactional() {
+				if err := m.databaseDrv.SetVersion(migr.TargetVersion, true); err != nil {
+					return err
+				}
 			}
 
 			if migr.Body != nil {
 				m.logVerbosePrintf("Read and execute %v\n", migr.LogString())
-				if err := m.databaseDrv.Run(migr.BufferedBody); err != nil {
+				if err := m.databaseDrv.Run(migr.BufferedBody, migr.TargetVersion); err != nil {
 					return err
 				}
 			}
 
 			// set clean state
-			if err := m.databaseDrv.SetVersion(migr.TargetVersion, false); err != nil {
-				return err
+			if !m.databaseDrv.Transactional() {
+				if err := m.databaseDrv.SetVersion(migr.TargetVersion, false); err != nil {
+					return err
+				}
 			}
 
 			endTime := time.Now()

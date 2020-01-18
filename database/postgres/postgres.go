@@ -182,15 +182,29 @@ func (p *Postgres) Unlock() error {
 	return nil
 }
 
-func (p *Postgres) Run(migration io.Reader) error {
+func (p *Postgres) Run(migration io.Reader, targetVersion int) error {
 	migr, err := ioutil.ReadAll(migration)
 	if err != nil {
 		return err
 	}
 
+	setDirty := `
+TRUNCATE ` + pq.QuoteIdentifier(p.config.MigrationsTable) + `;
+INSERT INTO ` + pq.QuoteIdentifier(p.config.MigrationsTable) + ` (version, dirty) VALUES (` + strconv.Itoa(targetVersion) + `, true);`
+	setClean := `
+TRUNCATE ` + pq.QuoteIdentifier(p.config.MigrationsTable) + `;
+INSERT INTO ` + pq.QuoteIdentifier(p.config.MigrationsTable) + ` (version, dirty) VALUES (` + strconv.Itoa(targetVersion) + `, false);`
+
 	// run migration
-	query := string(migr[:])
+	query := `
+BEGIN;
+` + string(migr[:]) + `
+` + setClean + `
+COMMIT;`
 	if _, err := p.conn.ExecContext(context.Background(), query); err != nil {
+		if _, errDirty := p.conn.ExecContext(context.Background(), `BEGIN;`+setDirty+`COMMIT;`); errDirty != nil {
+			err = multierror.Append(err, errDirty)
+		}
 		if pgErr, ok := err.(*pq.Error); ok {
 			var line uint
 			var col uint
@@ -337,6 +351,10 @@ func (p *Postgres) Drop() (err error) {
 	}
 
 	return nil
+}
+
+func (p *Postgres) Transactional() bool {
+	return true
 }
 
 // ensureVersionTable checks if versions table exists and, if not, creates it.

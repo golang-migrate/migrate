@@ -219,7 +219,7 @@ func (c *CockroachDb) Unlock() error {
 	return nil
 }
 
-func (c *CockroachDb) Run(migration io.Reader) error {
+func (c *CockroachDb) Run(migration io.Reader, version int) error {
 	migr, err := ioutil.ReadAll(migration)
 	if err != nil {
 		return err
@@ -309,6 +309,10 @@ func (c *CockroachDb) Drop() (err error) {
 	}
 
 	return nil
+}
+
+func (c *CockroachDb) Transactional() bool {
+	return false
 }
 
 // ensureVersionTable checks if versions table exists and, if not, creates it.

@@ -96,7 +96,7 @@ func (ch *ClickHouse) init() error {
 	return ch.ensureVersionTable()
 }
 
-func (ch *ClickHouse) Run(r io.Reader) error {
+func (ch *ClickHouse) Run(r io.Reader, version int) error {
 	migration, err := ioutil.ReadAll(r)
 	if err != nil {
 		return err
@@ -193,7 +193,7 @@ func (ch *ClickHouse) ensureVersionTable() (err error) {
 	// if not, create the empty migration table
 	query = `
 		CREATE TABLE ` + ch.config.MigrationsTable + ` (
-			version    Int64, 
+			version    Int64,
 			dirty      UInt8,
 			sequence   UInt64
 		) Engine=TinyLog
@@ -229,6 +229,10 @@ func (ch *ClickHouse) Drop() (err error) {
 		}
 	}
 	return nil
+}
+
+func (ch *ClickHouse) Transactional() bool {
+	return false
 }
 
 func (ch *ClickHouse) Lock() error   { return nil }

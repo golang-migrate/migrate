@@ -164,7 +164,7 @@ func (c *Cassandra) Unlock() error {
 	return nil
 }
 
-func (c *Cassandra) Run(migration io.Reader) error {
+func (c *Cassandra) Run(migration io.Reader, version int) error {
 	migr, err := ioutil.ReadAll(migration)
 	if err != nil {
 		return err
@@ -243,6 +243,10 @@ func (c *Cassandra) Drop() error {
 	}
 
 	return nil
+}
+
+func (c *Cassandra) Transactional() bool {
+	return false
 }
 
 // ensureVersionTable checks if versions table exists and, if not, creates it.
