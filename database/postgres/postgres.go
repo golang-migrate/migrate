@@ -26,7 +26,7 @@ func init() {
 }
 
 var DefaultMigrationsTable = "schema_migrations"
-var DefaultStatementTimeout = 10000 // 10 seconds
+var DefaultStatementTimeoutMs = 10000 // 10 seconds
 
 var (
 	ErrNilConfig      = fmt.Errorf("no config")
