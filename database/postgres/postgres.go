@@ -26,7 +26,6 @@ func init() {
 }
 
 var DefaultMigrationsTable = "schema_migrations"
-var DefaultStatementTimeoutMs = 10000 // 10 seconds
 
 var (
 	ErrNilConfig      = fmt.Errorf("no config")
@@ -36,11 +35,10 @@ var (
 )
 
 type Config struct {
-	MigrationsTable         string
-	DatabaseName            string
-	SchemaName              string
-	StatementTimeoutEnabled bool
-	StatementTimeout        int
+	MigrationsTable  string
+	DatabaseName     string
+	SchemaName       string
+	StatementTimeout time.Duration
 }
 
 type Postgres struct {
@@ -94,10 +92,6 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		config.MigrationsTable = DefaultMigrationsTable
 	}
 
-	if config.StatementTimeout == 0 {
-		config.StatementTimeout = DefaultStatementTimeoutMs
-	}
-
 	conn, err := instance.Conn(context.Background())
 
 	if err != nil {
@@ -129,14 +123,21 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 	}
 
 	migrationsTable := purl.Query().Get("x-migrations-table")
-	StatementTimeoutEnabled, _ := strconv.ParseBool(purl.Query().Get("x-enable-statement-timeout"))
-	statementTimeout, _ := strconv.Atoi(purl.Query().Get("x-statement-timeout"))
+	statementTimeoutString := purl.Query().Get("x-statement-timeout")
+	var statementTimeout int
+	if statementTimeoutString == "" {
+		statementTimeout = 0
+	} else {
+		statementTimeout, err = strconv.Atoi(statementTimeoutString)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	px, err := WithInstance(db, &Config{
-		DatabaseName:            purl.Path,
-		MigrationsTable:         migrationsTable,
-		StatementTimeoutEnabled: StatementTimeoutEnabled,
-		StatementTimeout:        statementTimeout,
+		DatabaseName:     purl.Path,
+		MigrationsTable:  migrationsTable,
+		StatementTimeout: time.Duration(statementTimeout) * time.Millisecond,
 	})
 
 	if err != nil {
@@ -194,11 +195,11 @@ func (p *Postgres) Unlock() error {
 	return nil
 }
 
-func getContext(statementTimeoutEnabled bool, StatementTimeout int) (context.Context, context.CancelFunc) {
-	if statementTimeoutEnabled {
+func getContext(statementTimeout time.Duration) (context.Context, context.CancelFunc) {
+	if statementTimeout > 0 {
 		return context.WithTimeout(
 			context.Background(),
-			time.Duration(StatementTimeout)*time.Millisecond,
+			statementTimeout,
 		)
 	}
 	return context.Background(), nil
@@ -209,7 +210,7 @@ func (p *Postgres) Run(migration io.Reader) error {
 	if err != nil {
 		return err
 	}
-	ctx, cancel := getContext(p.config.StatementTimeoutEnabled, p.config.StatementTimeout)
+	ctx, cancel := getContext(p.config.StatementTimeout)
 	if cancel != nil {
 		defer cancel()
 	}
