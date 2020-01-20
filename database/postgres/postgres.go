@@ -196,10 +196,10 @@ func (p *Postgres) Unlock() error {
 }
 
 func getContext(statementTimeout time.Duration) (context.Context, context.CancelFunc) {
-	if statementTimeout > 0 {
-		return context.WithTimeout(context.Background(), statementTimeout)
+	if statementTimeout == 0 {
+		return context.Background(), nil
 	}
-	return context.Background(), nil
+	return context.WithTimeout(context.Background(), statementTimeout)
 }
 
 func (p *Postgres) Run(migration io.Reader) error {
