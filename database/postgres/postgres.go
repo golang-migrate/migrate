@@ -197,10 +197,7 @@ func (p *Postgres) Unlock() error {
 
 func getContext(statementTimeout time.Duration) (context.Context, context.CancelFunc) {
 	if statementTimeout > 0 {
-		return context.WithTimeout(
-			context.Background(),
-			statementTimeout,
-		)
+		return context.WithTimeout(context.Background(), statementTimeout)
 	}
 	return context.Background(), nil
 }
