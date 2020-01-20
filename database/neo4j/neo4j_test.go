@@ -76,7 +76,7 @@ func Test(t *testing.T) {
 				t.Error(err)
 			}
 		}()
-		dt.Test(t, d, []byte("MATCH a RETURN a"))
+		dt.Test(t, d, []byte("MATCH (a) RETURN a"))
 	})
 }
 

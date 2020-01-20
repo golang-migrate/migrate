@@ -113,18 +113,14 @@ func (n *Neo4j) Run(migration io.Reader) (err error) {
 		}
 	}()
 
-	result, err := session.Run(string(body[:]), nil)
-	if err != nil {
-		return err
-	}
-	if err = result.Err(); err != nil {
+	if _, err := neo4j.Collect(session.Run(string(body[:]), nil)); err != nil {
 		return err
 	}
 	return nil
 }
 
 func (n *Neo4j) SetVersion(version int, dirty bool) (err error) {
-	session, err := n.driver.Session(neo4j.AccessModeRead)
+	session, err := n.driver.Session(neo4j.AccessModeWrite)
 	if err != nil {
 		return err
 	}
@@ -134,13 +130,10 @@ func (n *Neo4j) SetVersion(version int, dirty bool) (err error) {
 		}
 	}()
 
-	query := fmt.Sprintf("MERGE (sm:%s {version: $version, dirty: $dirty})",
+	query := fmt.Sprintf("MERGE (sm:%s {version: $version}) SET sm.dirty = $dirty",
 		n.config.MigrationsLabel)
-	result, err := session.Run(query, map[string]interface{}{"version": version, "dirty": dirty})
+	_, err = neo4j.Collect(session.Run(query, map[string]interface{}{"version": version, "dirty": dirty}))
 	if err != nil {
-		return err
-	}
-	if err = result.Err(); err != nil {
 		return err
 	}
 	return nil
@@ -209,8 +202,10 @@ func (n *Neo4j) Drop() (err error) {
 		}
 	}()
 
-	_, err = session.Run("MATCH (n) DETACH DELETE n", nil)
-	return err
+	if _, err := neo4j.Collect(session.Run("MATCH (n) DETACH DELETE n", nil)); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (n *Neo4j) ensureVersionConstraint() (err error) {
@@ -225,11 +220,7 @@ func (n *Neo4j) ensureVersionConstraint() (err error) {
 	}()
 
 	query := fmt.Sprintf("CREATE CONSTRAINT ON (a:%s) ASSERT a.version IS UNIQUE", n.config.MigrationsLabel)
-	result, err := session.Run(query, nil)
-	if err != nil {
-		return err
-	}
-	if err = result.Err(); err != nil {
+	if _, err := neo4j.Collect(session.Run(query, nil)); err != nil {
 		return err
 	}
 	return nil
