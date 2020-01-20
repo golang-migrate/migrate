@@ -36,10 +36,11 @@ var (
 )
 
 type Config struct {
-	MigrationsTable  string
-	DatabaseName     string
-	SchemaName       string
-	StatementTimeout int
+	MigrationsTable         string
+	DatabaseName            string
+	SchemaName              string
+	StatementTimeoutEnabled bool
+	StatementTimeout        int
 }
 
 type Postgres struct {
@@ -94,7 +95,7 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	}
 
 	if config.StatementTimeout == 0 {
-		config.StatementTimeout = DefaultStatementTimeout
+		config.StatementTimeout = DefaultStatementTimeoutMs
 	}
 
 	conn, err := instance.Conn(context.Background())
@@ -128,12 +129,14 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 	}
 
 	migrationsTable := purl.Query().Get("x-migrations-table")
+	StatementTimeoutEnabled, _ := strconv.ParseBool(purl.Query().Get("x-enable-statement-timeout"))
 	statementTimeout, _ := strconv.Atoi(purl.Query().Get("x-statement-timeout"))
 
 	px, err := WithInstance(db, &Config{
-		DatabaseName:     purl.Path,
-		MigrationsTable:  migrationsTable,
-		StatementTimeout: statementTimeout,
+		DatabaseName:            purl.Path,
+		MigrationsTable:         migrationsTable,
+		StatementTimeoutEnabled: StatementTimeoutEnabled,
+		StatementTimeout:        statementTimeout,
 	})
 
 	if err != nil {
@@ -191,19 +194,27 @@ func (p *Postgres) Unlock() error {
 	return nil
 }
 
+func getContext(statementTimeoutEnabled bool, StatementTimeout int) (context.Context, context.CancelFunc) {
+	if statementTimeoutEnabled {
+		return context.WithTimeout(
+			context.Background(),
+			time.Duration(StatementTimeout)*time.Millisecond,
+		)
+	}
+	return context.Background(), nil
+}
+
 func (p *Postgres) Run(migration io.Reader) error {
 	migr, err := ioutil.ReadAll(migration)
 	if err != nil {
 		return err
 	}
-
+	ctx, cancel := getContext(p.config.StatementTimeoutEnabled, p.config.StatementTimeout)
+	if cancel != nil {
+		defer cancel()
+	}
 	// run migration
 	query := string(migr[:])
-	ctx, cancel := context.WithTimeout(
-		context.Background(),
-		time.Duration(p.config.StatementTimeout)*time.Millisecond,
-	)
-	defer cancel()
 	if _, err := p.conn.ExecContext(ctx, query); err != nil {
 		if pgErr, ok := err.(*pq.Error); ok {
 			var line uint
