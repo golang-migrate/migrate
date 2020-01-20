@@ -1,6 +1,7 @@
 package neo4j
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log"
@@ -102,5 +103,30 @@ func TestMigrate(t *testing.T) {
 			t.Fatal(err)
 		}
 		dt.TestMigrate(t, m)
+	})
+}
+
+func TestMalformed(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.Port(7687)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		n := &Neo4j{}
+		d, err := n.Open(neoConnectionString(ip, port))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
+
+		migration := bytes.NewReader([]byte("CREATE (a {qid: 1) RETURN a"))
+		if err := d.Run(migration); err == nil {
+			t.Fatal("expected failure for malformed migration")
+		}
 	})
 }

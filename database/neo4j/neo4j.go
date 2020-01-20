@@ -2,14 +2,15 @@ package neo4j
 
 import (
 	"C" // import C so that we can't compile with CGO_ENABLED=0
+	"bytes"
 	"fmt"
-	"github.com/hashicorp/go-multierror"
 	"io"
 	"io/ioutil"
 	neturl "net/url"
 	"sync/atomic"
 
 	"github.com/golang-migrate/migrate/v4/database"
+	"github.com/hashicorp/go-multierror"
 	"github.com/neo4j/neo4j-go-driver/neo4j"
 )
 
@@ -102,6 +103,8 @@ func (n *Neo4j) Run(migration io.Reader) (err error) {
 	if err != nil {
 		return err
 	}
+	// neo4j bolt doesn't allow multiple statements per query
+	statements := bytes.Split(body, []byte{';'})
 
 	session, err := n.driver.Session(neo4j.AccessModeWrite)
 	if err != nil {
@@ -113,9 +116,23 @@ func (n *Neo4j) Run(migration io.Reader) (err error) {
 		}
 	}()
 
-	if _, err := neo4j.Collect(session.Run(string(body[:]), nil)); err != nil {
+	_, err = session.WriteTransaction(func(transaction neo4j.Transaction) (interface{}, error) {
+		for _, stmt := range statements {
+			trimStmt := bytes.TrimSpace(stmt)
+			if len(trimStmt) == 0 {
+				continue
+			}
+			result, err := transaction.Run(string(trimStmt[:]), nil)
+			if _, err := neo4j.Collect(result, err); err != nil {
+				return nil, err
+			}
+		}
+		return nil, nil
+	})
+	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
