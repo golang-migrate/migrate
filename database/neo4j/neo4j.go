@@ -29,6 +29,7 @@ type Config struct {
 	AuthToken       neo4j.AuthToken
 	URL             string // if using WithInstance, don't provide auth in the URL, it will be ignored
 	MigrationsLabel string
+	MultiStatement  bool
 }
 
 type Neo4j struct {
@@ -70,11 +71,14 @@ func (n *Neo4j) Open(url string) (database.Driver, error) {
 	authToken := neo4j.BasicAuth(uri.User.Username(), password, "")
 	uri.User = nil
 	uri.Scheme = "bolt"
+	multi := uri.Query().Get("x-multi-statement")
+	uri.RawQuery = ""
 
 	return WithInstance(&Config{
 		URL:             uri.String(),
 		AuthToken:       authToken,
 		MigrationsLabel: DefaultMigrationsLabel,
+		MultiStatement:  multi == "true",
 	})
 }
 
@@ -103,8 +107,6 @@ func (n *Neo4j) Run(migration io.Reader) (err error) {
 	if err != nil {
 		return err
 	}
-	// neo4j bolt doesn't allow multiple statements per query
-	statements := bytes.Split(body, []byte{';'})
 
 	session, err := n.driver.Session(neo4j.AccessModeWrite)
 	if err != nil {
@@ -116,21 +118,28 @@ func (n *Neo4j) Run(migration io.Reader) (err error) {
 		}
 	}()
 
-	_, err = session.WriteTransaction(func(transaction neo4j.Transaction) (interface{}, error) {
-		for _, stmt := range statements {
-			trimStmt := bytes.TrimSpace(stmt)
-			if len(trimStmt) == 0 {
-				continue
+	if n.config.MultiStatement {
+		statements := bytes.Split(body, []byte{';'})
+		_, err = session.WriteTransaction(func(transaction neo4j.Transaction) (interface{}, error) {
+			for _, stmt := range statements {
+				trimStmt := bytes.TrimSpace(stmt)
+				if len(trimStmt) == 0 {
+					continue
+				}
+				result, err := transaction.Run(string(trimStmt[:]), nil)
+				if _, err := neo4j.Collect(result, err); err != nil {
+					return nil, err
+				}
 			}
-			result, err := transaction.Run(string(trimStmt[:]), nil)
-			if _, err := neo4j.Collect(result, err); err != nil {
-				return nil, err
-			}
+			return nil, nil
+		})
+		if err != nil {
+			return err
 		}
-		return nil, nil
-	})
-	if err != nil {
-		return err
+	} else {
+		if _, err := neo4j.Collect(session.Run(string(body[:]), nil)); err != nil {
+			return err
+		}
 	}
 
 	return nil

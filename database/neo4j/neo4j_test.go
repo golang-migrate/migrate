@@ -89,7 +89,8 @@ func TestMigrate(t *testing.T) {
 		}
 
 		n := &Neo4j{}
-		d, err := n.Open(neoConnectionString(ip, port))
+		neoUrl := neoConnectionString(ip, port) + "/?x-multi-statement=true"
+		d, err := n.Open(neoUrl)
 		if err != nil {
 			t.Fatal(err)
 		}
