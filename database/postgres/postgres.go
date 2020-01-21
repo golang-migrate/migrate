@@ -124,10 +124,8 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 
 	migrationsTable := purl.Query().Get("x-migrations-table")
 	statementTimeoutString := purl.Query().Get("x-statement-timeout")
-	var statementTimeout int
-	if statementTimeoutString == "" {
-		statementTimeout = 0
-	} else {
+	statementTimeout := 0
+	if statementTimeoutString != "" {
 		statementTimeout, err = strconv.Atoi(statementTimeoutString)
 		if err != nil {
 			return nil, err
@@ -200,12 +198,10 @@ func (p *Postgres) Run(migration io.Reader) error {
 	if err != nil {
 		return err
 	}
-	var ctx context.Context
-	var cancel context.CancelFunc
-	if p.config.StatementTimeout == 0 {
-		ctx = context.Background()
-	} else {
-		ctx, cancel = context.WithTimeout(context.Background(), p.config.StatementTimeout)
+	ctx := context.Background()
+	if p.config.StatementTimeout != 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, p.config.StatementTimeout)
 		defer cancel()
 	}
 	// run migration
