@@ -195,20 +195,17 @@ func (p *Postgres) Unlock() error {
 	return nil
 }
 
-func getContext(statementTimeout time.Duration) (context.Context, context.CancelFunc) {
-	if statementTimeout == 0 {
-		return context.Background(), nil
-	}
-	return context.WithTimeout(context.Background(), statementTimeout)
-}
-
 func (p *Postgres) Run(migration io.Reader) error {
 	migr, err := ioutil.ReadAll(migration)
 	if err != nil {
 		return err
 	}
-	ctx, cancel := getContext(p.config.StatementTimeout)
-	if cancel != nil {
+	var ctx context.Context
+	var cancel context.CancelFunc
+	if p.config.StatementTimeout == 0 {
+		ctx = context.Background()
+	} else {
+		ctx, cancel = context.WithTimeout(context.Background(), p.config.StatementTimeout)
 		defer cancel()
 	}
 	// run migration
