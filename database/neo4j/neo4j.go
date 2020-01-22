@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	neturl "net/url"
+	"strconv"
 	"sync/atomic"
 
 	"github.com/golang-migrate/migrate/v4/database"
@@ -19,7 +20,8 @@ func init() {
 	database.Register("neo4j", &db)
 }
 
-var DefaultMigrationsLabel = "SchemaMigration"
+const DefaultMigrationsLabel = "SchemaMigration"
+const StatementSeparator = ';'
 
 var (
 	ErrNilConfig = fmt.Errorf("no config")
@@ -71,14 +73,17 @@ func (n *Neo4j) Open(url string) (database.Driver, error) {
 	authToken := neo4j.BasicAuth(uri.User.Username(), password, "")
 	uri.User = nil
 	uri.Scheme = "bolt"
-	multi := uri.Query().Get("x-multi-statement")
+	multi, err := strconv.ParseBool(uri.Query().Get("x-multi-statement"))
+	if err != nil {
+		return nil, err
+	}
 	uri.RawQuery = ""
 
 	return WithInstance(&Config{
 		URL:             uri.String(),
 		AuthToken:       authToken,
 		MigrationsLabel: DefaultMigrationsLabel,
-		MultiStatement:  multi == "true",
+		MultiStatement:  multi,
 	})
 }
 
@@ -119,7 +124,7 @@ func (n *Neo4j) Run(migration io.Reader) (err error) {
 	}()
 
 	if n.config.MultiStatement {
-		statements := bytes.Split(body, []byte{';'})
+		statements := bytes.Split(body, []byte{StatementSeparator})
 		_, err = session.WriteTransaction(func(transaction neo4j.Transaction) (interface{}, error) {
 			for _, stmt := range statements {
 				trimStmt := bytes.TrimSpace(stmt)
