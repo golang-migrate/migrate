@@ -21,7 +21,8 @@ func init() {
 }
 
 const DefaultMigrationsLabel = "SchemaMigration"
-const StatementSeparator = ';'
+
+var StatementSeparator = []byte(";")
 
 var (
 	ErrNilConfig = fmt.Errorf("no config")
@@ -73,9 +74,13 @@ func (n *Neo4j) Open(url string) (database.Driver, error) {
 	authToken := neo4j.BasicAuth(uri.User.Username(), password, "")
 	uri.User = nil
 	uri.Scheme = "bolt"
-	multi, err := strconv.ParseBool(uri.Query().Get("x-multi-statement"))
-	if err != nil {
-		return nil, err
+	msQuery := uri.Query().Get("x-multi-statement")
+	multi := false
+	if msQuery != "" {
+		multi, err = strconv.ParseBool(uri.Query().Get("x-multi-statement"))
+		if err != nil {
+			return nil, err
+		}
 	}
 	uri.RawQuery = ""
 
@@ -124,7 +129,7 @@ func (n *Neo4j) Run(migration io.Reader) (err error) {
 	}()
 
 	if n.config.MultiStatement {
-		statements := bytes.Split(body, []byte{StatementSeparator})
+		statements := bytes.Split(body, StatementSeparator)
 		_, err = session.WriteTransaction(func(transaction neo4j.Transaction) (interface{}, error) {
 			for _, stmt := range statements {
 				trimStmt := bytes.TrimSpace(stmt)
