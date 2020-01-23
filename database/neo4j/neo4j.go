@@ -2,14 +2,16 @@ package neo4j
 
 import (
 	"C" // import C so that we can't compile with CGO_ENABLED=0
+	"bytes"
 	"fmt"
-	"github.com/hashicorp/go-multierror"
 	"io"
 	"io/ioutil"
 	neturl "net/url"
+	"strconv"
 	"sync/atomic"
 
 	"github.com/golang-migrate/migrate/v4/database"
+	"github.com/hashicorp/go-multierror"
 	"github.com/neo4j/neo4j-go-driver/neo4j"
 )
 
@@ -18,7 +20,9 @@ func init() {
 	database.Register("neo4j", &db)
 }
 
-var DefaultMigrationsLabel = "SchemaMigration"
+const DefaultMigrationsLabel = "SchemaMigration"
+
+var StatementSeparator = []byte(";")
 
 var (
 	ErrNilConfig = fmt.Errorf("no config")
@@ -28,6 +32,7 @@ type Config struct {
 	AuthToken       neo4j.AuthToken
 	URL             string // if using WithInstance, don't provide auth in the URL, it will be ignored
 	MigrationsLabel string
+	MultiStatement  bool
 }
 
 type Neo4j struct {
@@ -69,11 +74,21 @@ func (n *Neo4j) Open(url string) (database.Driver, error) {
 	authToken := neo4j.BasicAuth(uri.User.Username(), password, "")
 	uri.User = nil
 	uri.Scheme = "bolt"
+	msQuery := uri.Query().Get("x-multi-statement")
+	multi := false
+	if msQuery != "" {
+		multi, err = strconv.ParseBool(uri.Query().Get("x-multi-statement"))
+		if err != nil {
+			return nil, err
+		}
+	}
+	uri.RawQuery = ""
 
 	return WithInstance(&Config{
 		URL:             uri.String(),
 		AuthToken:       authToken,
 		MigrationsLabel: DefaultMigrationsLabel,
+		MultiStatement:  multi,
 	})
 }
 
@@ -113,9 +128,30 @@ func (n *Neo4j) Run(migration io.Reader) (err error) {
 		}
 	}()
 
-	if _, err := neo4j.Collect(session.Run(string(body[:]), nil)); err != nil {
-		return err
+	if n.config.MultiStatement {
+		statements := bytes.Split(body, StatementSeparator)
+		_, err = session.WriteTransaction(func(transaction neo4j.Transaction) (interface{}, error) {
+			for _, stmt := range statements {
+				trimStmt := bytes.TrimSpace(stmt)
+				if len(trimStmt) == 0 {
+					continue
+				}
+				result, err := transaction.Run(string(trimStmt[:]), nil)
+				if _, err := neo4j.Collect(result, err); err != nil {
+					return nil, err
+				}
+			}
+			return nil, nil
+		})
+		if err != nil {
+			return err
+		}
+	} else {
+		if _, err := neo4j.Collect(session.Run(string(body[:]), nil)); err != nil {
+			return err
+		}
 	}
+
 	return nil
 }
 
