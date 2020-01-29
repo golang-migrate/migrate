@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"sync"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -15,8 +16,18 @@ import (
 	"github.com/golang-migrate/migrate/v4/source"
 )
 
+var awsSessionMu sync.RWMutex
+var awsSession *session.Session
+
 func init() {
 	source.Register("s3", &s3Driver{})
+}
+
+// SetAWSSession allows you to set a custom aws session
+func SetAWSSession(customSession *session.Session) {
+	awsSessionMu.Lock()
+	defer awsSessionMu.Unlock()
+	awsSession = customSession
 }
 
 type s3Driver struct {
@@ -31,14 +42,19 @@ func (s *s3Driver) Open(folder string) (source.Driver, error) {
 	if err != nil {
 		return nil, err
 	}
-	sess, err := session.NewSession()
-	if err != nil {
-		return nil, err
+
+	awsSessionMu.Lock()
+	defer awsSessionMu.Unlock()
+	if awsSession == nil {
+		if awsSession, err = session.NewSession(); err != nil {
+			return nil, err
+		}
 	}
+
 	driver := s3Driver{
 		bucket:     u.Host,
 		prefix:     strings.Trim(u.Path, "/") + "/",
-		s3client:   s3.New(sess),
+		s3client:   s3.New(awsSession),
 		migrations: source.NewMigrations(),
 	}
 	err = driver.loadMigrations()
