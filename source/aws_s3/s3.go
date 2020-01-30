@@ -23,13 +23,6 @@ func init() {
 	source.Register("s3", &s3Driver{})
 }
 
-// SetAWSSession allows you to set a custom aws session
-func SetAWSSession(customSession *session.Session) {
-	awsSessionMu.Lock()
-	defer awsSessionMu.Unlock()
-	awsSession = customSession
-}
-
 type s3Driver struct {
 	s3client   s3iface.S3API
 	bucket     string
@@ -37,7 +30,27 @@ type s3Driver struct {
 	migrations *source.Migrations
 }
 
+// SetAWSSession allows you to set a custom aws session
+func SetAWSSession(customSession *session.Session) {
+	awsSessionMu.Lock()
+	defer awsSessionMu.Unlock()
+	awsSession = customSession
+}
+
 func (s *s3Driver) Open(folder string) (source.Driver, error) {
+	driver, err := newS3Driver(folder)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := driver.loadMigrations(); err != nil {
+		return nil, err
+	}
+
+	return driver, nil
+}
+
+func newS3Driver(folder string) (*s3Driver, error) {
 	u, err := url.Parse(folder)
 	if err != nil {
 		return nil, err
@@ -56,17 +69,12 @@ func (s *s3Driver) Open(folder string) (source.Driver, error) {
 		prefix = ""
 	}
 
-	driver := s3Driver{
+	return &s3Driver{
 		bucket:     u.Host,
 		prefix:     prefix,
 		s3client:   s3.New(awsSession),
 		migrations: source.NewMigrations(),
-	}
-	err = driver.loadMigrations()
-	if err != nil {
-		return nil, err
-	}
-	return &driver, nil
+	}, nil
 }
 
 func (s *s3Driver) loadMigrations() error {

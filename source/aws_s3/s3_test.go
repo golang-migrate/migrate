@@ -2,6 +2,7 @@ package awss3
 
 import (
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"strings"
 	"testing"
@@ -52,9 +53,49 @@ func TestSetAWSSession(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	SetAWSSession(customSession)
 	if customSession != awsSession {
 		t.Error("Custom AWS session was not saved")
+	}
+}
+
+func TestNewS3Driver(t *testing.T) {
+	const expectedBucket = "migration-bucket"
+	const expectedPrefix = "production/"
+
+	driver, err := newS3Driver(fmt.Sprintf("s3://%s/%s", expectedBucket, expectedPrefix))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if driver.bucket != expectedBucket {
+		t.Errorf("Expected: %s; actual: %s", expectedBucket, driver.bucket)
+	}
+
+	if driver.prefix != expectedPrefix {
+		t.Errorf("Expected: %s; actual: %s", expectedPrefix, driver.prefix)
+	}
+
+	if driver.s3client == nil {
+		t.Error("S3 client is not initialized")
+	}
+
+	if driver.migrations == nil {
+		t.Error("Migration source is not initialized")
+	}
+
+	driver, err = newS3Driver(fmt.Sprintf("s3://%s", expectedBucket))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if driver.bucket != expectedBucket {
+		t.Errorf("Expected: %s; actual: %s", expectedBucket, driver.bucket)
+	}
+
+	if driver.prefix != "" {
+		t.Errorf("Prefix should be empty")
 	}
 }
 
