@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/golang-migrate/migrate/v4/source"
 	st "github.com/golang-migrate/migrate/v4/source/testing"
@@ -41,6 +42,20 @@ func Test(t *testing.T) {
 		t.Fatal(err)
 	}
 	st.Test(t, &driver)
+}
+
+func TestSetAWSSession(t *testing.T) {
+	customSession, err := session.NewSession(&aws.Config{
+		Endpoint:         aws.String("http://localhost:4572"),
+		S3ForcePathStyle: aws.Bool(true),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	SetAWSSession(customSession)
+	if customSession != awsSession {
+		t.Error("Custom AWS session was not saved")
+	}
 }
 
 type fakeS3 struct {
