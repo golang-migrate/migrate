@@ -51,9 +51,14 @@ func (s *s3Driver) Open(folder string) (source.Driver, error) {
 		}
 	}
 
+	prefix := strings.Trim(u.Path, "/") + "/"
+	if prefix == "/" {
+		prefix = ""
+	}
+
 	driver := s3Driver{
 		bucket:     u.Host,
-		prefix:     strings.Trim(u.Path, "/") + "/",
+		prefix:     prefix,
 		s3client:   s3.New(awsSession),
 		migrations: source.NewMigrations(),
 	}
