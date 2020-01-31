@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/golang-migrate/migrate/v4/source"
 	st "github.com/golang-migrate/migrate/v4/source/testing"
@@ -33,8 +32,10 @@ func Test(t *testing.T) {
 		},
 	}
 	driver := s3Driver{
-		bucket:     "some-bucket",
-		prefix:     "prod/migrations/",
+		config: &Config{
+			Bucket: "some-bucket",
+			Prefix: "prod/migrations/",
+		},
 		migrations: source.NewMigrations(),
 		s3client:   &s3Client,
 	}
@@ -43,21 +44,6 @@ func Test(t *testing.T) {
 		t.Fatal(err)
 	}
 	st.Test(t, &driver)
-}
-
-func TestSetAWSSession(t *testing.T) {
-	customSession, err := session.NewSession(&aws.Config{
-		Endpoint:         aws.String("http://localhost:4572"),
-		S3ForcePathStyle: aws.Bool(true),
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	SetAWSSession(customSession)
-	if customSession != awsSession {
-		t.Error("Custom AWS session was not saved")
-	}
 }
 
 func TestNewS3Driver(t *testing.T) {
@@ -69,12 +55,12 @@ func TestNewS3Driver(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if driver.bucket != expectedBucket {
-		t.Errorf("Expected: %s; actual: %s", expectedBucket, driver.bucket)
+	if driver.config.Bucket != expectedBucket {
+		t.Errorf("Expected: %s; actual: %s", expectedBucket, driver.config.Bucket)
 	}
 
-	if driver.prefix != expectedPrefix {
-		t.Errorf("Expected: %s; actual: %s", expectedPrefix, driver.prefix)
+	if driver.config.Prefix != expectedPrefix {
+		t.Errorf("Expected: %s; actual: %s", expectedPrefix, driver.config.Prefix)
 	}
 
 	if driver.s3client == nil {
@@ -90,12 +76,12 @@ func TestNewS3Driver(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if driver.bucket != expectedBucket {
-		t.Errorf("Expected: %s; actual: %s", expectedBucket, driver.bucket)
+	if driver.config.Bucket != expectedBucket {
+		t.Errorf("Expected: %s; actual: %s", expectedBucket, driver.config.Bucket)
 	}
 
-	if driver.prefix != "" {
-		t.Errorf("Prefix should be empty")
+	if driver.config.Prefix != "" {
+		t.Errorf("Prefix should be empty; actual: %s", driver.config.Prefix)
 	}
 }
 

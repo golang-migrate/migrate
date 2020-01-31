@@ -7,7 +7,6 @@ import (
 	"os"
 	"path"
 	"strings"
-	"sync"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -16,25 +15,19 @@ import (
 	"github.com/golang-migrate/migrate/v4/source"
 )
 
-var awsSessionMu sync.RWMutex
-var awsSession *session.Session
-
 func init() {
 	source.Register("s3", &s3Driver{})
 }
 
 type s3Driver struct {
 	s3client   s3iface.S3API
-	bucket     string
-	prefix     string
+	config     *Config
 	migrations *source.Migrations
 }
 
-// SetAWSSession allows you to set a custom aws session
-func SetAWSSession(customSession *session.Session) {
-	awsSessionMu.Lock()
-	defer awsSessionMu.Unlock()
-	awsSession = customSession
+type Config struct {
+	Bucket string
+	Prefix string
 }
 
 func (s *s3Driver) Open(folder string) (source.Driver, error) {
@@ -50,37 +43,50 @@ func (s *s3Driver) Open(folder string) (source.Driver, error) {
 	return driver, nil
 }
 
+func WithInstance(sess *session.Session, config *Config) (source.Driver, error) {
+	driver := &s3Driver{
+		config:     config,
+		s3client:   s3.New(sess),
+		migrations: source.NewMigrations(),
+	}
+
+	if err := driver.loadMigrations(); err != nil {
+		return nil, err
+	}
+
+	return driver, nil
+}
+
 func newS3Driver(folder string) (*s3Driver, error) {
 	u, err := url.Parse(folder)
 	if err != nil {
 		return nil, err
 	}
 
-	awsSessionMu.Lock()
-	defer awsSessionMu.Unlock()
-	if awsSession == nil {
-		if awsSession, err = session.NewSession(); err != nil {
-			return nil, err
-		}
+	sess, err := session.NewSession()
+	if err != nil {
+		return nil, err
 	}
 
-	prefix := strings.Trim(u.Path, "/") + "/"
-	if prefix == "/" {
-		prefix = ""
+	prefix := strings.Trim(u.Path, "/")
+	if prefix != "" {
+		prefix += "/"
 	}
 
 	return &s3Driver{
-		bucket:     u.Host,
-		prefix:     prefix,
-		s3client:   s3.New(awsSession),
+		config: &Config{
+			Bucket: u.Host,
+			Prefix: prefix,
+		},
+		s3client:   s3.New(sess),
 		migrations: source.NewMigrations(),
 	}, nil
 }
 
 func (s *s3Driver) loadMigrations() error {
 	output, err := s.s3client.ListObjects(&s3.ListObjectsInput{
-		Bucket:    aws.String(s.bucket),
-		Prefix:    aws.String(s.prefix),
+		Bucket:    aws.String(s.config.Bucket),
+		Prefix:    aws.String(s.config.Prefix),
 		Delimiter: aws.String("/"),
 	})
 	if err != nil {
@@ -142,9 +148,9 @@ func (s *s3Driver) ReadDown(version uint) (io.ReadCloser, string, error) {
 }
 
 func (s *s3Driver) open(m *source.Migration) (io.ReadCloser, string, error) {
-	key := path.Join(s.prefix, m.Raw)
+	key := path.Join(s.config.Prefix, m.Raw)
 	object, err := s.s3client.GetObject(&s3.GetObjectInput{
-		Bucket: aws.String(s.bucket),
+		Bucket: aws.String(s.config.Bucket),
 		Key:    aws.String(key),
 	})
 	if err != nil {
