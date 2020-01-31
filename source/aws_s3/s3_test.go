@@ -9,7 +9,6 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/golang-migrate/migrate/v4/source"
 	st "github.com/golang-migrate/migrate/v4/source/testing"
 )
 
@@ -31,19 +30,14 @@ func Test(t *testing.T) {
 			"prod/migrations/0-random-stuff/whatever.txt": "",
 		},
 	}
-	driver := s3Driver{
-		config: &Config{
-			Bucket: "some-bucket",
-			Prefix: "prod/migrations/",
-		},
-		migrations: source.NewMigrations(),
-		s3client:   &s3Client,
-	}
-	err := driver.loadMigrations()
+	driver, err := WithInstance(&s3Client, &Config{
+		Bucket: "some-bucket",
+		Prefix: "prod/migrations/",
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	st.Test(t, &driver)
+	st.Test(t, driver)
 }
 
 func TestNewS3Driver(t *testing.T) {

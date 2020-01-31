@@ -43,10 +43,10 @@ func (s *s3Driver) Open(folder string) (source.Driver, error) {
 	return driver, nil
 }
 
-func WithInstance(sess *session.Session, config *Config) (source.Driver, error) {
+func WithInstance(s3client s3iface.S3API, config *Config) (source.Driver, error) {
 	driver := &s3Driver{
 		config:     config,
-		s3client:   s3.New(sess),
+		s3client:   s3client,
 		migrations: source.NewMigrations(),
 	}
 
