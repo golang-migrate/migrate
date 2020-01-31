@@ -39,7 +39,7 @@ And in the `.down.sql` let's delete it:
 ```
 DROP TABLE IF EXISTS users;
 ```
-By adding `IF EXISTS/IF NOT EXISTS` we are making migrations idempotent - you can read more about idempotency in [getting started](GETTING_STARTED.md#create-migrations)
+By adding `IF EXISTS/IF NOT EXISTS` we are making migrations idempotent - you can read more about idempotency in [getting started](../../GETTING_STARTED.md#create-migrations)
 
 ## Run migrations
 ```
