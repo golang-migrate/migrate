@@ -31,16 +31,17 @@ type Config struct {
 }
 
 func (s *s3Driver) Open(folder string) (source.Driver, error) {
-	driver, err := newS3Driver(folder)
+	sess, err := session.NewSession()
 	if err != nil {
 		return nil, err
 	}
 
-	if err := driver.loadMigrations(); err != nil {
+	config, err := parseURI(folder)
+	if err != nil {
 		return nil, err
 	}
 
-	return driver, nil
+	return WithInstance(s3.New(sess), config)
 }
 
 func WithInstance(s3client s3iface.S3API, config *Config) (source.Driver, error) {
@@ -57,13 +58,8 @@ func WithInstance(s3client s3iface.S3API, config *Config) (source.Driver, error)
 	return driver, nil
 }
 
-func newS3Driver(folder string) (*s3Driver, error) {
-	u, err := url.Parse(folder)
-	if err != nil {
-		return nil, err
-	}
-
-	sess, err := session.NewSession()
+func parseURI(uri string) (*Config, error) {
+	u, err := url.Parse(uri)
 	if err != nil {
 		return nil, err
 	}
@@ -73,13 +69,9 @@ func newS3Driver(folder string) (*s3Driver, error) {
 		prefix += "/"
 	}
 
-	return &s3Driver{
-		config: &Config{
-			Bucket: u.Host,
-			Prefix: prefix,
-		},
-		s3client:   s3.New(sess),
-		migrations: source.NewMigrations(),
+	return &Config{
+		Bucket: u.Host,
+		Prefix: prefix,
 	}, nil
 }
 

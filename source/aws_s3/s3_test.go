@@ -40,43 +40,40 @@ func Test(t *testing.T) {
 	st.Test(t, driver)
 }
 
-func TestNewS3Driver(t *testing.T) {
+func TestParseURI(t *testing.T) {
 	const expectedBucket = "migration-bucket"
-	const expectedPrefix = "production/"
 
-	driver, err := newS3Driver(fmt.Sprintf("s3://%s/%s", expectedBucket, expectedPrefix))
-	if err != nil {
-		t.Fatal(err)
-	}
+	t.Run("With prefix", func(t *testing.T) {
+		const expectedPrefix = "production/"
 
-	if driver.config.Bucket != expectedBucket {
-		t.Errorf("Expected: %s; actual: %s", expectedBucket, driver.config.Bucket)
-	}
+		config, err := parseURI(fmt.Sprintf("s3://%s/%s", expectedBucket, expectedPrefix))
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	if driver.config.Prefix != expectedPrefix {
-		t.Errorf("Expected: %s; actual: %s", expectedPrefix, driver.config.Prefix)
-	}
+		if config.Bucket != expectedBucket {
+			t.Errorf("Expected: %s; actual: %s", expectedBucket, config.Bucket)
+		}
 
-	if driver.s3client == nil {
-		t.Error("S3 client is not initialized")
-	}
+		if config.Prefix != expectedPrefix {
+			t.Errorf("Expected: %s; actual: %s", expectedPrefix, config.Prefix)
+		}
+	})
 
-	if driver.migrations == nil {
-		t.Error("Migration source is not initialized")
-	}
+	t.Run("Without prefix", func(t *testing.T) {
+		config, err := parseURI(fmt.Sprintf("s3://%s", expectedBucket))
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	driver, err = newS3Driver(fmt.Sprintf("s3://%s", expectedBucket))
-	if err != nil {
-		t.Fatal(err)
-	}
+		if config.Bucket != expectedBucket {
+			t.Errorf("Expected: %s; actual: %s", expectedBucket, config.Bucket)
+		}
 
-	if driver.config.Bucket != expectedBucket {
-		t.Errorf("Expected: %s; actual: %s", expectedBucket, driver.config.Bucket)
-	}
-
-	if driver.config.Prefix != "" {
-		t.Errorf("Prefix should be empty; actual: %s", driver.config.Prefix)
-	}
+		if config.Prefix != "" {
+			t.Errorf("Prefix should be empty; actual: %s", config.Prefix)
+		}
+	})
 }
 
 type fakeS3 struct {
