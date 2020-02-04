@@ -31,12 +31,12 @@ type Config struct {
 }
 
 func (s *s3Driver) Open(folder string) (source.Driver, error) {
-	sess, err := session.NewSession()
+	config, err := parseURI(folder)
 	if err != nil {
 		return nil, err
 	}
 
-	config, err := parseURI(folder)
+	sess, err := session.NewSession()
 	if err != nil {
 		return nil, err
 	}

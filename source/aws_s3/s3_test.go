@@ -2,8 +2,8 @@ package awss3
 
 import (
 	"errors"
-	"fmt"
 	"io/ioutil"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -41,39 +41,53 @@ func Test(t *testing.T) {
 }
 
 func TestParseURI(t *testing.T) {
-	const expectedBucket = "migration-bucket"
-
-	t.Run("With prefix", func(t *testing.T) {
-		const expectedPrefix = "production/"
-
-		config, err := parseURI(fmt.Sprintf("s3://%s/%s", expectedBucket, expectedPrefix))
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if config.Bucket != expectedBucket {
-			t.Errorf("Expected: %s; actual: %s", expectedBucket, config.Bucket)
-		}
-
-		if config.Prefix != expectedPrefix {
-			t.Errorf("Expected: %s; actual: %s", expectedPrefix, config.Prefix)
-		}
-	})
-
-	t.Run("Without prefix", func(t *testing.T) {
-		config, err := parseURI(fmt.Sprintf("s3://%s", expectedBucket))
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if config.Bucket != expectedBucket {
-			t.Errorf("Expected: %s; actual: %s", expectedBucket, config.Bucket)
-		}
-
-		if config.Prefix != "" {
-			t.Errorf("Prefix should be empty; actual: %s", config.Prefix)
-		}
-	})
+	tests := []struct {
+		name   string
+		uri    string
+		config *Config
+	}{
+		{
+			"with prefix, no trailing slash",
+			"s3://migration-bucket/production",
+			&Config{
+				Bucket: "migration-bucket",
+				Prefix: "production/",
+			},
+		},
+		{
+			"without prefix, no trailing slash",
+			"s3://migration-bucket",
+			&Config{
+				Bucket: "migration-bucket",
+			},
+		},
+		{
+			"with prefix, trailing slash",
+			"s3://migration-bucket/production/",
+			&Config{
+				Bucket: "migration-bucket",
+				Prefix: "production/",
+			},
+		},
+		{
+			"without prefix, trailing slash",
+			"s3://migration-bucket/",
+			&Config{
+				Bucket: "migration-bucket",
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			actual, err := parseURI(test.uri)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(actual, test.config) {
+				t.Errorf("parseURI() = %v, expected %v", actual, test.config)
+			}
+		})
+	}
 }
 
 type fakeS3 struct {
