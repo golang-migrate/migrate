@@ -3,13 +3,13 @@ package awss3
 import (
 	"errors"
 	"io/ioutil"
-	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
 	st "github.com/golang-migrate/migrate/v4/source/testing"
+	"github.com/stretchr/testify/assert"
 )
 
 func Test(t *testing.T) {
@@ -83,9 +83,7 @@ func TestParseURI(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if !reflect.DeepEqual(actual, test.config) {
-				t.Errorf("parseURI() = %v, expected %v", actual, test.config)
-			}
+			assert.Equal(t, test.config, actual)
 		})
 	}
 }
