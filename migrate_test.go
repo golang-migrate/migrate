@@ -70,7 +70,7 @@ func ExampleNew() {
 	}
 
 	// Migrate all the way up ...
-	if err := m.Up(); err != nil {
+	if err := m.Up(); err != nil && err != ErrNoChange {
 		log.Fatal(err)
 	}
 }
