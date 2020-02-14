@@ -28,6 +28,7 @@ require (
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/kr/pretty v0.1.0 // indirect
 	github.com/lib/pq v1.3.0
+	github.com/mattn/go-oci8 v0.0.4
 	github.com/mattn/go-sqlite3 v1.10.0
 	github.com/morikuni/aec v0.0.0-20170113033406-39771216ff4c // indirect
 	github.com/nakagami/firebirdsql v0.0.0-20190310045651-3c02a58cfed8

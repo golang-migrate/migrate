@@ -7,3 +7,4 @@ cli/migrate
 vendor/
 .vscode/
 .idea/
+a.out
