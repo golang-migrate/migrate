@@ -63,7 +63,7 @@ EOF
 1. Run test code 
 ```bash
 $ cd /path/to/repo/database/oracle/dir
-$ ORACLE_DSN=oracle://oracle/oracle@localhost:1522/XEPDB1 PKG_CONFIG_PATH=/opt/oracle/instantclient_18_5 LD_LIBRARY_PATH=/opt/oracle/instantclient_18_5 go test -race -v -covermode atomic ./... -coverprofile .coverage
+$ ORACLE_DSN=oracle://oracle/oracle@localhost:1522/XEPDB1 PKG_CONFIG_PATH=/path/to/oracle/lib/dir LD_LIBRARY_PATH=/path/to/oracle/lib/dir go test -race -v -covermode atomic ./... -coverprofile .coverage
 ```
 2. Check [example migration files](examples)
 
