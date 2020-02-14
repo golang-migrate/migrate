@@ -415,7 +415,8 @@ func parseStatements(rd io.Reader, plsqlStatementSeparator string) ([]string, er
 	} else {
 		queries = strings.Split(buf.String(), defaultStatementSeparator)
 	}
-	var results []string
+
+	results := make([]string, 0)
 	sLen := len(plsqlStatementEndToken)
 	for _, query := range queries {
 		query = strings.TrimSpace(query)
