@@ -28,14 +28,21 @@ In order to compile & run the migration against Oracle database, basically it wi
 
 ## Compile
 1. Download [oracle client dynamic library](https://www.oracle.com/technetwork/database/database-technologies/instant-client/downloads/index.html) from their official site manually, because there is a check box on download page need to honor manually.
-2. Build cli: `LD_LIBRARY_PATH=/path/to/lib/dir go build  -tags 'oracle' -o bin/migrate github.com/golang-migrate/migrate/v4/cli`
+2. Build cli 
+```bash
+$ cd /path/to/repo/dir
+$ LD_LIBRARY_PATH=/path/to/oracle/lib/dir go build  -tags 'oracle' -o bin/migrate github.com/golang-migrate/migrate/v4/cli
+```
 
 ## Configure Oracle database
 1. Example Oracle version: `Oracle Database Express Edition`, check [here](https://docs.oracle.com/cd/B28359_01/license.111/b28287/editions.htm#DBLIC119) from version details.
-2. Start a oracle docker container, e.g, `docker run --name oracle -d -p 1521:1521 -p 5500:5500 --volume ~/data/oracle-xe:/opt/oracle/oradata maxnilz/oracle-xe:18c`
-3. Wait a moment for the first startup.
+2. Start a oracle docker container 
+```bash
+$ docker run --name oracle -d -p 1521:1521 -p 5500:5500 --volume ~/data/oracle-xe:/opt/oracle/oradata maxnilz/oracle-xe:18c
+```
+3. Wait a moment, first time will take a a while to run for as the oracle-xe configure script needs to complete
 4. Connect to oracle server via [sqlpus](https://download.oracle.com/otn/linux/instantclient/185000/instantclient-sqlplus-linux.x64-18.5.0.0.0dbru.zip) by using the builtin sys user & password, 
-   create a user in Oracle PDB container.
+   create a user in Oracle PDB container:
 ```bash
 $ sqlplus sys/Oracle18@localhost:1521/XE as sysdba << EOF
   show con_name
@@ -55,7 +62,7 @@ EOF
 ## Play
 1. Run test code 
 ```bash
-$ cd /path/to/database/oracle
+$ cd /path/to/repo/database/oracle/dir
 $ ORACLE_DSN=oracle://oracle/oracle@localhost:1522/XEPDB1 PKG_CONFIG_PATH=/opt/oracle/instantclient_18_5 LD_LIBRARY_PATH=/opt/oracle/instantclient_18_5 go test -race -v -covermode atomic ./... -coverprofile .coverage
 ```
 2. Check [example migration files](examples)
