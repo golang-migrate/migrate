@@ -85,14 +85,15 @@ CREATE TABLE USERS (
 );
 -- this is comment
 ALTER TABLE USERS ADD CITY varchar(100);
-`, expectedQueries: []string{
-			`CREATE TABLE USERS (
+`,
+			expectedQueries: []string{
+				`CREATE TABLE USERS (
   USER_ID integer unique,
   NAME    varchar(40),
   EMAIL   varchar(40)
 )`,
-			`ALTER TABLE USERS ADD CITY varchar(100)`,
-		}},
+				`ALTER TABLE USERS ADD CITY varchar(100)`,
+			}},
 	}
 	for _, c := range cases {
 		queries, err := parseStatements(bytes.NewBufferString(c.migration), plsqlDefaultStatementSeparator)
