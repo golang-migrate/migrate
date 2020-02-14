@@ -21,3 +21,46 @@ You'll need to [Install Oracle full client or Instant Client:](https://www.oracl
 ## Supported & tested version
 - 12c-ee
 - 18c-xe
+
+## How to use
+
+In order to compile & run the migration against Oracle database, basically it will require:
+
+## Compile
+1. Download [oracle client dynamic library](https://www.oracle.com/technetwork/database/database-technologies/instant-client/downloads/index.html) from their official site manually, because there is a check box on download page need to honor manually.
+2. Build cli: `LD_LIBRARY_PATH=/path/to/lib/dir go build  -tags 'oracle' -o bin/migrate github.com/golang-migrate/migrate/v4/cli`
+
+## Configure Oracle database
+1. Example Oracle version: `Oracle Database Express Edition`, check [here](https://docs.oracle.com/cd/B28359_01/license.111/b28287/editions.htm#DBLIC119) from version details.
+2. Start a oracle docker container, e.g, `docker run --name oracle -d -p 1521:1521 -p 5500:5500 --volume ~/data/oracle-xe:/opt/oracle/oradata maxnilz/oracle-xe:18c`
+3. Wait a moment for the first startup.
+4. Connect to oracle server via [sqlpus](https://download.oracle.com/otn/linux/instantclient/185000/instantclient-sqlplus-linux.x64-18.5.0.0.0dbru.zip) by using the builtin sys user & password, 
+   create a user in Oracle PDB container.
+```bash
+$ sqlplus sys/Oracle18@localhost:1521/XE as sysdba << EOF
+  show con_name
+  show pdbs  
+
+  alter session set container=XEPDB1;
+  create user oracle identified by oracle;
+  grant dba to oracle;
+  grant create session to oracle;
+  grant connect, resource to oracle;
+  grant all privileges to oracle;
+  
+  exit;
+EOF
+```
+
+## Play
+1. Run test code 
+```bash
+$ cd /path/to/database/oracle
+$ ORACLE_DSN=oracle://oracle/oracle@localhost:1522/XEPDB1 PKG_CONFIG_PATH=/opt/oracle/instantclient_18_5 LD_LIBRARY_PATH=/opt/oracle/instantclient_18_5 go test -race -v -covermode atomic ./... -coverprofile .coverage
+```
+2. Check [example migration files](examples)
+
+## FAQ
+1. Why we need the dynamic library?
+Because there is no static lib for the application to compile & link. check [here](https://community.oracle.com/thread/4177571) for more details.
+ 
