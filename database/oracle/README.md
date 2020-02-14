@@ -17,3 +17,7 @@ This mode splits the migration text into separately-executed statements:
 ## Building
 
 You'll need to [Install Oracle full client or Instant Client:](https://www.oracle.com/technetwork/database/database-technologies/instant-client/downloads/index.html) for oracle support since this uses [github.com/mattn/go-oci8](https://github.com/mattn/go-oci8)
+
+## Supported & tested version
+- 12c-ee
+- 18c-xe
