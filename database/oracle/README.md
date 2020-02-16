@@ -1,11 +1,9 @@
 # oracle
 The golang oracle driver (go-oci8) does not natively support executing multiple statements in a single query. 
-To allow for multiple statements in a single migration, you can use the `x-multi-statement` param. 
-This mode splits the migration text into separately-executed statements:
+Here are the strategies for splitting the migration text into separately-executed statements:
 1. If there is no PL/SQL statement in a migration file, the `semicolons` will be the separator
-2. If there is any PL/SQL statement in a migration file, the separator will be `---` in a single line or specified by `x-plsql-line-separator`, 
+1. If there is any PL/SQL statement in a migration file, the separator will be `---` in a single line or specified by `x-plsql-line-separator`, 
    And in this case the multiple statements cannot be used when a statement in the migration contains a string with the given `line separator`.
-
 
 `oracle://user/password@host:port/sid?query` (`oci8` works too)
 
@@ -26,48 +24,55 @@ You'll need to [Install Oracle full client or Instant Client:](https://www.oracl
 
 In order to compile & run the migration against Oracle database, basically it will require:
 
-## Compile
+## Compile & link
 1. Download [oracle client dynamic library](https://www.oracle.com/technetwork/database/database-technologies/instant-client/downloads/index.html) from their official site manually, because there is a check box on download page need to honor manually.
-2. Build cli 
+1. Build cli 
 ```bash
 $ cd /path/to/repo/dir
-$ LD_LIBRARY_PATH=/path/to/oracle/lib/dir go build  -tags 'oracle' -o bin/migrate github.com/golang-migrate/migrate/v4/cli
+$ PKG_CONFIG_PATH=/path/to/oracle/sdk/dir LD_LIBRARY_PATH=/path/to/oracle/lib/dir go build  -tags 'oracle' -o bin/migrate github.com/golang-migrate/migrate/v4/cli
 ```
 
 ## Configure Oracle database
 1. Example Oracle version: `Oracle Database Express Edition`, check [here](https://docs.oracle.com/cd/B28359_01/license.111/b28287/editions.htm#DBLIC119) from version details.
-2. Start a oracle docker container 
+1. Start a oracle docker container, using customized oracle-xe image(include a PDB database & default user `oracle` in it)
 ```bash
 $ docker run --name oracle -d -p 1521:1521 -p 5500:5500 --volume ~/data/oracle-xe:/opt/oracle/oradata maxnilz/oracle-xe:18c
 ```
-3. Wait a moment, first time will take a a while to run for as the oracle-xe configure script needs to complete
-4. Connect to oracle server via [sqlpus](https://download.oracle.com/otn/linux/instantclient/185000/instantclient-sqlplus-linux.x64-18.5.0.0.0dbru.zip) by using the builtin sys user & password, 
-   create a user in Oracle PDB container:
-```bash
-$ sqlplus sys/Oracle18@localhost:1521/XE as sysdba << EOF
-  show con_name
-  show pdbs  
-
-  alter session set container=XEPDB1;
-  create user oracle identified by oracle;
-  grant dba to oracle;
-  grant create session to oracle;
-  grant connect, resource to oracle;
-  grant all privileges to oracle;
-  
-  exit;
-EOF
+1. Wait a moment, first time will take a while to run for as the oracle-xe configure script needs to complete
 ```
 
 ## Play
 1. Run test code 
 ```bash
 $ cd /path/to/repo/database/oracle/dir
-$ ORACLE_DSN=oracle://oracle/oracle@localhost:1522/XEPDB1 PKG_CONFIG_PATH=/path/to/oracle/lib/dir LD_LIBRARY_PATH=/path/to/oracle/lib/dir go test -race -v -covermode atomic ./... -coverprofile .coverage
+$ ORACLE_DSN=oracle://oracle/oracle@localhost:1521/XEPDB1 PKG_CONFIG_PATH=/path/to/oracle/lib/dir LD_LIBRARY_PATH=/path/to/oracle/lib/dir go test -tags "oracle" -race -v -covermode atomic ./... -coverprofile .coverage
 ```
-2. Check [example migration files](examples)
+1. Check [example migration files](examples)
 
-## FAQ
-1. Why we need the dynamic library?
-Because there is no static lib for the application to compile & link. check [here](https://community.oracle.com/thread/4177571) for more details.
- 
+## FAQs
+
+Maybe not "frequently asked", but hopefully these answers will be useful.
+
+### Why the test code for oracle in CI are disabled
+
+Setup test case via oracle container in CI is very expensive for these reasons:
+1. There is no public official docker images available
+1. The oracle image size in community is 8GB, which is huge
+1. The volume size of one single oracle container is about 5GB, which is huge too
+1. And more importantly, It will take a long time to start just a single oracle container & configure it(almost 30min on my 16GB memory, 8 cores machine). The test case will run in parallel and each case will require it's own container, which will increase the resource & time costs many times.
+1. Again, it's tricky to configure the dependencies for the compile & link automatically because of the oracle download policies. 
+
+### Why there is a dockerfile for oracle only?
+
+The dependent dynamic libs are missing in alpine system, the dockerfile for oracle is based on debian system.
+
+### Why there is an assets dir for the oracle sdk & libs
+
+1. It requires to login to the oracle official site & config the license manually for downloading these oracle sdk & lib, we can't use wget & curl to download directly.
+1. In order to make `Dockerfile.oracle` works, I download them manually and put them in the `assets` dir.
+
+### Why we need the dynamic library?
+
+There is no static lib for the application to compile & link. check [here](https://community.oracle.com/thread/4177571) for more details.
+
+

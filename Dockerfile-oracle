@@ -1,0 +1,37 @@
+FROM golang:1.13-buster as builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends zip unzip build-essential libaio1 \
+	&& rm -rf /var/lib/apt/lists/*
+
+ARG VERSION
+
+COPY database/oracle/assets/oci8.pc /opt/oracle/
+COPY database/oracle/assets/instantclient-sdk-linux.x64-18.5.0.0.0dbru.zip /opt/oracle/
+COPY database/oracle/assets/instantclient-basiclite-linux.x64-18.5.0.0.0dbru.zip /opt/oracle/
+RUN unzip -d /opt/oracle /opt/oracle/instantclient-sdk-linux.x64-18.5.0.0.0dbru.zip
+RUN unzip -d /opt/oracle /opt/oracle/instantclient-basiclite-linux.x64-18.5.0.0.0dbru.zip
+ENV PKG_CONFIG_PATH="/opt/oracle"
+ENV LD_LIBRARY_PATH="/opt/oracle/instantclient_18_5"
+
+WORKDIR /go/src/github.com/golang-migrate/migrate
+
+COPY go.mod go.sum ./
+
+RUN go mod download
+
+COPY . ./
+
+RUN go build -a -o build/migrate.linux-386 -ldflags="-s -w -X main.Version=${VERSION}" -tags "oracle" ./cmd/migrate
+
+FROM debian:buster-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends libaio1 ca-certificates \
+	&& rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /opt/oracle/instantclient_18_5 /opt/oracle/instantclient_18_5
+COPY --from=builder /go/src/github.com/golang-migrate/migrate/build/migrate.linux-386 /migrate
+
+ENV LD_LIBRARY_PATH="/opt/oracle/instantclient_18_5:${LD_LIBRARY_PATH}"
+
+ENTRYPOINT ["/migrate"]
+CMD ["--help"]

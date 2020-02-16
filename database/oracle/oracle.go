@@ -1,3 +1,5 @@
+// +build oracle
+
 package oracle
 
 import (
