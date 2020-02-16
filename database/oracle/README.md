@@ -1,5 +1,5 @@
 # oracle
-The golang oracle driver (go-oci8) does not natively support executing multiple statements in a single query. 
+The golang oracle driver [godror](https://github.com/godror/godror) does not natively support executing multiple statements in a single query. 
 Here are the strategies for splitting the migration text into separately-executed statements:
 1. If there is no PL/SQL statement in a migration file, the `semicolons` will be the separator
 1. If there is any PL/SQL statement in a migration file, the separator will be `---` in a single line or specified by `x-plsql-line-separator`, 
@@ -12,9 +12,9 @@ Here are the strategies for splitting the migration text into separately-execute
 | `x-migrations-table` | `MigrationsTable` | Name of the migrations table in UPPER case |
 | `x-plsql-line-separator` | `PLSQLStatementSeparator` | a single line which use as the token to spilt multiple statements in single migration file (See note above), default `---` |
 
-## Building
+## Runtime dependency
 
-You'll need to [Install Oracle full client or Instant Client:](https://www.oracle.com/technetwork/database/database-technologies/instant-client/downloads/index.html) for oracle support since this uses [github.com/mattn/go-oci8](https://github.com/mattn/go-oci8)
+Although an Oracle client is NOT required for compiling, it is at run time. One can download it from https://www.oracle.com/database/technologies/instant-client/downloads.html
 
 ## Supported & tested version
 - 12c-ee
@@ -24,9 +24,8 @@ You'll need to [Install Oracle full client or Instant Client:](https://www.oracl
 
 In order to compile & run the migration against Oracle database, basically it will require:
 
-## Compile & link
-1. Download [oracle client dynamic library](https://www.oracle.com/technetwork/database/database-technologies/instant-client/downloads/index.html) from their official site manually, because it requires to logon and honor a check box on download page manually.
-1. Build cli 
+## Build cli
+
 ```bash
 $ cd /path/to/repo/dir
 $ go build  -tags 'oracle' -o bin/migrate github.com/golang-migrate/migrate/v4/cli
@@ -36,6 +35,10 @@ $ go build  -tags 'oracle' -o bin/migrate github.com/golang-migrate/migrate/v4/c
 1. Example Oracle version: `Oracle Database Express Edition`, check [here](https://docs.oracle.com/cd/B28359_01/license.111/b28287/editions.htm#DBLIC119) from version details.
 1. Start a oracle docker container based on customized community oracle-xe image(include a PDB database & default user `oracle` in it): `docker run --name oracle -d -p 1521:1521 -p 5500:5500 --volume ~/data/oracle-xe:/opt/oracle/oradata maxnilz/oracle-xe:18c`
 1. Wait a moment, first time will take a while to run for as the oracle-xe configure script needs to complete
+
+## Download runtime dependency
+
+Download [oracle client dynamic library](https://www.oracle.com/technetwork/database/database-technologies/instant-client/downloads/index.html) from their official site manually, because it requires to logon and honor a check box on download page manually.
 
 ## Play
 
@@ -67,9 +70,9 @@ Setup test case via oracle container in CI is very expensive for these reasons:
 
 The dependent dynamic libs are missing in alpine system, the dockerfile for oracle is based on debian system.
 
-### Why there is an assets dir for the oracle sdk & libs
+### Why there is an assets dir for the oracle libs
 
-1. It requires to login to the oracle official site & config the license manually for downloading these oracle sdk & lib, we can't use wget & curl to download directly.
+1. It requires to login to the oracle official site & config the license manually for downloading these oracle lib, we can't use wget & curl to download directly.
 1. In order to make `Dockerfile.oracle` works, I download them manually and put them in the `assets` dir.
 
 ### Why we need the dynamic library?
