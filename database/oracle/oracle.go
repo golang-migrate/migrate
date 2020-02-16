@@ -1,5 +1,3 @@
-// +build oracle
-
 package oracle
 
 import (
@@ -7,23 +5,21 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	nurl "net/url"
 	"strings"
 
+	_ "github.com/godror/godror"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 	multierror "github.com/hashicorp/go-multierror"
-	_ "github.com/mattn/go-oci8"
 )
 
 func init() {
 	db := Oracle{}
 	database.Register("oracle", &db)
-	database.Register("oci8", &db)
 }
 
 const (
@@ -114,11 +110,7 @@ func (ora *Oracle) Open(url string) (database.Driver, error) {
 	if err != nil {
 		return nil, err
 	}
-	if purl.Scheme != "oracle" {
-		return nil, errors.New("invalid schema expected oracle, got: " + purl.Scheme)
-	}
-
-	db, err := sql.Open("oci8", migrate.FilterCustomQuery(purl).String())
+	db, err := sql.Open("godror", migrate.FilterCustomQuery(purl).String())
 	if err != nil {
 		return nil, err
 	}
@@ -435,7 +427,7 @@ func parseStatements(rd io.Reader, plsqlStatementSeparator string) ([]string, er
 	return results, nil
 }
 
-func b2i(b bool) int8 {
+func b2i(b bool) int {
 	if b {
 		return 1
 	}

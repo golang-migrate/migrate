@@ -1,9 +1,0 @@
-prefixdir=/opt/oracle/instantclient_18_5
-includedir=${prefixdir}/sdk/include
-libdir=${prefixdir}
-
-Name: oci8
-Description: Oracle Instant Client
-Version: 18.5
-Cflags: -I${includedir}
-Libs: -L${libdir} -lclntsh

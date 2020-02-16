@@ -5,12 +5,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends zip unzip build
 
 ARG VERSION
 
-COPY database/oracle/assets/oci8.pc /opt/oracle/
-COPY database/oracle/assets/instantclient-sdk-linux.x64-18.5.0.0.0dbru.zip /opt/oracle/
 COPY database/oracle/assets/instantclient-basiclite-linux.x64-18.5.0.0.0dbru.zip /opt/oracle/
-RUN unzip -d /opt/oracle /opt/oracle/instantclient-sdk-linux.x64-18.5.0.0.0dbru.zip
 RUN unzip -d /opt/oracle /opt/oracle/instantclient-basiclite-linux.x64-18.5.0.0.0dbru.zip
-ENV PKG_CONFIG_PATH="/opt/oracle"
 ENV LD_LIBRARY_PATH="/opt/oracle/instantclient_18_5"
 
 WORKDIR /go/src/github.com/golang-migrate/migrate

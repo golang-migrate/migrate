@@ -1,5 +1,3 @@
-// +build oracle
-
 package oracle
 
 import (
@@ -189,7 +187,7 @@ func TestWithInstance_Concurrent(t *testing.T) {
 	// actually a connection pool, and so, each of the below go
 	// routines will have a high probability of using a separate
 	// connection, which is something we want to exercise.
-	db, err := sql.Open("oci8", oracleDsn(t))
+	db, err := sql.Open("godror", oracleDsn(t))
 	if err != nil {
 		t.Fatal(err)
 	}

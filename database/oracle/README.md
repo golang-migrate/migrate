@@ -5,7 +5,7 @@ Here are the strategies for splitting the migration text into separately-execute
 1. If there is any PL/SQL statement in a migration file, the separator will be `---` in a single line or specified by `x-plsql-line-separator`, 
    And in this case the multiple statements cannot be used when a statement in the migration contains a string with the given `line separator`.
 
-`oracle://user/password@host:port/sid?query` (`oci8` works too)
+`oracle://user:password@host:port/sid?query`
 
 | URL Query  | WithInstance Config | Description |
 |------------|---------------------|-------------|
@@ -25,11 +25,11 @@ You'll need to [Install Oracle full client or Instant Client:](https://www.oracl
 In order to compile & run the migration against Oracle database, basically it will require:
 
 ## Compile & link
-1. Download [oracle client dynamic library](https://www.oracle.com/technetwork/database/database-technologies/instant-client/downloads/index.html) from their official site manually, because there is a check box on download page need to honor manually.
+1. Download [oracle client dynamic library](https://www.oracle.com/technetwork/database/database-technologies/instant-client/downloads/index.html) from their official site manually, because it requires to logon and honor a check box on download page manually.
 1. Build cli 
 ```bash
 $ cd /path/to/repo/dir
-$ PKG_CONFIG_PATH=/path/to/oracle/sdk/dir LD_LIBRARY_PATH=/path/to/oracle/lib/dir go build  -tags 'oracle' -o bin/migrate github.com/golang-migrate/migrate/v4/cli
+$ go build  -tags 'oracle' -o bin/migrate github.com/golang-migrate/migrate/v4/cli
 ```
 
 ## Configure Oracle database
@@ -43,7 +43,7 @@ $ PKG_CONFIG_PATH=/path/to/oracle/sdk/dir LD_LIBRARY_PATH=/path/to/oracle/lib/di
 
 ```bash
 $ cd /path/to/repo/database/oracle/dir
-$ ORACLE_DSN=oracle://oracle/oracle@localhost:1521/XEPDB1 PKG_CONFIG_PATH=/path/to/oracle/lib/dir LD_LIBRARY_PATH=/path/to/oracle/lib/dir go test -tags "oracle" -race -v -covermode atomic ./... -coverprofile .coverage
+$ ORACLE_DSN=oracle://oracle:oracle@localhost:1521/XEPDB1 LD_LIBRARY_PATH=/path/to/oracle/lib/dir go test -tags "oracle" -race -v -covermode atomic ./... -coverprofile .coverage
 ```
 
 ### Write migration files
@@ -61,7 +61,7 @@ Setup test case via oracle container in CI is very expensive for these reasons:
 1. The oracle image size in community is 8GB, which is huge
 1. The volume size of one single oracle container is about 5GB, which is huge too
 1. And more importantly, It will take a long time to start just a single oracle container & configure it(almost 30min on my 16GB memory, 8 cores machine). The test case will run in parallel and each case will require it's own container, which will increase the resource & time costs many times.
-1. Again, it's tricky to configure the dependencies for the compile & link automatically because of the oracle download policies. 
+1. Although an Oracle client is NOT required for compiling, it is at run time. and it's tricky to download the dynamic lib directly/automatically because of the oracle download policies. 
 
 ### Why there is a dockerfile for oracle only?
 
