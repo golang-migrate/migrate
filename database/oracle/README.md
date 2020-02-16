@@ -34,19 +34,21 @@ $ PKG_CONFIG_PATH=/path/to/oracle/sdk/dir LD_LIBRARY_PATH=/path/to/oracle/lib/di
 
 ## Configure Oracle database
 1. Example Oracle version: `Oracle Database Express Edition`, check [here](https://docs.oracle.com/cd/B28359_01/license.111/b28287/editions.htm#DBLIC119) from version details.
-1. Start a oracle docker container, using customized oracle-xe image(include a PDB database & default user `oracle` in it)
-```bash
-$ docker run --name oracle -d -p 1521:1521 -p 5500:5500 --volume ~/data/oracle-xe:/opt/oracle/oradata maxnilz/oracle-xe:18c
-```
+1. Start a oracle docker container based on customized community oracle-xe image(include a PDB database & default user `oracle` in it): `docker run --name oracle -d -p 1521:1521 -p 5500:5500 --volume ~/data/oracle-xe:/opt/oracle/oradata maxnilz/oracle-xe:18c`
 1. Wait a moment, first time will take a while to run for as the oracle-xe configure script needs to complete
 
 ## Play
-1. Run test code 
+
+### Run test code 
+
 ```bash
 $ cd /path/to/repo/database/oracle/dir
 $ ORACLE_DSN=oracle://oracle/oracle@localhost:1521/XEPDB1 PKG_CONFIG_PATH=/path/to/oracle/lib/dir LD_LIBRARY_PATH=/path/to/oracle/lib/dir go test -tags "oracle" -race -v -covermode atomic ./... -coverprofile .coverage
 ```
-1. Check [example migration files](examples)
+
+### Write migration files
+
+Check [example migration files](examples)
 
 ## FAQs
 
