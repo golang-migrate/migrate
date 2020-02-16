@@ -39,7 +39,6 @@ $ PKG_CONFIG_PATH=/path/to/oracle/sdk/dir LD_LIBRARY_PATH=/path/to/oracle/lib/di
 $ docker run --name oracle -d -p 1521:1521 -p 5500:5500 --volume ~/data/oracle-xe:/opt/oracle/oradata maxnilz/oracle-xe:18c
 ```
 1. Wait a moment, first time will take a while to run for as the oracle-xe configure script needs to complete
-```
 
 ## Play
 1. Run test code 
