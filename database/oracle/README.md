@@ -74,5 +74,3 @@ The dependent dynamic libs are missing in alpine system, the dockerfile for orac
 ### Why we need the dynamic library?
 
 There is no static lib for the application to compile & link. check [here](https://community.oracle.com/thread/4177571) for more details.
-
-
