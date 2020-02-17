@@ -71,6 +71,7 @@ deploy:
       - cli/build/migrate.linux-arm64.tar.gz
       - cli/build/migrate.darwin-amd64.tar.gz
       - cli/build/migrate.windows-amd64.exe.tar.gz
+      - cli/build/migrate.windows-386.exe.tar.gz
       - cli/build/sha256sum.txt
       - dependency_tree.txt
   - provider: packagecloud
