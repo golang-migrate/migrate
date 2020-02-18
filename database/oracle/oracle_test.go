@@ -16,7 +16,7 @@ import (
 
 func oracleDsn(t *testing.T) string {
 	//E.g: oci8://user/password@localhost:1521/ORCLPDB1
-	dsn := os.Getenv("ORACLE_DSN")
+	dsn := os.Getenv("MIGRATE_TEST_ORACLE_DSN")
 	if dsn == "" {
 		t.Skip("ORACLE_DSN not found, skip the test case")
 	}
@@ -96,7 +96,7 @@ ALTER TABLE USERS ADD CITY varchar(100);
 			}},
 	}
 	for _, c := range cases {
-		queries, err := parseStatements(bytes.NewBufferString(c.migration), plsqlDefaultStatementSeparator)
+		queries, err := parseStatements(bytes.NewBufferString(c.migration), &Config{PLSQLStatementSeparator: plsqlDefaultStatementSeparator})
 		require.Nil(t, err)
 		require.Equal(t, c.expectedQueries, queries)
 	}

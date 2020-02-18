@@ -42,6 +42,7 @@ type OraErr interface {
 
 type Config struct {
 	MigrationsTable         string
+	DisableMultiStatements  bool
 	PLSQLStatementSeparator string
 
 	databaseName string
@@ -117,10 +118,15 @@ func (ora *Oracle) Open(url string) (database.Driver, error) {
 
 	migrationsTable := strings.ToUpper(purl.Query().Get("x-migrations-table"))
 	statementSeparator := purl.Query().Get("x-statement-separator")
+	disableMultiStatement := false
+	if purl.Query().Get("x-disable-multi-statements") == "true" {
+		disableMultiStatement = true
+	}
 
 	oraInst, err := WithInstance(db, &Config{
 		databaseName:            purl.Path,
 		MigrationsTable:         migrationsTable,
+		DisableMultiStatements:  disableMultiStatement,
 		PLSQLStatementSeparator: statementSeparator,
 	})
 
@@ -213,7 +219,7 @@ end;
 }
 
 func (ora *Oracle) Run(migration io.Reader) error {
-	queries, err := parseStatements(migration, ora.config.PLSQLStatementSeparator)
+	queries, err := parseStatements(migration, ora.config)
 	if err != nil {
 		return err
 	}
@@ -371,11 +377,20 @@ END;
 	return nil
 }
 
-func parseStatements(rd io.Reader, plsqlStatementSeparator string) ([]string, error) {
+func parseStatements(rd io.Reader, c *Config) ([]string, error) {
 	migr, err := ioutil.ReadAll(rd)
 	if err != nil {
 		return nil, err
 	}
+
+	// If multi-statements has been disable explicitly,
+	// i.e, there is no multi-statement enabled(neither normal multi-statements nor multi-PL/SQL-statements),
+	// return the whole migration as a blob.
+	if c.DisableMultiStatements {
+		return []string{string(migr)}, nil
+	}
+
+	// Either normal multi-statements or multi-PL/SQL-statements has been enabled.
 	plsqlEnabled := false
 	if strings.Contains(string(migr), plsqlStatementEndToken) {
 		plsqlEnabled = true
@@ -386,7 +401,7 @@ func parseStatements(rd io.Reader, plsqlStatementSeparator string) ([]string, er
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	for scanner.Scan() {
 		line := scanner.Text()
-		if plsqlEnabled && line == plsqlStatementSeparator {
+		if plsqlEnabled && line == c.PLSQLStatementSeparator {
 			query := buf.String()
 			if query != "" {
 				queries = append(queries, query)

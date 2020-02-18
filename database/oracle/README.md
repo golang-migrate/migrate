@@ -1,6 +1,6 @@
 # oracle
 The golang oracle driver [godror](https://github.com/godror/godror) does not natively support executing multiple statements in a single query. 
-Here are the strategies for splitting the migration text into separately-executed statements:
+Here are the strategies for splitting the migration text into separately-executed statements if multi statements detecting isn't been disable explicitly via `x-disable-multi-statements`:
 1. If there is no PL/SQL statement in a migration file, the `semicolons` will be the separator
 1. If there is any PL/SQL statement in a migration file, the separator will be `---` in a single line or specified by `x-plsql-line-separator`, 
    And in this case the multiple statements cannot be used when a statement in the migration contains a string with the given `line separator`.
@@ -10,6 +10,7 @@ Here are the strategies for splitting the migration text into separately-execute
 | URL Query  | WithInstance Config | Description |
 |------------|---------------------|-------------|
 | `x-migrations-table` | `MigrationsTable` | Name of the migrations table in UPPER case |
+| `x-disable-multi-statements` | `DisableMultiStatements` | Indicate if disable multi statements detection automatically |
 | `x-plsql-line-separator` | `PLSQLStatementSeparator` | a single line which use as the token to spilt multiple statements in single migration file (See note above), default `---` |
 
 ## Runtime dependency
@@ -78,3 +79,7 @@ The dependent dynamic libs are missing in alpine system, the dockerfile for orac
 ### Why we need the dynamic library?
 
 There is no static lib for the application to compile & link. check [here](https://community.oracle.com/thread/4177571) for more details.
+
+### Are there public docker images available
+
+There is no official pubic docker images available, but based on [this official open-source repo](https://github.com/oracle/docker-images), I published [maxnilz/oracle-ee:12.2.0.1](https://hub.docker.com/repository/docker/maxnilz/oracle-ee), [maxnilz/oracle-xe:18c](https://hub.docker.com/repository/docker/maxnilz/oracle-xe) in docker hub without official support and JUST FOR LEARN PURPOSE!!!
