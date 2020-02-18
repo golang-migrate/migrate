@@ -180,7 +180,7 @@ func (ch *ClickHouse) ensureVersionTable() (err error) {
 
 	var (
 		table string
-		query = "SHOW TABLES FROM " + ch.config.DatabaseName + " LIKE '" + ch.config.MigrationsTable + "'"
+		query = "SHOW TABLES FROM `" + ch.config.DatabaseName + "` LIKE '" + ch.config.MigrationsTable + "'"
 	)
 	// check if migration table exists
 	if err := ch.conn.QueryRow(query).Scan(&table); err != nil {
