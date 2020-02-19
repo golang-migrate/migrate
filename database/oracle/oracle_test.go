@@ -47,7 +47,7 @@ func isDKHonored(t *testing.T) {
 
 func oracleDKDsn(t *testing.T, args ...interface{}) string {
 	c := args[0].(dktest.ContainerInfo)
-	ip, port, err := c.FirstPort()
+	ip, port, err := c.Port(1521)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -154,7 +154,7 @@ func TestWithInstanceConcurrent(t *testing.T) {
 }
 
 func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
-	ip, port, err := c.FirstPort()
+	ip, port, err := c.Port(1521)
 	if err != nil {
 		return false
 	}
@@ -169,13 +169,17 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 	}()
 	if err = db.PingContext(ctx); err != nil {
 		oraErr, ok := godror.AsOraErr(err)
-		if ok && (oraErr.Code() == 12514 || oraErr.Code() == 12537 || oraErr.Code() == 12547) {
-			// log the not ready very 60s
-			if time.Now().Unix()%60 == 0 {
-				log.Println(oracleConnectionString(ip, port), "not ready")
+		if ok {
+			if oraErr.Code() == 12514 || oraErr.Code() == 12547 {
+				// log the not ready very 60s
+				if time.Now().Unix()%60 == 0 {
+					log.Println(oracleConnectionString(ip, port), "not ready, ora code:", oraErr.Code())
+				}
+			} else {
+				log.Printf("%s got ora error code: %v\n", oracleConnectionString(ip, port), oraErr.Code())
 			}
 		} else {
-			log.Println(err)
+			log.Printf("%s got unexpected err: %v", oracleConnectionString(ip, port), err)
 		}
 		return false
 	}
@@ -183,7 +187,7 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 	return true
 }
 
-// Since start a oracle container is very time expensive, just try start one and reuse it for different test case.
+// Since start a oracle container is very time expensive, just try to start one and reuse it for different test case.
 func TestAllInOneWithDK(t *testing.T) {
 	isDKHonored(t)
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
