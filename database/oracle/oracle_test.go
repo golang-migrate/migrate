@@ -52,7 +52,7 @@ func oracleDKDsn(t *testing.T, args ...interface{}) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Println("oracleDKDsn: ", ip, port, oracleConnectionString(ip, port))
+	log.Println("oracleDKDsn: ", ip, port, oracleConnectionString(ip, port))
 	return oracleConnectionString(ip, port)
 }
 
@@ -173,6 +173,11 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 		switch err {
 		case sqldriver.ErrBadConn, io.EOF:
 			return false
+		default:
+			// log an error 300s one time
+			if time.Now().Unix()%300 == 0 {
+				log.Println(oracleConnectionString(ip, port), err)
+			}
 		}
 		return false
 	}
