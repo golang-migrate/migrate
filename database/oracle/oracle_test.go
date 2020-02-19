@@ -22,7 +22,7 @@ import (
 )
 
 var (
-	opts  = dktest.Options{PortRequired: true, ReadyFunc: isReady, ReadyTimeout: time.Minute}
+	opts  = dktest.Options{PortRequired: true, ReadyFunc: isReady, ReadyTimeout: time.Minute, PullTimeout: time.Minute * 30}
 	specs = []dktesting.ContainerSpec{
 		{ImageName: "maxnilz/oracle-xe:18c", Options: opts},
 	}
