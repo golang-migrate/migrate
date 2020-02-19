@@ -11,6 +11,8 @@ import (
 	nurl "net/url"
 	"strings"
 
+	"github.com/godror/godror"
+
 	_ "github.com/godror/godror"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
@@ -33,12 +35,6 @@ var (
 	ErrNilConfig      = fmt.Errorf("no config")
 	ErrNoDatabaseName = fmt.Errorf("no database name")
 )
-
-type OraErr interface {
-	Code() int
-	Error() string
-	Message() string
-}
 
 type Config struct {
 	MigrationsTable         string
@@ -225,8 +221,8 @@ func (ora *Oracle) Run(migration io.Reader) error {
 	}
 	for _, query := range queries {
 		if _, err := ora.conn.ExecContext(context.Background(), query); err != nil {
-			if sqlError, ok := err.(OraErr); ok {
-				return database.Error{OrigErr: err, Err: sqlError.Message(), Query: []byte(query)}
+			if oraErr, ok := godror.AsOraErr(err); ok {
+				return database.Error{OrigErr: oraErr, Err: oraErr.Message(), Query: []byte(query)}
 			}
 			return database.Error{OrigErr: err, Err: "migration failed", Query: []byte(query)}
 		}
@@ -274,7 +270,7 @@ func (ora *Oracle) Version() (version int, dirty bool, err error) {
 		return database.NilVersion, false, nil
 
 	case err != nil:
-		if _, ok := err.(OraErr); ok {
+		if _, ok := godror.AsOraErr(err); ok {
 			return database.NilVersion, false, nil
 		}
 		return 0, false, &database.Error{OrigErr: err, Query: []byte(query)}

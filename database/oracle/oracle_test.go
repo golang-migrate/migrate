@@ -4,9 +4,7 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
-	sqldriver "database/sql/driver"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"sync"
@@ -14,6 +12,7 @@ import (
 	"time"
 
 	"github.com/dhui/dktest"
+	"github.com/godror/godror"
 	"github.com/golang-migrate/migrate/v4"
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
 	"github.com/golang-migrate/migrate/v4/dktesting"
@@ -52,7 +51,6 @@ func oracleDKDsn(t *testing.T, args ...interface{}) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	log.Println("oracleDKDsn: ", ip, port, oracleConnectionString(ip, port))
 	return oracleConnectionString(ip, port)
 }
 
@@ -170,14 +168,14 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 		}
 	}()
 	if err = db.PingContext(ctx); err != nil {
-		switch err {
-		case sqldriver.ErrBadConn, io.EOF:
-			return false
-		default:
-			// log an error 300s one time
-			if time.Now().Unix()%300 == 0 {
-				log.Println(oracleConnectionString(ip, port), err)
+		oraErr, ok := godror.AsOraErr(err)
+		if ok && (oraErr.Code() == 12514 || oraErr.Code() == 12547) {
+			// log the not ready very 60s
+			if time.Now().Unix()%60 == 0 {
+				log.Println("not ready for ", oracleConnectionString(ip, port))
 			}
+		} else {
+			log.Println(err)
 		}
 		return false
 	}
@@ -185,30 +183,13 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 	return true
 }
 
-func TestOpenWithDK(t *testing.T) {
+// Since start a oracle container is very time expensive, just try start one and reuse it for different test case.
+func TestAllInOneWithDK(t *testing.T) {
 	isDKHonored(t)
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		testOpen(t, oracleDKDsn, c)
-	})
-}
-
-func TestMigrateWithDK(t *testing.T) {
-	isDKHonored(t)
-	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		testMigrate(t, oracleDKDsn, c)
-	})
-}
-
-func TestLockWorksWithDK(t *testing.T) {
-	isDKHonored(t)
-	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		testLockWorks(t, oracleDKDsn, c)
-	})
-}
-
-func TestWithInstanceConcurrentWithDK(t *testing.T) {
-	isDKHonored(t)
-	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		testWithInstanceConcurrent(t, oracleDKDsn, c)
 	})
 }
