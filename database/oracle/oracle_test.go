@@ -22,8 +22,7 @@ import (
 )
 
 var (
-	opts = dktest.Options{PortRequired: true, ReadyFunc: isReady, ReadyTimeout: time.Minute}
-	// Supported versions: https://www.postgresql.org/support/versioning/
+	opts  = dktest.Options{PortRequired: true, ReadyFunc: isReady, ReadyTimeout: time.Minute}
 	specs = []dktesting.ContainerSpec{
 		{ImageName: "maxnilz/oracle-xe:18c", Options: opts},
 	}
