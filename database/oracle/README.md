@@ -82,4 +82,6 @@ There is no static lib for the application to compile & link. check [here](https
 
 ### Are there public docker images available
 
-There is no official pubic docker images available, but based on [this official open-source repo](https://github.com/oracle/docker-images), I published [maxnilz/oracle-ee:12.2.0.1](https://hub.docker.com/repository/docker/maxnilz/oracle-ee), [maxnilz/oracle-xe:18c](https://hub.docker.com/repository/docker/maxnilz/oracle-xe) in docker hub without official support and JUST FOR LEARN PURPOSE!!!
+1. There is no official pubic docker images available
+1. Based on [this official open-source repo](https://github.com/oracle/docker-images), I published [maxnilz/oracle-ee:12.2.0.1](https://hub.docker.com/repository/docker/maxnilz/oracle-ee) and [maxnilz/oracle-xe:18c](https://hub.docker.com/repository/docker/maxnilz/oracle-xe) in docker hub 
+1. JUST FOR LEARN PURPOSE!!!
