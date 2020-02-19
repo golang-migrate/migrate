@@ -169,10 +169,10 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 	}()
 	if err = db.PingContext(ctx); err != nil {
 		oraErr, ok := godror.AsOraErr(err)
-		if ok && (oraErr.Code() == 12514 || oraErr.Code() == 12547) {
+		if ok && (oraErr.Code() == 12514 || oraErr.Code() == 12537 || oraErr.Code() == 12547) {
 			// log the not ready very 60s
 			if time.Now().Unix()%60 == 0 {
-				log.Println("not ready for ", oracleConnectionString(ip, port))
+				log.Println(oracleConnectionString(ip, port), "not ready")
 			}
 		} else {
 			log.Println(err)
