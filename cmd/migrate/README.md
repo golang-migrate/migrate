@@ -16,6 +16,14 @@ $ curl -L https://github.com/golang-migrate/migrate/releases/download/$version/m
 $ brew install golang-migrate
 ```
 
+### Windows
+
+Using [scoop](https://scoop.sh/)
+
+```bash
+$ scoop install migrate
+```
+
 ### Linux (*.deb package)
 
 ```bash
