@@ -127,7 +127,8 @@ func createCmd(dir string, startTime time.Time, format string, name string, ext 
 		}
 
 		if print {
-			log.Println(filename)
+			absPath, _ := filepath.Abs(filename)
+			log.Println(absPath)
 		}
 	}
 
