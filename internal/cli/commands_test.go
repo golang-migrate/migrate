@@ -201,7 +201,7 @@ func (s *CreateCmdSuite) TestCreateCmd() {
 		{"time unixNano", nil, "", nil, []string{tsUnixNanoStr + "_name.up.sql", tsUnixNanoStr + "_name.down.sql"}, noErrorExpected, ".", ts, "unixNano", false, 0, "sql", "name"},
 		{"time custom format", nil, "", nil, []string{"20001225000102_name.up.sql", "20001225000102_name.down.sql"}, noErrorExpected, ".", ts, "20060102150405", false, 0, "sql", "name"},
 		{"time version collision", nil, "", []string{"20001225_name.up.sql", "20001225_name.down.sql"}, []string{"20001225_name.up.sql", "20001225_name.down.sql"}, errors.New("duplicate migration version: 20001225"), ".", ts, "20060102", false, 0, "sql", "name"},
-		{"dir invalid", nil, "", []string{"file"}, []string{"file"}, errors.New("mkdir 'test: this is invalid dir name': The directory name is invalid."), `'test: this is invalid dir name'`, ts, "unix", false, 0, "sql", "name"},
+		{"dir invalid", nil, "", []string{"file"}, []string{"file"}, errors.New("mkdir 'test: this is invalid dir name'\x00: invalid argument"), "'test: this is invalid dir name'\000", ts, "unix", false, 0, "sql", "name"},
 	}
 
 	for _, c := range cases {
