@@ -109,9 +109,12 @@ func (m *Sqlite) Open(url string) (database.Driver, error) {
 		migrationsTable = DefaultMigrationsTable
 	}
 
-	noTxWrap, err := strconv.ParseBool(qv.Get("x-no-tx-wrap"))
-	if err != nil {
-		noTxWrap = false
+	noTxWrap := false
+	if v := qv.Get("x-no-tx-wrap"); v != "" {
+		noTxWrap, err = strconv.ParseBool(v)
+		if err != nil {
+			return nil, fmt.Errorf("x-no-tx-wrap: %s", err)
+		}
 	}
 
 	mx, err := WithInstance(db, &Config{
