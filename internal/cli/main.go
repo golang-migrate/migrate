@@ -20,6 +20,7 @@ const defaultTimeFormat = "20060102150405"
 // set main log
 var log = &Log{}
 
+// Main main function of a cli application. It is publiic for backwards compatibility with `cli` package
 func Main(version string) {
 	helpPtr := flag.Bool("help", false, "")
 	versionPtr := flag.Bool("version", false, "")
@@ -49,7 +50,7 @@ Commands:
   create [-ext E] [-dir D] [-seq] [-digits N] [-format] NAME
 			   Create a set of timestamped up/down migrations titled NAME, in directory D with extension E.
 			   Use -seq option to generate sequential up/down migrations with N digits.
-			   Use -format option to specify a Go time format string.
+			   Use -format option to specify a Go time format string. Note: migrations with the same time cause "duplicate migration version" error. 
   goto V       Migrate to version V
   up [N]       Apply all or N up migrations
   down [N]     Apply all or N down migrations
