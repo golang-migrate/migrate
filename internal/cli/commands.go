@@ -146,21 +146,22 @@ func createFile(filename string) error {
 	return f.Close()
 }
 
-func gotoCmd(m *migrate.Migrate, v uint) {
+func gotoCmd(m *migrate.Migrate, v uint) error {
 	if err := m.Migrate(v); err != nil {
 		if err != migrate.ErrNoChange {
-			log.fatalErr(err)
+			return err
 		} else {
 			log.Println(err)
 		}
 	}
+	return nil
 }
 
-func upCmd(m *migrate.Migrate, limit int) {
+func upCmd(m *migrate.Migrate, limit int) error {
 	if limit >= 0 {
 		if err := m.Steps(limit); err != nil {
 			if err != migrate.ErrNoChange {
-				log.fatalErr(err)
+				return err
 			} else {
 				log.Println(err)
 			}
@@ -168,19 +169,20 @@ func upCmd(m *migrate.Migrate, limit int) {
 	} else {
 		if err := m.Up(); err != nil {
 			if err != migrate.ErrNoChange {
-				log.fatalErr(err)
+				return err
 			} else {
 				log.Println(err)
 			}
 		}
 	}
+	return nil
 }
 
-func downCmd(m *migrate.Migrate, limit int) {
+func downCmd(m *migrate.Migrate, limit int) error {
 	if limit >= 0 {
 		if err := m.Steps(-limit); err != nil {
 			if err != migrate.ErrNoChange {
-				log.fatalErr(err)
+				return err
 			} else {
 				log.Println(err)
 			}
@@ -188,36 +190,40 @@ func downCmd(m *migrate.Migrate, limit int) {
 	} else {
 		if err := m.Down(); err != nil {
 			if err != migrate.ErrNoChange {
-				log.fatalErr(err)
+				return err
 			} else {
 				log.Println(err)
 			}
 		}
 	}
+	return nil
 }
 
-func dropCmd(m *migrate.Migrate) {
+func dropCmd(m *migrate.Migrate) error {
 	if err := m.Drop(); err != nil {
-		log.fatalErr(err)
+		return err
 	}
+	return nil
 }
 
-func forceCmd(m *migrate.Migrate, v int) {
+func forceCmd(m *migrate.Migrate, v int) error {
 	if err := m.Force(v); err != nil {
-		log.fatalErr(err)
+		return err
 	}
+	return nil
 }
 
-func versionCmd(m *migrate.Migrate) {
+func versionCmd(m *migrate.Migrate) error {
 	v, dirty, err := m.Version()
 	if err != nil {
-		log.fatalErr(err)
+		return err
 	}
 	if dirty {
 		log.Printf("%v (dirty)\n", v)
 	} else {
 		log.Println(v)
 	}
+	return nil
 }
 
 // numDownMigrationsFromArgs returns an int for number of migrations to apply

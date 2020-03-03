@@ -156,7 +156,9 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 			log.fatal("error: can't read version argument V")
 		}
 
-		gotoCmd(migrater, uint(v))
+		if err := gotoCmd(migrater, uint(v)); err != nil {
+			log.fatalErr(err)
+		}
 
 		if log.verbose {
 			log.Println("Finished after", time.Since(startTime))
@@ -176,7 +178,9 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 			limit = int(n)
 		}
 
-		upCmd(migrater, limit)
+		if err := upCmd(migrater, limit); err != nil {
+			log.fatalErr(err)
+		}
 
 		if log.verbose {
 			log.Println("Finished after", time.Since(startTime))
@@ -213,7 +217,9 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 			}
 		}
 
-		downCmd(migrater, num)
+		if err := downCmd(migrater, num); err != nil {
+			log.fatalErr(err)
+		}
 
 		if log.verbose {
 			log.Println("Finished after", time.Since(startTime))
@@ -224,7 +230,9 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 			log.fatalErr(migraterErr)
 		}
 
-		dropCmd(migrater)
+		if err := dropCmd(migrater); err != nil {
+			log.fatalErr(err)
+		}
 
 		if log.verbose {
 			log.Println("Finished after", time.Since(startTime))
@@ -248,7 +256,9 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 			log.fatal("error: argument V must be >= -1")
 		}
 
-		forceCmd(migrater, int(v))
+		if err := forceCmd(migrater, int(v)); err != nil {
+			log.fatalErr(err)
+		}
 
 		if log.verbose {
 			log.Println("Finished after", time.Since(startTime))
@@ -259,7 +269,9 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 			log.fatalErr(migraterErr)
 		}
 
-		versionCmd(migrater)
+		if err := versionCmd(migrater); err != nil {
+			log.fatalErr(err)
+		}
 
 	default:
 		flag.Usage()
