@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/ioutil"
 	nurl "net/url"
+	"strconv"
 	"strings"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -28,6 +29,7 @@ var (
 type Config struct {
 	MigrationsTable string
 	DatabaseName    string
+	NoTxWrap        bool
 }
 
 type Sqlite struct {
@@ -100,13 +102,25 @@ func (m *Sqlite) Open(url string) (database.Driver, error) {
 		return nil, err
 	}
 
-	migrationsTable := purl.Query().Get("x-migrations-table")
+	qv := purl.Query()
+
+	migrationsTable := qv.Get("x-migrations-table")
 	if len(migrationsTable) == 0 {
 		migrationsTable = DefaultMigrationsTable
 	}
+
+	noTxWrap := false
+	if v := qv.Get("x-no-tx-wrap"); v != "" {
+		noTxWrap, err = strconv.ParseBool(v)
+		if err != nil {
+			return nil, fmt.Errorf("x-no-tx-wrap: %s", err)
+		}
+	}
+
 	mx, err := WithInstance(db, &Config{
 		DatabaseName:    purl.Path,
 		MigrationsTable: migrationsTable,
+		NoTxWrap:        noTxWrap,
 	})
 	if err != nil {
 		return nil, err
@@ -180,6 +194,9 @@ func (m *Sqlite) Run(migration io.Reader) error {
 	}
 	query := string(migr[:])
 
+	if m.config.NoTxWrap {
+		return m.executeQueryNoTx(query)
+	}
 	return m.executeQuery(query)
 }
 
@@ -196,6 +213,13 @@ func (m *Sqlite) executeQuery(query string) error {
 	}
 	if err := tx.Commit(); err != nil {
 		return &database.Error{OrigErr: err, Err: "transaction commit failed"}
+	}
+	return nil
+}
+
+func (m *Sqlite) executeQueryNoTx(query string) error {
+	if _, err := m.db.Exec(query); err != nil {
+		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 	return nil
 }

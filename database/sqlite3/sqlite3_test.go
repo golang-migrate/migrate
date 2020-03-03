@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/golang-migrate/migrate/v4"
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
@@ -114,5 +116,47 @@ func TestMigrationTable(t *testing.T) {
 	_, err = db.Query(fmt.Sprintf("SELECT * FROM %s", config.MigrationsTable))
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestNoTxWrap(t *testing.T) {
+	dir, err := ioutil.TempDir("", "sqlite3-driver-test")
+	if err != nil {
+		return
+	}
+	defer func() {
+		if err := os.RemoveAll(dir); err != nil {
+			t.Error(err)
+		}
+	}()
+	t.Logf("DB path : %s\n", filepath.Join(dir, "sqlite3.db"))
+	p := &Sqlite{}
+	addr := fmt.Sprintf("sqlite3://%s?x-no-tx-wrap=true", filepath.Join(dir, "sqlite3.db"))
+	d, err := p.Open(addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// An explicit BEGIN statement would ordinarily fail without x-no-tx-wrap.
+	// (Transactions in sqlite may not be nested.)
+	dt.Test(t, d, []byte("BEGIN; CREATE TABLE t (Qty int, Name string); COMMIT;"))
+}
+
+func TestNoTxWrapInvalidValue(t *testing.T) {
+	dir, err := ioutil.TempDir("", "sqlite3-driver-test")
+	if err != nil {
+		return
+	}
+	defer func() {
+		if err := os.RemoveAll(dir); err != nil {
+			t.Error(err)
+		}
+	}()
+	t.Logf("DB path : %s\n", filepath.Join(dir, "sqlite3.db"))
+	p := &Sqlite{}
+	addr := fmt.Sprintf("sqlite3://%s?x-no-tx-wrap=yeppers", filepath.Join(dir, "sqlite3.db"))
+	_, err = p.Open(addr)
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "x-no-tx-wrap")
+		assert.Contains(t, err.Error(), "invalid syntax")
 	}
 }
