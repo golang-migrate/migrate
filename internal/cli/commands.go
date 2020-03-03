@@ -150,9 +150,8 @@ func gotoCmd(m *migrate.Migrate, v uint) error {
 	if err := m.Migrate(v); err != nil {
 		if err != migrate.ErrNoChange {
 			return err
-		} else {
-			log.Println(err)
 		}
+		log.Println(err)
 	}
 	return nil
 }
@@ -162,17 +161,15 @@ func upCmd(m *migrate.Migrate, limit int) error {
 		if err := m.Steps(limit); err != nil {
 			if err != migrate.ErrNoChange {
 				return err
-			} else {
-				log.Println(err)
 			}
+			log.Println(err)
 		}
 	} else {
 		if err := m.Up(); err != nil {
 			if err != migrate.ErrNoChange {
 				return err
-			} else {
-				log.Println(err)
 			}
+			log.Println(err)
 		}
 	}
 	return nil
@@ -183,17 +180,15 @@ func downCmd(m *migrate.Migrate, limit int) error {
 		if err := m.Steps(-limit); err != nil {
 			if err != migrate.ErrNoChange {
 				return err
-			} else {
-				log.Println(err)
 			}
+			log.Println(err)
 		}
 	} else {
 		if err := m.Down(); err != nil {
 			if err != migrate.ErrNoChange {
 				return err
-			} else {
-				log.Println(err)
 			}
+			log.Println(err)
 		}
 	}
 	return nil
