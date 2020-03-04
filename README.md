@@ -29,7 +29,7 @@ Database drivers run migrations. [Add a new database?](database/driver.go)
 * [Cassandra](database/cassandra)
 * [SQLite](database/sqlite3) ([todo #165](https://github.com/mattes/migrate/issues/165))
 * [MySQL/ MariaDB](database/mysql)
-* [Neo4j](database/neo4j) ([todo #167](https://github.com/mattes/migrate/issues/167))
+* [Neo4j](database/neo4j)
 * [MongoDB](database/mongodb)
 * [CrateDB](database/crate) ([todo #170](https://github.com/mattes/migrate/issues/170))
 * [Shell](database/shell) ([todo #171](https://github.com/mattes/migrate/issues/171))
@@ -146,6 +146,7 @@ Go to [getting started](GETTING_STARTED.md)
 
 ## Tutorials
 
+- [CockroachDB](database/cockroachdb/TUTORIAL.md)
 - [PostgreSQL](database/postgres/TUTORIAL.md)
 
 (more tutorials to come)

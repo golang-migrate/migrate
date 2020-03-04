@@ -9,7 +9,7 @@ psql -h localhost -U postgres -w -c "create database example;"
 ```
 When using Migrate CLI we need to pass to database URL. Let's export it to a variable for convienience:
 ```
-export POSTGRESQL_URL=postgres://postgres:password@localhost:5432/example?sslmode=disable
+export POSTGRESQL_URL='postgres://postgres:password@localhost:5432/example?sslmode=disable'
 ```
 `sslmode=disable` means that the connection with our database will not be encrypted. Enabling it is left as an exercise.
 
@@ -39,7 +39,7 @@ And in the `.down.sql` let's delete it:
 ```
 DROP TABLE IF EXISTS users;
 ```
-By adding `IF EXISTS/IF NOT EXISTS` we are making migrations idempotent - you can read more about idempotency in [getting started](GETTING_STARTED.md#create-migrations)
+By adding `IF EXISTS/IF NOT EXISTS` we are making migrations idempotent - you can read more about idempotency in [getting started](../../GETTING_STARTED.md#create-migrations)
 
 ## Run migrations
 ```

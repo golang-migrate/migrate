@@ -8,8 +8,8 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/golang-migrate/migrate/v4/source"
 	st "github.com/golang-migrate/migrate/v4/source/testing"
+	"github.com/stretchr/testify/assert"
 )
 
 func Test(t *testing.T) {
@@ -30,17 +30,62 @@ func Test(t *testing.T) {
 			"prod/migrations/0-random-stuff/whatever.txt": "",
 		},
 	}
-	driver := s3Driver{
-		bucket:     "some-bucket",
-		prefix:     "prod/migrations/",
-		migrations: source.NewMigrations(),
-		s3client:   &s3Client,
-	}
-	err := driver.loadMigrations()
+	driver, err := WithInstance(&s3Client, &Config{
+		Bucket: "some-bucket",
+		Prefix: "prod/migrations/",
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	st.Test(t, &driver)
+	st.Test(t, driver)
+}
+
+func TestParseURI(t *testing.T) {
+	tests := []struct {
+		name   string
+		uri    string
+		config *Config
+	}{
+		{
+			"with prefix, no trailing slash",
+			"s3://migration-bucket/production",
+			&Config{
+				Bucket: "migration-bucket",
+				Prefix: "production/",
+			},
+		},
+		{
+			"without prefix, no trailing slash",
+			"s3://migration-bucket",
+			&Config{
+				Bucket: "migration-bucket",
+			},
+		},
+		{
+			"with prefix, trailing slash",
+			"s3://migration-bucket/production/",
+			&Config{
+				Bucket: "migration-bucket",
+				Prefix: "production/",
+			},
+		},
+		{
+			"without prefix, trailing slash",
+			"s3://migration-bucket/",
+			&Config{
+				Bucket: "migration-bucket",
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			actual, err := parseURI(test.uri)
+			if err != nil {
+				t.Fatal(err)
+			}
+			assert.Equal(t, test.config, actual)
+		})
+	}
 }
 
 type fakeS3 struct {

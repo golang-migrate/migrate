@@ -11,6 +11,7 @@ import (
 	nurl "net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
@@ -34,9 +35,10 @@ var (
 )
 
 type Config struct {
-	MigrationsTable string
-	DatabaseName    string
-	SchemaName      string
+	MigrationsTable  string
+	DatabaseName     string
+	SchemaName       string
+	StatementTimeout time.Duration
 }
 
 type Postgres struct {
@@ -121,10 +123,19 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 	}
 
 	migrationsTable := purl.Query().Get("x-migrations-table")
+	statementTimeoutString := purl.Query().Get("x-statement-timeout")
+	statementTimeout := 0
+	if statementTimeoutString != "" {
+		statementTimeout, err = strconv.Atoi(statementTimeoutString)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	px, err := WithInstance(db, &Config{
-		DatabaseName:    purl.Path,
-		MigrationsTable: migrationsTable,
+		DatabaseName:     purl.Path,
+		MigrationsTable:  migrationsTable,
+		StatementTimeout: time.Duration(statementTimeout) * time.Millisecond,
 	})
 
 	if err != nil {
@@ -187,10 +198,15 @@ func (p *Postgres) Run(migration io.Reader) error {
 	if err != nil {
 		return err
 	}
-
+	ctx := context.Background()
+	if p.config.StatementTimeout != 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, p.config.StatementTimeout)
+		defer cancel()
+	}
 	// run migration
 	query := string(migr[:])
-	if _, err := p.conn.ExecContext(context.Background(), query); err != nil {
+	if _, err := p.conn.ExecContext(ctx, query); err != nil {
 		if pgErr, ok := err.(*pq.Error); ok {
 			var line uint
 			var col uint

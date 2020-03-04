@@ -39,5 +39,5 @@ func TestMigrate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dt.TestMigrate(t, m, []byte("/* foobar migration */"))
+	dt.TestMigrate(t, m)
 }

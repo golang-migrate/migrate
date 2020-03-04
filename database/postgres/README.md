@@ -5,6 +5,7 @@
 | URL Query  | WithInstance Config | Description |
 |------------|---------------------|-------------|
 | `x-migrations-table` | `MigrationsTable` | Name of the migrations table |
+| `x-statement-timeout` | `StatementTimeout` | Abort any statement that takes more than the specified number of milliseconds |
 | `dbname` | `DatabaseName` | The name of the database to connect to |
 | `search_path` | | This variable specifies the order in which schemas are searched when an object is referenced by a simple name with no schema specified. |
 | `user` | | The user to sign in as |
