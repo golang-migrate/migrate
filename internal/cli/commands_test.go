@@ -209,7 +209,7 @@ func (s *CreateCmdSuite) TestCreateCmd() {
 			baseDir := s.mustCreateTempDir()
 
 			for _, d := range c.existingDirs {
-				s.mustCreateDir(filepath.ToSlash(filepath.Join(baseDir, d)))
+				s.mustCreateDir(filepath.Join(baseDir, d))
 			}
 
 			cwd := baseDir
