@@ -137,6 +137,7 @@ func createCmd(dir string, startTime time.Time, format string, name string, ext 
 
 func createFile(filename string) error {
 	// create exclusive (fails if file already exists)
+	// os.Create() specifies 0666 as the FileMode, so we're doing the same
 	f, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0666)
 
 	if err != nil {
