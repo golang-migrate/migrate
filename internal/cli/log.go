@@ -6,10 +6,12 @@ import (
 	"os"
 )
 
+// Log represents the logger
 type Log struct {
 	verbose bool
 }
 
+// Printf prints out formatted string into a log
 func (l *Log) Printf(format string, v ...interface{}) {
 	if l.verbose {
 		logpkg.Printf(format, v...)
@@ -18,6 +20,7 @@ func (l *Log) Printf(format string, v ...interface{}) {
 	}
 }
 
+// Println prints out args into a log
 func (l *Log) Println(args ...interface{}) {
 	if l.verbose {
 		logpkg.Println(args...)
@@ -26,6 +29,7 @@ func (l *Log) Println(args ...interface{}) {
 	}
 }
 
+// Verbose shows if verbose print enabled
 func (l *Log) Verbose() bool {
 	return l.verbose
 }

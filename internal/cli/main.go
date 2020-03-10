@@ -20,6 +20,7 @@ const defaultTimeFormat = "20060102150405"
 // set main log
 var log = &Log{}
 
+// Main function of a cli application. It is public for backwards compatibility with `cli` package
 func Main(version string) {
 	helpPtr := flag.Bool("help", false, "")
 	versionPtr := flag.Bool("version", false, "")
@@ -49,7 +50,7 @@ Commands:
   create [-ext E] [-dir D] [-seq] [-digits N] [-format] NAME
 			   Create a set of timestamped up/down migrations titled NAME, in directory D with extension E.
 			   Use -seq option to generate sequential up/down migrations with N digits.
-			   Use -format option to specify a Go time format string.
+			   Use -format option to specify a Go time format string. Note: migrations with the same time cause "duplicate migration version" error. 
   goto V       Migrate to version V
   up [N]       Apply all or N up migrations
   down [N]     Apply all or N down migrations
@@ -137,9 +138,10 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 		if *extPtr == "" {
 			log.fatal("error: -ext flag must be specified")
 		}
-		*extPtr = "." + strings.TrimPrefix(*extPtr, ".")
 
-		createCmd(*dirPtr, startTime, *formatPtr, name, *extPtr, seq, seqDigits)
+		if err := createCmd(*dirPtr, startTime, *formatPtr, name, *extPtr, seq, seqDigits, true); err != nil {
+			log.fatalErr(err)
+		}
 
 	case "goto":
 		if migraterErr != nil {
@@ -155,7 +157,9 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 			log.fatal("error: can't read version argument V")
 		}
 
-		gotoCmd(migrater, uint(v))
+		if err := gotoCmd(migrater, uint(v)); err != nil {
+			log.fatalErr(err)
+		}
 
 		if log.verbose {
 			log.Println("Finished after", time.Since(startTime))
@@ -175,7 +179,9 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 			limit = int(n)
 		}
 
-		upCmd(migrater, limit)
+		if err := upCmd(migrater, limit); err != nil {
+			log.fatalErr(err)
+		}
 
 		if log.verbose {
 			log.Println("Finished after", time.Since(startTime))
@@ -212,7 +218,9 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 			}
 		}
 
-		downCmd(migrater, num)
+		if err := downCmd(migrater, num); err != nil {
+			log.fatalErr(err)
+		}
 
 		if log.verbose {
 			log.Println("Finished after", time.Since(startTime))
@@ -223,7 +231,9 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 			log.fatalErr(migraterErr)
 		}
 
-		dropCmd(migrater)
+		if err := dropCmd(migrater); err != nil {
+			log.fatalErr(err)
+		}
 
 		if log.verbose {
 			log.Println("Finished after", time.Since(startTime))
@@ -247,7 +257,9 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 			log.fatal("error: argument V must be >= -1")
 		}
 
-		forceCmd(migrater, int(v))
+		if err := forceCmd(migrater, int(v)); err != nil {
+			log.fatalErr(err)
+		}
 
 		if log.verbose {
 			log.Println("Finished after", time.Since(startTime))
@@ -258,7 +270,9 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 			log.fatalErr(migraterErr)
 		}
 
-		versionCmd(migrater)
+		if err := versionCmd(migrater); err != nil {
+			log.fatalErr(err)
+		}
 
 	default:
 		flag.Usage()
