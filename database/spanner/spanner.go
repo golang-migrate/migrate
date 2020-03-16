@@ -1,6 +1,7 @@
 package spanner
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -218,6 +219,15 @@ var nameMatcher = regexp.MustCompile(`(CREATE TABLE\s(\S+)\s)|(CREATE.+INDEX\s(\
 // be "build up", it seems logical to "unbuild" the database simply by going the
 // opposite direction. More testing
 func (s *Spanner) Drop() error {
+	log.Println("Are you sure you want to drop the entire database schema? [y/N]")
+	var response string
+	fmt.Scanln(&response)
+	response = strings.ToLower(strings.TrimSpace(response))
+
+	if response != "y" {
+		return errors.New("User aborted drop database")
+	}
+
 	ctx := context.Background()
 	res, err := s.db.admin.GetDatabaseDdl(ctx, &adminpb.GetDatabaseDdlRequest{
 		Database: s.config.DatabaseName,
