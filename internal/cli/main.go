@@ -227,14 +227,15 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 		}
 
 	case "drop":
-		log.Println("Are you sure you want to drop the entire database? [y/N]")
+		log.Println("Are you sure you want to drop the entire database schema? [y/N]")
 		var response string
 		fmt.Scanln(&response)
 		response = strings.ToLower(strings.TrimSpace(response))
 
-		if response != "y" {
-			log.fatal("Aborted dropping the entire database")
-			os.Exit(1)
+		if response == "y" {
+			log.Println("Dropping the entire database schema")
+		} else {
+			log.fatal("Aborted dropping the entire database schema")
 		}
 
 		if migraterErr != nil {
