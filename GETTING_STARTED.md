@@ -35,7 +35,7 @@ It's also worth checking your migrations in a separate, containerized environmen
 **IMPORTANT:** If you would like to run multiple instances of your app on different machines be sure to use a database that supports locking when running migrations. Otherwise you may encounter issues.
 
 ## Forcing your database version
-In case you run a migration that contained an error, migrate will not let you run other migrations on the same database. You will see an error `Dirty database version 1. Fix and force version`, even when you fix migration. This means your database was marked as 'dirty'.
+In case you run a migration that contained an error, migrate will not let you run other migrations on the same database. You will see an error like `Dirty database version 1. Fix and force version`, even when you fix the erred migration. This means your database was marked as 'dirty'.
 You need to investigate the migration error - was your migration applied partially, or was it not applied at all? Once you know, you should force your database to a version reflecting it's real state. You can do so with `force` command:
 ```
 migrate -path PATH_TO_YOUR_MIGRATIONS -database YOUR_DATBASE_URL force VERSION
