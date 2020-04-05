@@ -27,7 +27,7 @@ type Stub struct {
 func (s *Stub) Open(url string) (database.Driver, error) {
 	return &Stub{
 		Url:               url,
-		CurrentVersion:    -1,
+		CurrentVersion:    database.NilVersion,
 		MigrationSequence: make([]string, 0),
 		Config:            &Config{},
 	}, nil
@@ -38,7 +38,7 @@ type Config struct{}
 func WithInstance(instance interface{}, config *Config) (database.Driver, error) {
 	return &Stub{
 		Instance:          instance,
-		CurrentVersion:    -1,
+		CurrentVersion:    database.NilVersion,
 		MigrationSequence: make([]string, 0),
 		Config:            config,
 	}, nil
@@ -84,7 +84,7 @@ func (s *Stub) Version() (version int, dirty bool, err error) {
 const DROP = "DROP"
 
 func (s *Stub) Drop() error {
-	s.CurrentVersion = -1
+	s.CurrentVersion = database.NilVersion
 	s.LastRunMigration = nil
 	s.MigrationSequence = append(s.MigrationSequence, DROP)
 	return nil

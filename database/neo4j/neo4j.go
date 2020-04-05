@@ -183,7 +183,7 @@ type MigrationRecord struct {
 func (n *Neo4j) Version() (version int, dirty bool, err error) {
 	session, err := n.driver.Session(neo4j.AccessModeRead)
 	if err != nil {
-		return -1, false, err
+		return database.NilVersion, false, err
 	}
 	defer func() {
 		if cerr := session.Close(); cerr != nil {
@@ -203,7 +203,7 @@ func (n *Neo4j) Version() (version int, dirty bool, err error) {
 			mr := MigrationRecord{}
 			versionResult, ok := record.Get("version")
 			if !ok {
-				mr.Version = -1
+				mr.Version = database.NilVersion
 			} else {
 				mr.Version = int(versionResult.(int64))
 			}
@@ -218,10 +218,10 @@ func (n *Neo4j) Version() (version int, dirty bool, err error) {
 		return nil, result.Err()
 	})
 	if err != nil {
-		return -1, false, err
+		return database.NilVersion, false, err
 	}
 	if result == nil {
-		return -1, false, err
+		return database.NilVersion, false, err
 	}
 	mr := result.(MigrationRecord)
 	return mr.Version, mr.Dirty, err

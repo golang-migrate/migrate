@@ -116,43 +116,40 @@ func TestDrop(t *testing.T, d database.Driver) {
 }
 
 func TestSetVersion(t *testing.T, d database.Driver) {
-	if err := d.SetVersion(1, true); err != nil {
-		t.Fatal(err)
+	// nolint:maligned
+	testCases := []struct {
+		name            string
+		version         int
+		dirty           bool
+		expectedErr     error
+		expectedReadErr error
+		expectedVersion int
+		expectedDirty   bool
+	}{
+		{name: "set 1 dirty", version: 1, dirty: true, expectedErr: nil, expectedReadErr: nil, expectedVersion: 1, expectedDirty: true},
+		{name: "re-set 1 dirty", version: 1, dirty: true, expectedErr: nil, expectedReadErr: nil, expectedVersion: 1, expectedDirty: true},
+		{name: "set 2 clean", version: 2, dirty: false, expectedErr: nil, expectedReadErr: nil, expectedVersion: 2, expectedDirty: false},
+		{name: "re-set 2 clean", version: 2, dirty: false, expectedErr: nil, expectedReadErr: nil, expectedVersion: 2, expectedDirty: false},
+		{name: "last migration dirty", version: database.NilVersion, dirty: true, expectedErr: nil, expectedReadErr: nil, expectedVersion: database.NilVersion, expectedDirty: true},
+		{name: "last migration clean", version: database.NilVersion, dirty: false, expectedErr: nil, expectedReadErr: nil, expectedVersion: database.NilVersion, expectedDirty: false},
 	}
 
-	// call again
-	if err := d.SetVersion(1, true); err != nil {
-		t.Fatal(err)
-	}
-
-	v, dirty, err := d.Version()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !dirty {
-		t.Fatal("expected dirty")
-	}
-	if v != 1 {
-		t.Fatal("expected version to be 1")
-	}
-
-	if err := d.SetVersion(2, false); err != nil {
-		t.Fatal(err)
-	}
-
-	// call again
-	if err := d.SetVersion(2, false); err != nil {
-		t.Fatal(err)
-	}
-
-	v, dirty, err = d.Version()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if dirty {
-		t.Fatal("expected not dirty")
-	}
-	if v != 2 {
-		t.Fatal("expected version to be 2")
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := d.SetVersion(tc.version, tc.dirty)
+			if err != tc.expectedErr {
+				t.Fatal("Got unexpected error:", err, "!=", tc.expectedErr)
+			}
+			v, dirty, readErr := d.Version()
+			if readErr != tc.expectedReadErr {
+				t.Fatal("Got unexpected error:", readErr, "!=", tc.expectedReadErr)
+			}
+			if v != tc.expectedVersion {
+				t.Error("Got unexpected version:", v, "!=", tc.expectedVersion)
+			}
+			if dirty != tc.expectedDirty {
+				t.Error("Got unexpected dirty value:", dirty, "!=", tc.dirty)
+			}
+		})
 	}
 }
