@@ -191,7 +191,8 @@ func (n *Neo4j) Version() (version int, dirty bool, err error) {
 		}
 	}()
 
-	query := fmt.Sprintf("MATCH (sm:%s) RETURN sm.version AS version, sm.dirty AS dirty ORDER BY sm.ts DESC, sm.version DESC LIMIT 1",
+	query := fmt.Sprintf(`MATCH (sm:%s) RETURN sm.version AS version, sm.dirty AS dirty
+ORDER BY COALESCE(sm.ts, datetime({year: 0})) DESC, sm.version DESC LIMIT 1`,
 		n.config.MigrationsLabel)
 	result, err := session.ReadTransaction(func(transaction neo4j.Transaction) (interface{}, error) {
 		result, err := transaction.Run(query, nil)
