@@ -166,7 +166,7 @@ func (n *Neo4j) SetVersion(version int, dirty bool) (err error) {
 		}
 	}()
 
-	query := fmt.Sprintf("MERGE (sm:%s {version: $version}) SET sm.dirty = $dirty",
+	query := fmt.Sprintf("MERGE (sm:%s {version: $version}) SET sm.dirty = $dirty, sm.ts = datetime()",
 		n.config.MigrationsLabel)
 	_, err = neo4j.Collect(session.Run(query, map[string]interface{}{"version": version, "dirty": dirty}))
 	if err != nil {
@@ -191,7 +191,7 @@ func (n *Neo4j) Version() (version int, dirty bool, err error) {
 		}
 	}()
 
-	query := fmt.Sprintf("MATCH (sm:%s) RETURN sm.version AS version, sm.dirty AS dirty ORDER BY sm.version DESC LIMIT 1",
+	query := fmt.Sprintf("MATCH (sm:%s) RETURN sm.version AS version, sm.dirty AS dirty ORDER BY sm.ts DESC, sm.version DESC LIMIT 1",
 		n.config.MigrationsLabel)
 	result, err := session.ReadTransaction(func(transaction neo4j.Transaction) (interface{}, error) {
 		result, err := transaction.Run(query, nil)
