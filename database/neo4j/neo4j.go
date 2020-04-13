@@ -43,26 +43,21 @@ type Neo4j struct {
 	config *Config
 }
 
-func WithInstance(config *Config) (database.Driver, error) {
+func WithInstance(driver neo4j.Driver, config *Config) (database.Driver, error) {
 	if config == nil {
 		return nil, ErrNilConfig
 	}
 
-	neoDriver, err := neo4j.NewDriver(config.URL, config.AuthToken)
-	if err != nil {
-		return nil, err
-	}
-
-	driver := &Neo4j{
-		driver: neoDriver,
+	nDriver := &Neo4j{
+		driver: driver,
 		config: config,
 	}
 
-	if err := driver.ensureVersionConstraint(); err != nil {
+	if err := nDriver.ensureVersionConstraint(); err != nil {
 		return nil, err
 	}
 
-	return driver, nil
+	return nDriver, nil
 }
 
 func (n *Neo4j) Open(url string) (database.Driver, error) {
@@ -84,7 +79,12 @@ func (n *Neo4j) Open(url string) (database.Driver, error) {
 	}
 	uri.RawQuery = ""
 
-	return WithInstance(&Config{
+	driver, err := neo4j.NewDriver(uri.String(), authToken)
+	if err != nil {
+		return nil, err
+	}
+
+	return WithInstance(driver, &Config{
 		URL:             uri.String(),
 		AuthToken:       authToken,
 		MigrationsLabel: DefaultMigrationsLabel,
