@@ -32,8 +32,6 @@ var (
 )
 
 type Config struct {
-	AuthToken       neo4j.AuthToken
-	URL             string // if using WithInstance, don't provide auth in the URL, it will be ignored
 	MigrationsLabel string
 	MultiStatement  bool
 }
@@ -90,8 +88,6 @@ func (n *Neo4j) Open(url string) (database.Driver, error) {
 	}
 
 	return WithInstance(n.driver, &Config{
-		URL:             uri.String(),
-		AuthToken:       authToken,
 		MigrationsLabel: DefaultMigrationsLabel,
 		MultiStatement:  multi,
 	})
