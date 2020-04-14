@@ -258,16 +258,12 @@ func (n *Neo4j) ensureVersionConstraint() (err error) {
 	}()
 
 	// Get constraint and check to avoid error duplicate
-	res, err := neo4j.Collect(session.Run("CALL db.constraints", nil))
+	res, err := neo4j.Collect(session.Run(fmt.Sprintf("CALL db.constraints() yield name WHERE name=\"%s\" RETURN *", DefaultVersionUniqueKey), nil))
 	if err != nil {
 		return err
 	}
-
-	for _, record := range res {
-		constraintKey, _ := record.Get("name")
-		if constraintKey == DefaultVersionUniqueKey {
-			return nil
-		}
+	if len(res) == 1 {
+		return nil
 	}
 
 	query := fmt.Sprintf("CREATE CONSTRAINT %s ON (a:%s) ASSERT a.version IS UNIQUE", DefaultVersionUniqueKey, n.config.MigrationsLabel)
