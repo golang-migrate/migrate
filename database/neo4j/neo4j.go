@@ -82,12 +82,14 @@ func (n *Neo4j) Open(url string) (database.Driver, error) {
 	}
 	uri.RawQuery = ""
 
-	driver, err := neo4j.NewDriver(uri.String(), authToken)
-	if err != nil {
-		return nil, err
+	if n.driver == nil {
+		n.driver, err = neo4j.NewDriver(uri.String(), authToken)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	return WithInstance(driver, &Config{
+	return WithInstance(n.driver, &Config{
 		URL:             uri.String(),
 		AuthToken:       authToken,
 		MigrationsLabel: DefaultMigrationsLabel,
