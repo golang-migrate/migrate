@@ -20,7 +20,10 @@ func init() {
 	database.Register("neo4j", &db)
 }
 
-const DefaultMigrationsLabel = "SchemaMigration"
+const (
+	DefaultMigrationsLabel  = "SchemaMigration"
+	DefaultVersionUniqueKey = "schema_migration_constraint_key"
+)
 
 var StatementSeparator = []byte(";")
 
@@ -256,7 +259,20 @@ func (n *Neo4j) ensureVersionConstraint() (err error) {
 		}
 	}()
 
-	query := fmt.Sprintf("CREATE CONSTRAINT ON (a:%s) ASSERT a.version IS UNIQUE", n.config.MigrationsLabel)
+	// Get constraint and check to avoid error duplicate
+	res, err := neo4j.Collect(session.Run("CALL db.constraints", nil))
+	if err != nil {
+		return err
+	}
+
+	for _, record := range res {
+		constraintKey, _ := record.Get("name")
+		if constraintKey == DefaultVersionUniqueKey {
+			return nil
+		}
+	}
+
+	query := fmt.Sprintf("CREATE CONSTRAINT %s ON (a:%s) ASSERT a.version IS UNIQUE", DefaultVersionUniqueKey, n.config.MigrationsLabel)
 	if _, err := neo4j.Collect(session.Run(query, nil)); err != nil {
 		return err
 	}
