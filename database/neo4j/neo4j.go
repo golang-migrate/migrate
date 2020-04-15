@@ -20,10 +20,7 @@ func init() {
 	database.Register("neo4j", &db)
 }
 
-const (
-	DefaultMigrationsLabel  = "SchemaMigration"
-	DefaultVersionUniqueKey = "schema_migration_constraint_key"
-)
+const DefaultMigrationsLabel  = "SchemaMigration"
 
 var StatementSeparator = []byte(";")
 
@@ -255,8 +252,12 @@ func (n *Neo4j) ensureVersionConstraint() (err error) {
 		}
 	}()
 
-	// Get constraint and check to avoid error duplicate
-	res, err := neo4j.Collect(session.Run(fmt.Sprintf("CALL db.constraints() yield name WHERE name=\"%s\" RETURN *", DefaultVersionUniqueKey), nil))
+	/**
+	Get constraint and check to avoid error duplicate
+	using db.labels() to support Neo4j 3 and 4.
+	Neo4J 3 doesn't support db.constraints() YIELD name
+	 */
+	res, err := neo4j.Collect(session.Run(fmt.Sprintf("CALL db.labels() YIELD label WHERE label=\"%s\" RETURN label", n.config.MigrationsLabel), nil))
 	if err != nil {
 		return err
 	}
@@ -264,7 +265,7 @@ func (n *Neo4j) ensureVersionConstraint() (err error) {
 		return nil
 	}
 
-	query := fmt.Sprintf("CREATE CONSTRAINT %s ON (a:%s) ASSERT a.version IS UNIQUE", DefaultVersionUniqueKey, n.config.MigrationsLabel)
+	query := fmt.Sprintf("CREATE CONSTRAINT ON (a:%s) ASSERT a.version IS UNIQUE", n.config.MigrationsLabel)
 	if _, err := neo4j.Collect(session.Run(query, nil)); err != nil {
 		return err
 	}
