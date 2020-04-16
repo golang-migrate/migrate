@@ -20,6 +20,8 @@ var (
 	opts = dktest.Options{PortRequired: true, ReadyFunc: isReady,
 		Env: map[string]string{"NEO4J_AUTH": "neo4j/migratetest", "NEO4J_ACCEPT_LICENSE_AGREEMENT": "yes"}}
 	specs = []dktesting.ContainerSpec{
+		{ImageName: "neo4j:4.0", Options: opts},
+		{ImageName: "neo4j:4.0-enterprise", Options: opts},
 		{ImageName: "neo4j:3.5", Options: opts},
 		{ImageName: "neo4j:3.5-enterprise", Options: opts},
 		{ImageName: "neo4j:3.4", Options: opts},
@@ -37,7 +39,12 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 		return false
 	}
 
-	driver, err := neo4j.NewDriver(neoConnectionString(ip, port), neo4j.BasicAuth("neo4j", "migratetest", ""))
+	driver, err := neo4j.NewDriver(
+		neoConnectionString(ip, port),
+		neo4j.BasicAuth("neo4j", "migratetest", ""),
+		func(config *neo4j.Config) {
+			config.Encrypted = false
+		})
 	if err != nil {
 		return false
 	}
