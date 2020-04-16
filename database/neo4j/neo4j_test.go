@@ -39,7 +39,12 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 		return false
 	}
 
-	driver, err := neo4j.NewDriver(neoConnectionString(ip, port), neo4j.BasicAuth("neo4j", "migratetest", ""))
+	driver, err := neo4j.NewDriver(
+		neoConnectionString(ip, port),
+		neo4j.BasicAuth("neo4j", "migratetest", ""),
+		func(config *neo4j.Config) {
+			config.Encrypted = false
+		})
 	if err != nil {
 		return false
 	}

@@ -20,7 +20,7 @@ func init() {
 	database.Register("neo4j", &db)
 }
 
-const DefaultMigrationsLabel  = "SchemaMigration"
+const DefaultMigrationsLabel = "SchemaMigration"
 
 var StatementSeparator = []byte(";")
 
@@ -68,16 +68,30 @@ func (n *Neo4j) Open(url string) (database.Driver, error) {
 	uri.User = nil
 	uri.Scheme = "bolt"
 	msQuery := uri.Query().Get("x-multi-statement")
+
+	// Whether to turn on/off TLS encryption.
+	tlsEncrypted := uri.Query().Get("x-tls-encrypted")
 	multi := false
+	encrypted := false
 	if msQuery != "" {
 		multi, err = strconv.ParseBool(uri.Query().Get("x-multi-statement"))
 		if err != nil {
 			return nil, err
 		}
 	}
+
+	if tlsEncrypted != "" {
+		encrypted, err = strconv.ParseBool(tlsEncrypted)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	uri.RawQuery = ""
 
-	driver, err := neo4j.NewDriver(uri.String(), authToken)
+	driver, err := neo4j.NewDriver(uri.String(), authToken, func(config *neo4j.Config) {
+		config.Encrypted = encrypted
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -256,7 +270,7 @@ func (n *Neo4j) ensureVersionConstraint() (err error) {
 	Get constraint and check to avoid error duplicate
 	using db.labels() to support Neo4j 3 and 4.
 	Neo4J 3 doesn't support db.constraints() YIELD name
-	 */
+	*/
 	res, err := neo4j.Collect(session.Run(fmt.Sprintf("CALL db.labels() YIELD label WHERE label=\"%s\" RETURN label", n.config.MigrationsLabel), nil))
 	if err != nil {
 		return err
