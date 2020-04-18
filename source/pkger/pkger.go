@@ -43,23 +43,17 @@ func (d *driver) Open(url string) (source.Driver, error) {
 }
 
 // WithInstance returns a source.Driver that is backed by an instance of Pkger.
-func WithInstance(instance interface{}) (source.Driver, error) {
-	if _, ok := instance.(*Pkger); !ok {
-		return nil, fmt.Errorf("expects *Pkger")
-	}
-
-	p := instance.(*Pkger)
-
-	if p.Path == "" {
-		p.Path = "/"
+func WithInstance(instance *Pkger) (source.Driver, error) {
+	if instance.Path == "" {
+		instance.Path = "/"
 	}
 
 	var fs http.FileSystem
 	var ds driver
 
-	fs = p
+	fs = instance
 
-	if err := ds.Init(fs, p.Path); err != nil {
+	if err := ds.Init(fs, instance.Path); err != nil {
 		return nil, fmt.Errorf("failed to init: %w", err)
 	}
 
