@@ -13,9 +13,9 @@ func init() {
 	source.Register("pkger", &driver{})
 }
 
-// Instance is an implementation of http.FileSystem backed by an instance of
+// Pkger is an implementation of http.FileSystem backed by an instance of
 // pkging.Pkger.
-type Instance struct {
+type Pkger struct {
 	pkging.Pkger
 
 	// Path is the relative path location of the migrations. It is passed to
@@ -25,7 +25,7 @@ type Instance struct {
 }
 
 // Open implements http.FileSystem.
-func (p *Instance) Open(name string) (http.File, error) {
+func (p *Pkger) Open(name string) (http.File, error) {
 	f, err := p.Pkger.Open(name)
 	if err != nil {
 		return nil, err
@@ -42,13 +42,13 @@ func (d *driver) Open(url string) (source.Driver, error) {
 	return nil, fmt.Errorf("not yet implemented")
 }
 
-// WithInstance returns a source.Driver that is backed by an Instance.
+// WithInstance returns a source.Driver that is backed by an instance of Pkger.
 func WithInstance(instance interface{}) (source.Driver, error) {
-	if _, ok := instance.(*Instance); !ok {
-		return nil, fmt.Errorf("expects *Instance")
+	if _, ok := instance.(*Pkger); !ok {
+		return nil, fmt.Errorf("expects *Pkger")
 	}
 
-	p := instance.(*Instance)
+	p := instance.(*Pkger)
 
 	if p.Path == "" {
 		p.Path = "/"

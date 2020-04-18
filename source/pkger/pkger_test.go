@@ -37,7 +37,7 @@ func TestOpen(t *testing.T) {
 	}
 }
 
-func testInstance(t *testing.T) *Instance {
+func testInstance(t *testing.T) *Pkger {
 	info, err := here.New().Current()
 	if err != nil {
 		t.Fatalf("failed to get the current here.Info: %v\n", err)
@@ -57,7 +57,7 @@ func testInstance(t *testing.T) *Instance {
 	createMigrationFile(t, pkg, "/7_foobar.up.sql")
 	createMigrationFile(t, pkg, "/7_foobar.down.sql")
 
-	return &Instance{
+	return &Pkger{
 		Pkger: pkg,
 	}
 }
