@@ -97,8 +97,7 @@ func TestWithInstance(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if _, err := d.First(); errors.Is(err, os.ErrNotExist) {
-			t.Log(err)
+		if _, err := d.First(); !errors.Is(err, os.ErrNotExist) {
 			t.Fatal(err)
 		}
 
