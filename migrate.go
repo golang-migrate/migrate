@@ -594,7 +594,7 @@ func (m *Migrate) readUp(from int, limit int, ret chan<- interface{}) {
 
 			// reached end, and didn't apply any migrations
 			if limit > 0 && count == 0 {
-				ret <- os.ErrNotExist
+				ret <- ErrNoChange
 				return
 			}
 

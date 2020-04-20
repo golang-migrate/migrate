@@ -8,11 +8,10 @@ import (
 	"os"
 	"strings"
 	"testing"
-)
 
-import (
 	dStub "github.com/golang-migrate/migrate/v4/database/stub"
 	"github.com/golang-migrate/migrate/v4/source"
+
 	sStub "github.com/golang-migrate/migrate/v4/source/stub"
 )
 
@@ -566,7 +565,7 @@ func TestSteps(t *testing.T) {
 		},
 		{
 			steps:     1,
-			expectErr: os.ErrNotExist,
+			expectErr: ErrNoChange,
 			expectSeq: migrationSequence{
 				mr("CREATE 1"),
 				mr("CREATE 3"),
@@ -1206,8 +1205,8 @@ func TestReadUp(t *testing.T) {
 
 		{from: 7, limit: -1, expectErr: ErrNoChange},
 		{from: 7, limit: 0, expectErr: ErrNoChange},
-		{from: 7, limit: 1, expectErr: os.ErrNotExist},
-		{from: 7, limit: 2, expectErr: os.ErrNotExist},
+		{from: 7, limit: 1, expectErr: ErrNoChange},
+		{from: 7, limit: 2, expectErr: ErrNoChange},
 
 		{from: 8, limit: -1, expectErr: os.ErrNotExist},
 		{from: 8, limit: 0, expectErr: os.ErrNotExist},
