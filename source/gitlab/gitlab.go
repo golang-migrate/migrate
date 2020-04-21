@@ -113,13 +113,30 @@ func WithInstance(client *gitlab.Client, config *Config) (source.Driver, error) 
 }
 
 func (g *Gitlab) readDirectory() error {
-	nodes, response, err := g.client.Repositories.ListTree(g.projectID, g.listOptions)
-	if err != nil {
-		return err
-	}
+	var (
+		nodes    []*gitlab.TreeNode
+		n        []*gitlab.TreeNode
+		response *gitlab.Response
+		err      error
+	)
 
-	if response.StatusCode != http.StatusOK {
-		return ErrInvalidResponse
+	for {
+		n, response, err = g.client.Repositories.ListTree(g.projectID, g.listOptions)
+		if err != nil {
+			return err
+		}
+
+		if response.StatusCode != http.StatusOK {
+			return ErrInvalidResponse
+		}
+
+		nodes = append(nodes, n...)
+
+		if response.NextPage == 0 {
+			break
+		}
+
+		g.listOptions.ListOptions.Page = response.NextPage
 	}
 
 	for i := range nodes {
