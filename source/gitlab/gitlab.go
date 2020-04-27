@@ -32,17 +32,20 @@ var (
 )
 
 type Gitlab struct {
+	config     *Config
 	client *gitlab.Client
 	url    string
 
-	projectID   string
-	path        string
 	listOptions *gitlab.ListTreeOptions
 	getOptions  *gitlab.GetFileOptions
 	migrations  *source.Migrations
 }
 
 type Config struct {
+	GitlabUrl string
+	ProjectID string
+	Path      string
+	Ref       string
 }
 
 func (g *Gitlab) Open(url string) (source.Driver, error) {
@@ -78,17 +81,19 @@ func (g *Gitlab) Open(url string) (source.Driver, error) {
 		}
 	}
 
+	gn.ensureFields()
+
 	pe := strings.Split(strings.Trim(u.Path, "/"), "/")
 	if len(pe) < 1 {
 		return nil, ErrInvalidProjectID
 	}
-	gn.projectID = pe[0]
+	gn.config.ProjectID = pe[0]
 	if len(pe) > 1 {
-		gn.path = strings.Join(pe[1:], "/")
+		gn.config.Path = strings.Join(pe[1:], "/")
 	}
 
 	gn.listOptions = &gitlab.ListTreeOptions{
-		Path: &gn.path,
+		Path: &gn.config.Path,
 		Ref:  &u.Fragment,
 		ListOptions: gitlab.ListOptions{
 			PerPage: DefaultMaxItemsPerPage,
@@ -121,7 +126,7 @@ func (g *Gitlab) readDirectory() error {
 	var nodes []*gitlab.TreeNode
 
 	for {
-		n, response, err := g.client.Repositories.ListTree(g.projectID, g.listOptions)
+		n, response, err := g.client.Repositories.ListTree(g.config.ProjectID, g.listOptions)
 		if err != nil {
 			return err
 		}
@@ -153,6 +158,12 @@ func (g *Gitlab) readDirectory() error {
 	return nil
 }
 
+func (g *Gitlab) ensureFields() {
+	if g.config == nil {
+		g.config = &Config{}
+	}
+}
+
 func (g *Gitlab) nodeToMigration(node *gitlab.TreeNode) (*source.Migration, error) {
 	m := source.Regex.FindStringSubmatch(node.Name)
 	if len(m) == 5 {
@@ -164,7 +175,7 @@ func (g *Gitlab) nodeToMigration(node *gitlab.TreeNode) (*source.Migration, erro
 			Version:    uint(versionUint64),
 			Identifier: m[2],
 			Direction:  source.Direction(m[3]),
-			Raw:        g.path + "/" + node.Name,
+			Raw:        g.config.Path + "/" + node.Name,
 		}, nil
 	}
 	return nil, source.ErrParse
@@ -176,7 +187,7 @@ func (g *Gitlab) Close() error {
 
 func (g *Gitlab) First() (version uint, er error) {
 	if v, ok := g.migrations.First(); !ok {
-		return 0, &os.PathError{Op: "first", Path: g.path, Err: os.ErrNotExist}
+		return 0, &os.PathError{Op: "first", Path: g.config.Path, Err: os.ErrNotExist}
 	} else {
 		return v, nil
 	}
@@ -184,7 +195,7 @@ func (g *Gitlab) First() (version uint, er error) {
 
 func (g *Gitlab) Prev(version uint) (prevVersion uint, err error) {
 	if v, ok := g.migrations.Prev(version); !ok {
-		return 0, &os.PathError{Op: fmt.Sprintf("prev for version %v", version), Path: g.path, Err: os.ErrNotExist}
+		return 0, &os.PathError{Op: fmt.Sprintf("prev for version %v", version), Path: g.config.Path, Err: os.ErrNotExist}
 	} else {
 		return v, nil
 	}
@@ -192,7 +203,7 @@ func (g *Gitlab) Prev(version uint) (prevVersion uint, err error) {
 
 func (g *Gitlab) Next(version uint) (nextVersion uint, err error) {
 	if v, ok := g.migrations.Next(version); !ok {
-		return 0, &os.PathError{Op: fmt.Sprintf("next for version %v", version), Path: g.path, Err: os.ErrNotExist}
+		return 0, &os.PathError{Op: fmt.Sprintf("next for version %v", version), Path: g.config.Path, Err: os.ErrNotExist}
 	} else {
 		return v, nil
 	}
@@ -200,7 +211,7 @@ func (g *Gitlab) Next(version uint) (nextVersion uint, err error) {
 
 func (g *Gitlab) ReadUp(version uint) (r io.ReadCloser, identifier string, err error) {
 	if m, ok := g.migrations.Up(version); ok {
-		f, response, err := g.client.RepositoryFiles.GetFile(g.projectID, m.Raw, g.getOptions)
+		f, response, err := g.client.RepositoryFiles.GetFile(g.config.ProjectID, m.Raw, g.getOptions)
 		if err != nil {
 			return nil, "", err
 		}
@@ -217,12 +228,12 @@ func (g *Gitlab) ReadUp(version uint) (r io.ReadCloser, identifier string, err e
 		return ioutil.NopCloser(strings.NewReader(string(content))), m.Identifier, nil
 	}
 
-	return nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: g.path, Err: os.ErrNotExist}
+	return nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: g.config.Path, Err: os.ErrNotExist}
 }
 
 func (g *Gitlab) ReadDown(version uint) (r io.ReadCloser, identifier string, err error) {
 	if m, ok := g.migrations.Down(version); ok {
-		f, response, err := g.client.RepositoryFiles.GetFile(g.projectID, m.Raw, g.getOptions)
+		f, response, err := g.client.RepositoryFiles.GetFile(g.config.ProjectID, m.Raw, g.getOptions)
 		if err != nil {
 			return nil, "", err
 		}
@@ -239,5 +250,5 @@ func (g *Gitlab) ReadDown(version uint) (r io.ReadCloser, identifier string, err
 		return ioutil.NopCloser(strings.NewReader(string(content))), m.Identifier, nil
 	}
 
-	return nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: g.path, Err: os.ErrNotExist}
+	return nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: g.config.Path, Err: os.ErrNotExist}
 }
