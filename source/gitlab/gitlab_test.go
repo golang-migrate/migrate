@@ -8,22 +8,22 @@ import (
 	st "github.com/golang-migrate/migrate/v4/source/testing"
 )
 
-var GitlabTestSecret = "" // username:token
+var GitlabTestUrl = "" // gitlab://username:token@gitlab.com/11197284/migrations?per_page=3
 
 func init() {
-	secrets, err := ioutil.ReadFile(".gitlab_test_secrets")
+	secrets, err := ioutil.ReadFile(".gitlab_test_url")
 	if err == nil {
-		GitlabTestSecret = string(bytes.TrimSpace(secrets)[:])
+		GitlabTestUrl = string(bytes.TrimSpace(secrets)[:])
 	}
 }
 
 func Test(t *testing.T) {
-	if len(GitlabTestSecret) == 0 {
-		t.Skip("test requires .gitlab_test_secrets")
+	if len(GitlabTestUrl) == 0 {
+		t.Skip("test requires .gitlab_test_url")
 	}
 
 	g := &Gitlab{}
-	d, err := g.Open("gitlab://" + GitlabTestSecret + "@gitlab.com/11197284/migrations")
+	d, err := g.Open(GitlabTestUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
