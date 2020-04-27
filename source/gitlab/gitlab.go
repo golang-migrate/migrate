@@ -10,11 +10,10 @@ import (
 	"os"
 	"strconv"
 	"strings"
-)
 
-import (
-	"github.com/golang-migrate/migrate/v4/source"
 	"github.com/xanzy/go-gitlab"
+
+	"github.com/golang-migrate/migrate/v4/source"
 )
 
 func init() {
@@ -32,7 +31,7 @@ var (
 )
 
 type Gitlab struct {
-	config     *Config
+	config *Config
 	client *gitlab.Client
 	url    string
 
@@ -42,10 +41,12 @@ type Gitlab struct {
 }
 
 type Config struct {
-	GitlabUrl string
+	Scheme    string
+	Host      string
 	ProjectID string
 	Path      string
 	Ref       string
+	PerPage   int
 }
 
 func (g *Gitlab) Open(url string) (source.Driver, error) {
@@ -69,19 +70,25 @@ func (g *Gitlab) Open(url string) (source.Driver, error) {
 		migrations: source.NewMigrations(),
 	}
 
-	if u.Host != "" {
-		uri := nurl.URL{
-			Scheme: "https",
-			Host:   u.Host,
-		}
+	gn.ensureFields()
 
-		err = gn.client.SetBaseURL(uri.String())
-		if err != nil {
-			return nil, ErrInvalidHost
-		}
+	if u.Scheme != "" {
+		gn.config.Scheme = u.Scheme
 	}
 
-	gn.ensureFields()
+	if u.Host != "" {
+		gn.config.Host = u.Host
+	}
+
+	uri := nurl.URL{
+		Scheme: gn.config.Scheme,
+		Host:   gn.config.Host,
+	}
+
+	err = gn.client.SetBaseURL(uri.String())
+	if err != nil {
+		return nil, ErrInvalidHost
+	}
 
 	pe := strings.Split(strings.Trim(u.Path, "/"), "/")
 	if len(pe) < 1 {
@@ -92,16 +99,15 @@ func (g *Gitlab) Open(url string) (source.Driver, error) {
 		gn.config.Path = strings.Join(pe[1:], "/")
 	}
 
-	gn.listOptions = &gitlab.ListTreeOptions{
-		Path: &gn.config.Path,
-		Ref:  &u.Fragment,
-		ListOptions: gitlab.ListOptions{
-			PerPage: DefaultMaxItemsPerPage,
-		},
+	qPerPage := u.Query().Get("per_page")
+	if qPerPage != "" {
+		if i, err := strconv.Atoi(qPerPage); err != nil {
+			gn.config.PerPage = i
+		}
 	}
 
-	gn.getOptions = &gitlab.GetFileOptions{
-		Ref: &u.Fragment,
+	if u.Fragment != "" {
+		gn.config.Ref = u.Fragment
 	}
 
 	if err := gn.readDirectory(); err != nil {
@@ -114,6 +120,7 @@ func (g *Gitlab) Open(url string) (source.Driver, error) {
 func WithInstance(client *gitlab.Client, config *Config) (source.Driver, error) {
 	gn := &Gitlab{
 		client:     client,
+		config:     config,
 		migrations: source.NewMigrations(),
 	}
 	if err := gn.readDirectory(); err != nil {
@@ -124,6 +131,14 @@ func WithInstance(client *gitlab.Client, config *Config) (source.Driver, error) 
 
 func (g *Gitlab) readDirectory() error {
 	var nodes []*gitlab.TreeNode
+
+	g.listOptions = &gitlab.ListTreeOptions{
+		Path: &g.config.Path,
+		Ref:  &g.config.Ref,
+		ListOptions: gitlab.ListOptions{
+			PerPage: g.config.PerPage,
+		},
+	}
 
 	for {
 		n, response, err := g.client.Repositories.ListTree(g.config.ProjectID, g.listOptions)
@@ -161,6 +176,7 @@ func (g *Gitlab) readDirectory() error {
 func (g *Gitlab) ensureFields() {
 	if g.config == nil {
 		g.config = &Config{}
+		g.config.PerPage = DefaultMaxItemsPerPage
 	}
 }
 
@@ -210,7 +226,13 @@ func (g *Gitlab) Next(version uint) (nextVersion uint, err error) {
 }
 
 func (g *Gitlab) ReadUp(version uint) (r io.ReadCloser, identifier string, err error) {
+	g.ensureFields()
+
 	if m, ok := g.migrations.Up(version); ok {
+		g.getOptions = &gitlab.GetFileOptions{
+			Ref: &g.config.Ref,
+		}
+
 		f, response, err := g.client.RepositoryFiles.GetFile(g.config.ProjectID, m.Raw, g.getOptions)
 		if err != nil {
 			return nil, "", err
@@ -232,7 +254,13 @@ func (g *Gitlab) ReadUp(version uint) (r io.ReadCloser, identifier string, err e
 }
 
 func (g *Gitlab) ReadDown(version uint) (r io.ReadCloser, identifier string, err error) {
+	g.ensureFields()
+
 	if m, ok := g.migrations.Down(version); ok {
+		g.getOptions = &gitlab.GetFileOptions{
+			Ref: &g.config.Ref,
+		}
+
 		f, response, err := g.client.RepositoryFiles.GetFile(g.config.ProjectID, m.Raw, g.getOptions)
 		if err != nil {
 			return nil, "", err
