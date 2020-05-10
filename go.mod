@@ -32,10 +32,8 @@ require (
 	github.com/markbates/pkger v0.15.1
 	github.com/mattn/go-sqlite3 v1.10.0
 	github.com/nakagami/firebirdsql v0.0.0-20190310045651-3c02a58cfed8
-	github.com/neo4j-drivers/gobolt v1.7.4 // indirect
-	github.com/neo4j/neo4j-go-driver v1.7.4
-	github.com/pkg/errors v0.9.1 // indirect
-	github.com/stretchr/testify v1.4.0
+	github.com/neo4j/neo4j-go-driver v1.8.0-beta01
+	github.com/stretchr/testify v1.5.1
 	github.com/tidwall/pretty v0.0.0-20180105212114-65a9db5fad51 // indirect
 	github.com/xanzy/go-gitlab v0.15.0
 	github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c // indirect

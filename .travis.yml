@@ -36,11 +36,6 @@ before_install:
   # Install golangci-lint
   - curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $(go env GOPATH)/bin v1.24.0
   - echo "TRAVIS_GO_VERSION=${TRAVIS_GO_VERSION}"
-  # Install seabolt for Neo4j
-  - sudo apt-get install -y libssl1.0.0
-  - wget https://github.com/neo4j-drivers/seabolt/releases/download/v1.7.4/seabolt-1.7.4-Linux-ubuntu-$(lsb_release -rs).deb
-  - sudo dpkg -i seabolt-1.7.4-Linux-ubuntu-$(lsb_release -rs).deb
-  - rm seabolt-1.7.4-Linux-ubuntu-$(lsb_release -rs).deb
 
 install:
   - go get github.com/mattn/goveralls

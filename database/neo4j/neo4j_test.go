@@ -24,8 +24,6 @@ var (
 		{ImageName: "neo4j:4.0-enterprise", Options: opts},
 		{ImageName: "neo4j:3.5", Options: opts},
 		{ImageName: "neo4j:3.5-enterprise", Options: opts},
-		{ImageName: "neo4j:3.4", Options: opts},
-		{ImageName: "neo4j:3.4-enterprise", Options: opts},
 	}
 )
 
