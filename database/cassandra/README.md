@@ -11,6 +11,8 @@ system_schema table which comes with 3.X
 ## Usage
 `cassandra://host:port/keyspace?param1=value&param2=value2`
 
+**Note**: Unlike a normal URL, you may not provide username and password as normal. If you supply them, they must be provided as parameters.
+
 
 | URL Query  | Default value | Description |
 |------------|-------------|-----------|
@@ -25,7 +27,7 @@ system_schema table which comes with 3.X
 | `sslcert` | | Cert file location. The file must contain PEM encoded data. |
 | `sslkey` | | Key file location. The file must contain PEM encoded data. |
 | `sslrootcert` | | The location of the root certificate file. The file must contain PEM encoded data. |
-| `sslmode` | | Whether or not to use SSL (disable\|require\|verify-ca\|verify-full) |
+| `sslmode` | | Whether or not to use SSL (disable\|noverify\|verify-ca\|verify-full) |
 
 `timeout` is parsed using [time.ParseDuration(s string)](https://golang.org/pkg/time/#ParseDuration)
 
