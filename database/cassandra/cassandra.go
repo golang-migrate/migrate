@@ -121,16 +121,25 @@ func (c *Cassandra) Open(url string) (database.Driver, error) {
 		cluster.Timeout = timeout
 	}
 
-	if len(u.Query().Get("sslmode")) > 0 && len(u.Query().Get("sslrootcert")) > 0 && len(u.Query().Get("sslcert")) > 0 && len(u.Query().Get("sslkey")) > 0 {
+	if len(u.Query().Get("sslmode")) > 0 {
 		if u.Query().Get("sslmode") != "disable" {
-			cluster.SslOpts = &gocql.SslOptions{
-				CaPath:   u.Query().Get("sslrootcert"),
-				CertPath: u.Query().Get("sslcert"),
-				KeyPath:  u.Query().Get("sslkey"),
+			sslOpts := &gocql.SslOptions{}
+
+			if len(u.Query().Get("sslrootcert")) > 0 {
+				sslOpts.CaPath = u.Query().Get("sslrootcert")
 			}
+			if len(u.Query().Get("sslcert")) > 0 {
+				sslOpts.CertPath = u.Query().Get("sslcert")
+			}
+			if len(u.Query().Get("sslkey")) > 0 {
+				sslOpts.KeyPath = u.Query().Get("sslkey")
+			}
+
 			if u.Query().Get("sslmode") == "verify-full" {
-				cluster.SslOpts.EnableHostVerification = true
+				sslOpts.EnableHostVerification = true
 			}
+
+			cluster.SslOpts = sslOpts
 		}
 	}
 
