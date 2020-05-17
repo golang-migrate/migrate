@@ -7,7 +7,7 @@
 
 # Usage
 
-`mongodb://user:password@host:port/dbname?query`
+`mongodb://user:password@host:port/dbname?query` (`mongodb+srv://` work, too)
 
 | URL Query  | WithInstance Config | Description |
 |------------|---------------------|-------------|
