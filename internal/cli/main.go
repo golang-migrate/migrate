@@ -227,15 +227,25 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 		}
 
 	case "drop":
-		log.Println("Are you sure you want to drop the entire database schema? [y/N]")
-		var response string
-		fmt.Scanln(&response)
-		response = strings.ToLower(strings.TrimSpace(response))
+		dropFlagSet := flag.NewFlagSet("drop", flag.ExitOnError)
+		forceDrop := dropFlagSet.Bool("f", false, "Force the drop command by bypassing the confirmation prompt")
 
-		if response == "y" {
-			log.Println("Dropping the entire database schema")
-		} else {
-			log.fatal("Aborted dropping the entire database schema")
+		args := flag.Args()[1:]
+		if err := dropFlagSet.Parse(args); err != nil {
+			log.fatalErr(err)
+		}
+
+		if !*forceDrop {
+			log.Println("Are you sure you want to drop the entire database schema? [y/N]")
+			var response string
+			fmt.Scanln(&response)
+			response = strings.ToLower(strings.TrimSpace(response))
+
+			if response == "y" {
+				log.Println("Dropping the entire database schema")
+			} else {
+				log.fatal("Aborted dropping the entire database schema")
+			}
 		}
 
 		if migraterErr != nil {
