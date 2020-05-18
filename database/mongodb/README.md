@@ -7,7 +7,7 @@
 
 # Usage
 
-`mongodb://user:password@host:port/dbname?query`
+`mongodb://user:password@host:port/dbname?query` (`mongodb+srv://` also works, but behaves a bit differently. See [docs](https://docs.mongodb.com/manual/reference/connection-string/#dns-seedlist-connection-format) for more information)
 
 | URL Query  | WithInstance Config | Description |
 |------------|---------------------|-------------|

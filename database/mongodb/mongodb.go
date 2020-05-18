@@ -16,7 +16,9 @@ import (
 )
 
 func init() {
-	database.Register("mongodb", &Mongo{})
+	db := Mongo{}
+	database.Register("mongodb", &db)
+	database.Register("mongodb+srv", &db)
 }
 
 var DefaultMigrationsCollection = "schema_migrations"
