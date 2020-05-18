@@ -228,7 +228,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 
 	case "drop":
 		dropFlagSet := flag.NewFlagSet("drop", flag.ExitOnError)
-		forceDrop := dropFlagSet.Bool("f", false, "Drop the entire database schema")
+		forceDrop := dropFlagSet.Bool("f", false, "Force the drop command by bypassing the confirmation prompt")
 
 		args := flag.Args()[1:]
 		if err := dropFlagSet.Parse(args); err != nil {
