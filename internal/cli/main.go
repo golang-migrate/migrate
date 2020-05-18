@@ -228,14 +228,14 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 
 	case "drop":
 		dropFlagSet := flag.NewFlagSet("drop", flag.ExitOnError)
-		responseYes := dropFlagSet.Bool("y", false, "Drop the entire database schema")
+		forceDrop := dropFlagSet.Bool("f", false, "Drop the entire database schema")
 
 		args := flag.Args()[1:]
 		if err := dropFlagSet.Parse(args); err != nil {
 			log.fatalErr(err)
 		}
 
-		if !*responseYes {
+		if !*forceDrop {
 			log.Println("Are you sure you want to drop the entire database schema? [y/N]")
 			var response string
 			fmt.Scanln(&response)
