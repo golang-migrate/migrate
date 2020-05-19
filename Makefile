@@ -1,6 +1,6 @@
 SOURCE ?= file go_bindata github github_ee aws_s3 google_cloud_storage godoc_vfs gitlab
 DATABASE ?= postgres mysql redshift cassandra spanner cockroachdb clickhouse mongodb sqlserver firebird
-DATABASE_TEST ?= $(DATABASE) sqlite neo4j
+DATABASE_TEST ?= $(DATABASE) sqlite neo4j oracle
 VERSION ?= $(shell git describe --tags 2>/dev/null | cut -c 2-)
 TEST_FLAGS ?=
 REPO_OWNER ?= $(shell cd .. && basename "$$(pwd)")
@@ -31,7 +31,7 @@ test-short:
 test:
 	@-rm -r $(COVERAGE_DIR)
 	@mkdir $(COVERAGE_DIR)
-	make test-with-flags TEST_FLAGS='-v -race -covermode atomic -coverprofile $$(COVERAGE_DIR)/combined.txt -bench=. -benchmem -timeout 20m'
+	make test-with-flags TEST_FLAGS='-v -race -covermode atomic -coverprofile $$(COVERAGE_DIR)/combined.txt -bench=. -benchmem -timeout 120m'
 
 
 test-with-flags:

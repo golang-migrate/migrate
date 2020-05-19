@@ -38,6 +38,7 @@ Database drivers run migrations. [Add a new database?](database/driver.go)
 * [ClickHouse](database/clickhouse)
 * [Firebird](database/firebird)
 * [MS SQL Server](database/sqlserver)
+* [Oracle](database/oracle) ([FYI](database/oracle/README.md#Are-there-public-docker-images-available))
 
 ### Database URLs
 
