@@ -1,4 +1,4 @@
-// +build go1.9
+// +build go1.12
 
 package snowflake
 
@@ -258,7 +258,7 @@ func (p *Snowflake) SetVersion(version int, dirty bool) error {
 	// empty schema version for failed down migration on the first migration
 	// See: https://github.com/golang-migrate/migrate/issues/330
 	if version >= 0 || (version == database.NilVersion && dirty) {
-		query = `INSERT INTO "` + p.config.MigrationsTable + `" (version, 
+		query = `INSERT INTO "` + p.config.MigrationsTable + `" (version,
 				dirty) VALUES (` + strconv.FormatInt(int64(version), 10) + `,
 				` + strconv.FormatBool(dirty)+ `)`
 		if _, err := tx.Exec(query); err != nil {
