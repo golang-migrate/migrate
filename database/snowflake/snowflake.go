@@ -24,11 +24,13 @@ func init() {
 var DefaultMigrationsTable = "schema_migrations"
 
 var (
-	ErrNilConfig          = fmt.Errorf("no config")
-	ErrNoDatabaseName     = fmt.Errorf("no database name")
-	ErrNoPassword         = fmt.Errorf("no password")
-	ErrNoSchema           = fmt.Errorf("no schema")
-	ErrNoSchemaOrDatabase = fmt.Errorf("no schema/database name")
+	ErrNilConfig                     = fmt.Errorf("no config")
+	ErrNoDatabaseName                = fmt.Errorf("no database name")
+	ErrNoPassword                    = fmt.Errorf("no password")
+	ErrNoSchema                      = fmt.Errorf("no schema")
+	ErrNoWarehouse                   = fmt.Errorf("no warehouse")
+	ErrNoSchemaOrDatabaseOrWarehouse = fmt.Errorf("no schema/database/warehouse name")
+	ErrNoRole                        = fmt.Errorf("no role")
 )
 
 type Config struct {
@@ -103,8 +105,8 @@ func (p *Snowflake) Open(url string) (database.Driver, error) {
 	}
 
 	splitPath := strings.Split(purl.Path, "/")
-	if len(splitPath) < 3 {
-		return nil, ErrNoSchemaOrDatabase
+	if len(splitPath) < 4 {
+		return nil, ErrNoSchemaOrDatabaseOrWarehouse
 	}
 
 	database := splitPath[2]
@@ -117,12 +119,24 @@ func (p *Snowflake) Open(url string) (database.Driver, error) {
 		return nil, ErrNoSchema
 	}
 
+	warehouse := splitPath[3]
+	if len(warehouse) == 0 {
+		return nil, ErrNoWarehouse
+	}
+
+	role := purl.Query().Get("role")
+	if role == "" {
+		return nil, ErrNoRole
+	}
+
 	cfg := &sf.Config{
-		Account:  purl.Host,
-		User:     purl.User.Username(),
-		Password: password,
-		Database: database,
-		Schema:   schema,
+		Account:   purl.Host,
+		User:      purl.User.Username(),
+		Password:  password,
+		Database:  database,
+		Schema:    schema,
+		Warehouse: warehouse,
+		Role:      role,
 	}
 
 	dsn, err := sf.DSN(cfg)
