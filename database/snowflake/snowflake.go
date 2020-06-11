@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	iurl "github.com/golang-migrate/migrate/v4/internal/url"
+	"github.com/golang/glog"
 	"io"
 	"io/ioutil"
 	nurl "net/url"
@@ -24,11 +26,8 @@ func init() {
 var DefaultMigrationsTable = "schema_migrations"
 
 var (
-	ErrNilConfig          = fmt.Errorf("no config")
-	ErrNoDatabaseName     = fmt.Errorf("no database name")
-	ErrNoPassword         = fmt.Errorf("no password")
-	ErrNoSchema           = fmt.Errorf("no schema")
-	ErrNoSchemaOrDatabase = fmt.Errorf("no schema/database name")
+	ErrNilConfig      = fmt.Errorf("no config")
+	ErrNoDatabaseName = fmt.Errorf("no database name")
 )
 
 type Config struct {
@@ -92,40 +91,31 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 }
 
 func (p *Snowflake) Open(url string) (database.Driver, error) {
+	scheme, err := iurl.SchemeFromURL(url)
+	if err != nil {
+		return nil, err
+	}
+
+	// Getting the actual snowflake URL by skipping snowflake://.
+	snowflakeUrl := url[len(scheme)+3:]
+	glog.Infof("Snowflake URL: %s", snowflakeUrl)
+
+	config, err := sf.ParseDSN(snowflakeUrl)
+	if err != nil {
+		return nil, err
+	}
+
+	glog.Infof("Account: %s, User: %s, Password: %s, Database: %s, "+
+		"Schema: %s, Warehouse: %s, Role: %s", config.Account, config.User,
+		config.Password, config.Database, config.Schema, config.Warehouse,
+		config.Role)
+
 	purl, err := nurl.Parse(url)
 	if err != nil {
 		return nil, err
 	}
 
-	password, isPasswordSet := purl.User.Password()
-	if !isPasswordSet {
-		return nil, ErrNoPassword
-	}
-
-	splitPath := strings.Split(purl.Path, "/")
-	if len(splitPath) < 3 {
-		return nil, ErrNoSchemaOrDatabase
-	}
-
-	database := splitPath[2]
-	if len(database) == 0 {
-		return nil, ErrNoDatabaseName
-	}
-
-	schema := splitPath[1]
-	if len(schema) == 0 {
-		return nil, ErrNoSchema
-	}
-
-	cfg := &sf.Config{
-		Account:  purl.Host,
-		User:     purl.User.Username(),
-		Password: password,
-		Database: database,
-		Schema:   schema,
-	}
-
-	dsn, err := sf.DSN(cfg)
+	dsn, err := sf.DSN(config)
 	if err != nil {
 		return nil, err
 	}
@@ -136,6 +126,7 @@ func (p *Snowflake) Open(url string) (database.Driver, error) {
 	}
 
 	migrationsTable := purl.Query().Get("x-migrations-table")
+	database := config.Database
 
 	px, err := WithInstance(db, &Config{
 		DatabaseName:    database,
@@ -177,27 +168,43 @@ func (p *Snowflake) Run(migration io.Reader) error {
 	}
 
 	// run migration
-	query := string(migr[:])
-	if _, err := p.conn.ExecContext(context.Background(), query); err != nil {
-		if pgErr, ok := err.(*pq.Error); ok {
-			var line uint
-			var col uint
-			var lineColOK bool
-			if pgErr.Position != "" {
-				if pos, err := strconv.ParseUint(pgErr.Position, 10, 64); err == nil {
-					line, col, lineColOK = computeLineFromPos(query, int(pos))
+	queriesStr := string(migr[:])
+
+	// Splitting queries string as executing multiple queries isnt possible in
+	// one go.
+	queries := strings.Split(queriesStr, ";")
+
+	for _, query := range queries {
+		query = strings.TrimSpace(query)
+
+		if len(query) > 0 {
+			query = query + ";"
+			glog.Infof("Executing query: %s", query)
+
+			if _, err := p.conn.ExecContext(context.Background(), query); err != nil {
+				glog.Errorf("Error while executing query: %s: %s", query, err.Error())
+
+				if pgErr, ok := err.(*pq.Error); ok {
+					var line uint
+					var col uint
+					var lineColOK bool
+					if pgErr.Position != "" {
+						if pos, err := strconv.ParseUint(pgErr.Position, 10, 64); err == nil {
+							line, col, lineColOK = computeLineFromPos(query, int(pos))
+						}
+					}
+					message := fmt.Sprintf("migration failed: %s", pgErr.Message)
+					if lineColOK {
+						message = fmt.Sprintf("%s (column %d)", message, col)
+					}
+					if pgErr.Detail != "" {
+						message = fmt.Sprintf("%s, %s", message, pgErr.Detail)
+					}
+					return database.Error{OrigErr: err, Err: message, Query: migr, Line: line}
 				}
+				return database.Error{OrigErr: err, Err: "migration failed", Query: migr}
 			}
-			message := fmt.Sprintf("migration failed: %s", pgErr.Message)
-			if lineColOK {
-				message = fmt.Sprintf("%s (column %d)", message, col)
-			}
-			if pgErr.Detail != "" {
-				message = fmt.Sprintf("%s, %s", message, pgErr.Detail)
-			}
-			return database.Error{OrigErr: err, Err: message, Query: migr, Line: line}
 		}
-		return database.Error{OrigErr: err, Err: "migration failed", Query: migr}
 	}
 
 	return nil
