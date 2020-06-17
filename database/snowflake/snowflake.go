@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	iurl "github.com/golang-migrate/migrate/v4/internal/url"
-	"github.com/golang/glog"
 	"io"
 	"io/ioutil"
 	nurl "net/url"
@@ -98,17 +97,11 @@ func (p *Snowflake) Open(url string) (database.Driver, error) {
 
 	// Getting the actual snowflake URL by skipping snowflake://.
 	snowflakeUrl := url[len(scheme)+3:]
-	glog.Infof("Snowflake URL: %s", snowflakeUrl)
 
 	config, err := sf.ParseDSN(snowflakeUrl)
 	if err != nil {
 		return nil, err
 	}
-
-	glog.Infof("Account: %s, User: %s, Password: %s, Database: %s, "+
-		"Schema: %s, Warehouse: %s, Role: %s", config.Account, config.User,
-		config.Password, config.Database, config.Schema, config.Warehouse,
-		config.Role)
 
 	purl, err := nurl.Parse(url)
 	if err != nil {
@@ -171,7 +164,9 @@ func (p *Snowflake) Run(migration io.Reader) error {
 	queriesStr := string(migr[:])
 
 	// Splitting queries string as executing multiple queries isnt possible in
-	// one go.
+	// one go (https://support.snowflake.
+	// net/s/question/0D50Z00007ltRE7SAM?multiple-sql-statements-in-a-single
+	// -api-call-are-not-supported-use-one-api-call-per-statement-instead).
 	queries := strings.Split(queriesStr, ";")
 
 	for _, query := range queries {
@@ -179,70 +174,15 @@ func (p *Snowflake) Run(migration io.Reader) error {
 
 		if len(query) > 0 {
 			query = query + ";"
-			glog.Infof("Executing query: %s", query)
 
 			if _, err := p.conn.ExecContext(context.Background(), query); err != nil {
-				glog.Errorf("Error while executing query: %s: %s", query, err.Error())
-
-				if pgErr, ok := err.(*pq.Error); ok {
-					var line uint
-					var col uint
-					var lineColOK bool
-					if pgErr.Position != "" {
-						if pos, err := strconv.ParseUint(pgErr.Position, 10, 64); err == nil {
-							line, col, lineColOK = computeLineFromPos(query, int(pos))
-						}
-					}
-					message := fmt.Sprintf("migration failed: %s", pgErr.Message)
-					if lineColOK {
-						message = fmt.Sprintf("%s (column %d)", message, col)
-					}
-					if pgErr.Detail != "" {
-						message = fmt.Sprintf("%s, %s", message, pgErr.Detail)
-					}
-					return database.Error{OrigErr: err, Err: message, Query: migr, Line: line}
-				}
-				return database.Error{OrigErr: err, Err: "migration failed", Query: migr}
+				return database.Error{OrigErr: err, Err: "Migration query failed",
+					Query: []byte(query)}
 			}
 		}
 	}
 
 	return nil
-}
-
-func computeLineFromPos(s string, pos int) (line uint, col uint, ok bool) {
-	// replace crlf with lf
-	s = strings.Replace(s, "\r\n", "\n", -1)
-	// pg docs: pos uses index 1 for the first character, and positions are measured in characters not bytes
-	runes := []rune(s)
-	if pos > len(runes) {
-		return 0, 0, false
-	}
-	sel := runes[:pos]
-	line = uint(runesCount(sel, newLine) + 1)
-	col = uint(pos - 1 - runesLastIndex(sel, newLine))
-	return line, col, true
-}
-
-const newLine = '\n'
-
-func runesCount(input []rune, target rune) int {
-	var count int
-	for _, r := range input {
-		if r == target {
-			count++
-		}
-	}
-	return count
-}
-
-func runesLastIndex(input []rune, target rune) int {
-	for i := len(input) - 1; i >= 0; i-- {
-		if input[i] == target {
-			return i
-		}
-	}
-	return -1
 }
 
 func (p *Snowflake) SetVersion(version int, dirty bool) error {
