@@ -3,7 +3,7 @@
 `snowflake://user:password@accountname/dbname/schema?query`
 
 Example URL
-`snowflake://abhinav:abc@ih12289.us-east-2.aws/UTIL_DB/public?x-migrations-table=schema_migrations&role=SYSADMIN&warehouse=compute_wh`
+`snowflake://xyz:abc@ih12289.us-east-2.aws/UTIL_DB/public?x-migrations-table=schema_migrations&role=SYSADMIN&warehouse=compute_wh`
 
 | URL Query  | WithInstance Config | Description |
 |------------|---------------------|-------------|
