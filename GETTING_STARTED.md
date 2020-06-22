@@ -23,7 +23,7 @@ This way if one of commands fails, our database will remain unchanged.
 Run your migrations through the CLI or your app and check if they applied expected changes.
 Just to give you an idea:
 ```
-migrate -database YOUR_DATBASE_URL -path PATH_TO_YOUR_MIGRATIONS up
+migrate -database YOUR_DATABASE_URL -path PATH_TO_YOUR_MIGRATIONS up
 ```
 
 Just add the code to your app and you're ready to go!
