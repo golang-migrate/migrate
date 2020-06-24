@@ -1,8 +1,8 @@
 module github.com/golang-migrate/migrate/v4
 
 require (
-	cloud.google.com/go/spanner v1.5.0
-	cloud.google.com/go/storage v1.6.0
+	cloud.google.com/go/spanner v1.6.0
+	cloud.google.com/go/storage v1.8.0
 	github.com/ClickHouse/clickhouse-go v1.3.12
 	github.com/Microsoft/go-winio v0.4.14 // indirect
 	github.com/aws/aws-sdk-go v1.17.7
@@ -40,10 +40,10 @@ require (
 	github.com/xdg/stringprep v1.0.0 // indirect
 	gitlab.com/nyarla/go-crypt v0.0.0-20160106005555-d9a5dc2b789b // indirect
 	go.mongodb.org/mongo-driver v1.1.0
-	golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e
-	golang.org/x/tools v0.0.0-20200413015812-1f08ef6002a8
-	google.golang.org/api v0.21.0
-	google.golang.org/genproto v0.0.0-20200413115906-b5235f65be36
+	golang.org/x/net v0.0.0-20200520182314-0ba52f642ac2
+	golang.org/x/tools v0.0.0-20200522201501-cb1345f3a375
+	google.golang.org/api v0.25.0
+	google.golang.org/genproto v0.0.0-20200526151428-9bb895338b15
 	modernc.org/b v1.0.0 // indirect
 	modernc.org/db v1.0.0 // indirect
 	modernc.org/file v1.0.0 // indirect

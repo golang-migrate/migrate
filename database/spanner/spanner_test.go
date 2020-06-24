@@ -4,16 +4,14 @@ import (
 	"fmt"
 	"os"
 	"testing"
-)
 
-import (
 	"github.com/golang-migrate/migrate/v4"
-	dt "github.com/golang-migrate/migrate/v4/database/testing"
-	_ "github.com/golang-migrate/migrate/v4/source/file"
-)
 
-import (
+	dt "github.com/golang-migrate/migrate/v4/database/testing"
+
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test(t *testing.T) {
@@ -58,71 +56,97 @@ func TestMigrate(t *testing.T) {
 	dt.TestMigrate(t, m)
 }
 
-func TestMultistatementSplit(t *testing.T) {
+func TestCleanStatements(t *testing.T) {
 	testCases := []struct {
 		name           string
 		multiStatement string
 		expected       []string
 	}{
 		{
-			name:           "single statement, single line, no semicolon",
+			name:           "no statement",
+			multiStatement: "",
+			expected:       []string{},
+		},
+		{
+			name:           "single statement, single line, no semicolon, no comment",
 			multiStatement: "CREATE TABLE table_name (id STRING(255) NOT NULL) PRIMARY KEY (id)",
-			expected:       []string{"CREATE TABLE table_name (id STRING(255) NOT NULL) PRIMARY KEY (id)"},
+			expected:       []string{"CREATE TABLE table_name (\n  id STRING(255) NOT NULL,\n) PRIMARY KEY(id)"},
 		},
 		{
-			name: "single statement, multi line, no semicolon",
+			name: "single statement, multi line, no semicolon, no comment",
 			multiStatement: `CREATE TABLE table_name (
-	id STRING(255) NOT NULL,
-) PRIMARY KEY (id)`,
-			expected: []string{`CREATE TABLE table_name (
-	id STRING(255) NOT NULL,
-) PRIMARY KEY (id)`},
+			id STRING(255) NOT NULL,
+		) PRIMARY KEY (id)`,
+			expected: []string{"CREATE TABLE table_name (\n  id STRING(255) NOT NULL,\n) PRIMARY KEY(id)"},
 		},
 		{
-			name:           "single statement, single line, with semicolon",
+			name:           "single statement, single line, with semicolon, no comment",
 			multiStatement: "CREATE TABLE table_name (id STRING(255) NOT NULL) PRIMARY KEY (id);",
-			expected:       []string{"CREATE TABLE table_name (id STRING(255) NOT NULL) PRIMARY KEY (id)"},
+			expected:       []string{"CREATE TABLE table_name (\n  id STRING(255) NOT NULL,\n) PRIMARY KEY(id)"},
 		},
 		{
-			name: "single statement, multi line, with semicolon",
+			name: "single statement, multi line, with semicolon, no comment",
 			multiStatement: `CREATE TABLE table_name (
-	id STRING(255) NOT NULL,
-) PRIMARY KEY (id);`,
-			expected: []string{`CREATE TABLE table_name (
-	id STRING(255) NOT NULL,
-) PRIMARY KEY (id)`},
+			id STRING(255) NOT NULL,
+		) PRIMARY KEY (id);`,
+			expected: []string{"CREATE TABLE table_name (\n  id STRING(255) NOT NULL,\n) PRIMARY KEY(id)"},
 		},
 		{
-			name: "multi statement, with trailing semicolon",
+			name: "multi statement, with trailing semicolon. no comment",
 			// From https://github.com/mattes/migrate/pull/281
 			multiStatement: `CREATE TABLE table_name (
-	id STRING(255) NOT NULL,
-) PRIMARY KEY(id);
+			id STRING(255) NOT NULL,
+		) PRIMARY KEY(id);
 
-CREATE INDEX table_name_id_idx ON table_name (id);`,
+		CREATE INDEX table_name_id_idx ON table_name (id);`,
 			expected: []string{`CREATE TABLE table_name (
-	id STRING(255) NOT NULL,
-) PRIMARY KEY(id)`, "CREATE INDEX table_name_id_idx ON table_name (id)"},
+  id STRING(255) NOT NULL,
+) PRIMARY KEY(id)`, "CREATE INDEX table_name_id_idx ON table_name(id)"},
 		},
 		{
-			name: "multi statement, no trailing semicolon",
+			name: "multi statement, no trailing semicolon, no comment",
 			// From https://github.com/mattes/migrate/pull/281
 			multiStatement: `CREATE TABLE table_name (
-	id STRING(255) NOT NULL,
-) PRIMARY KEY(id);
+			id STRING(255) NOT NULL,
+		) PRIMARY KEY(id);
 
-CREATE INDEX table_name_id_idx ON table_name (id)`,
+		CREATE INDEX table_name_id_idx ON table_name (id)`,
 			expected: []string{`CREATE TABLE table_name (
-	id STRING(255) NOT NULL,
-) PRIMARY KEY(id)`, "CREATE INDEX table_name_id_idx ON table_name (id)"},
+  id STRING(255) NOT NULL,
+) PRIMARY KEY(id)`, "CREATE INDEX table_name_id_idx ON table_name(id)"},
+		},
+		{
+			name: "multi statement, no trailing semicolon, standalone comment",
+			// From https://github.com/mattes/migrate/pull/281
+			multiStatement: `CREATE TABLE table_name (
+			-- standalone comment
+			id STRING(255) NOT NULL,
+		) PRIMARY KEY(id);
+
+		CREATE INDEX table_name_id_idx ON table_name (id)`,
+			expected: []string{`CREATE TABLE table_name (
+  id STRING(255) NOT NULL,
+) PRIMARY KEY(id)`, "CREATE INDEX table_name_id_idx ON table_name(id)"},
+		},
+		{
+			name: "multi statement, no trailing semicolon, inline comment",
+			// From https://github.com/mattes/migrate/pull/281
+			multiStatement: `CREATE TABLE table_name (
+			id STRING(255) NOT NULL, -- inline comment
+		) PRIMARY KEY(id);
+
+		CREATE INDEX table_name_id_idx ON table_name (id)`,
+			expected: []string{`CREATE TABLE table_name (
+  id STRING(255) NOT NULL,
+) PRIMARY KEY(id)`, "CREATE INDEX table_name_id_idx ON table_name(id)"},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			if stmts := migrationStatements([]byte(tc.multiStatement)); !assert.Equal(t, stmts, tc.expected) {
-				t.Error()
-			}
+			stmts, err := cleanStatements([]byte(tc.multiStatement))
+			require.NoError(t, err, "Error cleaning statements")
+			assert.Equal(t, tc.expected, stmts)
 		})
 	}
 }

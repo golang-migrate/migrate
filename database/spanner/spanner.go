@@ -7,12 +7,14 @@ import (
 	"log"
 	nurl "net/url"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"golang.org/x/net/context"
 
 	"cloud.google.com/go/spanner"
 	sdb "cloud.google.com/go/spanner/admin/database/apiv1"
+	"cloud.google.com/go/spanner/spansql"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
@@ -42,6 +44,11 @@ var (
 type Config struct {
 	MigrationsTable string
 	DatabaseName    string
+	// Whether to parse the migration DDL with spansql before
+	// running them towards Spanner.
+	// Parsing outputs clean DDL statements such as reformatted
+	// and void of comments.
+	CleanStatements bool
 }
 
 // Spanner implements database.Driver for Google Cloud Spanner
@@ -110,10 +117,20 @@ func (s *Spanner) Open(url string) (database.Driver, error) {
 
 	migrationsTable := purl.Query().Get("x-migrations-table")
 
+	cleanQuery := purl.Query().Get("x-clean-statements")
+	clean := false
+	if cleanQuery != "" {
+		clean, err = strconv.ParseBool(cleanQuery)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	db := &DB{admin: adminClient, data: dataClient}
 	return WithInstance(db, &Config{
 		DatabaseName:    dbname,
 		MigrationsTable: migrationsTable,
+		CleanStatements: clean,
 	})
 }
 
@@ -141,10 +158,15 @@ func (s *Spanner) Run(migration io.Reader) error {
 		return err
 	}
 
-	// run migration
-	stmts := migrationStatements(migr)
-	ctx := context.Background()
+	stmts := []string{string(migr)}
+	if s.config.CleanStatements {
+		stmts, err = cleanStatements(migr)
+		if err != nil {
+			return err
+		}
+	}
 
+	ctx := context.Background()
 	op, err := s.db.admin.UpdateDatabaseDdl(ctx, &adminpb.UpdateDatabaseDdlRequest{
 		Database:   s.config.DatabaseName,
 		Statements: stmts,
@@ -302,17 +324,17 @@ func (s *Spanner) ensureVersionTable() (err error) {
 	return nil
 }
 
-func migrationStatements(migration []byte) []string {
-	migrationString := string(migration[:])
-	migrationString = strings.TrimSpace(migrationString)
-
-	allStatements := strings.Split(migrationString, ";")
-	nonEmptyStatements := allStatements[:0]
-	for _, s := range allStatements {
-		s = strings.TrimSpace(s)
-		if s != "" {
-			nonEmptyStatements = append(nonEmptyStatements, s)
-		}
+func cleanStatements(migration []byte) ([]string, error) {
+	// The Spanner GCP backend does not yet support comments for the UpdateDatabaseDdl RPC
+	// (see https://issuetracker.google.com/issues/159730604) we use
+	// spansql to parse the DDL and output valid stamements without comments
+	ddl, err := spansql.ParseDDL("", string(migration))
+	if err != nil {
+		return nil, err
 	}
-	return nonEmptyStatements
+	stmts := make([]string, 0, len(ddl.List))
+	for _, stmt := range ddl.List {
+		stmts = append(stmts, stmt.SQL())
+	}
+	return stmts, nil
 }
