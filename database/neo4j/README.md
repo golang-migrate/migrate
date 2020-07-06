@@ -15,6 +15,6 @@ The queries **should** run in a single transaction, so partial migrations should
 | `port` | | The port to bind to. (default is 7687) |
 |  | `MigrationsLabel` | Name of the migrations node label |
 
-## Building
+## Supported versions
 
-You'll need to build [seabolt](https://github.com/neo4j-drivers/seabolt) for neo4j support since this uses [github.com/neo4j/neo4j-go-driver](https://github.com/neo4j/neo4j-go-driver)
+Only Neo4j v3.5+ is [supported](https://github.com/neo4j/neo4j-go-driver/issues/64#issuecomment-625133600)
