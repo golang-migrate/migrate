@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 
 	"github.com/golang-migrate/migrate/v4/database"
+	"github.com/golang-migrate/migrate/v4/database/multistmt"
 	"github.com/hashicorp/go-multierror"
 	"github.com/neo4j/neo4j-go-driver/neo4j"
 )
@@ -22,15 +23,19 @@ func init() {
 
 const DefaultMigrationsLabel = "SchemaMigration"
 
-var StatementSeparator = []byte(";")
+var (
+	StatementSeparator           = []byte(";")
+	DefaultMultiStatementMaxSize = 10 * 1 << 20 // 10 MB
+)
 
 var (
 	ErrNilConfig = fmt.Errorf("no config")
 )
 
 type Config struct {
-	MigrationsLabel string
-	MultiStatement  bool
+	MigrationsLabel       string
+	MultiStatement        bool
+	MultiStatementMaxSize int
 }
 
 type Neo4j struct {
@@ -87,6 +92,14 @@ func (n *Neo4j) Open(url string) (database.Driver, error) {
 		}
 	}
 
+	multiStatementMaxSize := DefaultMultiStatementMaxSize
+	if s := uri.Query().Get("x-multi-statement-max-size"); s != "" {
+		multiStatementMaxSize, err = strconv.Atoi(s)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	uri.RawQuery = ""
 
 	driver, err := neo4j.NewDriver(uri.String(), authToken, func(config *neo4j.Config) {
@@ -97,8 +110,9 @@ func (n *Neo4j) Open(url string) (database.Driver, error) {
 	}
 
 	return WithInstance(driver, &Config{
-		MigrationsLabel: DefaultMigrationsLabel,
-		MultiStatement:  multi,
+		MigrationsLabel:       DefaultMigrationsLabel,
+		MultiStatement:        multi,
+		MultiStatementMaxSize: multiStatementMaxSize,
 	})
 }
 
@@ -123,11 +137,6 @@ func (n *Neo4j) Unlock() error {
 }
 
 func (n *Neo4j) Run(migration io.Reader) (err error) {
-	body, err := ioutil.ReadAll(migration)
-	if err != nil {
-		return err
-	}
-
 	session, err := n.driver.Session(neo4j.AccessModeWrite)
 	if err != nil {
 		return err
@@ -139,30 +148,39 @@ func (n *Neo4j) Run(migration io.Reader) (err error) {
 	}()
 
 	if n.config.MultiStatement {
-		statements := bytes.Split(body, StatementSeparator)
 		_, err = session.WriteTransaction(func(transaction neo4j.Transaction) (interface{}, error) {
-			for _, stmt := range statements {
+			var stmtRunErr error
+			if err := multistmt.Parse(migration, StatementSeparator, n.config.MultiStatementMaxSize, func(stmt []byte) bool {
 				trimStmt := bytes.TrimSpace(stmt)
 				if len(trimStmt) == 0 {
-					continue
+					return true
 				}
-				result, err := transaction.Run(string(trimStmt[:]), nil)
+				trimStmt = bytes.TrimSuffix(trimStmt, StatementSeparator)
+				if len(trimStmt) == 0 {
+					return true
+				}
+
+				result, err := transaction.Run(string(trimStmt), nil)
 				if _, err := neo4j.Collect(result, err); err != nil {
-					return nil, err
+					stmtRunErr = err
+					return false
 				}
+				return true
+			}); err != nil {
+				return nil, err
 			}
-			return nil, nil
+			return nil, stmtRunErr
 		})
-		if err != nil {
-			return err
-		}
-	} else {
-		if _, err := neo4j.Collect(session.Run(string(body[:]), nil)); err != nil {
-			return err
-		}
+		return err
 	}
 
-	return nil
+	body, err := ioutil.ReadAll(migration)
+	if err != nil {
+		return err
+	}
+
+	_, err = neo4j.Collect(session.Run(string(body[:]), nil))
+	return err
 }
 
 func (n *Neo4j) SetVersion(version int, dirty bool) (err error) {
