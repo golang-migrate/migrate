@@ -12,6 +12,7 @@ import (
 
 	"github.com/gocql/gocql"
 	"github.com/golang-migrate/migrate/v4/database"
+	"github.com/golang-migrate/migrate/v4/database/multistmt"
 	"github.com/hashicorp/go-multierror"
 )
 
@@ -19,6 +20,12 @@ func init() {
 	db := new(Cassandra)
 	database.Register("cassandra", db)
 }
+
+var (
+	multiStmtDelimiter = []byte(";")
+
+	DefaultMultiStatementMaxSize = 10 * 1 << 20 // 10 MB
+)
 
 var DefaultMigrationsTable = "schema_migrations"
 
@@ -33,6 +40,7 @@ type Config struct {
 	MigrationsTable       string
 	KeyspaceName          string
 	MultiStatementEnabled bool
+	MultiStatementMaxSize int
 }
 
 type Cassandra struct {
@@ -56,6 +64,10 @@ func WithInstance(session *gocql.Session, config *Config) (database.Driver, erro
 
 	if len(config.MigrationsTable) == 0 {
 		config.MigrationsTable = DefaultMigrationsTable
+	}
+
+	if config.MultiStatementMaxSize <= 0 {
+		config.MultiStatementMaxSize = DefaultMultiStatementMaxSize
 	}
 
 	c := &Cassandra{
@@ -148,10 +160,19 @@ func (c *Cassandra) Open(url string) (database.Driver, error) {
 		return nil, err
 	}
 
+	multiStatementMaxSize := DefaultMultiStatementMaxSize
+	if s := u.Query().Get("x-multi-statement-max-size"); len(s) > 0 {
+		multiStatementMaxSize, err = strconv.Atoi(s)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return WithInstance(session, &Config{
 		KeyspaceName:          strings.TrimPrefix(u.Path, "/"),
 		MigrationsTable:       u.Query().Get("x-migrations-table"),
 		MultiStatementEnabled: u.Query().Get("x-multi-statement") == "true",
+		MultiStatementMaxSize: multiStatementMaxSize,
 	})
 }
 
@@ -174,31 +195,30 @@ func (c *Cassandra) Unlock() error {
 }
 
 func (c *Cassandra) Run(migration io.Reader) error {
+	if c.config.MultiStatementEnabled {
+		var err error
+		if e := multistmt.Parse(migration, multiStmtDelimiter, c.config.MultiStatementMaxSize, func(m []byte) bool {
+			tq := strings.TrimSpace(string(m))
+			if tq == "" {
+				return true
+			}
+			if e := c.session.Query(tq).Exec(); e != nil {
+				err = database.Error{OrigErr: e, Err: "migration failed", Query: m}
+				return false
+			}
+			return true
+		}); e != nil {
+			return e
+		}
+		return err
+	}
+
 	migr, err := ioutil.ReadAll(migration)
 	if err != nil {
 		return err
 	}
 	// run migration
-	query := string(migr[:])
-
-	if c.config.MultiStatementEnabled {
-		// split query by semi-colon
-		queries := strings.Split(query, ";")
-
-		for _, q := range queries {
-			tq := strings.TrimSpace(q)
-			if tq == "" {
-				continue
-			}
-			if err := c.session.Query(tq).Exec(); err != nil {
-				// TODO: cast to Cassandra error and get line number
-				return database.Error{OrigErr: err, Err: "migration failed", Query: migr}
-			}
-		}
-		return nil
-	}
-
-	if err := c.session.Query(query).Exec(); err != nil {
+	if err := c.session.Query(string(migr)).Exec(); err != nil {
 		// TODO: cast to Cassandra error and get line number
 		return database.Error{OrigErr: err, Err: "migration failed", Query: migr}
 	}

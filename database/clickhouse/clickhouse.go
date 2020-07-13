@@ -6,22 +6,30 @@ import (
 	"io"
 	"io/ioutil"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
+	"github.com/golang-migrate/migrate/v4/database/multistmt"
 	"github.com/hashicorp/go-multierror"
 )
 
-var DefaultMigrationsTable = "schema_migrations"
+var (
+	multiStmtDelimiter = []byte(";")
 
-var ErrNilConfig = fmt.Errorf("no config")
+	DefaultMigrationsTable       = "schema_migrations"
+	DefaultMultiStatementMaxSize = 10 * 1 << 20 // 10 MB
+
+	ErrNilConfig = fmt.Errorf("no config")
+)
 
 type Config struct {
 	DatabaseName          string
 	MigrationsTable       string
 	MultiStatementEnabled bool
+	MultiStatementMaxSize int
 }
 
 func init() {
@@ -66,12 +74,21 @@ func (ch *ClickHouse) Open(dsn string) (database.Driver, error) {
 		return nil, err
 	}
 
+	multiStatementMaxSize := DefaultMultiStatementMaxSize
+	if s := purl.Query().Get("x-multi-statement-max-size"); len(s) > 0 {
+		multiStatementMaxSize, err = strconv.Atoi(s)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	ch = &ClickHouse{
 		conn: conn,
 		config: &Config{
 			MigrationsTable:       purl.Query().Get("x-migrations-table"),
 			DatabaseName:          purl.Query().Get("database"),
 			MultiStatementEnabled: purl.Query().Get("x-multi-statement") == "true",
+			MultiStatementMaxSize: multiStatementMaxSize,
 		},
 	}
 
@@ -93,28 +110,35 @@ func (ch *ClickHouse) init() error {
 		ch.config.MigrationsTable = DefaultMigrationsTable
 	}
 
+	if ch.config.MultiStatementMaxSize <= 0 {
+		ch.config.MultiStatementMaxSize = DefaultMultiStatementMaxSize
+	}
+
 	return ch.ensureVersionTable()
 }
 
 func (ch *ClickHouse) Run(r io.Reader) error {
-	migration, err := ioutil.ReadAll(r)
-	if err != nil {
+	if ch.config.MultiStatementEnabled {
+		var err error
+		if e := multistmt.Parse(r, multiStmtDelimiter, ch.config.MultiStatementMaxSize, func(m []byte) bool {
+			tq := strings.TrimSpace(string(m))
+			if tq == "" {
+				return true
+			}
+			if _, e := ch.conn.Exec(string(m)); e != nil {
+				err = database.Error{OrigErr: e, Err: "migration failed", Query: m}
+				return false
+			}
+			return true
+		}); e != nil {
+			return e
+		}
 		return err
 	}
 
-	if ch.config.MultiStatementEnabled {
-		// split query by semi-colon
-		queries := strings.Split(string(migration), ";")
-		for _, q := range queries {
-			tq := strings.TrimSpace(q)
-			if tq == "" {
-				continue
-			}
-			if _, err := ch.conn.Exec(q); err != nil {
-				return database.Error{OrigErr: err, Err: "migration failed", Query: []byte(q)}
-			}
-		}
-		return nil
+	migration, err := ioutil.ReadAll(r)
+	if err != nil {
+		return err
 	}
 
 	if _, err := ch.conn.Exec(string(migration)); err != nil {
