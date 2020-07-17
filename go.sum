@@ -291,6 +291,8 @@ github.com/nakagami/firebirdsql v0.0.0-20190310045651-3c02a58cfed8 h1:P48LjvUQpT
 github.com/nakagami/firebirdsql v0.0.0-20190310045651-3c02a58cfed8/go.mod h1:86wM1zFnC6/uDBfZGNwB65O+pR2OFi5q/YQaEUid1qA=
 github.com/neo4j/neo4j-go-driver v1.8.0-beta02 h1:/z/q3q+T/E/oKqp3sGn7Mn1B8DL4JZevXO41hFLsDOE=
 github.com/neo4j/neo4j-go-driver v1.8.0-beta02/go.mod h1:0A49wIv0oP3uQdnbceK7Kc+snlY5B0F6dmtYArM0ltk=
+github.com/neo4j/neo4j-go-driver v1.8.0 h1:YRp9jsFcF9k/AnvbcqFCN9OMeIT2XTJgxOpp2Puq7OE=
+github.com/neo4j/neo4j-go-driver v1.8.0/go.mod h1:0A49wIv0oP3uQdnbceK7Kc+snlY5B0F6dmtYArM0ltk=
 github.com/onsi/ginkgo v1.6.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
 github.com/onsi/ginkgo v1.7.0 h1:WSHQ+IS43OoUrWtD1/bbclrwK8TTH5hzp+umCiuxHgs=
 github.com/onsi/ginkgo v1.7.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=

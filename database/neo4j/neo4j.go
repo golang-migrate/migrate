@@ -1,7 +1,6 @@
 package neo4j
 
 import (
-	"C" // import C so that we can't compile with CGO_ENABLED=0
 	"bytes"
 	"fmt"
 	"io"
