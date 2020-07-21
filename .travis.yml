@@ -98,7 +98,7 @@ deploy:
     username: golang-migrate
     token:
       secure: aICwu3gJ1sJ1QVCD3elpg+Jxzt4P+Zj1uoh5f0sOwnjDNIZ4FwUT1cMrWloP8P2KD0iyCOawuZER27o/kQ21oX2OxHvQbYPReA2znLm7lHzCmypAAOHPxpgnQ4rMGHHJXd+OsxtdclGs67c+EbdBfoRRbK400Qz/vjPJEDeH4mh02ZHC2nw4Nk/wV4jjBIkIt9dGEx6NgOA17FCMa3MaPHlHeFIzU7IfTlDHbS0mCCYbg/wafWBWcbGqtZLWAYtJDmfjrAStmDLdAX5J5PsB7taGSGPZHmPmpGoVgrKt/tb9Xz1rFBGslTpGROOiO4CiMAvkEKFn8mxrBGjfSBqp7Dp3eeSalKXB1DJAbEXx2sEbMcvmnoR9o43meaAn+ZRts8lRL8S/skBloe6Nk8bx3NlJCGB9WPK1G56b7c/fZnJxQbrCw6hxDfbZwm8S2YPviFTo/z1BfZDhRsL74reKsN2kgnGo2W/k38vvzIpsssQ9DHN1b0TLCxolCNPtQ7oHcQ1ohcjP2UgYXk0FhqDoL+9LQva/DU4N9sKH0UbAaqsMVSErLeG8A4aauuFcVrWRBaDYyTag4dQqzTulEy7iru2kDDIBgSQ1gMW/yoBOIPK4oi6MtbTf1X39fzXFLS1cDd3LW61yAu3YrbjAetpfx2frIvrRAiL9TxWA1gnrs5o=
-    dist: ubuntu/cosmic
+    dist: ubuntu/focal
     package_glob: '*.deb'
     skip_cleanup: true
     on:
