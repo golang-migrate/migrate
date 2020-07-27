@@ -1,8 +1,9 @@
 module github.com/golang-migrate/migrate/v4
 
 require (
-	cloud.google.com/go/spanner v1.6.0
-	cloud.google.com/go/storage v1.8.0
+	cloud.google.com/go v0.61.0 // indirect
+	cloud.google.com/go/spanner v1.8.0
+	cloud.google.com/go/storage v1.10.0
 	github.com/ClickHouse/clickhouse-go v1.3.12
 	github.com/Microsoft/go-winio v0.4.14 // indirect
 	github.com/aws/aws-sdk-go v1.17.7
@@ -10,7 +11,7 @@ require (
 	github.com/bmizerany/assert v0.0.0-20160611221934-b7ed37b82869 // indirect
 	github.com/cockroachdb/cockroach-go v0.0.0-20190925194419-606b3d062051
 	github.com/cznic/mathutil v0.0.0-20180504122225-ca4c9f2c1369 // indirect
-	github.com/denisenkom/go-mssqldb v0.0.0-20190515213511-eb9f6a1743f3
+	github.com/denisenkom/go-mssqldb v0.0.0-20200620013148-b91950f658ec
 	github.com/dhui/dktest v0.3.2
 	github.com/docker/distribution v2.7.1+incompatible // indirect
 	github.com/docker/docker v1.4.2-0.20200213202729-31a86c4ab209
@@ -22,6 +23,7 @@ require (
 	github.com/gocql/gocql v0.0.0-20190301043612-f6df8288f9b4
 	github.com/gogo/protobuf v1.3.1 // indirect
 	github.com/golang/snappy v0.0.1 // indirect
+	github.com/google/go-cmp v0.5.1 // indirect
 	github.com/google/go-github v17.0.0+incompatible
 	github.com/gorilla/mux v1.7.4 // indirect
 	github.com/hashicorp/go-multierror v1.1.0
@@ -40,10 +42,13 @@ require (
 	github.com/xdg/stringprep v1.0.0 // indirect
 	gitlab.com/nyarla/go-crypt v0.0.0-20160106005555-d9a5dc2b789b // indirect
 	go.mongodb.org/mongo-driver v1.1.0
-	golang.org/x/net v0.0.0-20200520182314-0ba52f642ac2
-	golang.org/x/tools v0.0.0-20200522201501-cb1345f3a375
-	google.golang.org/api v0.25.0
-	google.golang.org/genproto v0.0.0-20200526151428-9bb895338b15
+	golang.org/x/crypto v0.0.0-20200709230013-948cd5f35899 // indirect
+	golang.org/x/net v0.0.0-20200707034311-ab3426394381
+	golang.org/x/sys v0.0.0-20200724161237-0e2f3a69832c // indirect
+	golang.org/x/time v0.0.0-20200630173020-3af7569d3a1e // indirect
+	golang.org/x/tools v0.0.0-20200725200936-102e7d357031
+	google.golang.org/api v0.29.0
+	google.golang.org/genproto v0.0.0-20200726014623-da3ae01ef02d
 	modernc.org/b v1.0.0 // indirect
 	modernc.org/db v1.0.0 // indirect
 	modernc.org/file v1.0.0 // indirect
