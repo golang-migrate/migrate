@@ -6,6 +6,8 @@ TEST_FLAGS ?=
 REPO_OWNER ?= $(shell cd .. && basename "$$(pwd)")
 COVERAGE_DIR ?= .coverage
 
+build:
+	CGO_ENABLED=0 go build -ldflags='-X main.Version=$(VERSION)' -tags '$(DATABASE) $(SOURCE)' ./cmd/migrate
 
 build-cli: clean
 	-mkdir ./cli/build
@@ -100,7 +102,7 @@ define external_deps
 endef
 
 
-.PHONY: build-cli clean test-short test test-with-flags html-coverage \
+.PHONY: build build-cli clean test-short test test-with-flags html-coverage \
         restore-import-paths rewrite-import-paths list-external-deps release \
         docs kill-docs open-docs kill-orphaned-docker-containers
 
