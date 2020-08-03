@@ -1,4 +1,4 @@
-FROM golang:1.14-alpine3.11 AS builder
+FROM golang:1.14-alpine3.12 AS builder
 ARG VERSION
 
 RUN apk add --no-cache git gcc musl-dev
@@ -17,7 +17,7 @@ COPY . ./
 
 RUN go build -a -o build/migrate.linux-386 -ldflags="-s -w -X main.Version=${VERSION}" -tags "$DATABASES $SOURCES" ./cmd/migrate
 
-FROM alpine:3.11
+FROM alpine:3.12
 
 RUN apk add --no-cache ca-certificates
 
