@@ -2,12 +2,14 @@
 
 ## Usage
 
+See [Google Spanner Documentation](https://cloud.google.com/spanner/docs) for
+more details.
+
 The DSN must be given in the following format.
 
-`spanner://projects/{projectId}/instances/{instanceId}/databases/{databaseName}`
+`spanner://projects/{projectId}/instances/{instanceId}/databases/{databaseName}?param=true`
 
-See [Google Spanner Documentation](https://cloud.google.com/spanner/docs) for details.
-
+as described in [README.md#database-urls](../../README.md#database-urls)
 
 | Param | WithInstance Config | Description |
 | ----- | ------------------- | ----------- |
@@ -17,7 +19,6 @@ See [Google Spanner Documentation](https://cloud.google.com/spanner/docs) for de
 | `projectId` || The Google Cloud Platform project id
 | `instanceId` || The id of the instance running Spanner
 | `databaseName` || The name of the Spanner database
-
 
 > **Note:** Google Cloud Spanner migrations can take a considerable amount of 
 > time. The migrations provided as part of the example take about 6 minutes to 
