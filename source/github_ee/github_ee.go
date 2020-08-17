@@ -14,14 +14,14 @@ import (
 )
 
 func init() {
-	source.Register("github-ee", &GitHubEE{})
+	source.Register("github-ee", &GithubEE{})
 }
 
-type GitHubEE struct {
+type GithubEE struct {
 	source.Driver
 }
 
-func (g *GitHubEE) Open(url string) (source.Driver, error) {
+func (g *GithubEE) Open(url string) (source.Driver, error) {
 	verifyTLS := true
 
 	u, err := nurl.Parse(url)
@@ -42,7 +42,7 @@ func (g *GitHubEE) Open(url string) (source.Driver, error) {
 		return nil, gh.ErrNoUserInfo
 	}
 
-	ghc, err := g.createGitHubClient(u.Host, u.User.Username(), password, verifyTLS)
+	ghc, err := g.createGithubClient(u.Host, u.User.Username(), password, verifyTLS)
 	if err != nil {
 		return nil, err
 	}
@@ -68,10 +68,10 @@ func (g *GitHubEE) Open(url string) (source.Driver, error) {
 		return nil, err
 	}
 
-	return &GitHubEE{Driver: i}, nil
+	return &GithubEE{Driver: i}, nil
 }
 
-func (g *GitHubEE) createGitHubClient(host, username, password string, verifyTLS bool) (*github.Client, error) {
+func (g *GithubEE) createGithubClient(host, username, password string, verifyTLS bool) (*github.Client, error) {
 	tr := &github.BasicAuthTransport{
 		Username: username,
 		Password: password,

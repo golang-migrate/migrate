@@ -35,7 +35,7 @@ func Test(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	g := &GitHubEE{}
+	g := &GithubEE{}
 	_, err = g.Open("github-ee://foo:bar@" + u.Host + "/mattes/migrate_test_tmp/test?verify-tls=false#452b8003e7")
 
 	if err != nil {
