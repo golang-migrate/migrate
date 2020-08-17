@@ -8,22 +8,22 @@ import (
 	st "github.com/golang-migrate/migrate/v4/source/testing"
 )
 
-var GithubTestSecret = "" // username:token
+var GitHubTestSecret = "" // username:token
 
 func init() {
 	secrets, err := ioutil.ReadFile(".github_test_secrets")
 	if err == nil {
-		GithubTestSecret = string(bytes.TrimSpace(secrets)[:])
+		GitHubTestSecret = string(bytes.TrimSpace(secrets)[:])
 	}
 }
 
 func Test(t *testing.T) {
-	if len(GithubTestSecret) == 0 {
+	if len(GitHubTestSecret) == 0 {
 		t.Skip("test requires .github_test_secrets")
 	}
 
-	g := &Github{}
-	d, err := g.Open("github://" + GithubTestSecret + "@mattes/migrate_test_tmp/test#452b8003e7")
+	g := &GitHub{}
+	d, err := g.Open("github://" + GitHubTestSecret + "@mattes/migrate_test_tmp/test#452b8003e7")
 	if err != nil {
 		t.Fatal(err)
 	}

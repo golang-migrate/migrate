@@ -53,7 +53,7 @@
   Yes, technically thats possible. We want to encourage you to contribute your driver to this respository though.
   The driver's functionality is dictated by migrate's interfaces. That means there should really
   just be one driver for a database/ source. We want to prevent a future where several drivers doing the exact same thing,
-  just implemented a bit differently, co-exist somewhere on Github. If users have to do research first to find the
+  just implemented a bit differently, co-exist somewhere on GitHub. If users have to do research first to find the
   "best" available driver for a database in order to get started, we would have failed as an open source community.
 
 #### Can I mix multiple sources during a batch of migrations?

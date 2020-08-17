@@ -17,18 +17,18 @@ import (
 )
 
 func init() {
-	source.Register("github", &Github{})
+	source.Register("github", &GitHub{})
 }
 
 var (
 	ErrNoUserInfo          = fmt.Errorf("no username:token provided")
 	ErrNoAccessToken       = fmt.Errorf("no access token")
 	ErrInvalidRepo         = fmt.Errorf("invalid repo")
-	ErrInvalidGithubClient = fmt.Errorf("expected *github.Client")
+	ErrInvalidGitHubClient = fmt.Errorf("expected *github.Client")
 	ErrNoDir               = fmt.Errorf("no directory")
 )
 
-type Github struct {
+type GitHub struct {
 	config     *Config
 	client     *github.Client
 	options    *github.RepositoryContentGetOptions
@@ -42,7 +42,7 @@ type Config struct {
 	Ref   string
 }
 
-func (g *Github) Open(url string) (source.Driver, error) {
+func (g *GitHub) Open(url string) (source.Driver, error) {
 	u, err := nurl.Parse(url)
 	if err != nil {
 		return nil, err
@@ -62,7 +62,7 @@ func (g *Github) Open(url string) (source.Driver, error) {
 		Password: password,
 	}
 
-	gn := &Github{
+	gn := &GitHub{
 		client:     github.NewClient(tr.Client()),
 		migrations: source.NewMigrations(),
 		options:    &github.RepositoryContentGetOptions{Ref: u.Fragment},
@@ -89,7 +89,7 @@ func (g *Github) Open(url string) (source.Driver, error) {
 }
 
 func WithInstance(client *github.Client, config *Config) (source.Driver, error) {
-	gn := &Github{
+	gn := &GitHub{
 		client:     client,
 		config:     config,
 		migrations: source.NewMigrations(),
@@ -103,7 +103,7 @@ func WithInstance(client *github.Client, config *Config) (source.Driver, error) 
 	return gn, nil
 }
 
-func (g *Github) readDirectory() error {
+func (g *GitHub) readDirectory() error {
 	g.ensureFields()
 
 	fileContent, dirContents, _, err := g.client.Repositories.GetContents(
@@ -134,17 +134,17 @@ func (g *Github) readDirectory() error {
 	return nil
 }
 
-func (g *Github) ensureFields() {
+func (g *GitHub) ensureFields() {
 	if g.config == nil {
 		g.config = &Config{}
 	}
 }
 
-func (g *Github) Close() error {
+func (g *GitHub) Close() error {
 	return nil
 }
 
-func (g *Github) First() (version uint, er error) {
+func (g *GitHub) First() (version uint, er error) {
 	g.ensureFields()
 
 	if v, ok := g.migrations.First(); !ok {
@@ -154,7 +154,7 @@ func (g *Github) First() (version uint, er error) {
 	}
 }
 
-func (g *Github) Prev(version uint) (prevVersion uint, err error) {
+func (g *GitHub) Prev(version uint) (prevVersion uint, err error) {
 	g.ensureFields()
 
 	if v, ok := g.migrations.Prev(version); !ok {
@@ -164,7 +164,7 @@ func (g *Github) Prev(version uint) (prevVersion uint, err error) {
 	}
 }
 
-func (g *Github) Next(version uint) (nextVersion uint, err error) {
+func (g *GitHub) Next(version uint) (nextVersion uint, err error) {
 	g.ensureFields()
 
 	if v, ok := g.migrations.Next(version); !ok {
@@ -174,7 +174,7 @@ func (g *Github) Next(version uint) (nextVersion uint, err error) {
 	}
 }
 
-func (g *Github) ReadUp(version uint) (r io.ReadCloser, identifier string, err error) {
+func (g *GitHub) ReadUp(version uint) (r io.ReadCloser, identifier string, err error) {
 	g.ensureFields()
 
 	if m, ok := g.migrations.Up(version); ok {
@@ -200,7 +200,7 @@ func (g *Github) ReadUp(version uint) (r io.ReadCloser, identifier string, err e
 	return nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: g.config.Path, Err: os.ErrNotExist}
 }
 
-func (g *Github) ReadDown(version uint) (r io.ReadCloser, identifier string, err error) {
+func (g *GitHub) ReadDown(version uint) (r io.ReadCloser, identifier string, err error) {
 	g.ensureFields()
 
 	if m, ok := g.migrations.Down(version); ok {
