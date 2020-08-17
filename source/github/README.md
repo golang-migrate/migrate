@@ -7,7 +7,7 @@ This driver is catered for those that want to source migrations from [github.com
 | URL Query  | WithInstance Config | Description |
 |------------|---------------------|-------------|
 | user | | The username of the user connecting |
-| personal-access-token | | An access token from Github (https://github.com/settings/tokens) |
+| personal-access-token | | An access token from GitHub (https://github.com/settings/tokens) |
 | owner | | the repo owner |
 | repo | | the name of the repository |
 | path | | path in repo to migrations |
