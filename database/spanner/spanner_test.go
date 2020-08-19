@@ -140,6 +140,12 @@ func TestCleanStatements(t *testing.T) {
   id STRING(255) NOT NULL,
 ) PRIMARY KEY(id)`, "CREATE INDEX table_name_id_idx ON table_name(id)"},
 		},
+		{
+			name: "alter table with SET OPTIONS",
+			multiStatement: `ALTER TABLE users ALTER COLUMN created
+			SET OPTIONS (allow_commit_timestamp=true);`,
+			expected: []string{"ALTER TABLE users ALTER COLUMN created SET OPTIONS (allow_commit_timestamp = true)"},
+		},
 	}
 
 	for _, tc := range testCases {
