@@ -22,6 +22,7 @@ func init() {
 }
 
 var DefaultMigrationsTable = "schema_migrations"
+var multiStmtDelimiter = ";"
 
 var (
 	ErrNilConfig          = fmt.Errorf("no config")
@@ -32,8 +33,9 @@ var (
 )
 
 type Config struct {
-	MigrationsTable string
-	DatabaseName    string
+	MigrationsTable       string
+	DatabaseName          string
+	MultiStatementEnabled bool
 }
 
 type Snowflake struct {
@@ -177,27 +179,39 @@ func (p *Snowflake) Run(migration io.Reader) error {
 	}
 
 	// run migration
-	query := string(migr[:])
-	if _, err := p.conn.ExecContext(context.Background(), query); err != nil {
-		if pgErr, ok := err.(*pq.Error); ok {
-			var line uint
-			var col uint
-			var lineColOK bool
-			if pgErr.Position != "" {
-				if pos, err := strconv.ParseUint(pgErr.Position, 10, 64); err == nil {
-					line, col, lineColOK = computeLineFromPos(query, int(pos))
-				}
-			}
-			message := fmt.Sprintf("migration failed: %s", pgErr.Message)
-			if lineColOK {
-				message = fmt.Sprintf("%s (column %d)", message, col)
-			}
-			if pgErr.Detail != "" {
-				message = fmt.Sprintf("%s, %s", message, pgErr.Detail)
-			}
-			return database.Error{OrigErr: err, Err: message, Query: migr, Line: line}
+	dataIn := string(migr[:])
+	var queries []string
+	if p.config.MultiStatementEnabled {
+		queries = strings.Split(dataIn, multiStmtDelimiter)
+	} else {
+		queries = append(queries, dataIn)
+	}
+
+	for _, query := range queries {
+		if len(strings.TrimSpace(query)) < 1 {
+			continue
 		}
-		return database.Error{OrigErr: err, Err: "migration failed", Query: migr}
+		if _, err := p.conn.ExecContext(context.Background(), query); err != nil {
+			if pgErr, ok := err.(*pq.Error); ok {
+				var line uint
+				var col uint
+				var lineColOK bool
+				if pgErr.Position != "" {
+					if pos, err := strconv.ParseUint(pgErr.Position, 10, 64); err == nil {
+						line, col, lineColOK = computeLineFromPos(query, int(pos))
+					}
+				}
+				message := fmt.Sprintf("migration failed: %s", pgErr.Message)
+				if lineColOK {
+					message = fmt.Sprintf("%s (column %d)", message, col)
+				}
+				if pgErr.Detail != "" {
+					message = fmt.Sprintf("%s, %s", message, pgErr.Detail)
+				}
+				return database.Error{OrigErr: err, Err: message, Query: []byte(query), Line: line}
+			}
+			return database.Error{OrigErr: err, Err: "migration failed", Query: []byte(query)}
+		}
 	}
 
 	return nil
