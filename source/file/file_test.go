@@ -1,6 +1,7 @@
 package file
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -235,7 +236,7 @@ func BenchmarkNext(b *testing.B) {
 	b.ResetTimer()
 	v, err := d.First()
 	for n := 0; n < b.N; n++ {
-		for !os.IsNotExist(err) {
+		for !errors.Is(err, os.ErrNotExist) {
 			v, err = d.Next(v)
 		}
 	}

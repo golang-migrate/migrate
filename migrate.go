@@ -806,8 +806,9 @@ func (m *Migrate) versionExists(version uint) (result error) {
 		return err
 	}
 
-	m.logErr(fmt.Errorf("no migration found for version %d", version))
-	return os.ErrNotExist
+	err = fmt.Errorf("no migration found for version %d: %w", version, err)
+	m.logErr(err)
+	return err
 }
 
 // stop returns true if no more migrations should be run against the database
