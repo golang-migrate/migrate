@@ -3,6 +3,7 @@ package migrate
 import (
 	"bytes"
 	"database/sql"
+	"errors"
 	"io/ioutil"
 	"log"
 	"os"
@@ -468,7 +469,7 @@ func TestMigrate(t *testing.T) {
 
 	for i, v := range tt {
 		err := m.Migrate(v.version)
-		if (v.expectErr == os.ErrNotExist && !os.IsNotExist(err)) ||
+		if (v.expectErr == os.ErrNotExist && !errors.Is(err, os.ErrNotExist)) ||
 			(v.expectErr != os.ErrNotExist && err != v.expectErr) {
 			t.Errorf("expected err %v, got %v, in %v", v.expectErr, err, i)
 
@@ -731,7 +732,7 @@ func TestSteps(t *testing.T) {
 
 	for i, v := range tt {
 		err := m.Steps(v.steps)
-		if (v.expectErr == os.ErrNotExist && !os.IsNotExist(err)) ||
+		if (v.expectErr == os.ErrNotExist && !errors.Is(err, os.ErrNotExist)) ||
 			(v.expectErr != os.ErrNotExist && err != v.expectErr) {
 			t.Errorf("expected err %v, got %v, in %v", v.expectErr, err, i)
 
@@ -1143,7 +1144,7 @@ func TestRead(t *testing.T) {
 		go m.read(v.from, v.to, ret)
 		migrations, err := migrationsFromChannel(ret)
 
-		if (v.expectErr == os.ErrNotExist && !os.IsNotExist(err)) ||
+		if (v.expectErr == os.ErrNotExist && !errors.Is(err, os.ErrNotExist)) ||
 			(v.expectErr != os.ErrNotExist && v.expectErr != err) {
 			t.Errorf("expected %v, got %v, in %v", v.expectErr, err, i)
 			t.Logf("%v, in %v", migrations, i)
@@ -1220,7 +1221,7 @@ func TestReadUp(t *testing.T) {
 		go m.readUp(v.from, v.limit, ret)
 		migrations, err := migrationsFromChannel(ret)
 
-		if (v.expectErr == os.ErrNotExist && !os.IsNotExist(err)) ||
+		if (v.expectErr == os.ErrNotExist && !errors.Is(err, os.ErrNotExist)) ||
 			(v.expectErr != os.ErrNotExist && v.expectErr != err) {
 			t.Errorf("expected %v, got %v, in %v", v.expectErr, err, i)
 			t.Logf("%v, in %v", migrations, i)
@@ -1297,7 +1298,7 @@ func TestReadDown(t *testing.T) {
 		go m.readDown(v.from, v.limit, ret)
 		migrations, err := migrationsFromChannel(ret)
 
-		if (v.expectErr == os.ErrNotExist && !os.IsNotExist(err)) ||
+		if (v.expectErr == os.ErrNotExist && !errors.Is(err, os.ErrNotExist)) ||
 			(v.expectErr != os.ErrNotExist && v.expectErr != err) {
 			t.Errorf("expected %v, got %v, in %v", v.expectErr, err, i)
 			t.Logf("%v, in %v", migrations, i)
