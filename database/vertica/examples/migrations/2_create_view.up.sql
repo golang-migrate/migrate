@@ -1,0 +1,1 @@
+CREATE VIEW v_test AS SELECT * from test;
