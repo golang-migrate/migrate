@@ -23,14 +23,12 @@ var DefaultMigrationsTable = "schema_migrations"
 var (
 	ErrDatabaseDirty    = fmt.Errorf("database is dirty")
 	ErrNilConfig        = fmt.Errorf("no config")
-	ErrNoDatabaseName   = fmt.Errorf("no database name")
 	ErrAppendPEM        = fmt.Errorf("failed to append PEM")
 	ErrTLSCertKeyConfig = fmt.Errorf("To use TLS client authentication, both x-tls-cert and x-tls-key must not be empty")
 )
 
 type Config struct {
 	MigrationsTable string
-	DatabaseName    string
 	Schema          string
 }
 
@@ -82,12 +80,12 @@ func (v *Vertica) Close() error {
 }
 
 func (v *Vertica) dropTables() error {
-	// select all tables
-	whereStmt := ""
+	
+	query := `SELECT DISTINCT table_name FROM tables`
+	
 	if len(v.config.Schema) > 0 {
-		whereStmt = ` WHERE table_schema='` + v.config.Schema + `'`
+		query = fmt.Sprintf("DROP SCHEMA %s CASCADE",  v.config.Schema)
 	}
-	query := `SELECT DISTINCT table_name FROM tables` + whereStmt
 	tables, err := v.conn.QueryContext(context.Background(), query)
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}

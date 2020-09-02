@@ -61,34 +61,6 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 	return true
 }
 
-func TestParseDbName(t *testing.T) {
-
-	cases := []struct {
-		input string
-		exp   string
-	}{
-		{
-			"vertica://dbadmin:password@localhost:5433/mydb?x-migrations-table=lolo",
-			"mydb",
-		},
-		{
-			"vertica://dbadmin:password@localhost:5433/docker",
-			"docker",
-		},
-		{
-			"",
-			"",
-		},
-	}
-	for _, c := range cases {
-		n := parseDbName(c.input)
-		if n != c.exp {
-			t.Logf(`parseDbName should return %v and returned %v`, c.exp, n)
-		}
-	}
-
-}
-
 func Test(t *testing.T) {
 
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
@@ -142,10 +114,6 @@ func TestOpen(t *testing.T) {
 				addr + "?x-migrations-table=lolo",
 				false,
 			},
-			{
-				"unknown://bla",
-				true,
-			},
 		}
 
 		for _, c := range cases {
@@ -159,8 +127,8 @@ func TestOpen(t *testing.T) {
 					} else {
 						if vd, ok := d.(*Vertica); !ok {
 							t.Fatalf("expected *Vertica got %T", d)
-						} else if vd.config.MigrationsTable != "lolo" || vd.config.DatabaseName != "docker" {
-							t.Fatalf("expected %q got %q or expected db name be docker got %q", "lolo", vd.config.MigrationsTable, vd.config.DatabaseName)
+						} else if vd.config.MigrationsTable != "lolo"  {
+							t.Fatalf("expected %q got %q", "lolo", vd.config.MigrationsTable)
 						}
 					}
 				} else if !c.err {
