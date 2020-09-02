@@ -42,6 +42,11 @@ type Vertica struct {
 
 func (v *Vertica) Open(url string) (database.Driver, error) {
 	purl, err := nurl.Parse(url)
+
+	if err != nil {
+		return nil, err
+	}
+
 	db, err := sql.Open("vertica", migrate.FilterCustomQuery(purl).String())
 	if err != nil {
 		return nil, err
@@ -67,10 +72,12 @@ func (v *Vertica) Open(url string) (database.Driver, error) {
 }
 
 func (v *Vertica) Close() error {
-	connErr := v.conn.Close()
-	dbErr := v.db.Close()
-	if connErr != nil || dbErr != nil {
-		return fmt.Errorf("conn: %v, db: %v", connErr, dbErr)
+	if e := v.conn.Close(); e != nil {
+		return fmt.Errorf("error closing vertica connection: %w", e)
+	}
+
+	if e := v.db.Close(); e != nil {
+		return fmt.Errorf("error closing vertica db: %w", e)
 	}
 	return nil
 }
