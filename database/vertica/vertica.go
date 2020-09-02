@@ -79,13 +79,16 @@ func (v *Vertica) Close() error {
 	return nil
 }
 
+
+func (v *Vertica) dropSchema() error {
+	query := fmt.Sprintf("DROP SCHEMA %s CASCADE",  v.config.Schema)
+	_, e := v.conn.QueryContext(context.Background(), query)
+	return e
+}
+
+
 func (v *Vertica) dropTables() error {
-	
-	query := `SELECT DISTINCT table_name FROM tables`
-	
-	if len(v.config.Schema) > 0 {
-		query = fmt.Sprintf("DROP SCHEMA %s CASCADE",  v.config.Schema)
-	}
+	query := `SELECT TABLE_NAME FROM v_catalog.tables`
 	tables, err := v.conn.QueryContext(context.Background(), query)
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
@@ -123,12 +126,7 @@ func (v *Vertica) dropTables() error {
 }
 
 func (v *Vertica) dropViews() error {
-	// select all tables
-	whereStmt := ""
-	if len(v.config.Schema) > 0 {
-		whereStmt = ` WHERE table_schema='` + v.config.Schema + `'`
-	}
-	query := `SELECT DISTINCT table_name FROM views` + whereStmt
+	query := `SELECT TABLE_NAME FROM v_catalog.views`
 	tables, err := v.conn.QueryContext(context.Background(), query)
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
@@ -166,6 +164,11 @@ func (v *Vertica) dropViews() error {
 }
 
 func (v *Vertica) Drop() error {
+	
+	if v.config.Schema != "" {
+		return v.dropSchema()
+	}
+	
 	err := v.dropTables()
 	if err != nil {
 		return err
@@ -180,6 +183,9 @@ func (v *Vertica) Lock() error {
 func (v *Vertica) Unlock() error {
 	return nil
 }
+
+
+
 
 func (v *Vertica) Run(migration io.Reader) error {
 	migr, err := ioutil.ReadAll(migration)
