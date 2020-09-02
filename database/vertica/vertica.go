@@ -60,7 +60,6 @@ func (v *Vertica) Open(url string) (database.Driver, error) {
 
 	vx, err := WithInstance(db, &Config{
 		Schema:          schema,
-		DatabaseName:    parseDbName(url),
 		MigrationsTable: migrationsTable,
 	})
 
@@ -251,14 +250,6 @@ func (v *Vertica) Version() (version int, dirty bool, err error) {
 	}
 }
 
-func parseDbName(url string) string {
-	purl, err := nurl.Parse(url)
-	if err != nil || len(purl.Path) == 0 {
-		return ""
-	}
-	return purl.Path[1:]
-
-}
 
 func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	if config == nil {
