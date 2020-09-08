@@ -175,6 +175,46 @@ func TestLockWorks(t *testing.T) {
 	})
 }
 
+func TestNoLockWorks(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.Port(defaultPort)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := fmt.Sprintf("mysql://root:root@tcp(%v:%v)/public", ip, port)
+		p := &Mysql{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		lock := d.(*Mysql)
+
+		p = &Mysql{}
+		d, err = p.Open(addr + "?x-no-lock=true")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		noLock := d.(*Mysql)
+
+		// Should be possible to take real lock and no-lock at the same time
+		if err = lock.Lock(); err != nil {
+			t.Fatal(err)
+		}
+		if err = noLock.Lock(); err != nil {
+			t.Fatal(err)
+		}
+		if err = lock.Unlock(); err != nil {
+			t.Fatal(err)
+		}
+		if err = noLock.Unlock(); err != nil {
+			t.Fatal(err)
+		}
+	})
+}
+
 func TestExtractCustomQueryParams(t *testing.T) {
 	testcases := []struct {
 		name                 string
