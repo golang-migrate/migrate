@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/golang-migrate/migrate/v4/database"
+	"github.com/golang-migrate/migrate/v4/database/multistmt"
 	"github.com/hashicorp/go-multierror"
 	"github.com/lib/pq"
 	sf "github.com/snowflakedb/gosnowflake"
@@ -22,7 +23,8 @@ func init() {
 }
 
 var DefaultMigrationsTable = "schema_migrations"
-var multiStmtDelimiter = ";"
+var multiStmtDelimiter = []byte(";")
+var DefaultMultiStatementMaxSize = 10 * 1 << 20 // 10 MB
 
 var (
 	ErrNilConfig          = fmt.Errorf("no config")
@@ -36,6 +38,7 @@ type Config struct {
 	MigrationsTable       string
 	DatabaseName          string
 	MultiStatementEnabled bool
+	MultiStatementMaxSize int
 }
 
 type Snowflake struct {
@@ -72,6 +75,10 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 
 	if len(config.MigrationsTable) == 0 {
 		config.MigrationsTable = DefaultMigrationsTable
+	}
+
+	if config.MultiStatementMaxSize <= 0 {
+		config.MultiStatementMaxSize = DefaultMultiStatementMaxSize
 	}
 
 	conn, err := instance.Conn(context.Background())
@@ -173,45 +180,72 @@ func (p *Snowflake) Unlock() error {
 }
 
 func (p *Snowflake) Run(migration io.Reader) error {
+
+	// run migration
+	if p.config.MultiStatementEnabled {
+		var err error
+		if e := multistmt.Parse(migration, multiStmtDelimiter, p.config.MultiStatementMaxSize, func(m []byte) bool {
+			tq := strings.TrimSpace(string(m))
+			if tq == "" {
+				return true
+			}
+			if _, err = p.conn.ExecContext(context.Background(), tq); err != nil {
+				if pgErr, ok := err.(*pq.Error); ok {
+					var line uint
+					var col uint
+					var lineColOK bool
+					if pgErr.Position != "" {
+						if pos, err := strconv.ParseUint(pgErr.Position, 10, 64); err == nil {
+							line, col, lineColOK = computeLineFromPos(tq, int(pos))
+						}
+					}
+					message := fmt.Sprintf("migration failed: %s", pgErr.Message)
+					if lineColOK {
+						message = fmt.Sprintf("%s (column %d)", message, col)
+					}
+					if pgErr.Detail != "" {
+						message = fmt.Sprintf("%s, %s", message, pgErr.Detail)
+					}
+					err = database.Error{OrigErr: err, Err: message, Query: []byte(tq), Line: line}
+				}
+				err = database.Error{OrigErr: err, Err: "migration failed", Query: []byte(tq)}
+				return false
+			}
+			return true
+		}); e != nil {
+			return e
+		}
+		return err
+	}
+
 	migr, err := ioutil.ReadAll(migration)
 	if err != nil {
 		return err
 	}
 
 	// run migration
-	dataIn := string(migr[:])
-	var queries []string
-	if p.config.MultiStatementEnabled {
-		queries = strings.Split(dataIn, multiStmtDelimiter)
-	} else {
-		queries = append(queries, dataIn)
-	}
+	query := string(migr[:])
 
-	for _, query := range queries {
-		if len(strings.TrimSpace(query)) < 1 {
-			continue
-		}
-		if _, err := p.conn.ExecContext(context.Background(), query); err != nil {
-			if pgErr, ok := err.(*pq.Error); ok {
-				var line uint
-				var col uint
-				var lineColOK bool
-				if pgErr.Position != "" {
-					if pos, err := strconv.ParseUint(pgErr.Position, 10, 64); err == nil {
-						line, col, lineColOK = computeLineFromPos(query, int(pos))
-					}
+	if _, err := p.conn.ExecContext(context.Background(), query); err != nil {
+		if pgErr, ok := err.(*pq.Error); ok {
+			var line uint
+			var col uint
+			var lineColOK bool
+			if pgErr.Position != "" {
+				if pos, err := strconv.ParseUint(pgErr.Position, 10, 64); err == nil {
+					line, col, lineColOK = computeLineFromPos(query, int(pos))
 				}
-				message := fmt.Sprintf("migration failed: %s", pgErr.Message)
-				if lineColOK {
-					message = fmt.Sprintf("%s (column %d)", message, col)
-				}
-				if pgErr.Detail != "" {
-					message = fmt.Sprintf("%s, %s", message, pgErr.Detail)
-				}
-				return database.Error{OrigErr: err, Err: message, Query: []byte(query), Line: line}
 			}
-			return database.Error{OrigErr: err, Err: "migration failed", Query: []byte(query)}
+			message := fmt.Sprintf("migration failed: %s", pgErr.Message)
+			if lineColOK {
+				message = fmt.Sprintf("%s (column %d)", message, col)
+			}
+			if pgErr.Detail != "" {
+				message = fmt.Sprintf("%s, %s", message, pgErr.Detail)
+			}
+			return database.Error{OrigErr: err, Err: message, Query: migr, Line: line}
 		}
+		return database.Error{OrigErr: err, Err: "migration failed", Query: migr}
 	}
 
 	return nil
