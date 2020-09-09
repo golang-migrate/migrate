@@ -4,8 +4,10 @@ import (
 	"context"
 	"database/sql"
 	sqldriver "database/sql/driver"
+	"errors"
 	"fmt"
 	"log"
+	"strconv"
 	"testing"
 )
 
@@ -173,6 +175,17 @@ func TestLockWorks(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
+}
+
+func TestNoLockParamValidation(t *testing.T) {
+	ip := "127.0.0.1"
+	port := 3306
+	addr := fmt.Sprintf("mysql://root:root@tcp(%v:%v)/public", ip, port)
+	p := &Mysql{}
+	_, err := p.Open(addr + "?x-no-lock=not-a-bool")
+	if !errors.Is(err, strconv.ErrSyntax) {
+		t.Fatal("Expected syntax error when passing a non-bool as x-no-lock parameter")
+	}
 }
 
 func TestNoLockWorks(t *testing.T) {

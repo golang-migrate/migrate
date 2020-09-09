@@ -200,6 +200,14 @@ func (m *Mysql) Open(url string) (database.Driver, error) {
 		return nil, err
 	}
 
+	noLockParam, noLock := customParams["x-no-lock"], false
+	if noLockParam != "" {
+		noLock, err = strconv.ParseBool(noLockParam)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse x-no-lock as bool: %w", err)
+		}
+	}
+
 	db, err := sql.Open("mysql", config.FormatDSN())
 	if err != nil {
 		return nil, err
@@ -208,7 +216,7 @@ func (m *Mysql) Open(url string) (database.Driver, error) {
 	mx, err := WithInstance(db, &Config{
 		DatabaseName:    config.DBName,
 		MigrationsTable: customParams["x-migrations-table"],
-		NoLock:          customParams["x-no-lock"] == "true",
+		NoLock:          noLock,
 	})
 	if err != nil {
 		return nil, err
