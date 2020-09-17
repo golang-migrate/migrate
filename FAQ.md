@@ -16,7 +16,7 @@
   NilMigration defines a migration without a body. NilVersion is defined as const -1.
 
 #### What is the difference between uint(version) and int(targetVersion)?
-  version refers to an existing migration version coming from a source and therefor can never be negative.
+  version refers to an existing migration version coming from a source and therefore can never be negative.
   targetVersion can either be a version OR represent a NilVersion, which equals -1.
 
 #### What's the difference between Next/Previous and Up/Down?
