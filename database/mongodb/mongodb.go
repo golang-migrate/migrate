@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/golang-migrate/migrate/v4/database"
 	"go.mongodb.org/mongo-driver/bson"
@@ -80,7 +81,12 @@ func (m *Mongo) Open(dsn string) (database.Driver, error) {
 	migrationsCollection := unknown.Get("x-migrations-collection")
 	transactionMode, _ := strconv.ParseBool(unknown.Get("x-transaction-mode"))
 
-	client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(dsn))
+	credential := options.Credential{
+		Username: uri.Username,
+		Password: uri.Password,
+	}
+	clientOpts := options.Client().ApplyURI("mongodb://" + strings.Join(uri.Hosts, ",")).SetAuth(credential)
+	client, err := mongo.Connect(context.TODO(), clientOpts)
 	if err != nil {
 		return nil, err
 	}
