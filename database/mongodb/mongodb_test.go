@@ -222,7 +222,7 @@ func TestLockWorks(t *testing.T) {
 		}
 
 		// disable locking, validate wer can lock twice
-		mc.config.Locking.UseAdvisoryLocking = false
+		mc.config.Locking.Enabled = false
 		err = mc.Lock()
 		if err != nil {
 			t.Fatal(err)
@@ -234,7 +234,7 @@ func TestLockWorks(t *testing.T) {
 
 		// re-enable locking,
 		//try to hit a lock conflict
-		mc.config.Locking.UseAdvisoryLocking = true
+		mc.config.Locking.Enabled = true
 		mc.config.Locking.Timeout = 1
 		err = mc.Lock()
 		if err != nil {

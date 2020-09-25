@@ -46,10 +46,10 @@ type Mongo struct {
 }
 
 type Locking struct {
-	CollectionName     string
-	Timeout            int
-	UseAdvisoryLocking bool
-	Interval           int
+	CollectionName string
+	Timeout        int
+	Enabled        bool
+	Interval       int
 }
 type Config struct {
 	DatabaseName         string
@@ -98,7 +98,7 @@ func WithInstance(instance *mongo.Client, config *Config) (database.Driver, erro
 		config: config,
 	}
 
-	if mc.config.Locking.UseAdvisoryLocking {
+	if mc.config.Locking.Enabled {
 		if err := mc.ensureLockTable(); err != nil {
 			return nil, err
 		}
@@ -123,14 +123,22 @@ func (m *Mongo) Open(dsn string) (database.Driver, error) {
 
 	migrationsCollection := unknown.Get("x-migrations-collection")
 	lockCollection := unknown.Get("x-advisory-lock-collection")
-	transactionMode, _ := strconv.ParseBool(unknown.Get("x-transaction-mode"))
-	advisoryLockingFlag, err := strconv.ParseBool(unknown.Get("x-advisory-locking"))
+	transactionMode, err := parseBoolean(unknown.Get("x-transaction-mode"), false)
 	if err != nil {
-		advisoryLockingFlag = DefaultAdvisoryLockingFlag
+		return nil, err
 	}
-	lockingTimout, _ := strconv.Atoi(unknown.Get("x-advisory-lock-timeout"))
-	maxLockingIntervals, _ := strconv.Atoi(unknown.Get("x-advisory-lock-timout-interval"))
-
+	advisoryLockingFlag, err := parseBoolean(unknown.Get("x-advisory-locking"), DefaultAdvisoryLockingFlag)
+	if err != nil {
+		return nil, err
+	}
+	lockingTimout, err := parseInt(unknown.Get("x-advisory-lock-timeout"), DefaultLockTimeout)
+	if err != nil {
+		return nil, err
+	}
+	maxLockingIntervals, err := parseInt(unknown.Get("x-advisory-lock-timout-interval"), DefaultLockTimeoutInterval)
+	if err != nil {
+		return nil, err
+	}
 	client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(dsn))
 	if err != nil {
 		return nil, err
@@ -144,10 +152,10 @@ func (m *Mongo) Open(dsn string) (database.Driver, error) {
 		MigrationsCollection: migrationsCollection,
 		TransactionMode:      transactionMode,
 		Locking: Locking{
-			CollectionName:     lockCollection,
-			Timeout:            lockingTimout,
-			UseAdvisoryLocking: advisoryLockingFlag,
-			Interval:           maxLockingIntervals,
+			CollectionName: lockCollection,
+			Timeout:        lockingTimout,
+			Enabled:        advisoryLockingFlag,
+			Interval:       maxLockingIntervals,
 		},
 	})
 	if err != nil {
@@ -156,6 +164,39 @@ func (m *Mongo) Open(dsn string) (database.Driver, error) {
 	return mc, nil
 }
 
+//Parse the url param, convert it to boolean
+// returns error if param invalid. returns defaultValue if param not present
+func parseBoolean(urlParam string, defaultValue bool) (bool, error) {
+
+	// if parameter passed, parse it (otherwise return default value)
+	if urlParam != "" {
+		result, err := strconv.ParseBool(urlParam)
+		if err != nil {
+			return false, err
+		}
+		return result, nil
+	}
+
+	// if no url Param passed, return default value
+	return defaultValue, nil
+}
+
+//Parse the url param, convert it to int
+// returns error if param invalid. returns defaultValue if param not present
+func parseInt(urlParam string, defaultValue int) (int, error) {
+
+	// if parameter passed, parse it (otherwise return default value)
+	if urlParam != "" {
+		result, err := strconv.Atoi(urlParam)
+		if err != nil {
+			return -1, err
+		}
+		return result, nil
+	}
+
+	// if no url Param passed, return default value
+	return defaultValue, nil
+}
 func (m *Mongo) SetVersion(version int, dirty bool) error {
 	migrationsCollection := m.db.Collection(m.config.MigrationsCollection)
 	if err := migrationsCollection.Drop(context.TODO()); err != nil {
@@ -286,7 +327,7 @@ func (m *Mongo) ensureVersionTable() (err error) {
 // Utilizes advisory locking on the config.LockingCollection collection
 // This uses a unique index on the `locking_key` field.
 func (m *Mongo) Lock() error {
-	if !m.config.Locking.UseAdvisoryLocking {
+	if !m.config.Locking.Enabled {
 		return nil
 	}
 	pid := os.Getpid()
@@ -321,7 +362,7 @@ func (m *Mongo) Lock() error {
 
 }
 func (m *Mongo) Unlock() error {
-	if !m.config.Locking.UseAdvisoryLocking {
+	if !m.config.Locking.Enabled {
 		return nil
 	}
 
