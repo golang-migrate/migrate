@@ -56,26 +56,21 @@ func (b *Bitbucket) Open(url string) (source.Driver, error) {
 
 	cl := bitbucket.NewBasicAuth(u.User.Username(), password)
 
-	bi := &Bitbucket{
-		client:     cl,
-		migrations: source.NewMigrations(),
-	}
-
-	bi.ensureFields()
-
+	cfg := &Config{}
 	// set owner, repo and path in repo
-	bi.config.Owner = u.Host
+	cfg.Owner = u.Host
 	pe := strings.Split(strings.Trim(u.Path, "/"), "/")
 	if len(pe) < 1 {
 		return nil, ErrInvalidRepo
 	}
-	bi.config.Repo = pe[0]
+	cfg.Repo = pe[0]
 	if len(pe) > 1 {
-		bi.config.Path = strings.Join(pe[1:], "/")
+		cfg.Path = strings.Join(pe[1:], "/")
 	}
-	bi.config.Ref = u.Fragment
+	cfg.Ref = u.Fragment
 
-	if err := bi.readDirectory(); err != nil {
+	bi, err := WithInstance(cl, cfg)
+	if err != nil {
 		return nil, err
 	}
 
