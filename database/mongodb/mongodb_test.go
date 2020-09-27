@@ -92,7 +92,7 @@ func Test(t *testing.T) {
 			}
 		}()
 		dt.TestNilVersion(t, d)
-		//TestLockAndUnlock(t, d) driver doesn't support lock on database level
+		dt.TestLockAndUnlock(t, d)
 		dt.TestRun(t, d, bytes.NewReader([]byte(`[{"insert":"hello","documents":[{"wild":"world"}]}]`)))
 		dt.TestSetVersion(t, d)
 		dt.TestDrop(t, d)
@@ -176,6 +176,73 @@ func TestWithAuth(t *testing.T) {
 					t.Fatalf("unexpected error: %v", err)
 				}
 			})
+		}
+	})
+}
+
+func TestLockWorks(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := mongoConnectionString(ip, port)
+		p := &Mongo{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
+
+		dt.TestRun(t, d, bytes.NewReader([]byte(`[{"insert":"hello","documents":[{"wild":"world"}]}]`)))
+
+		mc := d.(*Mongo)
+
+		err = mc.Lock()
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = mc.Unlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = mc.Lock()
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = mc.Unlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// disable locking, validate wer can lock twice
+		mc.config.Locking.Enabled = false
+		err = mc.Lock()
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = mc.Lock()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// re-enable locking,
+		//try to hit a lock conflict
+		mc.config.Locking.Enabled = true
+		mc.config.Locking.Timeout = 1
+		err = mc.Lock()
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = mc.Lock()
+		if err == nil {
+			t.Fatal("should have failed, mongo should be locked already")
 		}
 	})
 }
