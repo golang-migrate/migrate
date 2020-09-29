@@ -69,6 +69,7 @@ Source drivers read migrations from local or remote sources. [Add a new source?]
 * [Go-Bindata](source/go_bindata) - read from embedded binary data ([jteeuwen/go-bindata](https://github.com/jteeuwen/go-bindata))
 * [GitHub](source/github) - read from remote GitHub repositories
 * [GitHub Enterprise](source/github_ee) - read from remote GitHub Enterprise repositories
+* [Bitbucket](source/bitbucket) - read from remote Bitbucket repositories
 * [Gitlab](source/gitlab) - read from remote Gitlab repositories
 * [AWS S3](source/aws_s3) - read from Amazon Web Services S3
 * [Google Cloud Storage](source/google_cloud_storage) - read from Google Cloud Platform Storage
