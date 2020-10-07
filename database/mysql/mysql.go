@@ -118,6 +118,68 @@ func extractCustomQueryParams(c *mysql.Config) (map[string]string, error) {
 }
 
 func urlToMySQLConfig(url string) (*mysql.Config, error) {
+	// Need to parse out custom TLS parameters and call
+	// mysql.RegisterTLSConfig() before mysql.ParseDSN() is called
+	// which consumes the registered tls.Config
+	// Fixes: https://github.com/golang-migrate/migrate/issues/411
+	//
+	// Can't use url.Parse() since it fails to parse MySQL DSNs
+	// mysql.ParseDSN() also searches for "?" to find query parameters:
+	// https://github.com/go-sql-driver/mysql/blob/46351a8/dsn.go#L344
+	if idx := strings.LastIndex(url, "?"); idx > 0 {
+		rawParams := url[idx+1:]
+		parsedParams, err := nurl.ParseQuery(rawParams)
+		if err != nil {
+			return nil, err
+		}
+
+		ctls := parsedParams.Get("tls")
+		if len(ctls) > 0 {
+			if _, isBool := readBool(ctls); !isBool && strings.ToLower(ctls) != "skip-verify" {
+				rootCertPool := x509.NewCertPool()
+				pem, err := ioutil.ReadFile(parsedParams.Get("x-tls-ca"))
+				if err != nil {
+					return nil, err
+				}
+
+				if ok := rootCertPool.AppendCertsFromPEM(pem); !ok {
+					return nil, ErrAppendPEM
+				}
+
+				clientCert := make([]tls.Certificate, 0, 1)
+				if ccert, ckey := parsedParams.Get("x-tls-cert"), parsedParams.Get("x-tls-key"); ccert != "" || ckey != "" {
+					if ccert == "" || ckey == "" {
+						return nil, ErrTLSCertKeyConfig
+					}
+					certs, err := tls.LoadX509KeyPair(ccert, ckey)
+					if err != nil {
+						return nil, err
+					}
+					clientCert = append(clientCert, certs)
+				}
+
+				insecureSkipVerify := false
+				insecureSkipVerifyStr := parsedParams.Get("x-tls-insecure-skip-verify")
+				if len(insecureSkipVerifyStr) > 0 {
+					x, err := strconv.ParseBool(insecureSkipVerifyStr)
+					if err != nil {
+						return nil, err
+					}
+					insecureSkipVerify = x
+				}
+
+				err = mysql.RegisterTLSConfig(ctls, &tls.Config{
+					RootCAs:            rootCertPool,
+					Certificates:       clientCert,
+					InsecureSkipVerify: insecureSkipVerify,
+				})
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+	}
+
 	config, err := mysql.ParseDSN(strings.TrimPrefix(url, "mysql://"))
 	if err != nil {
 		return nil, err
@@ -139,52 +201,6 @@ func urlToMySQLConfig(url string) (*mysql.Config, error) {
 		return nil, err
 	}
 	config.Passwd = password
-
-	// use custom TLS?
-	ctls := config.TLSConfig
-	if len(ctls) > 0 {
-		if _, isBool := readBool(ctls); !isBool && strings.ToLower(ctls) != "skip-verify" {
-			rootCertPool := x509.NewCertPool()
-			pem, err := ioutil.ReadFile(config.Params["x-tls-ca"])
-			if err != nil {
-				return nil, err
-			}
-
-			if ok := rootCertPool.AppendCertsFromPEM(pem); !ok {
-				return nil, ErrAppendPEM
-			}
-
-			clientCert := make([]tls.Certificate, 0, 1)
-			if ccert, ckey := config.Params["x-tls-cert"], config.Params["x-tls-key"]; ccert != "" || ckey != "" {
-				if ccert == "" || ckey == "" {
-					return nil, ErrTLSCertKeyConfig
-				}
-				certs, err := tls.LoadX509KeyPair(ccert, ckey)
-				if err != nil {
-					return nil, err
-				}
-				clientCert = append(clientCert, certs)
-			}
-
-			insecureSkipVerify := false
-			if len(config.Params["x-tls-insecure-skip-verify"]) > 0 {
-				x, err := strconv.ParseBool(config.Params["x-tls-insecure-skip-verify"])
-				if err != nil {
-					return nil, err
-				}
-				insecureSkipVerify = x
-			}
-
-			err = mysql.RegisterTLSConfig(ctls, &tls.Config{
-				RootCAs:            rootCertPool,
-				Certificates:       clientCert,
-				InsecureSkipVerify: insecureSkipVerify,
-			})
-			if err != nil {
-				return nil, err
-			}
-		}
-	}
 
 	return config, nil
 }
