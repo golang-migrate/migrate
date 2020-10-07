@@ -46,7 +46,6 @@ require (
 	go.mongodb.org/mongo-driver v1.1.0
 	go.uber.org/atomic v1.4.0
 	golang.org/x/crypto v0.0.0-20200709230013-948cd5f35899 // indirect
-	golang.org/x/net v0.0.0-20200813134508-3edf25e44fcc
 	golang.org/x/sys v0.0.0-20200817155316-9781c653f443 // indirect
 	golang.org/x/time v0.0.0-20200630173020-3af7569d3a1e // indirect
 	golang.org/x/tools v0.0.0-20200818005847-188abfa75333
