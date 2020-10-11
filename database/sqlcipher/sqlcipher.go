@@ -143,6 +143,7 @@ func (m *Sqlite) Drop() (err error) {
 			err = multierror.Append(err, errClose)
 		}
 	}()
+
 	tableNames := make([]string, 0)
 	for tables.Next() {
 		var tableName string
@@ -153,6 +154,10 @@ func (m *Sqlite) Drop() (err error) {
 			tableNames = append(tableNames, tableName)
 		}
 	}
+	if err := tables.Err(); err != nil {
+		return &database.Error{OrigErr: err, Query: []byte(query)}
+	}
+
 	if len(tableNames) > 0 {
 		for _, t := range tableNames {
 			query := "DROP TABLE " + t

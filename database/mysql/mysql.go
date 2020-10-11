@@ -401,6 +401,9 @@ func (m *Mysql) Drop() (err error) {
 			tableNames = append(tableNames, tableName)
 		}
 	}
+	if err := tables.Err(); err != nil {
+		return &database.Error{OrigErr: err, Query: []byte(query)}
+	}
 
 	if len(tableNames) > 0 {
 		// disable checking foreign key constraints until finished
