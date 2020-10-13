@@ -1,6 +1,6 @@
 // Package migrate reads migrations from sources and runs them against databases.
 // Sources are defined by the `source.Driver` and databases by the `database.Driver`
-// interface. The driver interfaces are kept "dump", all migration logic is kept
+// interface. The driver interfaces are kept "dumb", all migration logic is kept
 // in this package.
 package migrate
 
