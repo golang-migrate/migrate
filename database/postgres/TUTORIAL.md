@@ -155,27 +155,13 @@ In the first run (with an empty database) the migrate table is created in `publi
 When the migrations create the `$user` schema, the next run will store (a new) migrate table in this schema (due to order of schemas in `search_path`) and tries to apply all migrations again (most likely failing).
 
 To solve this you need to change the default `search_path` by removing the `$user` component, so the migrate table is always stored in the (available) `public` schema.
-This can only be done when using migrate from your own code, by creating the `driver` manually, so it can be used to configure the `search_path` before applying the migrations:
-```golang
-	db, err := sql.Open("postgres", os.Getenv("POSTGRESQL_URL"))
-	if err != nil {
-		log.Fatalf("Unable to connect to the database: %s", err)
-	}
-	defer db.Close()
+This can be done using the [`search_path` query parameter in the URL](https://github.com/jexia/migrate/blob/fix-postgres-version-table/database/postgres/README.md#postgres).
 
-	driver, err := postgres.WithInstance(db, &postgres.Config{})
-	if err != nil {
-		log.Fatalf("Unable to initialize the driver: %s", err)
-	}
-
-	// Set search_path (default schema) to prevent issues where MigrationsTable is not stored in public schema
-	// after a migration created a new schema, resulting in migrations getting executed more than once.
-	if err := driver.Run(strings.NewReader("SET search_path TO public;")); err != nil {
-		log.Fatalf("Failed to set search_path: %s", err)
-	}
-
-	m, err := migrate.NewWithDatabaseInstance("file://path/to/migrations", "postgres", driver)
-	if err != nil {
-		log.Fatalf("Cannot create the migrator: %s", err)
-	}
+For example to force the migrations table in the public schema you can use:
 ```
+export POSTGRESQL_URL='postgres://postgres:password@localhost:5432/example?sslmode=disable&search_path=public'
+```
+
+Note that you need to explicitly add the schema names to the table names in your migrations when you to modify the tables of the non-public schema.
+
+Alternatively you can add the non-public schema manually (before applying the migrations) if that is possible in your case and let the tool store the migrations table in this schema as well.
