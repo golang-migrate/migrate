@@ -146,3 +146,36 @@ func main() {
 }
 ```
 You can find details [here](README.md#use-in-your-go-project)
+
+## Fix issue where migrations run twice
+
+When the schema and role names are the same, you might run into issues if you create this schema using migrations.
+This is caused by the fact that the [default `search_path`](https://www.postgresql.org/docs/current/ddl-schemas.html#DDL-SCHEMAS-PATH) is `"$user", public`.
+In the first run (with an empty database) the migrate table is created in `public`.
+When the migrations create the `$user` schema, the next run will store (a new) migrate table in this schema (due to order of schemas in `search_path`) and tries to apply all migrations again (most likely failing).
+
+To solve this you need to change the default `search_path` by removing the `$user` component, so the migrate table is always stored in the (available) `public` schema.
+This can only be done when using migrate from your own code, by creating the `driver` manually, so it can be used to configure the `search_path` before applying the migrations:
+```golang
+	db, err := sql.Open("postgres", dbURI)
+	if err != nil {
+		log.Fatalf("Unable to connect to the database: %s", err)
+	}
+	defer db.Close()
+
+	driver, err := postgres.WithInstance(db, &postgres.Config{})
+	if err != nil {
+		log.Fatalf("Unable to initialize the driver: %s", err)
+	}
+
+	// Set search_path (default schema) to prevent issues where MigrationsTable is not stored in public schema
+	// after a migration created a new schema, resulting in migrations getting executed more than once.
+	if err := driver.Run(strings.NewReader("SET search_path TO public;")); err != nil {
+		log.Fatalf("Failed to set search_path: %s", err)
+	}
+
+	m, err := migrate.NewWithDatabaseInstance("file://path/to/migrations", "postgres", driver)
+	if err != nil {
+		log.Fatalf("Cannot create the migrator: %s", err)
+	}
+```
