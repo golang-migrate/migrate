@@ -7,7 +7,7 @@ Our user here is `postgres`, password `password`, and host is `localhost`.
 ```
 psql -h localhost -U postgres -w -c "create database example;"
 ```
-When using Migrate CLI we need to pass to database URL. Let's export it to a variable for convienience:
+When using Migrate CLI we need to pass to database URL. Let's export it to a variable for convenience:
 ```
 export POSTGRESQL_URL='postgres://postgres:password@localhost:5432/example?sslmode=disable'
 ```
@@ -157,7 +157,7 @@ When the migrations create the `$user` schema, the next run will store (a new) m
 To solve this you need to change the default `search_path` by removing the `$user` component, so the migrate table is always stored in the (available) `public` schema.
 This can only be done when using migrate from your own code, by creating the `driver` manually, so it can be used to configure the `search_path` before applying the migrations:
 ```golang
-	db, err := sql.Open("postgres", dbURI)
+	db, err := sql.Open("postgres", os.Getenv("POSTGRESQL_URL"))
 	if err != nil {
 		log.Fatalf("Unable to connect to the database: %s", err)
 	}
