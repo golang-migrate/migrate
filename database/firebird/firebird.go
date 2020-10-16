@@ -193,6 +193,9 @@ func (f *Firebird) Drop() (err error) {
 			tableNames = append(tableNames, tableName)
 		}
 	}
+	if err := tables.Err(); err != nil {
+		return &database.Error{OrigErr: err, Query: []byte(query)}
+	}
 
 	// delete one by one ...
 	for _, t := range tableNames {

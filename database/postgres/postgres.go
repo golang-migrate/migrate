@@ -345,6 +345,9 @@ func (p *Postgres) Drop() (err error) {
 			tableNames = append(tableNames, tableName)
 		}
 	}
+	if err := tables.Err(); err != nil {
+		return &database.Error{OrigErr: err, Query: []byte(query)}
+	}
 
 	if len(tableNames) > 0 {
 		// delete one by one ...
