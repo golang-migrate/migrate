@@ -7,7 +7,7 @@ Our user here is `postgres`, password `password`, and host is `localhost`.
 ```
 psql -h localhost -U postgres -w -c "create database example;"
 ```
-When using Migrate CLI we need to pass to database URL. Let's export it to a variable for convienience:
+When using Migrate CLI we need to pass to database URL. Let's export it to a variable for convenience:
 ```
 export POSTGRESQL_URL='postgres://postgres:password@localhost:5432/example?sslmode=disable'
 ```
@@ -146,3 +146,22 @@ func main() {
 }
 ```
 You can find details [here](README.md#use-in-your-go-project)
+
+## Fix issue where migrations run twice
+
+When the schema and role names are the same, you might run into issues if you create this schema using migrations.
+This is caused by the fact that the [default `search_path`](https://www.postgresql.org/docs/current/ddl-schemas.html#DDL-SCHEMAS-PATH) is `"$user", public`.
+In the first run (with an empty database) the migrate table is created in `public`.
+When the migrations create the `$user` schema, the next run will store (a new) migrate table in this schema (due to order of schemas in `search_path`) and tries to apply all migrations again (most likely failing).
+
+To solve this you need to change the default `search_path` by removing the `$user` component, so the migrate table is always stored in the (available) `public` schema.
+This can be done using the [`search_path` query parameter in the URL](https://github.com/jexia/migrate/blob/fix-postgres-version-table/database/postgres/README.md#postgres).
+
+For example to force the migrations table in the public schema you can use:
+```
+export POSTGRESQL_URL='postgres://postgres:password@localhost:5432/example?sslmode=disable&search_path=public'
+```
+
+Note that you need to explicitly add the schema names to the table names in your migrations when you to modify the tables of the non-public schema.
+
+Alternatively you can add the non-public schema manually (before applying the migrations) if that is possible in your case and let the tool store the migrations table in this schema as well.
