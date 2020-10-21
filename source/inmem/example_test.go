@@ -1,7 +1,7 @@
 package inmem_test
 
 import (
-	"testing"
+	"log"
 
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
@@ -22,7 +22,7 @@ func (m DummyMigration) Down() string { return m.DownQuery }
 
 var _ inmem.Migration = (*DummyMigration)(nil)
 
-func TestMemory_WithInstance(t *testing.T) {
+func ExampleWithInstance() {
 	createUserTable := &DummyMigration{
 		Ver:       1,
 		UpQuery:   "CREATE TABLE IF NOT EXISTS users(id bigint primary key, username varchar);",
@@ -32,18 +32,18 @@ func TestMemory_WithInstance(t *testing.T) {
 	driver, _ := inmem.WithInstance(createUserTable)
 	m, err := migrate.NewWithSourceInstance("inmem", driver, "database://foobar")
 	if err != nil {
-		t.Fatal(err)
+		log.Fatal(err)
 		return
 	}
 
 	err = m.Up() // run your migrations and handle the errors above of course
 	if err != nil {
-		t.Fatal(err)
+		log.Fatal(err)
 		return
 	}
 }
 
-func TestMemory_RegisterMigrations(t *testing.T) {
+func ExampleRegisterMigrations() {
 	createUserTable := &DummyMigration{
 		Ver:       1,
 		UpQuery:   "CREATE TABLE IF NOT EXISTS users(id bigint primary key, username varchar);",
@@ -53,18 +53,18 @@ func TestMemory_RegisterMigrations(t *testing.T) {
 	key := "myUniqueKey"
 	err := inmem.RegisterMigrations(key, createUserTable)
 	if err != nil {
-		t.Fatal(err)
+		log.Fatal(err)
 		return
 	}
 
 	m, err := migrate.New("inmem://"+key, "database://foobar")
 	if err != nil {
-		t.Fatal(err)
+		log.Fatal(err)
 		return
 	}
 	err = m.Up() // run your migrations and handle the errors above of course
 	if err != nil {
-		t.Fatal(err)
+		log.Fatal(err)
 		return
 	}
 }
