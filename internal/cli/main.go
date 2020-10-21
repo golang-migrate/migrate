@@ -28,7 +28,8 @@ const (
 	dropUsage = `drop [-f] [-all]    Drop everything inside database
 	Use -f to bypass confirmation
 	Use -all to apply all down migrations`
-	forceUsage = `force V      Set version V but don't run migration (ignores dirty state)`
+	forceUsage   = `force V      Set version V but don't run migration (ignores dirty state)`
+	helpArgument = "-help"
 )
 
 // set main log
@@ -162,7 +163,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 		}
 
 	case "goto":
-		if flag.Arg(1) == "-help" {
+		if flag.Arg(1) == helpArgument {
 			log.Println(gotoUsage)
 			os.Exit(0)
 		}
@@ -189,7 +190,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 		}
 
 	case "up":
-		if flag.Arg(1) == "-help" {
+		if flag.Arg(1) == helpArgument {
 			log.Println(upUsage)
 			os.Exit(0)
 		}
@@ -216,7 +217,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 		}
 
 	case "down":
-		if flag.Arg(1) == "-help" {
+		if flag.Arg(1) == helpArgument {
 			log.Println(downUsage)
 			os.Exit(0)
 		}
@@ -299,7 +300,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 		}
 
 	case "force":
-		if flag.Arg(1) == "-help" {
+		if flag.Arg(1) == helpArgument {
 			log.Println(forceUsage)
 			os.Exit(0)
 		}
