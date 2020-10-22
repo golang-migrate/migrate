@@ -2,10 +2,20 @@ package mysql
 
 import (
 	"context"
+	"crypto/ed25519"
+	"crypto/x509"
 	"database/sql"
 	sqldriver "database/sql/driver"
+	"encoding/pem"
+	"errors"
 	"fmt"
+	"io/ioutil"
 	"log"
+	"math/big"
+	"math/rand"
+	"net/url"
+	"os"
+	"strconv"
 	"testing"
 )
 
@@ -175,6 +185,57 @@ func TestLockWorks(t *testing.T) {
 	})
 }
 
+func TestNoLockParamValidation(t *testing.T) {
+	ip := "127.0.0.1"
+	port := 3306
+	addr := fmt.Sprintf("mysql://root:root@tcp(%v:%v)/public", ip, port)
+	p := &Mysql{}
+	_, err := p.Open(addr + "?x-no-lock=not-a-bool")
+	if !errors.Is(err, strconv.ErrSyntax) {
+		t.Fatal("Expected syntax error when passing a non-bool as x-no-lock parameter")
+	}
+}
+
+func TestNoLockWorks(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.Port(defaultPort)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := fmt.Sprintf("mysql://root:root@tcp(%v:%v)/public", ip, port)
+		p := &Mysql{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		lock := d.(*Mysql)
+
+		p = &Mysql{}
+		d, err = p.Open(addr + "?x-no-lock=true")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		noLock := d.(*Mysql)
+
+		// Should be possible to take real lock and no-lock at the same time
+		if err = lock.Lock(); err != nil {
+			t.Fatal(err)
+		}
+		if err = noLock.Lock(); err != nil {
+			t.Fatal(err)
+		}
+		if err = lock.Unlock(); err != nil {
+			t.Fatal(err)
+		}
+		if err = noLock.Unlock(); err != nil {
+			t.Fatal(err)
+		}
+	})
+}
+
 func TestExtractCustomQueryParams(t *testing.T) {
 	testcases := []struct {
 		name                 string
@@ -231,7 +292,42 @@ func TestExtractCustomQueryParams(t *testing.T) {
 	}
 }
 
+func createTmpCert(t *testing.T) string {
+	tmpCertFile, err := ioutil.TempFile("", "migrate_test_cert")
+	if err != nil {
+		t.Fatal("Failed to create temp cert file:", err)
+	}
+	t.Cleanup(func() {
+		if err := os.Remove(tmpCertFile.Name()); err != nil {
+			t.Log("Failed to cleanup temp cert file:", err)
+		}
+	})
+
+	r := rand.New(rand.NewSource(0))
+	pub, priv, err := ed25519.GenerateKey(r)
+	if err != nil {
+		t.Fatal("Failed to generate ed25519 key for temp cert file:", err)
+	}
+	tmpl := x509.Certificate{
+		SerialNumber: big.NewInt(0),
+	}
+	derBytes, err := x509.CreateCertificate(r, &tmpl, &tmpl, pub, priv)
+	if err != nil {
+		t.Fatal("Failed to generate temp cert file:", err)
+	}
+	if err := pem.Encode(tmpCertFile, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes}); err != nil {
+		t.Fatal("Failed to encode ")
+	}
+	if err := tmpCertFile.Close(); err != nil {
+		t.Fatal("Failed to close temp cert file:", err)
+	}
+	return tmpCertFile.Name()
+}
+
 func TestURLToMySQLConfig(t *testing.T) {
+	tmpCertFilename := createTmpCert(t)
+	tmpCertFilenameEscaped := url.PathEscape(tmpCertFilename)
+
 	testcases := []struct {
 		name        string
 		urlStr      string
@@ -262,6 +358,9 @@ func TestURLToMySQLConfig(t *testing.T) {
 		{name: "user/password - password with encoded @",
 			urlStr:      "mysql://username:password%40@tcp(127.0.0.1:3306)/myDB?multiStatements=true",
 			expectedDSN: "username:password@@tcp(127.0.0.1:3306)/myDB?multiStatements=true"},
+		{name: "custom tls",
+			urlStr:      "mysql://username:password@tcp(127.0.0.1:3306)/myDB?multiStatements=true&tls=custom&x-tls-ca=" + tmpCertFilenameEscaped,
+			expectedDSN: "username:password@tcp(127.0.0.1:3306)/myDB?multiStatements=true&tls=custom&x-tls-ca=" + tmpCertFilenameEscaped},
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {

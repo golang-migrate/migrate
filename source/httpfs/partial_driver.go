@@ -1,6 +1,7 @@
 package httpfs
 
 import (
+	"errors"
 	"io"
 	"net/http"
 	"os"
@@ -108,7 +109,7 @@ func (p *PartialDriver) Next(version uint) (nextVersion uint, err error) {
 // ReadUp is part of source.Driver interface implementation.
 func (p *PartialDriver) ReadUp(version uint) (r io.ReadCloser, identifier string, err error) {
 	if m, ok := p.migrations.Up(version); ok {
-		body, err := p.fs.Open(path.Join(p.path, m.Raw))
+		body, err := p.open(path.Join(p.path, m.Raw))
 		if err != nil {
 			return nil, "", err
 		}
@@ -124,7 +125,7 @@ func (p *PartialDriver) ReadUp(version uint) (r io.ReadCloser, identifier string
 // ReadDown is part of source.Driver interface implementation.
 func (p *PartialDriver) ReadDown(version uint) (r io.ReadCloser, identifier string, err error) {
 	if m, ok := p.migrations.Down(version); ok {
-		body, err := p.fs.Open(path.Join(p.path, m.Raw))
+		body, err := p.open(path.Join(p.path, m.Raw))
 		if err != nil {
 			return nil, "", err
 		}
@@ -135,4 +136,21 @@ func (p *PartialDriver) ReadDown(version uint) (r io.ReadCloser, identifier stri
 		Path: p.path,
 		Err:  os.ErrNotExist,
 	}
+}
+
+func (p *PartialDriver) open(path string) (http.File, error) {
+	f, err := p.fs.Open(path)
+	if err == nil {
+		return f, nil
+	}
+	// Some non-standard file systems may return errors that don't include the path, that
+	// makes debugging harder.
+	if !errors.As(err, new(*os.PathError)) {
+		err = &os.PathError{
+			Op:   "open",
+			Path: path,
+			Err:  err,
+		}
+	}
+	return nil, err
 }

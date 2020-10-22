@@ -50,6 +50,8 @@ $ go build -tags 'postgres' -ldflags="-X main.Version=$(git describe --tags)" -o
 $ go get -tags 'postgres' -u github.com/golang-migrate/migrate/cmd/migrate
 ```
 
+[Make sure](https://github.com/golang-migrate/migrate/pull/257#issuecomment-705249902) you're not installing the `migrate` CLI from a module. e.g. there should not be any `go.mod` files in your current directory or any directory from your current one to the root
+
 #### Notes
 
 1. Requires a version of Go that [supports modules](https://golang.org/cmd/go/#hdr-Preliminary_module_support). e.g. Go 1.11+

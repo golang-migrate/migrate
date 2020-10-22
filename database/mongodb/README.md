@@ -7,12 +7,16 @@
 
 # Usage
 
-`mongodb://user:password@host:port/dbname?query`
+`mongodb://user:password@host:port/dbname?query` (`mongodb+srv://` also works, but behaves a bit differently. See [docs](https://docs.mongodb.com/manual/reference/connection-string/#dns-seedlist-connection-format) for more information)
 
 | URL Query  | WithInstance Config | Description |
 |------------|---------------------|-------------|
 | `x-migrations-collection` | `MigrationsCollection` | Name of the migrations collection |
 | `x-transaction-mode` | `TransactionMode` | If set to `true` wrap commands in [transaction](https://docs.mongodb.com/manual/core/transactions). Available only for replica set. Driver is using [strconv.ParseBool](https://golang.org/pkg/strconv/#ParseBool) for parsing|
+| `x-advisory-locking` | `true` | Feature flag for advisory locking, if set to false, disable advisory locking |
+| `x-advisory-lock-collection` | `migrate_advisory_lock` | The name of the collection to use for advisory locking.|
+| `x-advisory-lock-timout` | `15` | The max time in seconds that the advisory lock will wait if the db is already locked. |
+| `x-advisory-lock-timout-interval` | `10` | The max timeout in seconds interval that the advisory lock will wait if the db is already locked. |
 | `dbname` | `DatabaseName` | The name of the database to connect to |
 | `user` | | The user to sign in as. Can be omitted |
 | `password` | | The user's password. Can be omitted | 
