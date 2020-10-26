@@ -28,12 +28,19 @@ const (
 	dropUsage = `drop [-f] [-all]    Drop everything inside database
 	Use -f to bypass confirmation
 	Use -all to apply all down migrations`
-	forceUsage   = `force V      Set version V but don't run migration (ignores dirty state)`
-	helpArgument = "-help"
+	forceUsage = `force V      Set version V but don't run migration (ignores dirty state)`
 )
 
 // set main log
 var log = &Log{}
+
+func printUsageAndExit() {
+	flag.Usage()
+
+	// If a command is not found we exit with a status 2 to match the behavior
+	// of flag.Parse() with flag.ExitOnError when parsing an invalid flag.
+	os.Exit(2)
+}
 
 // Main function of a cli application. It is public for backwards compatibility with `cli` package
 func Main(version string) {
@@ -71,7 +78,7 @@ Commands:
   version      Print current migration version
 
 Source drivers: `+strings.Join(source.List(), ", ")+`
-Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoUsage, upUsage, downUsage, forceUsage)
+Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoUsage, upUsage, downUsage, dropUsage, forceUsage)
 	}
 
 	flag.Parse()
@@ -126,9 +133,14 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 
 	startTime := time.Now()
 
+	if len(flag.Args()) < 1 {
+		printUsageAndExit()
+	}
+	args := flag.Args()[1:]
+
 	switch flag.Arg(0) {
 	case "create":
-		args := flag.Args()[1:]
+
 		seq := false
 		seqDigits := 6
 
@@ -138,7 +150,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 		formatPtr := createFlagSet.String("format", defaultTimeFormat, `The Go time format string to use. If the string "unix" or "unixNano" is specified, then the seconds or nanoseconds since January 1, 1970 UTC respectively will be used. Caution, due to the behavior of time.Time.Format(), invalid format strings will not error`)
 		createFlagSet.BoolVar(&seq, "seq", seq, "Use sequential numbers instead of timestamps (default: false)")
 		createFlagSet.IntVar(&seqDigits, "digits", seqDigits, "The number of digits to use in sequences (default: 6)")
-		help := createFlagSet.Bool("help", false, "")
+		help := createFlagSet.Bool("help", false, "Print help information")
 
 		if err := createFlagSet.Parse(args); err != nil {
 			log.Println(err)
@@ -146,6 +158,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 
 		if *help {
 			log.Println(createUsage)
+			createFlagSet.PrintDefaults()
 			os.Exit(0)
 		}
 
@@ -163,8 +176,17 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 		}
 
 	case "goto":
-		if flag.Arg(1) == helpArgument {
+
+		gotoSet := flag.NewFlagSet("goto", flag.ExitOnError)
+		helpPtr := gotoSet.Bool("help", false, "Print help information")
+
+		if err := gotoSet.Parse(args); err != nil {
+			log.Println(err)
+		}
+
+		if *helpPtr {
 			log.Println(gotoUsage)
+			gotoSet.PrintDefaults()
 			os.Exit(0)
 		}
 
@@ -172,7 +194,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 			log.fatalErr(migraterErr)
 		}
 
-		if flag.Arg(1) == "" {
+		if flag.NArg() == 0 {
 			log.fatal("error: please specify version argument V")
 		}
 
@@ -190,8 +212,16 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 		}
 
 	case "up":
-		if flag.Arg(1) == helpArgument {
+		upSet := flag.NewFlagSet("up", flag.ExitOnError)
+		helpPtr := upSet.Bool("help", false, "Print help information")
+
+		if err := upSet.Parse(args); err != nil {
+			log.Println(err)
+		}
+
+		if *helpPtr {
 			log.Println(upUsage)
+			upSet.PrintDefaults()
 			os.Exit(0)
 		}
 
@@ -200,7 +230,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 		}
 
 		limit := -1
-		if flag.Arg(1) != "" {
+		if flag.NArg() > 0 {
 			n, err := strconv.ParseUint(flag.Arg(1), 10, 64)
 			if err != nil {
 				log.fatal("error: can't read limit argument N")
@@ -217,20 +247,22 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 		}
 
 	case "down":
-		if flag.Arg(1) == helpArgument {
-			log.Println(downUsage)
-			os.Exit(0)
-		}
-		if migraterErr != nil {
-			log.fatalErr(migraterErr)
-		}
-
 		downFlagSet := flag.NewFlagSet("down", flag.ExitOnError)
+		helpPtr := downFlagSet.Bool("help", false, "Print help information")
 		applyAll := downFlagSet.Bool("all", false, "Apply all down migrations")
 
-		args := flag.Args()[1:]
 		if err := downFlagSet.Parse(args); err != nil {
-			log.fatalErr(err)
+			log.Println(err)
+		}
+
+		if *helpPtr {
+			log.Println(downUsage)
+			downFlagSet.PrintDefaults()
+			os.Exit(0)
+		}
+
+		if migraterErr != nil {
+			log.fatalErr(migraterErr)
 		}
 
 		downArgs := downFlagSet.Args()
@@ -262,15 +294,15 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 	case "drop":
 		dropFlagSet := flag.NewFlagSet("drop", flag.ExitOnError)
 		forceDrop := dropFlagSet.Bool("f", false, "Force the drop command by bypassing the confirmation prompt")
-		help := dropFlagSet.Bool("help", false, "")
+		help := dropFlagSet.Bool("help", false, "Print help information")
 
-		args := flag.Args()[1:]
 		if err := dropFlagSet.Parse(args); err != nil {
 			log.fatalErr(err)
 		}
 
 		if *help {
 			log.Println(dropUsage)
+			dropFlagSet.PrintDefaults()
 			os.Exit(0)
 		}
 
@@ -300,8 +332,16 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 		}
 
 	case "force":
-		if flag.Arg(1) == helpArgument {
+		forceSet := flag.NewFlagSet("force", flag.ExitOnError)
+		helpPtr := forceSet.Bool("help", false, "Print help information")
+
+		if err := forceSet.Parse(args); err != nil {
+			log.Println(err)
+		}
+
+		if *helpPtr {
 			log.Println(forceUsage)
+			forceSet.PrintDefaults()
 			os.Exit(0)
 		}
 
@@ -309,7 +349,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 			log.fatalErr(migraterErr)
 		}
 
-		if flag.Arg(1) == "" {
+		if flag.NArg() == 0 {
 			log.fatal("error: please specify version argument V")
 		}
 
@@ -340,10 +380,6 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 		}
 
 	default:
-		flag.Usage()
-
-		// If a command is not found we exit with a status 2 to match the behavior
-		// of flag.Parse() with flag.ExitOnError when parsing an invalid flag.
-		os.Exit(2)
+		printUsageAndExit()
 	}
 }
