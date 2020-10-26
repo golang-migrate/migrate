@@ -1,11 +1,11 @@
-package inmem
+package mem
 
 import (
 	"io/ioutil"
 	"testing"
 
-	"github.com/bmizerany/assert"
 	"github.com/golang-migrate/migrate/v4/source"
+	"github.com/stretchr/testify/assert"
 )
 
 const (
@@ -138,6 +138,20 @@ func TestMemory_Open_ErrNilMigration(t *testing.T) {
 	driver, err := m.Open(scheme + "notExist")
 	assert.Equal(t, nil, driver)
 	assert.Equal(t, ErrNilMigration, err)
+}
+
+func TestMemory_Open(t *testing.T) {
+	t.Cleanup(func() {
+		clear()
+	})
+
+	m := new(Memory)
+	err := RegisterMigrations(testKey, firstMigration, secondMigration)
+	assert.Equal(t, nil, err)
+
+	driver, err := m.Open(scheme + testKey)
+	assert.NotEqual(t, nil, driver)
+	assert.Equal(t, nil, err)
 }
 
 func TestMemory_Close(t *testing.T) {

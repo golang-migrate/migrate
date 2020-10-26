@@ -1,4 +1,4 @@
-package inmem
+package mem
 
 import (
 	"fmt"
@@ -9,13 +9,13 @@ import (
 )
 
 const (
-	schemeKey = "inmem"
-	scheme    = schemeKey + "://" // construct inmem:// as scheme in Open function
+	schemeKey = "mem"
+	scheme    = schemeKey + "://" // construct mem:// as scheme in Open function
 )
 
 // localMemory saves all *source.Migrations mapped by key
 type localMemory struct {
-	lock       sync.RWMutex
+	sync.RWMutex
 	data       map[string]*source.Migrations
 	versionLog map[string]uint
 }
@@ -34,8 +34,8 @@ func RegisterMigrations(key string, mig ...Migration) error {
 		return ErrEmptyKey
 	}
 
-	migrations.lock.Lock()
-	defer migrations.lock.Unlock()
+	migrations.Lock()
+	defer migrations.Unlock()
 
 	// Create new instance on map if not exist
 	if m, exist := migrations.data[key]; !exist || m == nil {

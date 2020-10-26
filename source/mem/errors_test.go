@@ -1,9 +1,9 @@
-package inmem
+package mem
 
 import (
 	"testing"
 
-	"github.com/bmizerany/assert"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestErrDuplicateVersion_Error(t *testing.T) {

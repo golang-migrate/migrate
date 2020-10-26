@@ -1,4 +1,4 @@
-package inmem
+package mem
 
 import (
 	"bytes"
@@ -26,7 +26,7 @@ type Migration interface {
 
 // Memory implements source.Driver interface and hold in memory migration
 type Memory struct {
-	lock           sync.RWMutex
+	sync.RWMutex
 	currKey        string
 	migrationsData *source.Migrations
 }
@@ -41,8 +41,8 @@ func WithInstance(mig ...Migration) (source.Driver, error) {
 		migrationsData: source.NewMigrations(),
 	}
 
-	mem.lock.Lock()
-	defer mem.lock.Unlock()
+	mem.Lock()
+	defer mem.Unlock()
 
 	for _, m := range mig {
 		if m == nil {
@@ -88,8 +88,8 @@ func (m *Memory) Open(url string) (source.Driver, error) {
 		return nil, ErrEmptyKey
 	}
 
-	migrations.lock.Lock()
-	defer migrations.lock.Unlock()
+	migrations.RLock()
+	defer migrations.RUnlock()
 	srcMigration, exist := migrations.data[key]
 	if !exist {
 		return nil, ErrNilMigration

@@ -1,4 +1,4 @@
-package inmem
+package mem
 
 import (
 	"errors"

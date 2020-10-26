@@ -1,11 +1,11 @@
-package inmem_test
+package mem_test
 
 import (
 	"log"
 
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
-	"github.com/golang-migrate/migrate/v4/source/inmem"
+	"github.com/golang-migrate/migrate/v4/source/mem"
 )
 
 type DummyMigration struct {
@@ -20,7 +20,7 @@ func (m DummyMigration) Up() string { return m.UpQuery }
 
 func (m DummyMigration) Down() string { return m.DownQuery }
 
-var _ inmem.Migration = (*DummyMigration)(nil)
+var _ mem.Migration = (*DummyMigration)(nil)
 
 func ExampleWithInstance() {
 	createUserTable := &DummyMigration{
@@ -29,7 +29,7 @@ func ExampleWithInstance() {
 		DownQuery: "DROP TABLE IF EXISTS users;",
 	}
 
-	driver, _ := inmem.WithInstance(createUserTable)
+	driver, _ := mem.WithInstance(createUserTable)
 	m, err := migrate.NewWithSourceInstance("inmem", driver, "database://foobar")
 	if err != nil {
 		log.Fatal(err)
@@ -51,13 +51,13 @@ func ExampleRegisterMigrations() {
 	}
 
 	key := "myUniqueKey"
-	err := inmem.RegisterMigrations(key, createUserTable)
+	err := mem.RegisterMigrations(key, createUserTable)
 	if err != nil {
 		log.Fatal(err)
 		return
 	}
 
-	m, err := migrate.New("inmem://"+key, "database://foobar")
+	m, err := migrate.New("mem://"+key, "database://foobar")
 	if err != nil {
 		log.Fatal(err)
 		return

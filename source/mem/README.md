@@ -10,11 +10,11 @@ There are 2 way to use in memory migration driver:
 * Using `WithInstance` so you can use it anywhere without worrying about `key` identifier conflict. Or
 * Using `RegisterMigrations` so you can migrate from anywhere in your code using `key` in URL.
 
-Whichever the method you use, you still need to implement `inmem.Migration` for all your migration schema.
+Whichever the method you use, you still need to implement `mem.Migration` for all your migration schema.
 
-### Implements `inmem.Migration`
+### Implements `mem.Migration`
 
-Create struct and implement all method receiver for `inmam.Migration`:
+Create struct and implement all method receiver for `mem.Migration`:
 
 ```go
 type DummyMigration struct {
@@ -37,7 +37,7 @@ var _ inmem.Migration = (*DummyMigration)(nil)
 ```go
 import (
   "github.com/golang-migrate/migrate/v4"
-  "github.com/golang-migrate/migrate/v4/source/inmem"
+  "github.com/golang-migrate/migrate/v4/source/mem"
 )
 
 func main() {
@@ -47,8 +47,8 @@ func main() {
 		DownQuery: "DROP TABLE IF EXISTS users;",
 	}
 
-	driver, err := inmem.WithInstance(createUserTable)
-	m, err := migrate.NewWithSourceInstance("inmem", driver, "database://foobar")
+	driver, err := mem.WithInstance(createUserTable)
+	m, err := migrate.NewWithSourceInstance("mem", driver, "database://foobar")
 	m.Up() // run your migrations and handle the errors above of course
 }
 ```
@@ -69,8 +69,8 @@ func main() {
 	}
 
 	key := "myUniqueKey"
-	err := inmem.RegisterMigrations(key, createUserTable)
-	m, err := migrate.New("inmem://"+key, "database://foobar")
+	err := mem.RegisterMigrations(key, createUserTable)
+	m, err := migrate.New("mem://"+key, "database://foobar")
 	err = m.Up() // run your migrations and handle the errors above of course
 }
 ```
