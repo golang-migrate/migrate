@@ -1,6 +1,6 @@
 # inmem
 
-In memory (`inmem`) driver useful when you want to always includes your database schema migration along with your binary.
+In memory (`mem`) driver useful when you want to always includes your database schema migration along with your binary.
 
 
 ## Usage
