@@ -30,7 +30,7 @@ func ExampleWithInstance() {
 	}
 
 	driver, _ := mem.WithInstance(createUserTable)
-	m, err := migrate.NewWithSourceInstance("inmem", driver, "database://foobar")
+	m, err := migrate.NewWithSourceInstance("mem", driver, "database://foobar")
 	if err != nil {
 		log.Fatal(err)
 		return
