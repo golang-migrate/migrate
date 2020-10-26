@@ -8,8 +8,7 @@ import (
 var (
 	ErrEmptyKey         = errors.New("key is empty")
 	ErrNilMigration     = errors.New("some migration(s) is nil")
-	ErrEmptyUrl         = errors.New("url is empty")
-	ErrInvalidUrlScheme = errors.New("url scheme must be inmem://")
+	ErrInvalidUrlScheme = errors.New("url scheme must be mem://")
 )
 
 // ErrDuplicateVersion error type when duplicate version occurred

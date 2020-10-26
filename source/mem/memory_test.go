@@ -14,25 +14,20 @@ const (
 
 type testCaseKeyEmptiness struct {
 	key string
-	err error
 }
 
 var testCasesKey = []testCaseKeyEmptiness{
 	{
 		key: "",
-		err: ErrEmptyKey,
 	},
 	{
 		key: " ",
-		err: ErrEmptyKey,
 	},
 	{
 		key: "   ", // more spaces
-		err: ErrEmptyKey,
 	},
 	{
 		key: "	", // tabs
-		err: ErrEmptyKey,
 	},
 }
 
@@ -93,15 +88,15 @@ func TestWithInstance(t *testing.T) {
 	assert.Equal(t, nil, err)
 }
 
-func TestMemory_Open_ErrEmptyUrl(t *testing.T) {
+func TestMemory_Open_ErrParseUrl(t *testing.T) {
 	t.Cleanup(func() {
 		clear()
 	})
 
 	m := new(Memory)
-	driver, err := m.Open("")
+	driver, err := m.Open(":foo")
 	assert.Equal(t, nil, driver)
-	assert.Equal(t, ErrEmptyUrl, err)
+	assert.NotEqual(t, nil, err)
 }
 
 func TestMemory_Open_ErrInvalidUrlScheme(t *testing.T) {
@@ -121,10 +116,11 @@ func TestMemory_Open_ErrEmptyKey(t *testing.T) {
 	})
 
 	m := new(Memory)
-	for _, caseData := range testCasesKey {
-		driver, err := m.Open(scheme + caseData.key)
+
+	for _, testCase := range testCasesKey {
+		driver, err := m.Open(testCase.key)
 		assert.Equal(t, nil, driver)
-		assert.Equal(t, caseData.err, err)
+		assert.Error(t, err)
 	}
 
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	nurl "net/url"
 	"os"
 	"strings"
 	"sync"
@@ -68,25 +69,21 @@ func WithInstance(mig ...Migration) (source.Driver, error) {
 }
 
 // Open create new source.Driver using Memory based on url string.
-// url string should contain format: `inmem://{key}`
+// url string should contain format: `mem://{key}`
 // where `{key}` is a unique identifier registered using RegisterMigrations method.
 // ErrEmptyKey returned when key is not found, or other error will be thrown if unexpected things happen.
 // This is part of source.Driver interface implementation.
 func (m *Memory) Open(url string) (source.Driver, error) {
-	url = strings.TrimSpace(url)
-	if url == "" {
-		return nil, ErrEmptyUrl
+	u, err := nurl.Parse(url)
+	if err != nil {
+		return nil, err
 	}
 
-	if !strings.HasPrefix(url, scheme) {
+	if !strings.HasPrefix(u.Scheme, schemeKey) {
 		return nil, ErrInvalidUrlScheme
 	}
 
-	key := strings.TrimPrefix(url, scheme)
-	key = strings.TrimSpace(key)
-	if key == "" {
-		return nil, ErrEmptyKey
-	}
+	key := strings.TrimSpace(u.Host)
 
 	migrations.RLock()
 	defer migrations.RUnlock()
