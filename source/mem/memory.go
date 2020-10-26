@@ -1,16 +1,14 @@
 package mem
 
 import (
-	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	nurl "net/url"
-	"os"
 	"strings"
 	"sync"
 
 	"github.com/golang-migrate/migrate/v4/source"
+	"github.com/golang-migrate/migrate/v4/source/stub"
 )
 
 // init register to the source.Driver so it can be used easily
@@ -28,8 +26,7 @@ type Migration interface {
 // Memory implements source.Driver interface and hold in memory migration
 type Memory struct {
 	sync.RWMutex
-	currKey        string
-	migrationsData *source.Migrations
+	stub *stub.Stub
 }
 
 // Ensures that Memory implements source.Driver
@@ -37,9 +34,15 @@ var _ source.Driver = (*Memory)(nil)
 
 // WithInstance creates new instance using Memory driver.
 func WithInstance(mig ...Migration) (source.Driver, error) {
+	st := &stub.Stub{
+		Url:        "",
+		Instance:   nil,
+		Migrations: source.NewMigrations(),
+		Config:     &stub.Config{},
+	}
+
 	mem := &Memory{
-		currKey:        "WithInstance",
-		migrationsData: source.NewMigrations(),
+		stub: st,
 	}
 
 	mem.Lock()
@@ -50,14 +53,14 @@ func WithInstance(mig ...Migration) (source.Driver, error) {
 			return nil, ErrNilMigration
 		}
 
-		mem.migrationsData.Append(&source.Migration{
+		mem.stub.Migrations.Append(&source.Migration{
 			Version:    m.Version(),
 			Identifier: m.Up(),
 			Direction:  source.Up,
 			Raw:        fmt.Sprintf("%d.instance_memory.up", m.Version()),
 		})
 
-		mem.migrationsData.Append(&source.Migration{
+		mem.stub.Migrations.Append(&source.Migration{
 			Version:    m.Version(),
 			Identifier: m.Down(),
 			Direction:  source.Down,
@@ -92,9 +95,15 @@ func (m *Memory) Open(url string) (source.Driver, error) {
 		return nil, ErrNilMigration
 	}
 
+	st := &stub.Stub{
+		Url:        "",
+		Instance:   nil,
+		Migrations: srcMigration,
+		Config:     &stub.Config{},
+	}
+
 	return &Memory{
-		currKey:        key,
-		migrationsData: srcMigration,
+		stub: st,
 	}, nil
 }
 
@@ -107,80 +116,29 @@ func (m *Memory) Close() error {
 // First returns first migration data after sorted by version in ascending order.
 // This is part of source.Driver interface implementation.
 func (m *Memory) First() (version uint, err error) {
-	if v, ok := m.migrationsData.First(); ok {
-		return v, nil
-	}
-
-	err = &os.PathError{
-		Op:   "first",
-		Path: fmt.Sprintf("%s%s", scheme, m.currKey),
-		Err:  os.ErrNotExist,
-	}
-	return
+	return m.stub.First()
 }
 
 // Prev return previous version of current version value.
 // This is part of source.Driver interface implementation.
 func (m *Memory) Prev(version uint) (prevVersion uint, err error) {
-	if v, ok := m.migrationsData.Prev(version); ok {
-		return v, nil
-	}
-
-	err = &os.PathError{
-		Op:   fmt.Sprintf("prev for version %v", version),
-		Path: fmt.Sprintf("%s%s", scheme, m.currKey),
-		Err:  os.ErrNotExist,
-	}
-	return
+	return m.stub.Prev(version)
 }
 
 // Next return next version of current version value.
 // This is part of source.Driver interface implementation.
 func (m *Memory) Next(version uint) (nextVersion uint, err error) {
-	if v, ok := m.migrationsData.Next(version); ok {
-		return v, nil
-	}
-
-	err = &os.PathError{
-		Op:   fmt.Sprintf("next for version %v", version),
-		Path: fmt.Sprintf("%s%s", scheme, m.currKey),
-		Err:  os.ErrNotExist,
-	}
-	return
+	return m.stub.Next(version)
 }
 
 // ReadUp return the query that needs to be executed on source.Up command.
 // This is part of source.Driver interface implementation.
 func (m *Memory) ReadUp(version uint) (r io.ReadCloser, identifier string, err error) {
-	migration, ok := m.migrationsData.Up(version)
-	if !ok {
-		err = &os.PathError{
-			Op:   fmt.Sprintf("read up version %v", version),
-			Path: fmt.Sprintf("%s%s", scheme, m.currKey),
-			Err:  os.ErrNotExist,
-		}
-		return
-	}
-
-	r = ioutil.NopCloser(bytes.NewBufferString(migration.Identifier))
-	identifier = fmt.Sprintf("%d.memory.up", version)
-	return
+	return m.stub.ReadUp(version)
 }
 
 // ReadDown return the query that needs to be executed on source.Down command.
 // This is part of source.Driver interface implementation.
 func (m *Memory) ReadDown(version uint) (r io.ReadCloser, identifier string, err error) {
-	migration, ok := m.migrationsData.Down(version)
-	if !ok {
-		err = &os.PathError{
-			Op:   fmt.Sprintf("read down version %v", version),
-			Path: fmt.Sprintf("%s%s", scheme, m.currKey),
-			Err:  os.ErrNotExist,
-		}
-		return
-	}
-
-	r = ioutil.NopCloser(bytes.NewBufferString(migration.Identifier))
-	identifier = fmt.Sprintf("%d.memory.down", version)
-	return
+	return m.stub.ReadDown(version)
 }
