@@ -1,4 +1,4 @@
-# inmem
+# mem
 
 In memory (`mem`) driver useful when you want to always includes your database schema migration along with your binary.
 
@@ -29,7 +29,7 @@ func (m DummyMigration) Up() string { return m.UpQuery }
 
 func (m DummyMigration) Down() string { return m.DownQuery }
 
-var _ inmem.Migration = (*DummyMigration)(nil)
+var _ mem.Migration = (*DummyMigration)(nil)
 ```
 
 
@@ -58,7 +58,7 @@ func main() {
 ```go
 import (
   "github.com/golang-migrate/migrate/v4"
-  "github.com/golang-migrate/migrate/v4/source/inmem"
+  "github.com/golang-migrate/migrate/v4/source/mem"
 )
 
 func main() {
