@@ -31,6 +31,14 @@ const (
 	forceUsage = `force V      Set version V but don't run migration (ignores dirty state)`
 )
 
+func handleSubCmdHelp(help bool, usage string, flagSet *flag.FlagSet) {
+	if help {
+		fmt.Fprintln(os.Stderr, createUsage)
+		flagSet.PrintDefaults()
+		os.Exit(0)
+	}
+}
+
 // set main log
 var log = &Log{}
 
@@ -156,11 +164,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 			log.Println(err)
 		}
 
-		if *help {
-			log.Println(createUsage)
-			createFlagSet.PrintDefaults()
-			os.Exit(0)
-		}
+		handleSubCmdHelp(*help, createUsage, createFlagSet)
 
 		if createFlagSet.NArg() == 0 {
 			log.fatal("error: please specify name")
@@ -184,11 +188,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 			log.Println(err)
 		}
 
-		if *helpPtr {
-			log.Println(gotoUsage)
-			gotoSet.PrintDefaults()
-			os.Exit(0)
-		}
+		handleSubCmdHelp(*helpPtr, gotoUsage, gotoSet)
 
 		if migraterErr != nil {
 			log.fatalErr(migraterErr)
@@ -219,11 +219,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 			log.Println(err)
 		}
 
-		if *helpPtr {
-			log.Println(upUsage)
-			upSet.PrintDefaults()
-			os.Exit(0)
-		}
+		handleSubCmdHelp(*helpPtr, upUsage, upSet)
 
 		if migraterErr != nil {
 			log.fatalErr(migraterErr)
@@ -255,11 +251,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 			log.Println(err)
 		}
 
-		if *helpPtr {
-			log.Println(downUsage)
-			downFlagSet.PrintDefaults()
-			os.Exit(0)
-		}
+		handleSubCmdHelp(*helpPtr, downUsage, downFlagSet)
 
 		if migraterErr != nil {
 			log.fatalErr(migraterErr)
@@ -300,11 +292,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 			log.fatalErr(err)
 		}
 
-		if *help {
-			log.Println(dropUsage)
-			dropFlagSet.PrintDefaults()
-			os.Exit(0)
-		}
+		handleSubCmdHelp(*help, dropUsage, dropFlagSet)
 
 		if !*forceDrop {
 			log.Println("Are you sure you want to drop the entire database schema? [y/N]")
@@ -339,11 +327,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 			log.Println(err)
 		}
 
-		if *helpPtr {
-			log.Println(forceUsage)
-			forceSet.PrintDefaults()
-			os.Exit(0)
-		}
+		handleSubCmdHelp(*helpPtr, forceUsage, forceSet)
 
 		if migraterErr != nil {
 			log.fatalErr(migraterErr)
