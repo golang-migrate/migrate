@@ -33,13 +33,13 @@ const (
 
 func handleSubCmdHelp(help bool, usage string, flagSet *flag.FlagSet) {
 	if help {
-		fmt.Fprintln(os.Stderr, createUsage)
+		fmt.Fprintln(os.Stderr, usage)
 		flagSet.PrintDefaults()
 		os.Exit(0)
 	}
 }
 func newFlagSetWithHelp(name string, errHandling flag.ErrorHandling) (*flag.FlagSet, *bool) {
-	flagSet := flag.NewFlagSet(name, flag.ExitOnError)
+	flagSet := flag.NewFlagSet(name, errHandling)
 	helpPtr := flagSet.Bool("help", false, "Print help information")
 	return flagSet, helpPtr
 }
