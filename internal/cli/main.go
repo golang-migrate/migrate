@@ -38,8 +38,9 @@ func handleSubCmdHelp(help bool, usage string, flagSet *flag.FlagSet) {
 		os.Exit(0)
 	}
 }
-func newFlagSetWithHelp(name string, errHandling flag.ErrorHandling) (*flag.FlagSet, *bool) {
-	flagSet := flag.NewFlagSet(name, errHandling)
+
+func newFlagSetWithHelp(name string) (*flag.FlagSet, *bool) {
+	flagSet := flag.NewFlagSet(name, flag.ExitOnError)
 	helpPtr := flagSet.Bool("help", false, "Print help information")
 	return flagSet, helpPtr
 }
@@ -157,7 +158,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 		seq := false
 		seqDigits := 6
 
-		createFlagSet, help := newFlagSetWithHelp("create", flag.ExitOnError)
+		createFlagSet, help := newFlagSetWithHelp("create")
 		extPtr := createFlagSet.String("ext", "", "File extension")
 		dirPtr := createFlagSet.String("dir", "", "Directory to place file in (default: current working directory)")
 		formatPtr := createFlagSet.String("format", defaultTimeFormat, `The Go time format string to use. If the string "unix" or "unixNano" is specified, then the seconds or nanoseconds since January 1, 1970 UTC respectively will be used. Caution, due to the behavior of time.Time.Format(), invalid format strings will not error`)
@@ -185,7 +186,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 
 	case "goto":
 
-		gotoSet, helpPtr := newFlagSetWithHelp("goto", flag.ExitOnError)
+		gotoSet, helpPtr := newFlagSetWithHelp("goto")
 
 		if err := gotoSet.Parse(args); err != nil {
 			log.Println(err)
@@ -215,7 +216,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 		}
 
 	case "up":
-		upSet, helpPtr := newFlagSetWithHelp("up", flag.ExitOnError)
+		upSet, helpPtr := newFlagSetWithHelp("up")
 
 		if err := upSet.Parse(args); err != nil {
 			log.Println(err)
@@ -245,7 +246,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 		}
 
 	case "down":
-		downFlagSet, helpPtr := newFlagSetWithHelp("down", flag.ExitOnError)
+		downFlagSet, helpPtr := newFlagSetWithHelp("down")
 		applyAll := downFlagSet.Bool("all", false, "Apply all down migrations")
 
 		if err := downFlagSet.Parse(args); err != nil {
@@ -285,7 +286,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 		}
 
 	case "drop":
-		dropFlagSet, help := newFlagSetWithHelp("drop", flag.ExitOnError)
+		dropFlagSet, help := newFlagSetWithHelp("drop")
 		forceDrop := dropFlagSet.Bool("f", false, "Force the drop command by bypassing the confirmation prompt")
 
 		if err := dropFlagSet.Parse(args); err != nil {
@@ -320,7 +321,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 		}
 
 	case "force":
-		forceSet, helpPtr := newFlagSetWithHelp("force", flag.ExitOnError)
+		forceSet, helpPtr := newFlagSetWithHelp("force")
 
 		if err := forceSet.Parse(args); err != nil {
 			log.Println(err)
