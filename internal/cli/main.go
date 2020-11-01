@@ -250,7 +250,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 		applyAll := downFlagSet.Bool("all", false, "Apply all down migrations")
 
 		if err := downFlagSet.Parse(args); err != nil {
-			log.Println(err)
+			log.fatalErr(err)
 		}
 
 		handleSubCmdHelp(*helpPtr, downUsage, downFlagSet)
