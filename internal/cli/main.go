@@ -166,7 +166,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 		createFlagSet.IntVar(&seqDigits, "digits", seqDigits, "The number of digits to use in sequences (default: 6)")
 
 		if err := createFlagSet.Parse(args); err != nil {
-			log.Println(err)
+			log.fatalErr(err)
 		}
 
 		handleSubCmdHelp(*help, createUsage, createFlagSet)
@@ -189,7 +189,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 		gotoSet, helpPtr := newFlagSetWithHelp("goto")
 
 		if err := gotoSet.Parse(args); err != nil {
-			log.Println(err)
+			log.fatalErr(err)
 		}
 
 		handleSubCmdHelp(*helpPtr, gotoUsage, gotoSet)
@@ -219,7 +219,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 		upSet, helpPtr := newFlagSetWithHelp("up")
 
 		if err := upSet.Parse(args); err != nil {
-			log.Println(err)
+			log.fatalErr(err)
 		}
 
 		handleSubCmdHelp(*helpPtr, upUsage, upSet)
@@ -324,7 +324,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 		forceSet, helpPtr := newFlagSetWithHelp("force")
 
 		if err := forceSet.Parse(args); err != nil {
-			log.Println(err)
+			log.fatalErr(err)
 		}
 
 		handleSubCmdHelp(*helpPtr, forceUsage, forceSet)
