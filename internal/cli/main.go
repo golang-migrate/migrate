@@ -15,10 +15,46 @@ import (
 	"github.com/golang-migrate/migrate/v4/source"
 )
 
-const defaultTimeFormat = "20060102150405"
+const (
+	defaultTimeFormat = "20060102150405"
+	createUsage       = `create [-ext E] [-dir D] [-seq] [-digits N] [-format] NAME
+	   Create a set of timestamped up/down migrations titled NAME, in directory D with extension E.
+	   Use -seq option to generate sequential up/down migrations with N digits.
+	   Use -format option to specify a Go time format string. Note: migrations with the same time cause "duplicate migration version" error. 
+`
+	gotoUsage = `goto V       Migrate to version V`
+	upUsage   = `up [N]       Apply all or N up migrations`
+	downUsage = `down [N]     Apply all or N down migrations`
+	dropUsage = `drop [-f] [-all]    Drop everything inside database
+	Use -f to bypass confirmation
+	Use -all to apply all down migrations`
+	forceUsage = `force V      Set version V but don't run migration (ignores dirty state)`
+)
+
+func handleSubCmdHelp(help bool, usage string, flagSet *flag.FlagSet) {
+	if help {
+		fmt.Fprintln(os.Stderr, usage)
+		flagSet.PrintDefaults()
+		os.Exit(0)
+	}
+}
+
+func newFlagSetWithHelp(name string) (*flag.FlagSet, *bool) {
+	flagSet := flag.NewFlagSet(name, flag.ExitOnError)
+	helpPtr := flagSet.Bool("help", false, "Print help information")
+	return flagSet, helpPtr
+}
 
 // set main log
 var log = &Log{}
+
+func printUsageAndExit() {
+	flag.Usage()
+
+	// If a command is not found we exit with a status 2 to match the behavior
+	// of flag.Parse() with flag.ExitOnError when parsing an invalid flag.
+	os.Exit(2)
+}
 
 // Main function of a cli application. It is public for backwards compatibility with `cli` package
 func Main(version string) {
@@ -32,7 +68,7 @@ func Main(version string) {
 	sourcePtr := flag.String("source", "", "")
 
 	flag.Usage = func() {
-		fmt.Fprint(os.Stderr,
+		fmt.Fprintf(os.Stderr,
 			`Usage: migrate OPTIONS COMMAND [arg...]
        migrate [ -version | -help ]
 
@@ -47,20 +83,16 @@ Options:
   -help            Print usage
 
 Commands:
-  create [-ext E] [-dir D] [-seq] [-digits N] [-format] NAME
-			   Create a set of timestamped up/down migrations titled NAME, in directory D with extension E.
-			   Use -seq option to generate sequential up/down migrations with N digits.
-			   Use -format option to specify a Go time format string. Note: migrations with the same time cause "duplicate migration version" error. 
-  goto V       Migrate to version V
-  up [N]       Apply all or N up migrations
-  down [N]     Apply all or N down migrations
-  drop [-f]    Drop everything inside database
-               Use -f to bypass confirmation
-  force V      Set version V but don't run migration (ignores dirty state)
+  %s
+  %s
+  %s
+  %s
+  %s
+  %s
   version      Print current migration version
 
 Source drivers: `+strings.Join(source.List(), ", ")+`
-Database drivers: `+strings.Join(database.List(), ", ")+"\n")
+Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoUsage, upUsage, downUsage, dropUsage, forceUsage)
 	}
 
 	flag.Parse()
@@ -115,21 +147,29 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 
 	startTime := time.Now()
 
+	if len(flag.Args()) < 1 {
+		printUsageAndExit()
+	}
+	args := flag.Args()[1:]
+
 	switch flag.Arg(0) {
 	case "create":
-		args := flag.Args()[1:]
+
 		seq := false
 		seqDigits := 6
 
-		createFlagSet := flag.NewFlagSet("create", flag.ExitOnError)
+		createFlagSet, help := newFlagSetWithHelp("create")
 		extPtr := createFlagSet.String("ext", "", "File extension")
 		dirPtr := createFlagSet.String("dir", "", "Directory to place file in (default: current working directory)")
 		formatPtr := createFlagSet.String("format", defaultTimeFormat, `The Go time format string to use. If the string "unix" or "unixNano" is specified, then the seconds or nanoseconds since January 1, 1970 UTC respectively will be used. Caution, due to the behavior of time.Time.Format(), invalid format strings will not error`)
 		createFlagSet.BoolVar(&seq, "seq", seq, "Use sequential numbers instead of timestamps (default: false)")
 		createFlagSet.IntVar(&seqDigits, "digits", seqDigits, "The number of digits to use in sequences (default: 6)")
+
 		if err := createFlagSet.Parse(args); err != nil {
-			log.Println(err)
+			log.fatalErr(err)
 		}
+
+		handleSubCmdHelp(*help, createUsage, createFlagSet)
 
 		if createFlagSet.NArg() == 0 {
 			log.fatal("error: please specify name")
@@ -145,11 +185,20 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 		}
 
 	case "goto":
+
+		gotoSet, helpPtr := newFlagSetWithHelp("goto")
+
+		if err := gotoSet.Parse(args); err != nil {
+			log.fatalErr(err)
+		}
+
+		handleSubCmdHelp(*helpPtr, gotoUsage, gotoSet)
+
 		if migraterErr != nil {
 			log.fatalErr(migraterErr)
 		}
 
-		if flag.Arg(1) == "" {
+		if flag.NArg() == 0 {
 			log.fatal("error: please specify version argument V")
 		}
 
@@ -167,12 +216,20 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 		}
 
 	case "up":
+		upSet, helpPtr := newFlagSetWithHelp("up")
+
+		if err := upSet.Parse(args); err != nil {
+			log.fatalErr(err)
+		}
+
+		handleSubCmdHelp(*helpPtr, upUsage, upSet)
+
 		if migraterErr != nil {
 			log.fatalErr(migraterErr)
 		}
 
 		limit := -1
-		if flag.Arg(1) != "" {
+		if flag.NArg() > 0 {
 			n, err := strconv.ParseUint(flag.Arg(1), 10, 64)
 			if err != nil {
 				log.fatal("error: can't read limit argument N")
@@ -189,16 +246,17 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 		}
 
 	case "down":
-		if migraterErr != nil {
-			log.fatalErr(migraterErr)
-		}
-
-		downFlagSet := flag.NewFlagSet("down", flag.ExitOnError)
+		downFlagSet, helpPtr := newFlagSetWithHelp("down")
 		applyAll := downFlagSet.Bool("all", false, "Apply all down migrations")
 
-		args := flag.Args()[1:]
 		if err := downFlagSet.Parse(args); err != nil {
 			log.fatalErr(err)
+		}
+
+		handleSubCmdHelp(*helpPtr, downUsage, downFlagSet)
+
+		if migraterErr != nil {
+			log.fatalErr(migraterErr)
 		}
 
 		downArgs := downFlagSet.Args()
@@ -228,13 +286,14 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 		}
 
 	case "drop":
-		dropFlagSet := flag.NewFlagSet("drop", flag.ExitOnError)
+		dropFlagSet, help := newFlagSetWithHelp("drop")
 		forceDrop := dropFlagSet.Bool("f", false, "Force the drop command by bypassing the confirmation prompt")
 
-		args := flag.Args()[1:]
 		if err := dropFlagSet.Parse(args); err != nil {
 			log.fatalErr(err)
 		}
+
+		handleSubCmdHelp(*help, dropUsage, dropFlagSet)
 
 		if !*forceDrop {
 			log.Println("Are you sure you want to drop the entire database schema? [y/N]")
@@ -262,11 +321,19 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 		}
 
 	case "force":
+		forceSet, helpPtr := newFlagSetWithHelp("force")
+
+		if err := forceSet.Parse(args); err != nil {
+			log.fatalErr(err)
+		}
+
+		handleSubCmdHelp(*helpPtr, forceUsage, forceSet)
+
 		if migraterErr != nil {
 			log.fatalErr(migraterErr)
 		}
 
-		if flag.Arg(1) == "" {
+		if flag.NArg() == 0 {
 			log.fatal("error: please specify version argument V")
 		}
 
@@ -297,10 +364,6 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n")
 		}
 
 	default:
-		flag.Usage()
-
-		// If a command is not found we exit with a status 2 to match the behavior
-		// of flag.Parse() with flag.ExitOnError when parsing an invalid flag.
-		os.Exit(2)
+		printUsageAndExit()
 	}
 }
