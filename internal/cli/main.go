@@ -198,11 +198,11 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 			log.fatalErr(migraterErr)
 		}
 
-		if flag.NArg() == 0 {
+		if gotoSet.NArg() == 0 {
 			log.fatal("error: please specify version argument V")
 		}
 
-		v, err := strconv.ParseUint(flag.Arg(1), 10, 64)
+		v, err := strconv.ParseUint(gotoSet.Arg(0), 10, 64)
 		if err != nil {
 			log.fatal("error: can't read version argument V")
 		}
@@ -229,8 +229,8 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 		}
 
 		limit := -1
-		if flag.NArg() > 0 {
-			n, err := strconv.ParseUint(flag.Arg(1), 10, 64)
+		if upSet.NArg() > 0 {
+			n, err := strconv.ParseUint(upSet.Arg(0), 10, 64)
 			if err != nil {
 				log.fatal("error: can't read limit argument N")
 			}
@@ -333,11 +333,11 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 			log.fatalErr(migraterErr)
 		}
 
-		if flag.NArg() == 0 {
+		if forceSet.NArg() == 0 {
 			log.fatal("error: please specify version argument V")
 		}
 
-		v, err := strconv.ParseInt(flag.Arg(1), 10, 64)
+		v, err := strconv.ParseInt(forceSet.Arg(0), 10, 64)
 		if err != nil {
 			log.fatal("error: can't read version argument V")
 		}
