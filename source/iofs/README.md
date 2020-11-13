@@ -2,7 +2,7 @@
 
 Driver with file system interface (`io/fs#FS`) supported from Go 1.16.
 
-This Driver cannot be used with versions below Go 1.15.
+This Driver cannot be used with Go versions 1.15 and below.
 
 ## Usage
 
