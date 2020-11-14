@@ -23,7 +23,7 @@ func Test(t *testing.T) {
 }
 
 func TestOpen(t *testing.T) {
-	i := new(iofs.Iofs)
+	i := new(iofs.IoFS)
 	_, err := i.Open("")
 	if err == nil {
 		t.Fatal("iofs driver does not support open by url")
