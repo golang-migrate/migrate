@@ -31,13 +31,13 @@ func NewDriver(fsys fs.FS, path string) (source.Driver, error) {
 
 // Open is part of source.Driver interface implementation.
 // Open panics when called directly.
-func (i *Driver) Open(url string) (source.Driver, error) {
+func (d *Driver) Open(url string) (source.Driver, error) {
 	panic("iofs: Driver does not support open with url")
 }
 
 // Init prepares not initialized IoFS instance to read migrations from a
 // io/fs#FS instance and a relative path.
-func (i *Driver) Init(fsys fs.FS, path string) error {
+func (d *Driver) Init(fsys fs.FS, path string) error {
 	entries, err := fs.ReadDir(fsys, path)
 	if err != nil {
 		return err
@@ -64,9 +64,9 @@ func (i *Driver) Init(fsys fs.FS, path string) error {
 		}
 	}
 
-	i.fsys = fsys
-	i.path = path
-	i.migrations = ms
+	d.fsys = fsys
+	d.path = path
+	d.migrations = ms
 	return nil
 }
 
@@ -81,45 +81,45 @@ func (d *Driver) Close() error {
 }
 
 // First is part of source.Driver interface implementation.
-func (i *Driver) First() (version uint, err error) {
-	if version, ok := i.migrations.First(); ok {
+func (d *Driver) First() (version uint, err error) {
+	if version, ok := d.migrations.First(); ok {
 		return version, nil
 	}
 	return 0, &fs.PathError{
 		Op:   "first",
-		Path: i.path,
+		Path: d.path,
 		Err:  fs.ErrNotExist,
 	}
 }
 
 // Prev is part of source.Driver interface implementation.
-func (i *Driver) Prev(version uint) (prevVersion uint, err error) {
-	if version, ok := i.migrations.Prev(version); ok {
+func (d *Driver) Prev(version uint) (prevVersion uint, err error) {
+	if version, ok := d.migrations.Prev(version); ok {
 		return version, nil
 	}
 	return 0, &fs.PathError{
 		Op:   "prev for version " + strconv.FormatUint(uint64(version), 10),
-		Path: i.path,
+		Path: d.path,
 		Err:  fs.ErrNotExist,
 	}
 }
 
 // Next is part of source.Driver interface implementation.
-func (i *Driver) Next(version uint) (nextVersion uint, err error) {
-	if version, ok := i.migrations.Next(version); ok {
+func (d *Driver) Next(version uint) (nextVersion uint, err error) {
+	if version, ok := d.migrations.Next(version); ok {
 		return version, nil
 	}
 	return 0, &fs.PathError{
 		Op:   "next for version " + strconv.FormatUint(uint64(version), 10),
-		Path: i.path,
+		Path: d.path,
 		Err:  fs.ErrNotExist,
 	}
 }
 
 // ReadUp is part of source.Driver interface implementation.
-func (i *Driver) ReadUp(version uint) (r io.ReadCloser, identifier string, err error) {
-	if m, ok := i.migrations.Up(version); ok {
-		body, err := i.open(path.Join(i.path, m.Raw))
+func (d *Driver) ReadUp(version uint) (r io.ReadCloser, identifier string, err error) {
+	if m, ok := d.migrations.Up(version); ok {
+		body, err := d.open(path.Join(d.path, m.Raw))
 		if err != nil {
 			return nil, "", err
 		}
@@ -127,15 +127,15 @@ func (i *Driver) ReadUp(version uint) (r io.ReadCloser, identifier string, err e
 	}
 	return nil, "", &fs.PathError{
 		Op:   "read up for version " + strconv.FormatUint(uint64(version), 10),
-		Path: i.path,
+		Path: d.path,
 		Err:  fs.ErrNotExist,
 	}
 }
 
 // ReadDown is part of source.Driver interface implementation.
-func (i *Driver) ReadDown(version uint) (r io.ReadCloser, identifier string, err error) {
-	if m, ok := i.migrations.Down(version); ok {
-		body, err := i.open(path.Join(i.path, m.Raw))
+func (d *Driver) ReadDown(version uint) (r io.ReadCloser, identifier string, err error) {
+	if m, ok := d.migrations.Down(version); ok {
+		body, err := d.open(path.Join(d.path, m.Raw))
 		if err != nil {
 			return nil, "", err
 		}
@@ -143,13 +143,13 @@ func (i *Driver) ReadDown(version uint) (r io.ReadCloser, identifier string, err
 	}
 	return nil, "", &fs.PathError{
 		Op:   "read down for version " + strconv.FormatUint(uint64(version), 10),
-		Path: i.path,
+		Path: d.path,
 		Err:  fs.ErrNotExist,
 	}
 }
 
-func (i *Driver) open(path string) (fs.File, error) {
-	f, err := i.fsys.Open(path)
+func (d *Driver) open(path string) (fs.File, error) {
+	f, err := d.fsys.Open(path)
 	if err == nil {
 		return f, nil
 	}
