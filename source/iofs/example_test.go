@@ -24,5 +24,8 @@ func Example() {
 		log.Fatal(err)
 	}
 	err = m.Up()
+	if err != nil {
+		// ...
+	}
 	// ...
 }
