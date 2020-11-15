@@ -50,11 +50,11 @@ func (d *Driver) Init(fsys fs.FS, path string) error {
 		}
 		m, err := source.DefaultParse(e.Name())
 		if err != nil {
-			continue
+			return err
 		}
 		file, err := e.Info()
 		if err != nil {
-			continue
+			return err
 		}
 		if !ms.Append(m) {
 			return source.ErrDuplicateMigration{
