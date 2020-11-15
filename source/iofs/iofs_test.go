@@ -10,11 +10,10 @@ import (
 	st "github.com/golang-migrate/migrate/v4/source/testing"
 )
 
-//go:embed testdata
-var fs embed.FS
-
 func Test(t *testing.T) {
-	d, err := iofs.WithInstance(fs, "testdata")
+	//go:embed testdata/migrations/*.sql
+	var fs embed.FS
+	d, err := iofs.WithInstance(fs, "testdata/migrations")
 	if err != nil {
 		t.Fatal(err)
 	}
