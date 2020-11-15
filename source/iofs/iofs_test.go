@@ -13,18 +13,10 @@ import (
 func Test(t *testing.T) {
 	//go:embed testdata/migrations/*.sql
 	var fs embed.FS
-	d, err := iofs.WithInstance(fs, "testdata/migrations")
+	d, err := iofs.NewDriver(fs, "testdata/migrations")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	st.Test(t, d)
-}
-
-func TestOpen(t *testing.T) {
-	i := new(iofs.IoFS)
-	_, err := i.Open("")
-	if err == nil {
-		t.Fatal("iofs driver does not support open by url")
-	}
 }

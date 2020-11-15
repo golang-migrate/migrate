@@ -15,7 +15,7 @@ import (
 var fs embed.FS
 
 func Example() {
-	d, err := iofs.WithInstance(fs, "testdata/migrations")
+	d, err := iofs.NewDriver(fs, "testdata/migrations")
 	if err != nil {
 		log.Fatal(err)
 	}
