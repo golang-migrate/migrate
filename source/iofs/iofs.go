@@ -70,9 +70,14 @@ func (i *Driver) Init(fsys fs.FS, path string) error {
 	return nil
 }
 
-// Close is part of source.Driver interface implementation. This is a no-op.
-func (i *Driver) Close() error {
-	return nil
+// Close is part of source.Driver interface implementation.
+// Closes the file system if possible.
+func (d *Driver) Close() error {
+	c, ok := d.fsys.(io.Closer)
+	if !ok {
+		return nil
+	}
+	return c.Close()
 }
 
 // First is part of source.Driver interface implementation.
