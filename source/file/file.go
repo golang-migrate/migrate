@@ -12,8 +12,6 @@ func init() {
 	source.Register("file", &File{})
 }
 
-type File = file
-
 func parseURL(url string) (string, error) {
 	u, err := nurl.Parse(url)
 	if err != nil {

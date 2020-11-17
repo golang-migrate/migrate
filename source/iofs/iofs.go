@@ -13,16 +13,13 @@ import (
 	"github.com/golang-migrate/migrate/v4/source"
 )
 
-// Driver is a source driver that wraps io/fs#FS.
-type Driver struct {
-	migrations *source.Migrations
-	fsys       fs.FS
-	path       string
+type driver struct {
+	PartialDriver
 }
 
-// NewDriver returns a new Driver from io/fs#FS and a relative path.
-func NewDriver(fsys fs.FS, path string) (source.Driver, error) {
-	var i Driver
+// New returns a new Driver from io/fs#FS and a relative path.
+func New(fsys fs.FS, path string) (source.Driver, error) {
+	var i driver
 	if err := i.Init(fsys, path); err != nil {
 		return nil, fmt.Errorf("failed to init driver with path %s: %w", path, err)
 	}
@@ -31,13 +28,25 @@ func NewDriver(fsys fs.FS, path string) (source.Driver, error) {
 
 // Open is part of source.Driver interface implementation.
 // Open panics when called directly.
-func (d *Driver) Open(url string) (source.Driver, error) {
-	panic("iofs: Driver does not support open with url")
+func (d *driver) Open(url string) (source.Driver, error) {
+	panic("iofs: driver does not support open with url")
+}
+
+// PartialDriver is a helper service for creating new source drivers working with
+// io/fs.FS instances. It implements all source.Driver interface methods
+// except for Open(). New driver could embed this struct and add missing Open()
+// method.
+//
+// To prepare PartialDriver for use Init() function.
+type PartialDriver struct {
+	migrations *source.Migrations
+	fsys       fs.FS
+	path       string
 }
 
 // Init prepares not initialized IoFS instance to read migrations from a
 // io/fs#FS instance and a relative path.
-func (d *Driver) Init(fsys fs.FS, path string) error {
+func (d *PartialDriver) Init(fsys fs.FS, path string) error {
 	entries, err := fs.ReadDir(fsys, path)
 	if err != nil {
 		return err
@@ -50,7 +59,7 @@ func (d *Driver) Init(fsys fs.FS, path string) error {
 		}
 		m, err := source.DefaultParse(e.Name())
 		if err != nil {
-			return err
+			continue
 		}
 		file, err := e.Info()
 		if err != nil {
@@ -72,7 +81,7 @@ func (d *Driver) Init(fsys fs.FS, path string) error {
 
 // Close is part of source.Driver interface implementation.
 // Closes the file system if possible.
-func (d *Driver) Close() error {
+func (d *PartialDriver) Close() error {
 	c, ok := d.fsys.(io.Closer)
 	if !ok {
 		return nil
@@ -81,7 +90,7 @@ func (d *Driver) Close() error {
 }
 
 // First is part of source.Driver interface implementation.
-func (d *Driver) First() (version uint, err error) {
+func (d *PartialDriver) First() (version uint, err error) {
 	if version, ok := d.migrations.First(); ok {
 		return version, nil
 	}
@@ -93,7 +102,7 @@ func (d *Driver) First() (version uint, err error) {
 }
 
 // Prev is part of source.Driver interface implementation.
-func (d *Driver) Prev(version uint) (prevVersion uint, err error) {
+func (d *PartialDriver) Prev(version uint) (prevVersion uint, err error) {
 	if version, ok := d.migrations.Prev(version); ok {
 		return version, nil
 	}
@@ -105,7 +114,7 @@ func (d *Driver) Prev(version uint) (prevVersion uint, err error) {
 }
 
 // Next is part of source.Driver interface implementation.
-func (d *Driver) Next(version uint) (nextVersion uint, err error) {
+func (d *PartialDriver) Next(version uint) (nextVersion uint, err error) {
 	if version, ok := d.migrations.Next(version); ok {
 		return version, nil
 	}
@@ -117,7 +126,7 @@ func (d *Driver) Next(version uint) (nextVersion uint, err error) {
 }
 
 // ReadUp is part of source.Driver interface implementation.
-func (d *Driver) ReadUp(version uint) (r io.ReadCloser, identifier string, err error) {
+func (d *PartialDriver) ReadUp(version uint) (r io.ReadCloser, identifier string, err error) {
 	if m, ok := d.migrations.Up(version); ok {
 		body, err := d.open(path.Join(d.path, m.Raw))
 		if err != nil {
@@ -133,7 +142,7 @@ func (d *Driver) ReadUp(version uint) (r io.ReadCloser, identifier string, err e
 }
 
 // ReadDown is part of source.Driver interface implementation.
-func (d *Driver) ReadDown(version uint) (r io.ReadCloser, identifier string, err error) {
+func (d *PartialDriver) ReadDown(version uint) (r io.ReadCloser, identifier string, err error) {
 	if m, ok := d.migrations.Down(version); ok {
 		body, err := d.open(path.Join(d.path, m.Raw))
 		if err != nil {
@@ -148,7 +157,7 @@ func (d *Driver) ReadDown(version uint) (r io.ReadCloser, identifier string, err
 	}
 }
 
-func (d *Driver) open(path string) (fs.File, error) {
+func (d *PartialDriver) open(path string) (fs.File, error) {
 	f, err := d.fsys.Open(path)
 	if err == nil {
 		return f, nil

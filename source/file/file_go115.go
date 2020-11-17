@@ -9,13 +9,13 @@ import (
 	"github.com/golang-migrate/migrate/v4/source/httpfs"
 )
 
-type file struct {
+type File struct {
 	httpfs.PartialDriver
 	url  string
 	path string
 }
 
-func (f *file) Open(url string) (source.Driver, error) {
+func (f *File) Open(url string) (source.Driver, error) {
 	p, err := parseURL(url)
 	if err != nil {
 		return nil, err

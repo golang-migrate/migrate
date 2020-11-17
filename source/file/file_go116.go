@@ -9,18 +9,18 @@ import (
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 )
 
-type file struct {
-	iofs.Driver
+type File struct {
+	iofs.PartialDriver
 	url  string
 	path string
 }
 
-func (f *file) Open(url string) (source.Driver, error) {
+func (f *File) Open(url string) (source.Driver, error) {
 	p, err := parseURL(url)
 	if err != nil {
 		return nil, err
 	}
-	nf := &file{
+	nf := &File{
 		url:  url,
 		path: p,
 	}
