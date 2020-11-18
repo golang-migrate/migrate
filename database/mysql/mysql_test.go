@@ -39,12 +39,23 @@ var (
 		Env:          map[string]string{"MYSQL_ROOT_PASSWORD": "root", "MYSQL_DATABASE": "public"},
 		PortRequired: true, ReadyFunc: isReady,
 	}
+	optsAnsiQuotes = dktest.Options{
+		Env:          map[string]string{"MYSQL_ROOT_PASSWORD": "root", "MYSQL_DATABASE": "public"},
+		PortRequired: true, ReadyFunc: isReady,
+		Cmd: []string{"--sql-mode=ANSI_QUOTES"},
+	}
 	// Supported versions: https://www.mysql.com/support/supportedplatforms/database.html
 	specs = []dktesting.ContainerSpec{
 		{ImageName: "mysql:5.5", Options: opts},
 		{ImageName: "mysql:5.6", Options: opts},
 		{ImageName: "mysql:5.7", Options: opts},
 		{ImageName: "mysql:8", Options: opts},
+	}
+	specsAnsiQuotes = []dktesting.ContainerSpec{
+		{ImageName: "mysql:5.5", Options: optsAnsiQuotes},
+		{ImageName: "mysql:5.6", Options: optsAnsiQuotes},
+		{ImageName: "mysql:5.7", Options: optsAnsiQuotes},
+		{ImageName: "mysql:8", Options: optsAnsiQuotes},
 	}
 )
 
@@ -113,6 +124,44 @@ func TestMigrate(t *testing.T) {
 	// mysql.SetLogger(mysql.Logger(log.New(ioutil.Discard, "", log.Ltime)))
 
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.Port(defaultPort)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := fmt.Sprintf("mysql://root:root@tcp(%v:%v)/public", ip, port)
+		p := &Mysql{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
+
+		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "public", d)
+		if err != nil {
+			t.Fatal(err)
+		}
+		dt.TestMigrate(t, m)
+
+		// check ensureVersionTable
+		if err := d.(*Mysql).ensureVersionTable(); err != nil {
+			t.Fatal(err)
+		}
+		// check again
+		if err := d.(*Mysql).ensureVersionTable(); err != nil {
+			t.Fatal(err)
+		}
+	})
+}
+
+func TestMigrateAnsiQuotes(t *testing.T) {
+	// mysql.SetLogger(mysql.Logger(log.New(ioutil.Discard, "", log.Ltime)))
+
+	dktesting.ParallelTest(t, specsAnsiQuotes, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.Port(defaultPort)
 		if err != nil {
 			t.Fatal(err)
