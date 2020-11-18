@@ -42,7 +42,7 @@ var (
 	optsAnsiQuotes = dktest.Options{
 		Env:          map[string]string{"MYSQL_ROOT_PASSWORD": "root", "MYSQL_DATABASE": "public"},
 		PortRequired: true, ReadyFunc: isReady,
-		Cmd:          []string{"--sql-mode=ANSI_QUOTES"},
+		Cmd: []string{"--sql-mode=ANSI_QUOTES"},
 	}
 	// Supported versions: https://www.mysql.com/support/supportedplatforms/database.html
 	specs = []dktesting.ContainerSpec{
