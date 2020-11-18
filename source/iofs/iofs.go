@@ -27,9 +27,9 @@ func New(fsys fs.FS, path string) (source.Driver, error) {
 }
 
 // Open is part of source.Driver interface implementation.
-// Open panics when called directly.
+// Open cannot be called on the iofs passthrough driver.
 func (d *driver) Open(url string) (source.Driver, error) {
-	panic("iofs: driver does not support open with url")
+	return nil, errors.New("Open() cannot be called on the iofs passthrough driver")
 }
 
 // PartialDriver is a helper service for creating new source drivers working with
