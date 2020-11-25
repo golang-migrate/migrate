@@ -131,7 +131,7 @@ func TestReadUp(t *testing.T, d source.Driver) {
 		}
 		if up != nil {
 			if err := up.Close(); err != nil {
-				t.Log(err)
+				t.Error(err)
 			}
 		}
 	}
@@ -173,7 +173,7 @@ func TestReadDown(t *testing.T, d source.Driver) {
 		}
 		if down != nil {
 			if err := down.Close(); err != nil {
-				t.Log(err)
+				t.Error(err)
 			}
 		}
 	}
