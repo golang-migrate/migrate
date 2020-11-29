@@ -508,5 +508,46 @@ func Test_computeLineFromPos(t *testing.T) {
 			run(true, true)
 		})
 	}
+}
 
+func Test_quoteIdentifier(t *testing.T) {
+	testcases := []struct {
+		migrationsTableHasSchema bool
+		name                     string
+		want                     string
+	}{
+		{
+			true,
+			"schema_name.table_name",
+			"\"schema_name\".\"table_name\"",
+		},
+		{
+			true,
+			"schema_name.table.name",
+			"\"schema_name\".\"table.name\"",
+		},
+		{
+			false,
+			"table_name",
+			"\"table_name\"",
+		},
+		{
+			false,
+			"table.name",
+			"\"table.name\"",
+		},
+	}
+	p := &Postgres{
+		config: &Config{
+			MigrationsTableHasSchema: true,
+		},
+	}
+
+	for _, tc := range testcases {
+		p.config.MigrationsTableHasSchema = tc.migrationsTableHasSchema
+		got := p.quoteIdentifier(tc.name)
+		if tc.want != got {
+			t.Fatalf("expected %s but got %s", tc.want, got)
+	}
+	}
 }

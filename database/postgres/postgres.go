@@ -35,10 +35,11 @@ var (
 )
 
 type Config struct {
-	MigrationsTable  string
-	DatabaseName     string
-	SchemaName       string
-	StatementTimeout time.Duration
+	MigrationsTableHasSchema bool
+	MigrationsTable          string
+	DatabaseName             string
+	SchemaName               string
+	StatementTimeout         time.Duration
 }
 
 type Postgres struct {
@@ -124,6 +125,7 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 
 	migrationsTable := purl.Query().Get("x-migrations-table")
 	statementTimeoutString := purl.Query().Get("x-statement-timeout")
+	migrationsTableHasSchemaString := purl.Query().Get("x-migrations-table-has-schema")
 	statementTimeout := 0
 	if statementTimeoutString != "" {
 		statementTimeout, err = strconv.Atoi(statementTimeoutString)
@@ -132,10 +134,19 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 		}
 	}
 
+	migrationsTableHasSchema := false
+	if migrationsTableHasSchemaString != "" {
+		migrationsTableHasSchema, err = strconv.ParseBool(migrationsTableHasSchemaString)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	px, err := WithInstance(db, &Config{
-		DatabaseName:     purl.Path,
-		MigrationsTable:  migrationsTable,
-		StatementTimeout: time.Duration(statementTimeout) * time.Millisecond,
+		DatabaseName:             purl.Path,
+		MigrationsTableHasSchema: migrationsTableHasSchema,
+		MigrationsTable:          migrationsTable,
+		StatementTimeout:         time.Duration(statementTimeout) * time.Millisecond,
 	})
 
 	if err != nil {
@@ -266,13 +277,23 @@ func runesLastIndex(input []rune, target rune) int {
 	return -1
 }
 
+func (p *Postgres) quoteIdentifier(name string) string {
+	if p.config.MigrationsTableHasSchema {
+		firstDotPosition := strings.Index(name, ".")
+		if firstDotPosition != -1 {
+			return pq.QuoteIdentifier(name[0:firstDotPosition]) + "." + pq.QuoteIdentifier(name[firstDotPosition+1:])
+		}
+	}
+	return pq.QuoteIdentifier(name)
+}
+
 func (p *Postgres) SetVersion(version int, dirty bool) error {
 	tx, err := p.conn.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
 	}
 
-	query := `TRUNCATE ` + pq.QuoteIdentifier(p.config.MigrationsTable)
+	query := `TRUNCATE ` + p.quoteIdentifier(p.config.MigrationsTable)
 	if _, err := tx.Exec(query); err != nil {
 		if errRollback := tx.Rollback(); errRollback != nil {
 			err = multierror.Append(err, errRollback)
@@ -284,7 +305,7 @@ func (p *Postgres) SetVersion(version int, dirty bool) error {
 	// empty schema version for failed down migration on the first migration
 	// See: https://github.com/golang-migrate/migrate/issues/330
 	if version >= 0 || (version == database.NilVersion && dirty) {
-		query = `INSERT INTO ` + pq.QuoteIdentifier(p.config.MigrationsTable) +
+		query = `INSERT INTO ` + p.quoteIdentifier(p.config.MigrationsTable) +
 			` (version, dirty) VALUES ($1, $2)`
 		if _, err := tx.Exec(query, version, dirty); err != nil {
 			if errRollback := tx.Rollback(); errRollback != nil {
@@ -302,7 +323,7 @@ func (p *Postgres) SetVersion(version int, dirty bool) error {
 }
 
 func (p *Postgres) Version() (version int, dirty bool, err error) {
-	query := `SELECT version, dirty FROM ` + pq.QuoteIdentifier(p.config.MigrationsTable) + ` LIMIT 1`
+	query := `SELECT version, dirty FROM ` + p.quoteIdentifier(p.config.MigrationsTable) + ` LIMIT 1`
 	err = p.conn.QueryRowContext(context.Background(), query).Scan(&version, &dirty)
 	switch {
 	case err == sql.ErrNoRows:
@@ -380,7 +401,7 @@ func (p *Postgres) ensureVersionTable() (err error) {
 		}
 	}()
 
-	query := `CREATE TABLE IF NOT EXISTS ` + pq.QuoteIdentifier(p.config.MigrationsTable) + ` (version bigint not null primary key, dirty boolean not null)`
+	query := `CREATE TABLE IF NOT EXISTS ` + p.quoteIdentifier(p.config.MigrationsTable) + ` (version bigint not null primary key, dirty boolean not null)`
 	if _, err = p.conn.ExecContext(context.Background(), query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
