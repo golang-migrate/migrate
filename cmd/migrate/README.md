@@ -35,6 +35,17 @@ $ apt-get install -y migrate
 
 ### With Go toolchain
 
+#### To run directly
+```bash
+$ go run github.com/golang-migrate/migrate/v4/cmd/migrate
+```
+
+#### To build and use it locally
+```bash
+$ go build github.com/golang-migrate/migrate/v4/cmd/migrate
+$ ./migrate
+```
+
 #### Versioned
 
 ```bash
