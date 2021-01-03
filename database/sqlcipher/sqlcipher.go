@@ -1,4 +1,4 @@
-package sqlite3
+package sqlcipher
 
 import (
 	"database/sql"
@@ -12,11 +12,11 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/hashicorp/go-multierror"
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/mutecomm/go-sqlcipher/v4"
 )
 
 func init() {
-	database.Register("sqlite3", &Sqlite{})
+	database.Register("sqlcipher", &Sqlite{})
 }
 
 var DefaultMigrationsTable = "schema_migrations"

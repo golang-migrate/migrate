@@ -240,6 +240,7 @@ func (ch *ClickHouse) Drop() (err error) {
 			err = multierror.Append(err, errClose)
 		}
 	}()
+
 	for tables.Next() {
 		var table string
 		if err := tables.Scan(&table); err != nil {
@@ -252,6 +253,10 @@ func (ch *ClickHouse) Drop() (err error) {
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
 	}
+	if err := tables.Err(); err != nil {
+		return &database.Error{OrigErr: err, Query: []byte(query)}
+	}
+
 	return nil
 }
 
