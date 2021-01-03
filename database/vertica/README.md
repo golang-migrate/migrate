@@ -1,5 +1,6 @@
 # Vertica
 
+
 `vertica://user:password@tcp(host:port)/dbname?query`
 
 | URL Query  | WithInstance Config | Description |
@@ -11,6 +12,12 @@
 | `host` | | The host to connect to. |
 | `port` | | The port to bind to. |
 | `x-schema` | `Schema` | Optional, schema name. |
+
+
+## Existing Clients 
+If you use the Vertica driver with existing database client, you must create the client with parameter `use_prepared_statements=0`:
+
+
 
 ```go
 package main
