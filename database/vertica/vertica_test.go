@@ -77,7 +77,7 @@ func Test(t *testing.T) {
 		}()
 		dt.TestNilVersion(t, d) // test first
 		// dt.TestLockAndUnlock(t, d)
-		dt.TestRun(t, d, bytes.NewReader([]byte("SELECT 1")))
+		dt.TestRun(t, d, bytes.NewReader([]byte("select 1; select 2;")))
 		dt.TestSetVersion(t, d) // also tests Version()
 		// Drop breaks the driver, so test it last.
 		dt.TestDrop(t, d)
@@ -89,7 +89,7 @@ func getVerticaURL(t *testing.T, c dktest.ContainerInfo) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return fmt.Sprintf("vertica://dbadmin:password@%v:%v/docker", ip, port)
+	return fmt.Sprintf("vertica://dbadmin:password@%v:%v/docker?use_prepared_statements=0", ip, port)
 }
 
 func TestOpen(t *testing.T) {
@@ -111,7 +111,7 @@ func TestOpen(t *testing.T) {
 			err bool
 		}{
 			{
-				addr + "?x-migrations-table=lolo",
+				addr + "&x-migrations-table=lolo",
 				false,
 			},
 		}
@@ -127,7 +127,7 @@ func TestOpen(t *testing.T) {
 					} else {
 						if vd, ok := d.(*Vertica); !ok {
 							t.Fatalf("expected *Vertica got %T", d)
-						} else if vd.config.MigrationsTable != "lolo"  {
+						} else if vd.config.MigrationsTable != "lolo" {
 							t.Fatalf("expected %q got %q", "lolo", vd.config.MigrationsTable)
 						}
 					}

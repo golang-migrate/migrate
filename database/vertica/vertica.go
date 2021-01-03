@@ -10,7 +10,7 @@ import (
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
-	"github.com/hashicorp/go-multierror"
+	multierror "github.com/hashicorp/go-multierror"
 	_ "github.com/vertica/vertica-sql-go"
 )
 
@@ -56,6 +56,10 @@ func (v *Vertica) Open(url string) (database.Driver, error) {
 	}
 	schema := purl.Query().Get("x-schema")
 
+	if schema == "" {
+		schema = "public"
+	}
+
 	vx, err := WithInstance(db, &Config{
 		Schema:          schema,
 		MigrationsTable: migrationsTable,
@@ -79,16 +83,20 @@ func (v *Vertica) Close() error {
 	return nil
 }
 
-
 func (v *Vertica) dropSchema() error {
-	query := fmt.Sprintf("DROP SCHEMA %s CASCADE",  v.config.Schema)
+	query := fmt.Sprintf("DROP SCHEMA %s CASCADE", v.config.Schema)
 	_, e := v.conn.QueryContext(context.Background(), query)
 	return e
 }
 
-
 func (v *Vertica) dropTables() error {
-	query := `SELECT TABLE_NAME FROM v_catalog.tables`
+
+	schema, err := v.configuredSchema()
+	if err != nil {
+		return err
+	}
+	query := fmt.Sprintf(`SELECT TABLE_NAME FROM v_catalog.tables WHERE TABLE_SCHEMA = '%s'`, schema)
+
 	tables, err := v.conn.QueryContext(context.Background(), query)
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
@@ -112,7 +120,6 @@ func (v *Vertica) dropTables() error {
 	}
 
 	if len(tableNames) > 0 {
-
 		// delete one by one ...
 		for _, t := range tableNames {
 			query = "DROP TABLE " + t + " CASCADE"
@@ -126,8 +133,11 @@ func (v *Vertica) dropTables() error {
 }
 
 func (v *Vertica) dropViews() error {
-	query := `SELECT TABLE_NAME FROM v_catalog.views`
+	query := fmt.Sprintf(`SELECT TABLE_NAME FROM v_catalog.views WHERE TABLE_SCHEMA = '%s' `, v.config.Schema)
 	tables, err := v.conn.QueryContext(context.Background(), query)
+	if err != nil {
+		return &database.Error{OrigErr: err, Query: []byte(query)}
+	}
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
@@ -164,11 +174,7 @@ func (v *Vertica) dropViews() error {
 }
 
 func (v *Vertica) Drop() error {
-	
-	if v.config.Schema != "" {
-		return v.dropSchema()
-	}
-	
+
 	err := v.dropTables()
 	if err != nil {
 		return err
@@ -183,9 +189,6 @@ func (v *Vertica) Lock() error {
 func (v *Vertica) Unlock() error {
 	return nil
 }
-
-
-
 
 func (v *Vertica) Run(migration io.Reader) error {
 	migr, err := ioutil.ReadAll(migration)
@@ -253,7 +256,6 @@ func (v *Vertica) Version() (version int, dirty bool, err error) {
 		return version, dirty, nil
 	}
 }
-
 
 func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	if config == nil {
@@ -335,4 +337,20 @@ func (v *Vertica) ensureVersionTable() (err error) {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 	return nil
+}
+
+func (v *Vertica) configuredSchema() (string, error) {
+
+	if v.config.Schema != "" {
+		return v.config.Schema, nil
+	}
+
+	var schema string
+	sql := `select CURRENT_SCHEMA()`
+	rows, e := v.conn.QueryContext(context.Background(), sql)
+	if e != nil {
+		return "", e
+	}
+	rows.Scan(&schema)
+	return schema, e
 }
