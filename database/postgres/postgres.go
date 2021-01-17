@@ -15,6 +15,7 @@ import (
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
+	"github.com/golang-migrate/migrate/v4/database/multistmt"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/lib/pq"
 )
@@ -25,7 +26,12 @@ func init() {
 	database.Register("postgresql", &db)
 }
 
-var DefaultMigrationsTable = "schema_migrations"
+var (
+	multiStmtDelimiter = []byte(";")
+
+	DefaultMigrationsTable       = "schema_migrations"
+	DefaultMultiStatementMaxSize = 10 * 1 << 20 // 10 MB
+)
 
 var (
 	ErrNilConfig      = fmt.Errorf("no config")
@@ -35,10 +41,12 @@ var (
 )
 
 type Config struct {
-	MigrationsTable  string
-	DatabaseName     string
-	SchemaName       string
-	StatementTimeout time.Duration
+	MigrationsTable       string
+	DatabaseName          string
+	SchemaName            string
+	StatementTimeout      time.Duration
+	MultiStatementEnabled bool
+	MultiStatementMaxSize int
 }
 
 type Postgres struct {
@@ -132,10 +140,23 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 		}
 	}
 
+	multiStatementMaxSize := DefaultMultiStatementMaxSize
+	if s := purl.Query().Get("x-multi-statement-max-size"); len(s) > 0 {
+		multiStatementMaxSize, err = strconv.Atoi(s)
+		if err != nil {
+			return nil, err
+		}
+		if multiStatementMaxSize <= 0 {
+			multiStatementMaxSize = DefaultMultiStatementMaxSize
+		}
+	}
+
 	px, err := WithInstance(db, &Config{
-		DatabaseName:     purl.Path,
-		MigrationsTable:  migrationsTable,
-		StatementTimeout: time.Duration(statementTimeout) * time.Millisecond,
+		DatabaseName:          purl.Path,
+		MigrationsTable:       migrationsTable,
+		StatementTimeout:      time.Duration(statementTimeout) * time.Millisecond,
+		MultiStatementEnabled: purl.Query().Get("x-multi-statement") == "true",
+		MultiStatementMaxSize: multiStatementMaxSize,
 	})
 
 	if err != nil {
@@ -194,18 +215,36 @@ func (p *Postgres) Unlock() error {
 }
 
 func (p *Postgres) Run(migration io.Reader) error {
+	if p.config.MultiStatementEnabled {
+		var err error
+		if e := multistmt.Parse(migration, multiStmtDelimiter, p.config.MultiStatementMaxSize, func(m []byte) bool {
+			if err = p.runStatement(m); err != nil {
+				return false
+			}
+			return true
+		}); e != nil {
+			return e
+		}
+		return err
+	}
 	migr, err := ioutil.ReadAll(migration)
 	if err != nil {
 		return err
 	}
+	return p.runStatement(migr)
+}
+
+func (p *Postgres) runStatement(statement []byte) error {
 	ctx := context.Background()
 	if p.config.StatementTimeout != 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, p.config.StatementTimeout)
 		defer cancel()
 	}
-	// run migration
-	query := string(migr[:])
+	query := strings.TrimSpace(string(statement))
+	if query == "" {
+		return nil
+	}
 	if _, err := p.conn.ExecContext(ctx, query); err != nil {
 		if pgErr, ok := err.(*pq.Error); ok {
 			var line uint
@@ -223,11 +262,10 @@ func (p *Postgres) Run(migration io.Reader) error {
 			if pgErr.Detail != "" {
 				message = fmt.Sprintf("%s, %s", message, pgErr.Detail)
 			}
-			return database.Error{OrigErr: err, Err: message, Query: migr, Line: line}
+			return database.Error{OrigErr: err, Err: message, Query: statement, Line: line}
 		}
-		return database.Error{OrigErr: err, Err: "migration failed", Query: migr}
+		return database.Error{OrigErr: err, Err: "migration failed", Query: statement}
 	}
-
 	return nil
 }
 
