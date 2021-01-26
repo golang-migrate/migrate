@@ -1,4 +1,4 @@
-[![Build Status](https://img.shields.io/travis/com/golang-migrate/migrate/master.svg)](https://travis-ci.com/golang-migrate/migrate)
+![CircleCI - Build Status](https://img.shields.io/circleci/build/github/golang-migrate/migrate/master)
 [![GoDoc](https://godoc.org/github.com/golang-migrate/migrate?status.svg)](https://godoc.org/github.com/golang-migrate/migrate)
 [![Coverage Status](https://img.shields.io/coveralls/github/golang-migrate/migrate/master.svg)](https://coveralls.io/github/golang-migrate/migrate?branch=master)
 [![packagecloud.io](https://img.shields.io/badge/deb-packagecloud.io-844fec.svg)](https://packagecloud.io/golang-migrate/migrate?filter=debs)
