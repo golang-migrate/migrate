@@ -160,3 +160,23 @@ func TestNoTxWrapInvalidValue(t *testing.T) {
 		assert.Contains(t, err.Error(), "invalid syntax")
 	}
 }
+
+func TestMigrateWithDirectoryNameContainsWhitespaces(t *testing.T) {
+	dir, err := ioutil.TempDir("", "directory name contains whitespaces")
+	if err != nil {
+		return
+	}
+	defer func() {
+		if err := os.RemoveAll(dir); err != nil {
+			t.Error(err)
+		}
+	}()
+	t.Logf("DB path : %s\n", filepath.Join(dir, "sqlite3.db"))
+	p := &Sqlite{}
+	addr := fmt.Sprintf("sqlite3://%s%s", "file:", filepath.Join(dir, "sqlite3.db"))
+	d, err := p.Open(addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dt.Test(t, d, []byte("CREATE TABLE t (Qty int, Name string);"))
+}
