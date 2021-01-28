@@ -88,8 +88,8 @@ func (g *Gitlab) Open(url string) (source.Driver, error) {
 	}
 
 	gn.listOptions = &gitlab.ListTreeOptions{
-		Path:        &gn.path,
-		Ref:         &u.Fragment,
+		Path: &gn.path,
+		Ref:  &u.Fragment,
 		ListOptions: gitlab.ListOptions{
 			PerPage: DefaultMaxItemsPerPage,
 		},
@@ -238,4 +238,3 @@ func (g *Gitlab) ReadDown(version uint) (r io.ReadCloser, identifier string, err
 
 	return nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: g.path, Err: os.ErrNotExist}
 }
-
