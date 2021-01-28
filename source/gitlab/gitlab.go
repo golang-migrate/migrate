@@ -238,3 +238,4 @@ func (g *Gitlab) ReadDown(version uint) (r io.ReadCloser, identifier string, err
 
 	return nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: g.path, Err: os.ErrNotExist}
 }
+
