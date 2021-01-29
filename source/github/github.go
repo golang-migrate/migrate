@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/http"
 	nurl "net/url"
 	"os"
 	"path"
@@ -43,27 +44,30 @@ type Config struct {
 }
 
 func (g *Github) Open(url string) (source.Driver, error) {
+	var client *http.Client
 	u, err := nurl.Parse(url)
 	if err != nil {
 		return nil, err
 	}
 
 	if u.User == nil {
-		return nil, ErrNoUserInfo
-	}
+		// use http.DefaultClient
+		client = nil
+	} else {
+		password, ok := u.User.Password()
+		if !ok {
+			return nil, ErrNoUserInfo
+		}
 
-	password, ok := u.User.Password()
-	if !ok {
-		return nil, ErrNoUserInfo
-	}
-
-	tr := &github.BasicAuthTransport{
-		Username: u.User.Username(),
-		Password: password,
+		tr := &github.BasicAuthTransport{
+			Username: u.User.Username(),
+			Password: password,
+		}
+		client = tr.Client()
 	}
 
 	gn := &Github{
-		client:     github.NewClient(tr.Client()),
+		client:     github.NewClient(client),
 		migrations: source.NewMigrations(),
 		options:    &github.RepositoryContentGetOptions{Ref: u.Fragment},
 	}
@@ -144,7 +148,7 @@ func (g *Github) Close() error {
 	return nil
 }
 
-func (g *Github) First() (version uint, er error) {
+func (g *Github) First() (version uint, err error) {
 	g.ensureFields()
 
 	if v, ok := g.migrations.First(); !ok {
