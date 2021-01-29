@@ -171,9 +171,10 @@ func TestMigrateWithDirectoryNameContainsWhitespaces(t *testing.T) {
 			t.Error(err)
 		}
 	}()
-	t.Logf("DB path : %s\n", filepath.Join(dir, "sqlite3.db"))
+	dbPath := filepath.Join(dir, "sqlite3.db")
+	t.Logf("DB path : %s\n", dbPath)
 	p := &Sqlite{}
-	addr := fmt.Sprintf("sqlite3://%s%s", "file:", filepath.Join(dir, "sqlite3.db"))
+	addr := fmt.Sprintf("sqlite3://file:%s", dbPath)
 	d, err := p.Open(addr)
 	if err != nil {
 		t.Fatal(err)
