@@ -3,6 +3,7 @@
 This driver is catered for those that want to source migrations from [github.com](https://github.com). The URL scheme doesn't require a hostname, as it just simply defaults to `github.com`.
 
 Authenticated client: `github://user:personal-access-token@owner/repo/path#ref`
+
 Unauthenticated client: `github://owner/repo/path#ref`
 
 | URL Query  | WithInstance Config | Description |
