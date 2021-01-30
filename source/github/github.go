@@ -44,16 +44,14 @@ type Config struct {
 }
 
 func (g *Github) Open(url string) (source.Driver, error) {
-	var client *http.Client
 	u, err := nurl.Parse(url)
 	if err != nil {
 		return nil, err
 	}
 
-	if u.User == nil {
-		// use http.DefaultClient
-		client = nil
-	} else {
+	// client defaults to http.DefaultClient
+	var client *http.Client
+	if u.User != nil {
 		password, ok := u.User.Password()
 		if !ok {
 			return nil, ErrNoUserInfo
