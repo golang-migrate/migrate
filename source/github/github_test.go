@@ -2,10 +2,12 @@ package github
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"testing"
 
 	st "github.com/golang-migrate/migrate/v4/source/testing"
+	"github.com/stretchr/testify/assert"
 )
 
 var GithubTestSecret = "" // username:token
@@ -29,4 +31,29 @@ func Test(t *testing.T) {
 	}
 
 	st.Test(t, d)
+}
+
+func TestDefaultClient(t *testing.T) {
+	g := &Github{}
+	owner := "golang-migrate"
+	repo := "migrate"
+	path := "source/github/examples/migrations"
+
+	url := fmt.Sprintf("github://%s/%s/%s", owner, repo, path)
+	d, err := g.Open(url)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ver, err := d.First()
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, uint(1085649617), ver)
+
+	ver, err = d.Next(ver)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, uint(1185749658), ver)
 }
