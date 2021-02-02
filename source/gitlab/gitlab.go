@@ -21,6 +21,8 @@ func init() {
 	source.Register("gitlab", &Gitlab{})
 }
 
+const DefaultMaxItemsPerPage = 100
+
 var (
 	ErrNoUserInfo       = fmt.Errorf("no username:token provided")
 	ErrNoAccessToken    = fmt.Errorf("no access token")
@@ -88,6 +90,9 @@ func (g *Gitlab) Open(url string) (source.Driver, error) {
 	gn.listOptions = &gitlab.ListTreeOptions{
 		Path: &gn.path,
 		Ref:  &u.Fragment,
+		ListOptions: gitlab.ListOptions{
+			PerPage: DefaultMaxItemsPerPage,
+		},
 	}
 
 	gn.getOptions = &gitlab.GetFileOptions{
@@ -113,13 +118,22 @@ func WithInstance(client *gitlab.Client, config *Config) (source.Driver, error) 
 }
 
 func (g *Gitlab) readDirectory() error {
-	nodes, response, err := g.client.Repositories.ListTree(g.projectID, g.listOptions)
-	if err != nil {
-		return err
-	}
+	var nodes []*gitlab.TreeNode
+	for {
+		n, response, err := g.client.Repositories.ListTree(g.projectID, g.listOptions)
+		if err != nil {
+			return err
+		}
 
-	if response.StatusCode != http.StatusOK {
-		return ErrInvalidResponse
+		if response.StatusCode != http.StatusOK {
+			return ErrInvalidResponse
+		}
+
+		nodes = append(nodes, n...)
+		if response.CurrentPage >= response.TotalPages {
+			break
+		}
+		g.listOptions.ListOptions.Page = response.NextPage
 	}
 
 	for i := range nodes {
