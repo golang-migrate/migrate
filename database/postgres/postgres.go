@@ -241,8 +241,8 @@ func (p *Postgres) runStatement(statement []byte) error {
 		ctx, cancel = context.WithTimeout(ctx, p.config.StatementTimeout)
 		defer cancel()
 	}
-	query := strings.TrimSpace(string(statement))
-	if query == "" {
+	query := string(statement)
+	if strings.TrimSpace(query) == "" {
 		return nil
 	}
 	if _, err := p.conn.ExecContext(ctx, query); err != nil {

@@ -42,8 +42,9 @@ var (
 	}
 )
 
-func pgConnectionString(host, port string) string {
-	return fmt.Sprintf("postgres://postgres:%s@%s:%s/postgres?sslmode=disable", pgPassword, host, port)
+func pgConnectionString(host, port string, options ...string) string {
+	options = append(options, "sslmode=disable")
+	return fmt.Sprintf("postgres://postgres:%s@%s:%s/postgres?%s", pgPassword, host, port, strings.Join(options, "&"))
 }
 
 func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
@@ -162,7 +163,7 @@ func TestMultipleStatementsInMultiStatementMode(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		addr := pgConnectionString(ip, port) + "&x-multi-statement=true"
+		addr := pgConnectionString(ip, port, "x-multi-statement=true")
 		p := &Postgres{}
 		d, err := p.Open(addr)
 		if err != nil {
