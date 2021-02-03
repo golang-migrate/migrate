@@ -6,6 +6,8 @@
 |------------|---------------------|-------------|
 | `x-migrations-table` | `MigrationsTable` | Name of the migrations table |
 | `x-statement-timeout` | `StatementTimeout` | Abort any statement that takes more than the specified number of milliseconds |
+| `x-multi-statement` | `MultiStatementEnabled` | Enable multi-statement execution (default: false) |
+| `x-multi-statement-max-size` | `MultiStatementMaxSize` | Maximum size of single statement in bytes (default: 10MB) |
 | `dbname` | `DatabaseName` | The name of the database to connect to |
 | `search_path` | | This variable specifies the order in which schemas are searched when an object is referenced by a simple name with no schema specified. |
 | `user` | | The user to sign in as |
@@ -27,3 +29,10 @@
 2. Wrap your existing migrations in transactions ([BEGIN/COMMIT](https://www.postgresql.org/docs/current/static/transaction-iso.html)) if you use multiple statements within one migration.
 3. Download and install the latest migrate version.
 4. Force the current migration version with `migrate force <current_version>`.
+
+## Multi-statement mode
+
+In PostgreSQL running multiple SQL statements in one `Exec` executes them inside a transaction. Sometimes this
+behavior is not desirable because some statements can be only run outside of transaction (e.g.
+`CREATE INDEX CONCURRENTLY`). If you want to use `CREATE INDEX CONCURRENTLY` without activating multi-statement mode
+you have to put such statements in a separate migration files.

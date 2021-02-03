@@ -42,8 +42,9 @@ var (
 	}
 )
 
-func pgConnectionString(host, port string) string {
-	return fmt.Sprintf("postgres://postgres:%s@%s:%s/postgres?sslmode=disable", pgPassword, host, port)
+func pgConnectionString(host, port string, options ...string) string {
+	options = append(options, "sslmode=disable")
+	return fmt.Sprintf("postgres://postgres:%s@%s:%s/postgres?%s", pgPassword, host, port, strings.Join(options, "&"))
 }
 
 func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
@@ -122,7 +123,7 @@ func TestMigrate(t *testing.T) {
 	})
 }
 
-func TestMultiStatement(t *testing.T) {
+func TestMultipleStatements(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.FirstPort()
 		if err != nil {
@@ -147,6 +148,39 @@ func TestMultiStatement(t *testing.T) {
 		// make sure second table exists
 		var exists bool
 		if err := d.(*Postgres).conn.QueryRowContext(context.Background(), "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'bar' AND table_schema = (SELECT current_schema()))").Scan(&exists); err != nil {
+			t.Fatal(err)
+		}
+		if !exists {
+			t.Fatalf("expected table bar to exist")
+		}
+	})
+}
+
+func TestMultipleStatementsInMultiStatementMode(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := pgConnectionString(ip, port, "x-multi-statement=true")
+		p := &Postgres{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
+		if err := d.Run(strings.NewReader("CREATE TABLE foo (foo text); CREATE INDEX CONCURRENTLY idx_foo ON foo (foo);")); err != nil {
+			t.Fatalf("expected err to be nil, got %v", err)
+		}
+
+		// make sure created index exists
+		var exists bool
+		if err := d.(*Postgres).conn.QueryRowContext(context.Background(), "SELECT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = (SELECT current_schema()) AND indexname = 'idx_foo')").Scan(&exists); err != nil {
 			t.Fatal(err)
 		}
 		if !exists {
