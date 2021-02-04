@@ -151,11 +151,19 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 		}
 	}
 
+	multiStatementEnabled := false
+	if s := purl.Query().Get("x-multi-statement"); len(s) > 0 {
+		multiStatementEnabled, err = strconv.ParseBool(s)
+		if err != nil {
+			return nil, fmt.Errorf("Unable to parse option x-multi-statement: %w", err)
+		}
+	}
+
 	px, err := WithInstance(db, &Config{
 		DatabaseName:          purl.Path,
 		MigrationsTable:       migrationsTable,
 		StatementTimeout:      time.Duration(statementTimeout) * time.Millisecond,
-		MultiStatementEnabled: purl.Query().Get("x-multi-statement") == "true",
+		MultiStatementEnabled: multiStatementEnabled,
 		MultiStatementMaxSize: multiStatementMaxSize,
 	})
 
