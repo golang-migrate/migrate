@@ -25,19 +25,19 @@ jobs:
       # - setup_remote_docker:
       #    version: 19.03.13
           # docker_layer_caching: true
-      - restore_cache:
-          keys:
-            - go-mod-v1-{{ arch }}-{{ .Branch }}-{{ checksum "go.sum" }}
       - run: curl -sL -o ~/bin/gimme https://raw.githubusercontent.com/travis-ci/gimme/master/gimme
       - run: curl -sfL -o ~/bin/golangci-lint.sh https://install.goreleaser.com/github.com/golangci/golangci-lint.sh
       - run: chmod +x ~/bin/gimme ~/bin/golangci-lint.sh
       - run: eval "$(gimme $GO_VERSION)"
       - run: golangci-lint.sh -b ~/bin v1.33.0
       - checkout
+      - restore_cache:
+          keys:
+            - go-mod-v1-{{ arch }}-{{ checksum "go.sum" }}
       - run: golangci-lint run
       - run: make test COVERAGE_DIR=/tmp/coverage
       - save_cache:
-          key: go-mod-v1-{{ arch }}-{{ .Branch }}-{{ checksum "go.sum" }}
+          key: go-mod-v1-{{ arch }}-{{ checksum "go.sum" }}
           paths:
             - "/go/pkg/mod"
       - run: go get github.com/mattn/goveralls
