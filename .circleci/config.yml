@@ -48,9 +48,15 @@ jobs:
     environment:
       GO_VERSION: "1.15.x"
 
+  "golang-1_16":
+    <<: *template
+    environment:
+      GO_VERSION: "1.16.x"
+
 workflows:
   version: 2
   build:
     jobs:
       - "golang-1_14"
       - "golang-1_15"
+      - "golang-1_16"

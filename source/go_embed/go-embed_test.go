@@ -1,3 +1,5 @@
+// +build go1.6
+
 package goembed
 
 import (
