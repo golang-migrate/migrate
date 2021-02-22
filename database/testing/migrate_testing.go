@@ -5,10 +5,8 @@ package testing
 
 import (
 	"testing"
-)
 
-import (
-	"github.com/golang-migrate/migrate/v4"
+	"github.com/nagyistzcons/migrate/v4"
 )
 
 // TestMigrate runs integration-tests between the Migrate layer and database implementations.
