@@ -15,7 +15,6 @@ import (
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
-	"github.com/golang-migrate/migrate/v4/database/multistmt"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/lib/pq"
 )
@@ -26,12 +25,7 @@ func init() {
 	database.Register("postgresql", &db)
 }
 
-var (
-	multiStmtDelimiter = []byte(";")
-
-	DefaultMigrationsTable       = "schema_migrations"
-	DefaultMultiStatementMaxSize = 10 * 1 << 20 // 10 MB
-)
+var DefaultMigrationsTable = "schema_migrations"
 
 var (
 	ErrNilConfig      = fmt.Errorf("no config")
@@ -41,12 +35,11 @@ var (
 )
 
 type Config struct {
-	MigrationsTable       string
-	DatabaseName          string
-	SchemaName            string
-	StatementTimeout      time.Duration
-	MultiStatementEnabled bool
-	MultiStatementMaxSize int
+	MigrationsTableHasSchema bool
+	MigrationsTable          string
+	DatabaseName             string
+	SchemaName               string
+	StatementTimeout         time.Duration
 }
 
 type Postgres struct {
@@ -132,6 +125,7 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 
 	migrationsTable := purl.Query().Get("x-migrations-table")
 	statementTimeoutString := purl.Query().Get("x-statement-timeout")
+	migrationsTableHasSchemaString := purl.Query().Get("x-migrations-table-has-schema")
 	statementTimeout := 0
 	if statementTimeoutString != "" {
 		statementTimeout, err = strconv.Atoi(statementTimeoutString)
@@ -140,31 +134,19 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 		}
 	}
 
-	multiStatementMaxSize := DefaultMultiStatementMaxSize
-	if s := purl.Query().Get("x-multi-statement-max-size"); len(s) > 0 {
-		multiStatementMaxSize, err = strconv.Atoi(s)
+	migrationsTableHasSchema := false
+	if migrationsTableHasSchemaString != "" {
+		migrationsTableHasSchema, err = strconv.ParseBool(migrationsTableHasSchemaString)
 		if err != nil {
 			return nil, err
-		}
-		if multiStatementMaxSize <= 0 {
-			multiStatementMaxSize = DefaultMultiStatementMaxSize
-		}
-	}
-
-	multiStatementEnabled := false
-	if s := purl.Query().Get("x-multi-statement"); len(s) > 0 {
-		multiStatementEnabled, err = strconv.ParseBool(s)
-		if err != nil {
-			return nil, fmt.Errorf("Unable to parse option x-multi-statement: %w", err)
 		}
 	}
 
 	px, err := WithInstance(db, &Config{
-		DatabaseName:          purl.Path,
-		MigrationsTable:       migrationsTable,
-		StatementTimeout:      time.Duration(statementTimeout) * time.Millisecond,
-		MultiStatementEnabled: multiStatementEnabled,
-		MultiStatementMaxSize: multiStatementMaxSize,
+		DatabaseName:             purl.Path,
+		MigrationsTableHasSchema: migrationsTableHasSchema,
+		MigrationsTable:          migrationsTable,
+		StatementTimeout:         time.Duration(statementTimeout) * time.Millisecond,
 	})
 
 	if err != nil {
@@ -223,36 +205,18 @@ func (p *Postgres) Unlock() error {
 }
 
 func (p *Postgres) Run(migration io.Reader) error {
-	if p.config.MultiStatementEnabled {
-		var err error
-		if e := multistmt.Parse(migration, multiStmtDelimiter, p.config.MultiStatementMaxSize, func(m []byte) bool {
-			if err = p.runStatement(m); err != nil {
-				return false
-			}
-			return true
-		}); e != nil {
-			return e
-		}
-		return err
-	}
 	migr, err := ioutil.ReadAll(migration)
 	if err != nil {
 		return err
 	}
-	return p.runStatement(migr)
-}
-
-func (p *Postgres) runStatement(statement []byte) error {
 	ctx := context.Background()
 	if p.config.StatementTimeout != 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, p.config.StatementTimeout)
 		defer cancel()
 	}
-	query := string(statement)
-	if strings.TrimSpace(query) == "" {
-		return nil
-	}
+	// run migration
+	query := string(migr[:])
 	if _, err := p.conn.ExecContext(ctx, query); err != nil {
 		if pgErr, ok := err.(*pq.Error); ok {
 			var line uint
@@ -270,10 +234,11 @@ func (p *Postgres) runStatement(statement []byte) error {
 			if pgErr.Detail != "" {
 				message = fmt.Sprintf("%s, %s", message, pgErr.Detail)
 			}
-			return database.Error{OrigErr: err, Err: message, Query: statement, Line: line}
+			return database.Error{OrigErr: err, Err: message, Query: migr, Line: line}
 		}
-		return database.Error{OrigErr: err, Err: "migration failed", Query: statement}
+		return database.Error{OrigErr: err, Err: "migration failed", Query: migr}
 	}
+
 	return nil
 }
 
@@ -312,13 +277,23 @@ func runesLastIndex(input []rune, target rune) int {
 	return -1
 }
 
+func (p *Postgres) quoteIdentifier(name string) string {
+	if p.config.MigrationsTableHasSchema {
+		firstDotPosition := strings.Index(name, ".")
+		if firstDotPosition != -1 {
+			return pq.QuoteIdentifier(name[0:firstDotPosition]) + "." + pq.QuoteIdentifier(name[firstDotPosition+1:])
+		}
+	}
+	return pq.QuoteIdentifier(name)
+}
+
 func (p *Postgres) SetVersion(version int, dirty bool) error {
 	tx, err := p.conn.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
 	}
 
-	query := `TRUNCATE ` + pq.QuoteIdentifier(p.config.MigrationsTable)
+	query := `TRUNCATE ` + p.quoteIdentifier(p.config.MigrationsTable)
 	if _, err := tx.Exec(query); err != nil {
 		if errRollback := tx.Rollback(); errRollback != nil {
 			err = multierror.Append(err, errRollback)
@@ -330,7 +305,7 @@ func (p *Postgres) SetVersion(version int, dirty bool) error {
 	// empty schema version for failed down migration on the first migration
 	// See: https://github.com/golang-migrate/migrate/issues/330
 	if version >= 0 || (version == database.NilVersion && dirty) {
-		query = `INSERT INTO ` + pq.QuoteIdentifier(p.config.MigrationsTable) +
+		query = `INSERT INTO ` + p.quoteIdentifier(p.config.MigrationsTable) +
 			` (version, dirty) VALUES ($1, $2)`
 		if _, err := tx.Exec(query, version, dirty); err != nil {
 			if errRollback := tx.Rollback(); errRollback != nil {
@@ -348,7 +323,7 @@ func (p *Postgres) SetVersion(version int, dirty bool) error {
 }
 
 func (p *Postgres) Version() (version int, dirty bool, err error) {
-	query := `SELECT version, dirty FROM ` + pq.QuoteIdentifier(p.config.MigrationsTable) + ` LIMIT 1`
+	query := `SELECT version, dirty FROM ` + p.quoteIdentifier(p.config.MigrationsTable) + ` LIMIT 1`
 	err = p.conn.QueryRowContext(context.Background(), query).Scan(&version, &dirty)
 	switch {
 	case err == sql.ErrNoRows:
@@ -426,7 +401,7 @@ func (p *Postgres) ensureVersionTable() (err error) {
 		}
 	}()
 
-	query := `CREATE TABLE IF NOT EXISTS ` + pq.QuoteIdentifier(p.config.MigrationsTable) + ` (version bigint not null primary key, dirty boolean not null)`
+	query := `CREATE TABLE IF NOT EXISTS ` + p.quoteIdentifier(p.config.MigrationsTable) + ` (version bigint not null primary key, dirty boolean not null)`
 	if _, err = p.conn.ExecContext(context.Background(), query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
