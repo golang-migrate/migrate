@@ -13,10 +13,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/lib/pq"
+	"github.com/nagyistzcons/migrate/v4"
+	"github.com/nagyistzcons/migrate/v4/database"
 )
 
 func init() {
