@@ -10,7 +10,7 @@ matrix:
     - go: "1.15.x"
     - go: master
 
-go_import_path: github.com/golang-migrate/migrate
+go_import_path: github.com/nagyistzcons/migrate
 
 env:
   global:

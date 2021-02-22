@@ -3,7 +3,7 @@ DATABASE ?= postgres mysql redshift cassandra spanner cockroachdb clickhouse mon
 DATABASE_TEST ?= $(DATABASE) sqlite sqlcipher
 VERSION ?= $(shell git describe --tags 2>/dev/null | cut -c 2-)
 TEST_FLAGS ?=
-REPO_OWNER ?= $(shell cd .. && basename "$$(pwd)")
+REPO_OWNER ?= nagyistzcons # $(shell cd .. && basename "$$(pwd)")
 COVERAGE_DIR ?= .coverage
 
 build:

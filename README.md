@@ -1,11 +1,11 @@
-[![CircleCI - Build Status](https://img.shields.io/circleci/build/github/golang-migrate/migrate/master)](https://circleci.com/gh/golang-migrate/migrate)
-[![GoDoc](https://godoc.org/github.com/golang-migrate/migrate?status.svg)](https://godoc.org/github.com/golang-migrate/migrate)
-[![Coverage Status](https://img.shields.io/coveralls/github/golang-migrate/migrate/master.svg)](https://coveralls.io/github/golang-migrate/migrate?branch=master)
-[![packagecloud.io](https://img.shields.io/badge/deb-packagecloud.io-844fec.svg)](https://packagecloud.io/golang-migrate/migrate?filter=debs)
+[![CircleCI - Build Status](https://img.shields.io/circleci/build/github/golang-migrate/migrate/master)](https://circleci.com/gh/nagyistzcons/migrate)
+[![GoDoc](https://godoc.org/github.com/golang-migrate/migrate?status.svg)](https://godoc.org/github.com/nagyistzcons/migrate)
+[![Coverage Status](https://img.shields.io/coveralls/github/golang-migrate/migrate/master.svg)](https://coveralls.io/github/nagyistzcons/migrate?branch=master)
+[![packagecloud.io](https://img.shields.io/badge/deb-packagecloud.io-844fec.svg)](https://packagecloud.io/nagyistzcons/migrate?filter=debs)
 [![Docker Pulls](https://img.shields.io/docker/pulls/migrate/migrate.svg)](https://hub.docker.com/r/migrate/migrate/)
 ![Supported Go Versions](https://img.shields.io/badge/Go-1.15%2C%201.16-lightgrey.svg)
-[![GitHub Release](https://img.shields.io/github/release/golang-migrate/migrate.svg)](https://github.com/golang-migrate/migrate/releases)
-[![Go Report Card](https://goreportcard.com/badge/github.com/golang-migrate/migrate)](https://goreportcard.com/report/github.com/golang-migrate/migrate)
+[![GitHub Release](https://img.shields.io/github/release/golang-migrate/migrate.svg)](https://github.com/nagyistzcons/migrate/releases)
+[![Go Report Card](https://goreportcard.com/badge/github.com/golang-migrate/migrate)](https://goreportcard.com/report/github.com/nagyistzcons/migrate)
 
 # migrate
 
@@ -17,7 +17,7 @@ __Database migrations written in Go. Use as [CLI](#cli-usage) or import as [libr
    (Keeps the drivers lightweight, too.)
 * Database drivers don't assume things or try to correct user input. When in doubt, fail.
 
-Forked from [mattes/migrate](https://github.com/mattes/migrate)
+Forked from [golang-migrate/migrate](https://github.com/golang-migrate/migrate)
 
 ## Databases
 
@@ -108,9 +108,9 @@ __[Go Documentation](https://godoc.org/github.com/golang-migrate/migrate)__
 
 ```go
 import (
-    "github.com/golang-migrate/migrate/v4"
-    _ "github.com/golang-migrate/migrate/v4/database/postgres"
-    _ "github.com/golang-migrate/migrate/v4/source/github"
+    "github.com/nagyistzcons/migrate/v4"
+    _ "github.com/nagyistzcons/migrate/v4/database/postgres"
+    _ "github.com/nagyistzcons/migrate/v4/source/github"
 )
 
 func main() {
