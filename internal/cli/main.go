@@ -17,10 +17,12 @@ import (
 
 const (
 	defaultTimeFormat = "20060102150405"
-	createUsage       = `create [-ext E] [-dir D] [-seq] [-digits N] [-format] NAME
+	defaultTimezone   = "UTC"
+	createUsage       = `create [-ext E] [-dir D] [-seq] [-digits N] [-format] [-tz] NAME
 	   Create a set of timestamped up/down migrations titled NAME, in directory D with extension E.
 	   Use -seq option to generate sequential up/down migrations with N digits.
-	   Use -format option to specify a Go time format string. Note: migrations with the same time cause "duplicate migration version" error. 
+	   Use -format option to specify a Go time format string. Note: migrations with the same time cause "duplicate migration version" error.
+           Use -tz option to specify the timezone that will be used when generating non-sequential migrations (defaults: UTC).
 `
 	gotoUsage = `goto V       Migrate to version V`
 	upUsage   = `up [N]       Apply all or N up migrations`
@@ -162,6 +164,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 		extPtr := createFlagSet.String("ext", "", "File extension")
 		dirPtr := createFlagSet.String("dir", "", "Directory to place file in (default: current working directory)")
 		formatPtr := createFlagSet.String("format", defaultTimeFormat, `The Go time format string to use. If the string "unix" or "unixNano" is specified, then the seconds or nanoseconds since January 1, 1970 UTC respectively will be used. Caution, due to the behavior of time.Time.Format(), invalid format strings will not error`)
+		timezoneName := createFlagSet.String("tz", defaultTimezone, `The timezone that will be used for generating timestamps (default: utc)`)
 		createFlagSet.BoolVar(&seq, "seq", seq, "Use sequential numbers instead of timestamps (default: false)")
 		createFlagSet.IntVar(&seqDigits, "digits", seqDigits, "The number of digits to use in sequences (default: 6)")
 
@@ -180,7 +183,12 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 			log.fatal("error: -ext flag must be specified")
 		}
 
-		if err := createCmd(*dirPtr, startTime, *formatPtr, name, *extPtr, seq, seqDigits, true); err != nil {
+		timezone, err := time.LoadLocation(*timezoneName)
+		if err != nil {
+			log.fatal(err)
+		}
+
+		if err := createCmd(*dirPtr, startTime.In(timezone), *formatPtr, name, *extPtr, seq, seqDigits, true); err != nil {
 			log.fatalErr(err)
 		}
 
