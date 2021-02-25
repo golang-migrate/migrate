@@ -73,6 +73,7 @@ Source drivers read migrations from local or remote sources. [Add a new source?]
 * [Gitlab](source/gitlab) - read from remote Gitlab repositories
 * [AWS S3](source/aws_s3) - read from Amazon Web Services S3
 * [Google Cloud Storage](source/google_cloud_storage) - read from Google Cloud Platform Storage
+* [In Memory](source/mem) - read from defined struct to embed schema migration with program binary
 
 ## CLI usage
 
