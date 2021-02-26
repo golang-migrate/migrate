@@ -1,6 +1,6 @@
 package postgres
 
-// error codes https://github.com/lib/pq/blob/master/error.go
+// error codes https://github.com/jackc/pgerrcode/blob/master/errcode.go
 
 import (
 	"context"
@@ -9,12 +9,13 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/golang-migrate/migrate/v4"
 	"io"
 	"strconv"
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/golang-migrate/migrate/v4"
 
 	"github.com/dhui/dktest"
 
