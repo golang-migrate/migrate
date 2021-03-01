@@ -301,7 +301,13 @@ func (c *Cassandra) ensureVersionTable() (err error) {
 		return err
 	}
 	if _, _, err = c.Version(); err != nil {
-		if strings.Contains(err.Error(), "Undefined column name dummy") {
+		var count int8
+		err = c.session.Query(`SELECT COUNT(*) FROM system_schema.columns WHERE keyspace_name = '` + c.config.KeyspaceName + `' AND table_name = '` + c.config.MigrationsTable + `' AND column_name = 'dummy'`).Scan(&count)
+		if err != nil {
+			return err
+		}
+
+		if count == 0 {
 			if err = c.upgradeVersionTable(); err != nil {
 				return err
 			}
