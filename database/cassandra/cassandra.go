@@ -235,7 +235,7 @@ func (c *Cassandra) SetVersion(version int, dirty bool) error {
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
 	} else {
-		query := `TRUNCATE "` + c.config.MigrationsTable + `"`
+		query := `DELETE FROM "` + c.config.MigrationsTable + `" WHERE dummy = 1`
 		if err := c.session.Query(query).Exec(); err != nil {
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
