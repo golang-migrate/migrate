@@ -147,6 +147,26 @@ func createFile(filename string) error {
 	return f.Close()
 }
 
+func createDBCmd(m *migrate.Migrate, dbName string) {
+	if err := m.CreateDB(dbName); err != nil {
+		if err != migrate.ErrNoChange {
+			log.fatalErr(err)
+		} else {
+			log.Println(err)
+		}
+	}
+}
+
+func dropDBCmd(m *migrate.Migrate, dbName string) {
+	if err := m.DropDB(dbName); err != nil {
+		if err != migrate.ErrNoChange {
+			log.fatalErr(err)
+		} else {
+			log.Println(err)
+		}
+	}
+}
+
 func gotoCmd(m *migrate.Migrate, v uint) error {
 	if err := m.Migrate(v); err != nil {
 		if err != migrate.ErrNoChange {

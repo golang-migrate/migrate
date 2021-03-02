@@ -59,7 +59,7 @@ func printUsageAndExit() {
 }
 
 // Main function of a cli application. It is public for backwards compatibility with `cli` package
-func Main(version string) {
+func Main() {
 	helpPtr := flag.Bool("help", false, "")
 	versionPtr := flag.Bool("version", false, "")
 	verbosePtr := flag.Bool("verbose", false, "")
@@ -67,10 +67,10 @@ func Main(version string) {
 	lockTimeoutPtr := flag.Uint("lock-timeout", 15, "")
 	pathPtr := flag.String("path", "", "")
 	databasePtr := flag.String("database", "", "")
-	sourcePtr := flag.String("source", "", "")
+	sourcePtr := flag.String("source", "file://", "")
 
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr,
+		_, err := fmt.Fprint(os.Stderr,
 			`Usage: migrate OPTIONS COMMAND [arg...]
        migrate [ -version | -help ]
 
@@ -85,16 +85,25 @@ Options:
   -help            Print usage
 
 Commands:
-  %s
-  %s
-  %s
-  %s
-  %s
-  %s
-  version      Print current migration version
+  create [-ext E] [-dir D] [-seq] [-digits N] [-format] NAME
+							Create a set of timestamped up/down migrations titled NAME, in directory D with extension E.
+							Use -seq option to generate sequential up/down migrations with N digits.
+							Use -format option to specify a Go time format string.
+  goto V                    Migrate to version V
+  up [N]                    Apply all or N up migrations
+  down [N]                  Apply all or N down migrations
+  drop                      Drop everything inside database
+  force V                   Set version V but don't run migration (ignores dirty state)
+  version                   Print current migration version
+  create_db database_name   Creates database
+  drop_db database_name     Drops database
+  version                   Print current migration version
 
 Source drivers: `+strings.Join(source.List(), ", ")+`
-Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoUsage, upUsage, downUsage, dropUsage, forceUsage)
+Database drivers: `+strings.Join(database.List(), ", ")+"\n")
+		if err != nil {
+			panic("FPrint err: " + err.Error())
+		}
 	}
 
 	flag.Parse()
@@ -104,7 +113,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 
 	// show cli version
 	if *versionPtr {
-		fmt.Fprintln(os.Stderr, version)
+		fmt.Fprintln(os.Stderr, Version)
 		os.Exit(0)
 	}
 
@@ -371,7 +380,30 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 			log.fatalErr(err)
 		}
 
+	case "create_db":
+		createDB(migraterErr, migrater, startTime)
+
+	case "drop_db":
+		dropDB(migraterErr, migrater, startTime)
+
 	default:
 		printUsageAndExit()
 	}
+}
+
+var dropDB = func(migraterErr error, migrater *migrate.Migrate, startTime time.Time) {
+	flag.Usage()
+
+	// If a command is not found we exit with a status 2 to match the behavior
+	// of flag.Parse() with flag.ExitOnError when parsing an invalid flag.
+	os.Exit(2)
+
+}
+
+var createDB = func(migraterErr error, migrater *migrate.Migrate, startTime time.Time) {
+	flag.Usage()
+
+	// If a command is not found we exit with a status 2 to match the behavior
+	// of flag.Parse() with flag.ExitOnError when parsing an invalid flag.
+	os.Exit(2)
 }

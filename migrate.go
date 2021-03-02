@@ -7,7 +7,9 @@ package migrate
 import (
 	"errors"
 	"fmt"
+	"log"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -229,6 +231,25 @@ func (m *Migrate) Migrate(version uint) error {
 	go m.read(curVersion, int(version), ret)
 
 	return m.unlockErr(m.runMigrations(ret))
+}
+
+// CreateDB creates database for psql for now only
+func (m *Migrate) CreateDB(dbName string) error {
+	log.Println("db name", dbName)
+	if m.databaseName != "postgres" {
+		return fmt.Errorf("create_db not supported for %s", m.databaseName)
+	}
+
+	return m.databaseDrv.Run(strings.NewReader(fmt.Sprintf("CREATE DATABASE %s", dbName)))
+}
+
+// DropDB drops database for psql for now only
+func (m *Migrate) DropDB(dbName string) error {
+	if m.databaseName != "postgres" {
+		return fmt.Errorf("drop_db not supported for %s", m.databaseName)
+	}
+
+	return m.databaseDrv.Run(strings.NewReader(fmt.Sprintf("DROP DATABASE %s", dbName)))
 }
 
 // Steps looks at the currently active migration version.
