@@ -54,7 +54,7 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 		return false
 	}
 
-	db, err := sql.Open("postgres", pgConnectionString(ip, port))
+	db, err := sql.Open("pgx", pgConnectionString(ip, port))
 	if err != nil {
 		return false
 	}
@@ -210,7 +210,7 @@ func TestErrorParsing(t *testing.T) {
 		}()
 
 		wantErr := `migration failed: syntax error at or near "TABLEE" (column 37) in line 1: CREATE TABLE foo ` +
-			`(foo text); CREATE TABLEE bar (bar text); (details: pq: syntax error at or near "TABLEE")`
+			`(foo text); CREATE TABLEE bar (bar text); (details: ERROR: syntax error at or near "TABLEE" (SQLSTATE 42601))`
 		if err := d.Run(strings.NewReader("CREATE TABLE foo (foo text); CREATE TABLEE bar (bar text);")); err == nil {
 			t.Fatal("expected err but got nil")
 		} else if err.Error() != wantErr {
@@ -437,7 +437,7 @@ func TestWithInstance_Concurrent(t *testing.T) {
 		// actually a connection pool, and so, each of the below go
 		// routines will have a high probability of using a separate
 		// connection, which is something we want to exercise.
-		db, err := sql.Open("postgres", pgConnectionString(ip, port))
+		db, err := sql.Open("pgx", pgConnectionString(ip, port))
 		if err != nil {
 			t.Fatal(err)
 		}
