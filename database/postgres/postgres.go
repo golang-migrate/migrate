@@ -404,6 +404,38 @@ func (p *Postgres) Drop() (err error) {
 			}
 		}
 	}
+	query = `SELECT typname FROM pg_type WHERE typcategory = 'E';`
+	types, err := p.conn.QueryContext(context.Background(), query)
+	if err != nil {
+		return &database.Error{OrigErr: err, Query: []byte(query)}
+	}
+	defer func() {
+		if errClose := types.Close(); errClose != nil {
+			err = multierror.Append(err, errClose)
+		}
+	}()
+	typeNames := []string{}
+	for types.Next() {
+		var enumName string
+		if err := types.Scan(&enumName); err != nil {
+			return err
+		}
+		if enumName != "" {
+			typeNames = append(typeNames, enumName)
+		}
+	}
+	if err := types.Err(); err != nil {
+		return &database.Error{OrigErr: err, Query: []byte(query)}
+	}
+	if len(typeNames) > 0 {
+		// delete one by one ...
+		for _, t := range typeNames {
+			query = `DROP TYPE IF EXISTS ` + pq.QuoteIdentifier(t) + ` CASCADE`
+			if _, err := p.conn.ExecContext(context.Background(), query); err != nil {
+				return &database.Error{OrigErr: err, Query: []byte(query)}
+			}
+		}
+	}
 
 	return nil
 }
