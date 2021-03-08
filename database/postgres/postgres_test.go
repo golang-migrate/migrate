@@ -120,6 +120,10 @@ func TestMigrate(t *testing.T) {
 			t.Fatal(err)
 		}
 		dt.TestMigrate(t, m)
+		err = d.(*Postgres).Drop()
+		if err != nil {
+			t.Fatalf("Error When testing Drop: %s", err.Error())
+		}
 	})
 }
 
@@ -464,6 +468,7 @@ func TestWithInstance_Concurrent(t *testing.T) {
 		}
 	})
 }
+
 func Test_computeLineFromPos(t *testing.T) {
 	testcases := []struct {
 		pos      int
@@ -542,5 +547,4 @@ func Test_computeLineFromPos(t *testing.T) {
 			run(true, true)
 		})
 	}
-
 }
