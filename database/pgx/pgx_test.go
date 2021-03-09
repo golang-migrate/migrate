@@ -116,7 +116,7 @@ func TestMigrate(t *testing.T) {
 				t.Error(err)
 			}
 		}()
-		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "postgres", d)
+		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "pgx", d)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -226,7 +226,7 @@ func TestFilterCustomQuery(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		addr := fmt.Sprintf("postgres://postgres:%s@%v:%v/postgres?sslmode=disable&x-custom=foobar",
+		addr := fmt.Sprintf("pgx://postgres:%s@%v:%v/postgres?sslmode=disable&x-custom=foobar",
 			pgPassword, ip, port)
 		p := &Postgres{}
 		d, err := p.Open(addr)
@@ -269,7 +269,7 @@ func TestWithSchema(t *testing.T) {
 		}
 
 		// re-connect using that schema
-		d2, err := p.Open(fmt.Sprintf("postgres://postgres:%s@%v:%v/postgres?sslmode=disable&search_path=foobar",
+		d2, err := p.Open(fmt.Sprintf("pgx://postgres:%s@%v:%v/postgres?sslmode=disable&search_path=foobar",
 			pgPassword, ip, port))
 		if err != nil {
 			t.Fatal(err)
@@ -339,7 +339,7 @@ func TestParallelSchema(t *testing.T) {
 		}
 
 		// re-connect using that schemas
-		dfoo, err := p.Open(fmt.Sprintf("postgres://postgres:%s@%v:%v/postgres?sslmode=disable&search_path=foo",
+		dfoo, err := p.Open(fmt.Sprintf("pgx://postgres:%s@%v:%v/postgres?sslmode=disable&search_path=foo",
 			pgPassword, ip, port))
 		if err != nil {
 			t.Fatal(err)
@@ -350,7 +350,7 @@ func TestParallelSchema(t *testing.T) {
 			}
 		}()
 
-		dbar, err := p.Open(fmt.Sprintf("postgres://postgres:%s@%v:%v/postgres?sslmode=disable&search_path=bar",
+		dbar, err := p.Open(fmt.Sprintf("pgx://postgres:%s@%v:%v/postgres?sslmode=disable&search_path=bar",
 			pgPassword, ip, port))
 		if err != nil {
 			t.Fatal(err)
