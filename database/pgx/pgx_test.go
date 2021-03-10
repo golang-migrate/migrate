@@ -226,8 +226,7 @@ func TestFilterCustomQuery(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		addr := fmt.Sprintf("pgx://postgres:%s@%v:%v/postgres?sslmode=disable&x-custom=foobar",
-			pgPassword, ip, port)
+		addr := pgConnectionString(ip, port, "x-custom=foobar")
 		p := &Postgres{}
 		d, err := p.Open(addr)
 		if err != nil {
@@ -269,8 +268,7 @@ func TestWithSchema(t *testing.T) {
 		}
 
 		// re-connect using that schema
-		d2, err := p.Open(fmt.Sprintf("pgx://postgres:%s@%v:%v/postgres?sslmode=disable&search_path=foobar",
-			pgPassword, ip, port))
+		d2, err := p.Open(pgConnectionString(ip, port, "search_path=foobar"))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -339,8 +337,7 @@ func TestParallelSchema(t *testing.T) {
 		}
 
 		// re-connect using that schemas
-		dfoo, err := p.Open(fmt.Sprintf("pgx://postgres:%s@%v:%v/postgres?sslmode=disable&search_path=foo",
-			pgPassword, ip, port))
+		dfoo, err := p.Open(pgConnectionString(ip, port, "search_path=foo"))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -350,8 +347,7 @@ func TestParallelSchema(t *testing.T) {
 			}
 		}()
 
-		dbar, err := p.Open(fmt.Sprintf("pgx://postgres:%s@%v:%v/postgres?sslmode=disable&search_path=bar",
-			pgPassword, ip, port))
+		dbar, err := p.Open(pgConnectionString(ip, port, "search_path=bar"))
 		if err != nil {
 			t.Fatal(err)
 		}
