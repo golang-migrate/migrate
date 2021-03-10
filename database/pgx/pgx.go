@@ -17,9 +17,9 @@ import (
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/golang-migrate/migrate/v4/database/multistmt"
 	multierror "github.com/hashicorp/go-multierror"
+	"github.com/jackc/pgconn"
 	"github.com/jackc/pgerrcode"
-	"github.com/jackc/pgx"
-	_ "github.com/jackc/pgx/stdlib"
+	_ "github.com/jackc/pgx/v4/stdlib"
 )
 
 func init() {
@@ -121,6 +121,11 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 }
 
 func (p *Postgres) Open(url string) (database.Driver, error) {
+	// Driver is registered as pgx, but connection string must use postgres schema
+	// when making actual connection
+	// i.e. pgx://user:password@host:port/db => postgres://user:password@host:port/db
+	url = strings.Replace(url, "pgx://", "postgres://", 1)
+
 	purl, err := nurl.Parse(url)
 	if err != nil {
 		return nil, err
@@ -256,7 +261,7 @@ func (p *Postgres) runStatement(statement []byte) error {
 	}
 	if _, err := p.conn.ExecContext(ctx, query); err != nil {
 
-		if pgErr, ok := err.(pgx.PgError); ok {
+		if pgErr, ok := err.(*pgconn.PgError); ok {
 			var line uint
 			var col uint
 			var lineColOK bool
@@ -353,7 +358,7 @@ func (p *Postgres) Version() (version int, dirty bool, err error) {
 		return database.NilVersion, false, nil
 
 	case err != nil:
-		if e, ok := err.(pgx.PgError); ok {
+		if e, ok := err.(*pgconn.PgError); ok {
 			if e.SQLState() == pgerrcode.UndefinedTable {
 				return database.NilVersion, false, nil
 			}
