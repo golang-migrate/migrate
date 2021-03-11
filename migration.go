@@ -129,7 +129,9 @@ func (m *Migration) Buffer() error {
 
 	// start reading from body, peek won't move the read pointer though
 	// poor man's solution?
-	if _, err := b.Peek(int(m.BufferSize)); err != nil && err != io.EOF {
+	// related issue : https://github.com/gobuffalo/packd/issues/9
+	peekedData, err := b.Peek(int(m.BufferSize))
+	if err != nil && err != io.EOF {
 		return err
 	}
 
@@ -137,13 +139,13 @@ func (m *Migration) Buffer() error {
 
 	// write to bufferWriter, this will block until
 	// something starts reading from m.Buffer
-	n, err := b.WriteTo(m.bufferWriter)
+	n, err := m.bufferWriter.Write(peekedData)
 	if err != nil {
 		return err
 	}
 
 	m.FinishedReading = time.Now()
-	m.BytesRead = n
+	m.BytesRead = int64(n)
 
 	// close bufferWriter so Buffer knows that there is no
 	// more data coming
