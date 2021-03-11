@@ -121,15 +121,15 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 }
 
 func (p *Postgres) Open(url string) (database.Driver, error) {
-	// Driver is registered as pgx, but connection string must use postgres schema
-	// when making actual connection
-	// i.e. pgx://user:password@host:port/db => postgres://user:password@host:port/db
-	url = strings.Replace(url, "pgx://", "postgres://", 1)
-
 	purl, err := nurl.Parse(url)
 	if err != nil {
 		return nil, err
 	}
+
+	// Driver is registered as pgx, but connection string must use postgres schema
+	// when making actual connection
+	// i.e. pgx://user:password@host:port/db => postgres://user:password@host:port/db
+	purl.Scheme = "postgres"
 
 	db, err := sql.Open("pgx", migrate.FilterCustomQuery(purl).String())
 	if err != nil {
