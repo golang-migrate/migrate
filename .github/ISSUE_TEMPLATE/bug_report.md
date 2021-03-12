@@ -25,7 +25,7 @@ e.g. s3, github, go-bindata, gcs, file
 Obtained by running: `migrate -help`
 
 **Loaded Database Drivers**
-e.g. spanner, stub, clickhouse, cockroachdb, crdb-postgres, postgres, postgresql, redshift, cassandra, cockroach, mysql
+e.g. spanner, stub, clickhouse, cockroachdb, crdb-postgres, postgres, postgresql, pgx, redshift, cassandra, cockroach, mysql
 Obtained by running: `migrate -help`
 
 **Go Version**
