@@ -1,23 +1,3 @@
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-**Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
-
-- [migrate](#migrate)
-  - [Databases](#databases)
-    - [Database URLs](#database-urls)
-  - [Migration Sources](#migration-sources)
-  - [CLI usage](#cli-usage)
-    - [Basic usage](#basic-usage)
-    - [Docker usage](#docker-usage)
-  - [Use in your Go project](#use-in-your-go-project)
-  - [Getting started](#getting-started)
-  - [Tutorials](#tutorials)
-  - [Migration files](#migration-files)
-  - [Versions](#versions)
-  - [Development and Contributing](#development-and-contributing)
-
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
-
 [![CircleCI - Build Status](https://img.shields.io/circleci/build/github/golang-migrate/migrate/master)](https://circleci.com/gh/golang-migrate/migrate)
 [![GoDoc](https://godoc.org/github.com/golang-migrate/migrate?status.svg)](https://godoc.org/github.com/golang-migrate/migrate)
 [![Coverage Status](https://img.shields.io/coveralls/github/golang-migrate/migrate/master.svg)](https://coveralls.io/github/golang-migrate/migrate?branch=master)
