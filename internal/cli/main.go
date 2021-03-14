@@ -26,10 +26,10 @@ const (
 `
 	gotoUsage = `goto V       Migrate to version V`
 	upUsage   = `up [N]       Apply all or N up migrations`
-	downUsage = `down [N]     Apply all or N down migrations`
-	dropUsage = `drop [-f] [-all]    Drop everything inside database
-	Use -f to bypass confirmation
+	downUsage = `down [N] [-all]    Apply all or N down migrations
 	Use -all to apply all down migrations`
+	dropUsage = `drop [-f]    Drop everything inside database
+	Use -f to bypass confirmation`
 	forceUsage = `force V      Set version V but don't run migration (ignores dirty state)`
 )
 
