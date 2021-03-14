@@ -24,6 +24,7 @@ Forked from [mattes/migrate](https://github.com/mattes/migrate)
 Database drivers run migrations. [Add a new database?](database/driver.go)
 
 * [PostgreSQL](database/postgres)
+* [PGX](database/pgx)
 * [Redshift](database/redshift)
 * [Ql](database/ql)
 * [Cassandra](database/cassandra)
