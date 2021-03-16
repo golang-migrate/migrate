@@ -449,7 +449,7 @@ func (m *Mysql) ensureVersionTable() (err error) {
 
 	// check if migration table exists
 	var result string
-	query := `SHOW TABLES LIKE "` + m.config.MigrationsTable + `"`
+	query := `SHOW TABLES LIKE '` + m.config.MigrationsTable + `'`
 	if err := m.conn.QueryRowContext(context.Background(), query).Scan(&result); err != nil {
 		if err != sql.ErrNoRows {
 			return &database.Error{OrigErr: err, Query: []byte(query)}

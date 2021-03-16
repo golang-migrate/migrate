@@ -129,6 +129,11 @@ func TestReadUp(t *testing.T, d source.Driver) {
 				t.Errorf("expected up to be nil, got %v, in %v", up, i)
 			}
 		}
+		if up != nil {
+			if err := up.Close(); err != nil {
+				t.Error(err)
+			}
+		}
 	}
 }
 
@@ -164,6 +169,11 @@ func TestReadDown(t *testing.T, d source.Driver) {
 				t.Errorf("expected down not to be nil, in %v", i)
 			} else if !v.expectDown && down != nil {
 				t.Errorf("expected down to be nil, got %v, in %v", down, i)
+			}
+		}
+		if down != nil {
+			if err := down.Close(); err != nil {
+				t.Error(err)
 			}
 		}
 	}
