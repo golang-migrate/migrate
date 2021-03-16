@@ -340,7 +340,7 @@ func TestFailToCreateTableWithoutPermissions(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// create foobar schema
+		// create barfoo schema
 		if err := d.Run(strings.NewReader("CREATE SCHEMA barfoo AUTHORIZATION postgres")); err != nil {
 			t.Fatal(err)
 		}
@@ -406,7 +406,7 @@ func TestCheckBeforeCreateTable(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// create foobar schema
+		// create barfoo schema
 		if err := d.Run(strings.NewReader("CREATE SCHEMA barfoo AUTHORIZATION postgres")); err != nil {
 			t.Fatal(err)
 		}
@@ -527,10 +527,6 @@ func TestParallelSchema(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
-}
-
-func TestWithInstance(t *testing.T) {
-
 }
 
 func TestPostgres_Lock(t *testing.T) {
