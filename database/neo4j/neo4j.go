@@ -12,7 +12,7 @@ import (
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/golang-migrate/migrate/v4/database/multistmt"
 	"github.com/hashicorp/go-multierror"
-	"github.com/neo4j/neo4j-go-driver/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
 )
 
 func init() {
@@ -76,7 +76,6 @@ func (n *Neo4j) Open(url string) (database.Driver, error) {
 	// Whether to turn on/off TLS encryption.
 	tlsEncrypted := uri.Query().Get("x-tls-encrypted")
 	multi := false
-	encrypted := false
 	if msQuery != "" {
 		multi, err = strconv.ParseBool(uri.Query().Get("x-multi-statement"))
 		if err != nil {
@@ -85,7 +84,6 @@ func (n *Neo4j) Open(url string) (database.Driver, error) {
 	}
 
 	if tlsEncrypted != "" {
-		encrypted, err = strconv.ParseBool(tlsEncrypted)
 		if err != nil {
 			return nil, err
 		}
@@ -101,9 +99,7 @@ func (n *Neo4j) Open(url string) (database.Driver, error) {
 
 	uri.RawQuery = ""
 
-	driver, err := neo4j.NewDriver(uri.String(), authToken, func(config *neo4j.Config) {
-		config.Encrypted = encrypted
-	})
+	driver, err := neo4j.NewDriver(uri.String(), authToken)
 	if err != nil {
 		return nil, err
 	}

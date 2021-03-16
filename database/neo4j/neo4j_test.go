@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/dhui/dktest"
-	"github.com/neo4j/neo4j-go-driver/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
 
 	"github.com/golang-migrate/migrate/v4"
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
@@ -39,10 +39,7 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 
 	driver, err := neo4j.NewDriver(
 		neoConnectionString(ip, port),
-		neo4j.BasicAuth("neo4j", "migratetest", ""),
-		func(config *neo4j.Config) {
-			config.Encrypted = false
-		})
+		neo4j.BasicAuth("neo4j", "migratetest", ""))
 	if err != nil {
 		return false
 	}
