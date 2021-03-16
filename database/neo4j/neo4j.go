@@ -73,17 +73,9 @@ func (n *Neo4j) Open(url string) (database.Driver, error) {
 	uri.Scheme = "bolt"
 	msQuery := uri.Query().Get("x-multi-statement")
 
-	// Whether to turn on/off TLS encryption.
-	tlsEncrypted := uri.Query().Get("x-tls-encrypted")
 	multi := false
 	if msQuery != "" {
 		multi, err = strconv.ParseBool(uri.Query().Get("x-multi-statement"))
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if tlsEncrypted != "" {
 		if err != nil {
 			return nil, err
 		}
@@ -132,10 +124,7 @@ func (n *Neo4j) Unlock() error {
 }
 
 func (n *Neo4j) Run(migration io.Reader) (err error) {
-	session, err := n.driver.Session(neo4j.AccessModeWrite)
-	if err != nil {
-		return err
-	}
+	session := n.driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer func() {
 		if cerr := session.Close(); cerr != nil {
 			err = multierror.Append(err, cerr)
@@ -179,10 +168,7 @@ func (n *Neo4j) Run(migration io.Reader) (err error) {
 }
 
 func (n *Neo4j) SetVersion(version int, dirty bool) (err error) {
-	session, err := n.driver.Session(neo4j.AccessModeWrite)
-	if err != nil {
-		return err
-	}
+	session := n.driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer func() {
 		if cerr := session.Close(); cerr != nil {
 			err = multierror.Append(err, cerr)
@@ -204,10 +190,7 @@ type MigrationRecord struct {
 }
 
 func (n *Neo4j) Version() (version int, dirty bool, err error) {
-	session, err := n.driver.Session(neo4j.AccessModeRead)
-	if err != nil {
-		return database.NilVersion, false, err
-	}
+	session := n.driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer func() {
 		if cerr := session.Close(); cerr != nil {
 			err = multierror.Append(err, cerr)
@@ -252,10 +235,7 @@ ORDER BY COALESCE(sm.ts, datetime({year: 0})) DESC, sm.version DESC LIMIT 1`,
 }
 
 func (n *Neo4j) Drop() (err error) {
-	session, err := n.driver.Session(neo4j.AccessModeWrite)
-	if err != nil {
-		return err
-	}
+	session := n.driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer func() {
 		if cerr := session.Close(); cerr != nil {
 			err = multierror.Append(err, cerr)
@@ -269,10 +249,7 @@ func (n *Neo4j) Drop() (err error) {
 }
 
 func (n *Neo4j) ensureVersionConstraint() (err error) {
-	session, err := n.driver.Session(neo4j.AccessModeWrite)
-	if err != nil {
-		return err
-	}
+	session := n.driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer func() {
 		if cerr := session.Close(); cerr != nil {
 			err = multierror.Append(err, cerr)

@@ -48,14 +48,8 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 			log.Println("close error:", err)
 		}
 	}()
-	session, err := driver.Session(neo4j.AccessModeRead)
-	if err != nil {
-		return false
-	}
-	result, err := session.Run("RETURN 1", nil)
-	if err != nil {
-		return false
-	} else if result.Err() != nil {
+
+	if err := driver.VerifyConnectivity(); err != nil {
 		return false
 	}
 
