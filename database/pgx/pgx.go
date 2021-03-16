@@ -435,7 +435,7 @@ func (p *Postgres) ensureVersionTable() (err error) {
 	// Taken from https://github.com/mattes/migrate/blob/master/database/postgres/postgres.go#L258
 	var count int
 	query := `SELECT COUNT(1) FROM information_schema.tables WHERE table_name = $1 AND table_schema = (SELECT current_schema()) LIMIT 1`
-	row := p.conn.QueryRowContext(context.Background(), query, p.config.MigrationsTable);
+	row := p.conn.QueryRowContext(context.Background(), query, p.config.MigrationsTable)
 
 	err = row.Scan(&count)
 	if err != nil {
