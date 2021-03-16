@@ -190,7 +190,7 @@ type MigrationRecord struct {
 }
 
 func (n *Neo4j) Version() (version int, dirty bool, err error) {
-	session := n.driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	session := n.driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer func() {
 		if cerr := session.Close(); cerr != nil {
 			err = multierror.Append(err, cerr)
