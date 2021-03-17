@@ -77,6 +77,14 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 	return true
 }
 
+func mustRun(t *testing.T, d database.Driver, statements []string) {
+	for _, statement := range statements {
+		if err := d.Run(strings.NewReader(statement)); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
 func Test(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.FirstPort()
@@ -336,25 +344,13 @@ func TestFailToCreateTableWithoutPermissions(t *testing.T) {
 
 		// create user who is not the owner. Although we're concatenating strings in an sql statement it should be fine
 		// since this is a test environment and we're not expecting to the pgPassword to be malicious
-		if err := d.Run(strings.NewReader("CREATE USER not_owner WITH ENCRYPTED PASSWORD '" + pgPassword + "'")); err != nil {
-			t.Fatal(err)
-		}
-
-		// create barfoo schema
-		if err := d.Run(strings.NewReader("CREATE SCHEMA barfoo AUTHORIZATION postgres")); err != nil {
-			t.Fatal(err)
-		}
-
-		// revoke privileges
-		if err := d.Run(strings.NewReader("GRANT USAGE ON SCHEMA barfoo TO not_owner")); err != nil {
-			t.Fatal(err)
-		}
-		if err := d.Run(strings.NewReader("REVOKE CREATE ON SCHEMA barfoo FROM PUBLIC")); err != nil {
-			t.Fatal(err)
-		}
-		if err := d.Run(strings.NewReader("REVOKE CREATE ON SCHEMA barfoo FROM not_owner")); err != nil {
-			t.Fatal(err)
-		}
+		mustRun(t, d, []string{
+			"CREATE USER not_owner WITH ENCRYPTED PASSWORD '" + pgPassword + "'",
+			"CREATE SCHEMA barfoo AUTHORIZATION postgres",
+			"GRANT USAGE ON SCHEMA barfoo TO not_owner",
+			"REVOKE CREATE ON SCHEMA barfoo FROM PUBLIC",
+			"REVOKE CREATE ON SCHEMA barfoo FROM not_owner",
+		})
 
 		// re-connect using that schema
 		d2, err := p.Open(fmt.Sprintf("postgres://not_owner:%s@%v:%v/postgres?sslmode=disable&search_path=barfoo",
@@ -372,6 +368,10 @@ func TestFailToCreateTableWithoutPermissions(t *testing.T) {
 		var e *database.Error
 		if !errors.As(err, &e) || err == nil {
 			t.Fatal("Unexpected error, want permission denied error. Got: ", err)
+		}
+
+		if strings.Contains(e.Err, "permission denied for schema barfoo") {
+			t.Fatal(e)
 		}
 	})
 }
@@ -402,20 +402,12 @@ func TestCheckBeforeCreateTable(t *testing.T) {
 
 		// create user who is not the owner. Although we're concatenating strings in an sql statement it should be fine
 		// since this is a test environment and we're not expecting to the pgPassword to be malicious
-		if err := d.Run(strings.NewReader("CREATE USER not_owner WITH ENCRYPTED PASSWORD '" + pgPassword + "'")); err != nil {
-			t.Fatal(err)
-		}
-
-		// create barfoo schema
-		if err := d.Run(strings.NewReader("CREATE SCHEMA barfoo AUTHORIZATION postgres")); err != nil {
-			t.Fatal(err)
-		}
-		if err := d.Run(strings.NewReader("GRANT USAGE ON SCHEMA barfoo TO not_owner")); err != nil {
-			t.Fatal(err)
-		}
-		if err := d.Run(strings.NewReader("GRANT CREATE ON SCHEMA barfoo TO not_owner")); err != nil {
-			t.Fatal(err)
-		}
+		mustRun(t, d, []string{
+			"CREATE USER not_owner WITH ENCRYPTED PASSWORD '" + pgPassword + "'",
+			"CREATE SCHEMA barfoo AUTHORIZATION postgres",
+			"GRANT USAGE ON SCHEMA barfoo TO not_owner",
+			"GRANT CREATE ON SCHEMA barfoo TO not_owner",
+		})
 
 		// re-connect using that schema
 		d2, err := p.Open(fmt.Sprintf("postgres://not_owner:%s@%v:%v/postgres?sslmode=disable&search_path=barfoo",
@@ -430,12 +422,10 @@ func TestCheckBeforeCreateTable(t *testing.T) {
 		}
 
 		// revoke privileges
-		if err := d.Run(strings.NewReader("REVOKE CREATE ON SCHEMA barfoo FROM PUBLIC")); err != nil {
-			t.Fatal(err)
-		}
-		if err := d.Run(strings.NewReader("REVOKE CREATE ON SCHEMA barfoo FROM not_owner")); err != nil {
-			t.Fatal(err)
-		}
+		mustRun(t, d, []string{
+			"REVOKE CREATE ON SCHEMA barfoo FROM PUBLIC",
+			"REVOKE CREATE ON SCHEMA barfoo FROM not_owner",
+		})
 
 		// re-connect using that schema
 		d3, err := p.Open(fmt.Sprintf("postgres://not_owner:%s@%v:%v/postgres?sslmode=disable&search_path=barfoo",
