@@ -370,7 +370,7 @@ func TestFailToCreateTableWithoutPermissions(t *testing.T) {
 			t.Fatal("Unexpected error, want permission denied error. Got: ", err)
 		}
 
-		if strings.Contains(e.Err, "permission denied for schema barfoo") {
+		if !strings.Contains(e.OrigErr.Error(), "permission denied for schema barfoo") {
 			t.Fatal(e)
 		}
 	})
