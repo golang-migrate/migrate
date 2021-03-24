@@ -58,8 +58,9 @@ func WithInstance(conn *sql.DB, config *Config) (database.Driver, error) {
 }
 
 type ClickHouse struct {
-	conn   *sql.DB
-	config *Config
+	conn     *sql.DB
+	config   *Config
+	isLocked bool
 }
 
 func (ch *ClickHouse) Open(dsn string) (database.Driver, error) {
@@ -260,6 +261,18 @@ func (ch *ClickHouse) Drop() (err error) {
 	return nil
 }
 
-func (ch *ClickHouse) Lock() error   { return nil }
-func (ch *ClickHouse) Unlock() error { return nil }
-func (ch *ClickHouse) Close() error  { return ch.conn.Close() }
+func (ch *ClickHouse) Lock() error {
+	if ch.isLocked {
+		return database.ErrLocked
+	}
+	ch.isLocked = true
+	return nil
+}
+func (ch *ClickHouse) Unlock() error {
+	if !ch.isLocked {
+		return nil
+	}
+	ch.isLocked = false
+	return nil
+}
+func (ch *ClickHouse) Close() error { return ch.conn.Close() }
