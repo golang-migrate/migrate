@@ -1,4 +1,4 @@
-package clickhouse
+package clickhouse_test
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	_ "github.com/ClickHouse/clickhouse-go"
 	"github.com/dhui/dktest"
 	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/clickhouse"
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
 	"github.com/golang-migrate/migrate/v4/dktesting"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
@@ -70,7 +71,7 @@ func Test(t *testing.T) {
 		}
 
 		addr := clickhouseConnectionString(ip, port)
-		p := &ClickHouse{}
+		p := &clickhouse.ClickHouse{}
 		d, err := p.Open(addr)
 		if err != nil {
 			t.Fatal(err)
@@ -93,7 +94,7 @@ func TestMigrate(t *testing.T) {
 		}
 
 		addr := clickhouseConnectionString(ip, port)
-		p := &ClickHouse{}
+		p := &clickhouse.ClickHouse{}
 		d, err := p.Open(addr)
 		if err != nil {
 			t.Fatal(err)
@@ -122,7 +123,7 @@ func TestVersion(t *testing.T) {
 		}
 
 		addr := clickhouseConnectionString(ip, port)
-		p := &ClickHouse{}
+		p := &clickhouse.ClickHouse{}
 		d, err := p.Open(addr)
 		if err != nil {
 			t.Fatal(err)
@@ -157,7 +158,7 @@ func TestDrop(t *testing.T) {
 		}
 
 		addr := clickhouseConnectionString(ip, port)
-		p := &ClickHouse{}
+		p := &clickhouse.ClickHouse{}
 		d, err := p.Open(addr)
 		if err != nil {
 			t.Fatal(err)
