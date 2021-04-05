@@ -429,7 +429,24 @@ func (p *Postgres) ensureVersionTable() (err error) {
 		}
 	}()
 
-	query := `CREATE TABLE IF NOT EXISTS ` + quoteIdentifier(p.config.MigrationsTable) + ` (version bigint not null primary key, dirty boolean not null)`
+	// This block checks whether the `MigrationsTable` already exists. This is useful because it allows read only postgres
+	// users to also check the current version of the schema. Previously, even if `MigrationsTable` existed, the
+	// `CREATE TABLE IF NOT EXISTS...` query would fail because the user does not have the CREATE permission.
+	// Taken from https://github.com/mattes/migrate/blob/master/database/postgres/postgres.go#L258
+	var count int
+	query := `SELECT COUNT(1) FROM information_schema.tables WHERE table_name = $1 AND table_schema = (SELECT current_schema()) LIMIT 1`
+	row := p.conn.QueryRowContext(context.Background(), query, p.config.MigrationsTable)
+
+	err = row.Scan(&count)
+	if err != nil {
+		return &database.Error{OrigErr: err, Query: []byte(query)}
+	}
+
+	if count == 1 {
+		return nil
+	}
+
+	query = `CREATE TABLE IF NOT EXISTS ` + quoteIdentifier(p.config.MigrationsTable) + ` (version bigint not null primary key, dirty boolean not null)`
 	if _, err = p.conn.ExecContext(context.Background(), query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
