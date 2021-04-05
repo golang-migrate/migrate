@@ -3,6 +3,7 @@ package clickhouse
 import (
 	"database/sql"
 	"fmt"
+	"go.uber.org/atomic"
 	"io"
 	"io/ioutil"
 	"net/url"
@@ -60,7 +61,7 @@ func WithInstance(conn *sql.DB, config *Config) (database.Driver, error) {
 type ClickHouse struct {
 	conn     *sql.DB
 	config   *Config
-	isLocked bool
+	isLocked atomic.Bool
 }
 
 func (ch *ClickHouse) Open(dsn string) (database.Driver, error) {
@@ -262,17 +263,17 @@ func (ch *ClickHouse) Drop() (err error) {
 }
 
 func (ch *ClickHouse) Lock() error {
-	if ch.isLocked {
+	if !ch.isLocked.CAS(false, true) {
 		return database.ErrLocked
 	}
-	ch.isLocked = true
+
 	return nil
 }
 func (ch *ClickHouse) Unlock() error {
-	if !ch.isLocked {
-		return nil
+	if !ch.isLocked.CAS(true, false) {
+		return database.ErrLocked
 	}
-	ch.isLocked = false
+
 	return nil
 }
 func (ch *ClickHouse) Close() error { return ch.conn.Close() }

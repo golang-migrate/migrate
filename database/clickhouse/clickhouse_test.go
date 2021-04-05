@@ -82,14 +82,6 @@ func Test(t *testing.T) {
 		}()
 
 		dt.Test(t, d, []byte("SELECT 1"))
-
-		if err := d.(*ClickHouse).ensureVersionTable(); err != nil {
-			t.Fatal(err)
-		}
-
-		if err := d.(*ClickHouse).ensureVersionTable(); err != nil {
-			t.Fatal(err)
-		}
 	})
 }
 
