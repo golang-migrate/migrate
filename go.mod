@@ -4,7 +4,7 @@ require (
 	cloud.google.com/go v0.64.0 // indirect
 	cloud.google.com/go/spanner v1.9.0
 	cloud.google.com/go/storage v1.10.0
-	github.com/ClickHouse/clickhouse-go v1.3.12
+	github.com/ClickHouse/clickhouse-go v1.4.3
 	github.com/aws/aws-sdk-go v1.17.7
 	github.com/bitly/go-hostpool v0.0.0-20171023180738-a3a6125de932 // indirect
 	github.com/bmizerany/assert v0.0.0-20160611221934-b7ed37b82869 // indirect
