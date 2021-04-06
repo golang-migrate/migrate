@@ -70,7 +70,7 @@ func (n *Neo4j) Open(url string) (database.Driver, error) {
 	password, _ := uri.User.Password()
 	authToken := neo4j.BasicAuth(uri.User.Username(), password, "")
 	uri.User = nil
-	uri.Scheme = "bolt"
+	uri.Scheme = "neo4j"
 	msQuery := uri.Query().Get("x-multi-statement")
 
 	multi := false
