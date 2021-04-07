@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	neturl "net/url"
 	"strconv"
+	"strings"
 	"sync/atomic"
 
 	"github.com/golang-migrate/migrate/v4/database"
@@ -76,7 +77,7 @@ func (n *Neo4j) Open(url string) (database.Driver, error) {
 	// Whether to turn on/off TLS encryption.
 	tlsEncrypted := uri.Query().Get("x-tls-encrypted")
 	multi := false
-	encrypted := false
+
 	if msQuery != "" {
 		multi, err = strconv.ParseBool(uri.Query().Get("x-multi-statement"))
 		if err != nil {
@@ -84,16 +85,12 @@ func (n *Neo4j) Open(url string) (database.Driver, error) {
 		}
 	}
 
-	if tlsEncrypted != "" {
-		encrypted, err = strconv.ParseBool(tlsEncrypted)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// Set scheme to neo4j+ssc if encrypted
-	if encrypted {
+	// Set scheme to +ssc if value is self-signed
+	switch strings.ToLower(tlsEncrypted) {
+	case "self-signed":
 		uri.Scheme = "neo4j+ssc"
+	case "full":
+		uri.Scheme = "neo4j+s"
 	}
 
 	multiStatementMaxSize := DefaultMultiStatementMaxSize

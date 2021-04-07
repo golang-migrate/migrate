@@ -28,7 +28,7 @@ var (
 )
 
 func neoConnectionString(host, port string) string {
-	return fmt.Sprintf("bolt://neo4j:migratetest@%s:%s", host, port)
+	return fmt.Sprintf("neo4j://neo4j:migratetest@%s:%s", host, port)
 }
 
 func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
