@@ -73,12 +73,27 @@ func (n *Neo4j) Open(url string) (database.Driver, error) {
 	uri.Scheme = "neo4j"
 	msQuery := uri.Query().Get("x-multi-statement")
 
+	// Whether to turn on/off TLS encryption.
+	tlsEncrypted := uri.Query().Get("x-tls-encrypted")
 	multi := false
+	encrypted := false
 	if msQuery != "" {
 		multi, err = strconv.ParseBool(uri.Query().Get("x-multi-statement"))
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	if tlsEncrypted != "" {
+		encrypted, err = strconv.ParseBool(tlsEncrypted)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Set scheme to neo4j+ssc if encrypted
+	if encrypted {
+		uri.Scheme = "neo4j+ssc"
 	}
 
 	multiStatementMaxSize := DefaultMultiStatementMaxSize
