@@ -178,7 +178,11 @@ func (p *Snowflake) Run(migration io.Reader) error {
 
 	// run migration
 	query := string(migr[:])
-	if _, err := p.conn.ExecContext(context.Background(), query); err != nil {
+	ctx := context.Background()
+	if statements := strings.Count(query, ";"); statements > 1 {
+		ctx, _ = sf.WithMultiStatement(ctx, statements)
+	}
+	if _, err := p.conn.ExecContext(ctx, query); err != nil {
 		if pgErr, ok := err.(*pq.Error); ok {
 			var line uint
 			var col uint
