@@ -1,6 +1,7 @@
 SOURCE ?= file go_bindata github aws_s3 google_cloud_storage godoc_vfs
 DATABASE ?= postgres mysql redshift cassandra spanner cockroachdb clickhouse
-VERSION ?= $(shell git describe --tags 2>/dev/null | cut -c 2-)
+BUILD_NUMBER ?= 0
+VERSION ?= $(shell git describe --tags --long --dirty=-unsupported 2>/dev/null | cut -c 2-)-j$(BUILD_NUMBER)
 TEST_FLAGS ?=
 REPO_OWNER ?= $(shell cd .. && basename "$$(pwd)")
 COVERAGE_DIR ?= .coverage
@@ -15,6 +16,14 @@ build-cli: clean
 	cd ./cli/build && shasum -a 256 * > sha256sum.txt
 	cat ./cli/build/sha256sum.txt
 
+build:
+	docker build --build-arg VERSION=$(VERSION) . -t infoblox/migrate -t infoblox/migrate:$(VERSION)
+
+docker-push:
+	docker push infoblox/migrate:$(VERSION)
+
+show-image-version:
+	echo $(VERSION)
 
 clean:
 	-rm -r ./cli/build
@@ -33,7 +42,7 @@ test:
 
 
 test-with-flags:
-	@echo SOURCE: $(SOURCE) 
+	@echo SOURCE: $(SOURCE)
 	@echo DATABASE: $(DATABASE)
 
 	@go test $(TEST_FLAGS) .
@@ -84,7 +93,7 @@ rewrite-import-paths:
 docs:
 	-make kill-docs
 	nohup godoc -play -http=127.0.0.1:6064 </dev/null >/dev/null 2>&1 & echo $$! > .godoc.pid
-	cat .godoc.pid  
+	cat .godoc.pid
 
 
 kill-docs:
@@ -115,4 +124,3 @@ endef
 
 SHELL = /bin/bash
 RAND = $(shell echo $$RANDOM)
-
