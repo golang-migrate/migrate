@@ -32,25 +32,15 @@ pipeline {
       }
     }
     stage("Build Image") {
-      steps {
-        withDockerRegistry([credentialsId: "${env.JENKINS_DOCKER_CRED_ID}", url: ""]) {
-          dir("$DIRECTORY") {
-            sh "make build"
-          }
-        }
-      }
-    }
-    stage("Push Image") {
-      // only push images on trunk builds. An alternate approach
+      // only build images on trunk builds. An alternate approach
       // when { branch 'main' } or when { anyOf { branch "main", branch "develop" } }
       when {
         expression { ! isPrBuild() }
       }
       steps {
-        // reference Jenkins credential ids via an environment variable
         withDockerRegistry([credentialsId: "${env.JENKINS_DOCKER_CRED_ID}", url: ""]) {
           dir("$DIRECTORY") {
-            sh "make docker-push"
+            sh "make build"
           }
         }
       }
@@ -60,7 +50,12 @@ pipeline {
     success {
       // finalizeBuild is one of the Secure CICD helper methods
       dir("$DIRECTORY") {
-          finalizeBuild()
+        finalizeBuild(
+          sh(
+            script: 'make list-of-images',
+            returnStdout: true
+          )
+        )
       }
     }
     cleanup {

@@ -25,6 +25,9 @@ docker-push:
 show-image-version:
 	echo $(VERSION)
 
+list-of-images:
+	@echo "infoblox/migrate:$(VERSION)"
+
 clean:
 	-rm -r ./cli/build
 
