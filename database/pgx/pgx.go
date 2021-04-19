@@ -462,10 +462,10 @@ func (p *Postgres) ensureVersionTable() (err error) {
 	}
 	var query string
 	if len(schemaName) > 0 {
-		query := `SELECT COUNT(1) FROM information_schema.tables WHERE table_name = $1 AND table_schema = $2 LIMIT 1`
+		query = `SELECT COUNT(1) FROM information_schema.tables WHERE table_name = $1 AND table_schema = $2 LIMIT 1`
 		row = p.conn.QueryRowContext(context.Background(), query, tableName, schemaName)
 	} else {
-		query := `SELECT COUNT(1) FROM information_schema.tables WHERE table_name = $1 AND table_schema = (SELECT current_schema()) LIMIT 1`
+		query = `SELECT COUNT(1) FROM information_schema.tables WHERE table_name = $1 AND table_schema = (SELECT current_schema()) LIMIT 1`
 		row = p.conn.QueryRowContext(context.Background(), query, tableName)
 	}
 
