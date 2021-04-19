@@ -8,13 +8,14 @@ import (
 	sqldriver "database/sql/driver"
 	"errors"
 	"fmt"
-	"github.com/golang-migrate/migrate/v4"
 	"io"
 	"log"
 	"strconv"
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/golang-migrate/migrate/v4"
 
 	"github.com/dhui/dktest"
 
@@ -318,6 +319,74 @@ func TestWithSchema(t *testing.T) {
 	})
 }
 
+func TestMigrationTableOption(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := pgConnectionString(ip, port)
+		p := &Postgres{}
+		d, _ := p.Open(addr)
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Fatal(err)
+			}
+		}()
+
+		// create migrate schema
+		if err := d.Run(strings.NewReader("CREATE SCHEMA migrate AUTHORIZATION postgres")); err != nil {
+			t.Fatal(err)
+		}
+
+		// bad unquoted x-migrations-table parameter
+		wantErr := "x-migrations-table must be quoted (for instance '\"migrate\".\"schema_migrations\"') when x-migrations-table-quoted is enabled, current value is: migrate.schema_migrations"
+		d, err = p.Open(fmt.Sprintf("postgres://postgres:%s@%v:%v/postgres?sslmode=disable&x-migrations-table=migrate.schema_migrations&x-migrations-table-quoted=1",
+			pgPassword, ip, port))
+		if (err != nil) && (err.Error() != wantErr) {
+			t.Fatalf("expected '%s' but got '%s'", wantErr, err.Error())
+		}
+
+		// too many quoted x-migrations-table parameters
+		wantErr = "\"\"migrate\".\"schema_migrations\".\"toomany\"\" MigrationsTable contains too many dot characters"
+		d, err = p.Open(fmt.Sprintf("postgres://postgres:%s@%v:%v/postgres?sslmode=disable&x-migrations-table=\"migrate\".\"schema_migrations\".\"toomany\"&x-migrations-table-quoted=1",
+			pgPassword, ip, port))
+		if (err != nil) && (err.Error() != wantErr) {
+			t.Fatalf("expected '%s' but got '%s'", wantErr, err.Error())
+		}
+
+		// good quoted x-migrations-table parameter
+		d, err = p.Open(fmt.Sprintf("postgres://postgres:%s@%v:%v/postgres?sslmode=disable&x-migrations-table=\"migrate\".\"schema_migrations\"&x-migrations-table-quoted=1",
+			pgPassword, ip, port))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// make sure migrate.schema_migrations table exists
+		var exists bool
+		if err := d.(*Postgres).conn.QueryRowContext(context.Background(), "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'schema_migrations' AND table_schema = 'migrate')").Scan(&exists); err != nil {
+			t.Fatal(err)
+		}
+		if !exists {
+			t.Fatalf("expected table migrate.schema_migrations to exist")
+		}
+
+		d, err = p.Open(fmt.Sprintf("postgres://postgres:%s@%v:%v/postgres?sslmode=disable&x-migrations-table=migrate.schema_migrations",
+			pgPassword, ip, port))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := d.(*Postgres).conn.QueryRowContext(context.Background(), "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'migrate.schema_migrations' AND table_schema = (SELECT current_schema()))").Scan(&exists); err != nil {
+			t.Fatal(err)
+		}
+		if !exists {
+			t.Fatalf("expected table 'migrate.schema_migrations' to exist")
+		}
+
+	})
+}
+
 func TestFailToCreateTableWithoutPermissions(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.FirstPort()
@@ -366,6 +435,18 @@ func TestFailToCreateTableWithoutPermissions(t *testing.T) {
 		}()
 
 		var e *database.Error
+		if !errors.As(err, &e) || err == nil {
+			t.Fatal("Unexpected error, want permission denied error. Got: ", err)
+		}
+
+		if !strings.Contains(e.OrigErr.Error(), "permission denied for schema barfoo") {
+			t.Fatal(e)
+		}
+
+		// re-connect using that x-migrations-table and x-migrations-table-quoted
+		d2, err = p.Open(fmt.Sprintf("postgres://not_owner:%s@%v:%v/postgres?sslmode=disable&x-migrations-table=\"barfoo\".\"schema_migrations\"&x-migrations-table-quoted=1",
+			pgPassword, ip, port))
+
 		if !errors.As(err, &e) || err == nil {
 			t.Fatal("Unexpected error, want permission denied error. Got: ", err)
 		}
@@ -682,4 +763,44 @@ func Test_computeLineFromPos(t *testing.T) {
 		})
 	}
 
+}
+
+func Test_quoteIdentifier(t *testing.T) {
+	testcases := []struct {
+		migrationsTableQuoted bool
+		migrationsTable       string
+		expected              string
+	}{
+		{
+			false,
+			"schema_name.table_name",
+			"\"schema_name.table_name\"",
+		},
+		{
+			false,
+			"table_name",
+			"\"table_name\"",
+		},
+		{
+			true,
+			"\"schema_name\".\"table_name\"",
+			"\"schema_name\".\"table_name\"",
+		},
+		{
+			true,
+			"\"table_name\"",
+			"\"table_name\"",
+		},
+	}
+	p := &Postgres{
+		config: &Config{},
+	}
+
+	for _, tc := range testcases {
+		p.config.MigrationsTableQuoted = tc.migrationsTableQuoted
+		got := p.quoteIdentifier(tc.migrationsTable)
+		if tc.expected != got {
+			t.Fatalf("expected %s but got %s", tc.expected, got)
+		}
+	}
 }
