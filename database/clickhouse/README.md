@@ -1,13 +1,14 @@
 # ClickHouse
 
-`clickhouse://host:port?username=user&password=qwerty&database=clicks&x-multi-statement=true`
+`clickhouse://host:port?username=user&password=qwerty&database=clicks&x-multi-statement=true&x-table-engine=MergeTree`
 
 | URL Query  | Description |
 |------------|-------------|
 | `x-migrations-table`| Name of the migrations table |
+| `x-table-engine`| Table engine to use for the migrations table, defaults to TinyLog |
 | `database` | The name of the database to connect to |
 | `username` | The user to sign in as |
-| `password` | The user's password | 
+| `password` | The user's password |
 | `host` | The host to connect to. |
 | `port` | The port to bind to. |
 | `x-multi-statement` | false | Enable multiple statements to be ran in a single migration (See note below) |
