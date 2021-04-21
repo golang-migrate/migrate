@@ -33,7 +33,7 @@ var (
 func clickhouseConnectionString(host, port, engine string) string {
 	if engine != "" {
 		return fmt.Sprintf(
-			"clickhouse://%v:%v?username=user&password=password&database=db&x-multi-statement=true&x-table-engine=%v&debug=false",
+			"clickhouse://%v:%v?username=user&password=password&database=db&x-multi-statement=true&x-migrations-table-engine=%v&debug=false",
 			host, port, engine)
 	}
 
@@ -75,131 +75,123 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 
 func TestCases(t *testing.T) {
 	for _, engine := range tableEngines {
-		t.Run("Test_"+engine, testSimple(engine))
-		t.Run("Migrate_"+engine, testMigrate(engine))
-		t.Run("Version_"+engine, testVersion(engine))
-		t.Run("Drop_"+engine, testDrop(engine))
+		t.Run("Test_"+engine, func(t *testing.T) { testSimple(t, engine) })
+		t.Run("Migrate_"+engine, func(t *testing.T) { testMigrate(t, engine) })
+		t.Run("Version_"+engine, func(t *testing.T) { testVersion(t, engine) })
+		t.Run("Drop_"+engine, func(t *testing.T) { testDrop(t, engine) })
 
 	}
 }
 
-func testSimple(engine string) func(t *testing.T) {
-	return func(t *testing.T) {
-		dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
-			ip, port, err := c.Port(defaultPort)
-			if err != nil {
-				t.Fatal(err)
-			}
+func testSimple(t *testing.T, engine string) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.Port(defaultPort)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-			addr := clickhouseConnectionString(ip, port, engine)
-			p := &clickhouse.ClickHouse{}
-			d, err := p.Open(addr)
-			if err != nil {
-				t.Fatal(err)
+		addr := clickhouseConnectionString(ip, port, engine)
+		p := &clickhouse.ClickHouse{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
 			}
-			defer func() {
-				if err := d.Close(); err != nil {
-					t.Error(err)
-				}
-			}()
+		}()
 
-			dt.Test(t, d, []byte("SELECT 1"))
-		})
-	}
+		dt.Test(t, d, []byte("SELECT 1"))
+	})
 }
 
-func testMigrate(engine string) func(t *testing.T) {
-	return func(t *testing.T) {
-		dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
-			ip, port, err := c.Port(defaultPort)
-			if err != nil {
-				t.Fatal(err)
-			}
+func testMigrate(t *testing.T, engine string) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.Port(defaultPort)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-			addr := clickhouseConnectionString(ip, port, engine)
-			p := &clickhouse.ClickHouse{}
-			d, err := p.Open(addr)
-			if err != nil {
-				t.Fatal(err)
+		addr := clickhouseConnectionString(ip, port, engine)
+		p := &clickhouse.ClickHouse{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
 			}
-			defer func() {
-				if err := d.Close(); err != nil {
-					t.Error(err)
-				}
-			}()
-			m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "db", d)
+		}()
+		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "db", d)
 
-			if err != nil {
-				t.Fatal(err)
-			}
-			dt.TestMigrate(t, m)
-		})
-	}
+		if err != nil {
+			t.Fatal(err)
+		}
+		dt.TestMigrate(t, m)
+	})
 }
 
-func testVersion(engine string) func(t *testing.T) {
-	return func(t *testing.T) {
-		dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
-			expectedVersion := 1
+func testVersion(t *testing.T, engine string) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		expectedVersion := 1
 
-			ip, port, err := c.Port(defaultPort)
-			if err != nil {
-				t.Fatal(err)
-			}
+		ip, port, err := c.Port(defaultPort)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-			addr := clickhouseConnectionString(ip, port, engine)
-			p := &clickhouse.ClickHouse{}
-			d, err := p.Open(addr)
-			if err != nil {
-				t.Fatal(err)
+		addr := clickhouseConnectionString(ip, port, engine)
+		p := &clickhouse.ClickHouse{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
 			}
-			defer func() {
-				if err := d.Close(); err != nil {
-					t.Error(err)
-				}
-			}()
+		}()
 
-			err = d.SetVersion(expectedVersion, false)
-			if err != nil {
-				t.Fatal(err)
-			}
+		err = d.SetVersion(expectedVersion, false)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-			version, _, err := d.Version()
-			if err != nil {
-				t.Fatal(err)
-			}
+		version, _, err := d.Version()
+		if err != nil {
+			t.Fatal(err)
+		}
 
-			if version != expectedVersion {
-				t.Fatal("Version mismatch")
-			}
-		})
-	}
+		if version != expectedVersion {
+			t.Fatal("Version mismatch")
+		}
+	})
 }
 
-func testDrop(engine string) func(t *testing.T) {
-	return func(t *testing.T) {
-		dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
-			ip, port, err := c.Port(defaultPort)
-			if err != nil {
-				t.Fatal(err)
-			}
+func testDrop(t *testing.T, engine string) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.Port(defaultPort)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-			addr := clickhouseConnectionString(ip, port, engine)
-			p := &clickhouse.ClickHouse{}
-			d, err := p.Open(addr)
-			if err != nil {
-				t.Fatal(err)
+		addr := clickhouseConnectionString(ip, port, engine)
+		p := &clickhouse.ClickHouse{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
 			}
-			defer func() {
-				if err := d.Close(); err != nil {
-					t.Error(err)
-				}
-			}()
+		}()
 
-			err = d.Drop()
-			if err != nil {
-				t.Fatal(err)
-			}
-		})
-	}
+		err = d.Drop()
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
 }
