@@ -22,7 +22,7 @@ var (
 	multiStmtDelimiter = []byte(";")
 
 	DefaultMigrationsTable       = "schema_migrations"
-	DefaultTableEngine           = "TinyLog"
+	DefaultMigrationsTableEngine = "TinyLog"
 	DefaultMultiStatementMaxSize = 10 * 1 << 20 // 10 MB
 
 	ErrNilConfig = fmt.Errorf("no config")
@@ -31,7 +31,7 @@ var (
 type Config struct {
 	DatabaseName          string
 	MigrationsTable       string
-	TableEngine           string
+	MigrationsTableEngine string
 	MultiStatementEnabled bool
 	MultiStatementMaxSize int
 }
@@ -87,16 +87,16 @@ func (ch *ClickHouse) Open(dsn string) (database.Driver, error) {
 		}
 	}
 
-	tableEngine := DefaultTableEngine
-	if s := purl.Query().Get("x-table-engine"); len(s) > 0 {
-		tableEngine = s
+	migrationsTableEngine := DefaultMigrationsTableEngine
+	if s := purl.Query().Get("x-migrations-table-engine"); len(s) > 0 {
+		migrationsTableEngine = s
 	}
 
 	ch = &ClickHouse{
 		conn: conn,
 		config: &Config{
 			MigrationsTable:       purl.Query().Get("x-migrations-table"),
-			TableEngine:           tableEngine,
+			MigrationsTableEngine: migrationsTableEngine,
 			DatabaseName:          purl.Query().Get("database"),
 			MultiStatementEnabled: purl.Query().Get("x-multi-statement") == "true",
 			MultiStatementMaxSize: multiStatementMaxSize,
@@ -232,9 +232,9 @@ func (ch *ClickHouse) ensureVersionTable() (err error) {
 			version    Int64,
 			dirty      UInt8,
 			sequence   UInt64
-		) Engine=%s`, ch.config.MigrationsTable, ch.config.TableEngine)
+		) Engine=%s`, ch.config.MigrationsTable, ch.config.MigrationsTableEngine)
 
-	if strings.HasSuffix(ch.config.TableEngine, "Tree") {
+	if strings.HasSuffix(ch.config.MigrationsTableEngine, "Tree") {
 		query = fmt.Sprintf(`%s ORDER BY sequence`, query)
 	}
 
