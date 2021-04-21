@@ -5,6 +5,9 @@ import (
 	"database/sql"
 	sqldriver "database/sql/driver"
 	"fmt"
+	"log"
+	"testing"
+
 	_ "github.com/ClickHouse/clickhouse-go"
 	"github.com/dhui/dktest"
 	"github.com/golang-migrate/migrate/v4"
@@ -12,8 +15,6 @@ import (
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
 	"github.com/golang-migrate/migrate/v4/dktesting"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
-	"log"
-	"testing"
 )
 
 const defaultPort = 9000
@@ -29,7 +30,7 @@ var (
 )
 
 func clickhouseConnectionString(host, port string) string {
-	return fmt.Sprintf("clickhouse://%v:%v?username=user&password=password&database=db&x-multi-statement=true&debug=false", host, port)
+	return fmt.Sprintf("clickhouse://%v:%v?username=user&password=password&database=db&x-multi-statement=true&x-table-engine=MergeTree&debug=false", host, port)
 }
 
 func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
