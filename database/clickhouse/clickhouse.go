@@ -3,13 +3,14 @@ package clickhouse
 import (
 	"database/sql"
 	"fmt"
-	"go.uber.org/atomic"
 	"io"
 	"io/ioutil"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
+
+	"go.uber.org/atomic"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
@@ -21,6 +22,7 @@ var (
 	multiStmtDelimiter = []byte(";")
 
 	DefaultMigrationsTable       = "schema_migrations"
+	DefaultMigrationsTableEngine = "TinyLog"
 	DefaultMultiStatementMaxSize = 10 * 1 << 20 // 10 MB
 
 	ErrNilConfig = fmt.Errorf("no config")
@@ -29,6 +31,7 @@ var (
 type Config struct {
 	DatabaseName          string
 	MigrationsTable       string
+	MigrationsTableEngine string
 	MultiStatementEnabled bool
 	MultiStatementMaxSize int
 }
@@ -84,10 +87,16 @@ func (ch *ClickHouse) Open(dsn string) (database.Driver, error) {
 		}
 	}
 
+	migrationsTableEngine := DefaultMigrationsTableEngine
+	if s := purl.Query().Get("x-migrations-table-engine"); len(s) > 0 {
+		migrationsTableEngine = s
+	}
+
 	ch = &ClickHouse{
 		conn: conn,
 		config: &Config{
 			MigrationsTable:       purl.Query().Get("x-migrations-table"),
+			MigrationsTableEngine: migrationsTableEngine,
 			DatabaseName:          purl.Query().Get("database"),
 			MultiStatementEnabled: purl.Query().Get("x-multi-statement") == "true",
 			MultiStatementMaxSize: multiStatementMaxSize,
@@ -216,14 +225,19 @@ func (ch *ClickHouse) ensureVersionTable() (err error) {
 	} else {
 		return nil
 	}
+
 	// if not, create the empty migration table
-	query = `
-		CREATE TABLE ` + ch.config.MigrationsTable + ` (
-			version    Int64, 
+	query = fmt.Sprintf(`
+		CREATE TABLE %s (
+			version    Int64,
 			dirty      UInt8,
 			sequence   UInt64
-		) Engine=TinyLog
-	`
+		) Engine=%s`, ch.config.MigrationsTable, ch.config.MigrationsTableEngine)
+
+	if strings.HasSuffix(ch.config.MigrationsTableEngine, "Tree") {
+		query = fmt.Sprintf(`%s ORDER BY sequence`, query)
+	}
+
 	if _, err := ch.conn.Exec(query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
