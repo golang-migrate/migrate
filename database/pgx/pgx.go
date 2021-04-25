@@ -46,6 +46,8 @@ type Config struct {
 	MigrationsTable       string
 	DatabaseName          string
 	SchemaName            string
+	migrationsSchemaName  string
+	migrationsTableName   string
 	StatementTimeout      time.Duration
 	MigrationsTableQuoted bool
 	MultiStatementEnabled bool
@@ -101,6 +103,19 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 
 	if len(config.MigrationsTable) == 0 {
 		config.MigrationsTable = DefaultMigrationsTable
+	}
+
+	config.migrationsSchemaName = config.SchemaName
+	config.migrationsTableName = config.MigrationsTable
+	if config.MigrationsTableQuoted {
+		re := regexp.MustCompile(`"(.*?)"`)
+		result := re.FindAllStringSubmatch(config.MigrationsTable, -1)
+		config.migrationsTableName = result[len(result)-1][1]
+		if len(result) == 2 {
+			config.migrationsSchemaName = result[0][1]
+		} else if len(result) > 2 {
+			return nil, fmt.Errorf("\"%s\" MigrationsTable contains too many dot characters", config.MigrationsTable)
+		}
 	}
 
 	conn, err := instance.Conn(context.Background())
@@ -209,7 +224,7 @@ func (p *Postgres) Lock() error {
 		return database.ErrLocked
 	}
 
-	aid, err := database.GenerateAdvisoryLockId(p.config.DatabaseName, p.config.SchemaName)
+	aid, err := database.GenerateAdvisoryLockId(p.config.DatabaseName, p.config.migrationsSchemaName, p.config.migrationsTableName)
 	if err != nil {
 		return err
 	}
@@ -229,7 +244,7 @@ func (p *Postgres) Unlock() error {
 		return nil
 	}
 
-	aid, err := database.GenerateAdvisoryLockId(p.config.DatabaseName, p.config.SchemaName)
+	aid, err := database.GenerateAdvisoryLockId(p.config.DatabaseName, p.config.migrationsSchemaName, p.config.migrationsTableName)
 	if err != nil {
 		return err
 	}
@@ -335,7 +350,7 @@ func (p *Postgres) SetVersion(version int, dirty bool) error {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
 	}
 
-	query := `TRUNCATE ` + p.quoteIdentifier(p.config.MigrationsTable)
+	query := `TRUNCATE ` + quoteIdentifier(p.config.migrationsSchemaName) + `.` + quoteIdentifier(p.config.migrationsTableName)
 	if _, err := tx.Exec(query); err != nil {
 		if errRollback := tx.Rollback(); errRollback != nil {
 			err = multierror.Append(err, errRollback)
@@ -347,8 +362,7 @@ func (p *Postgres) SetVersion(version int, dirty bool) error {
 	// empty schema version for failed down migration on the first migration
 	// See: https://github.com/golang-migrate/migrate/issues/330
 	if version >= 0 || (version == database.NilVersion && dirty) {
-		query = `INSERT INTO ` + p.quoteIdentifier(p.config.MigrationsTable) +
-			` (version, dirty) VALUES ($1, $2)`
+		query = `INSERT INTO ` + quoteIdentifier(p.config.migrationsSchemaName) + `.` + quoteIdentifier(p.config.migrationsTableName) + ` (version, dirty) VALUES ($1, $2)`
 		if _, err := tx.Exec(query, version, dirty); err != nil {
 			if errRollback := tx.Rollback(); errRollback != nil {
 				err = multierror.Append(err, errRollback)
@@ -365,7 +379,7 @@ func (p *Postgres) SetVersion(version int, dirty bool) error {
 }
 
 func (p *Postgres) Version() (version int, dirty bool, err error) {
-	query := `SELECT version, dirty FROM ` + p.quoteIdentifier(p.config.MigrationsTable) + ` LIMIT 1`
+	query := `SELECT version, dirty FROM ` + quoteIdentifier(p.config.migrationsSchemaName) + `.` + quoteIdentifier(p.config.migrationsTableName) + ` LIMIT 1`
 	err = p.conn.QueryRowContext(context.Background(), query).Scan(&version, &dirty)
 	switch {
 	case err == sql.ErrNoRows:
@@ -415,7 +429,7 @@ func (p *Postgres) Drop() (err error) {
 	if len(tableNames) > 0 {
 		// delete one by one ...
 		for _, t := range tableNames {
-			query = `DROP TABLE IF EXISTS ` + p.quoteIdentifier(t) + ` CASCADE`
+			query = `DROP TABLE IF EXISTS ` + quoteIdentifier(t) + ` CASCADE`
 			if _, err := p.conn.ExecContext(context.Background(), query); err != nil {
 				return &database.Error{OrigErr: err, Query: []byte(query)}
 			}
@@ -447,27 +461,8 @@ func (p *Postgres) ensureVersionTable() (err error) {
 	// users to also check the current version of the schema. Previously, even if `MigrationsTable` existed, the
 	// `CREATE TABLE IF NOT EXISTS...` query would fail because the user does not have the CREATE permission.
 	// Taken from https://github.com/mattes/migrate/blob/master/database/postgres/postgres.go#L258
-	var row *sql.Row
-	tableName := p.config.MigrationsTable
-	schemaName := ""
-	if p.config.MigrationsTableQuoted {
-		re := regexp.MustCompile(`"(.*?)"`)
-		result := re.FindAllStringSubmatch(p.config.MigrationsTable, -1)
-		tableName = result[len(result)-1][1]
-		if len(result) == 2 {
-			schemaName = result[0][1]
-		} else if len(result) > 2 {
-			return fmt.Errorf("\"%s\" MigrationsTable contains too many dot characters", p.config.MigrationsTable)
-		}
-	}
-	var query string
-	if len(schemaName) > 0 {
-		query = `SELECT COUNT(1) FROM information_schema.tables WHERE table_name = $1 AND table_schema = $2 LIMIT 1`
-		row = p.conn.QueryRowContext(context.Background(), query, tableName, schemaName)
-	} else {
-		query = `SELECT COUNT(1) FROM information_schema.tables WHERE table_name = $1 AND table_schema = (SELECT current_schema()) LIMIT 1`
-		row = p.conn.QueryRowContext(context.Background(), query, tableName)
-	}
+	query := `SELECT COUNT(1) FROM information_schema.tables WHERE table_schema = $1 AND table_name = $2 LIMIT 1`
+	row := p.conn.QueryRowContext(context.Background(), query, p.config.migrationsSchemaName, p.config.migrationsTableName)
 
 	var count int
 	err = row.Scan(&count)
@@ -479,7 +474,7 @@ func (p *Postgres) ensureVersionTable() (err error) {
 		return nil
 	}
 
-	query = `CREATE TABLE IF NOT EXISTS ` + p.quoteIdentifier(p.config.MigrationsTable) + ` (version bigint not null primary key, dirty boolean not null)`
+	query = `CREATE TABLE IF NOT EXISTS ` + quoteIdentifier(p.config.migrationsSchemaName) + `.` + quoteIdentifier(p.config.migrationsTableName) + ` (version bigint not null primary key, dirty boolean not null)`
 	if _, err = p.conn.ExecContext(context.Background(), query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
@@ -488,10 +483,7 @@ func (p *Postgres) ensureVersionTable() (err error) {
 }
 
 // Copied from lib/pq implementation: https://github.com/lib/pq/blob/v1.9.0/conn.go#L1611
-func (p *Postgres) quoteIdentifier(name string) string {
-	if p.config.MigrationsTableQuoted {
-		return name
-	}
+func quoteIdentifier(name string) string {
 	end := strings.IndexRune(name, 0)
 	if end > -1 {
 		name = name[:end]
