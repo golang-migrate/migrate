@@ -226,17 +226,17 @@ func (c *Cassandra) Run(migration io.Reader) error {
 }
 
 func (c *Cassandra) SetVersion(version int, dirty bool) error {
-	query := `TRUNCATE "` + c.config.MigrationsTable + `"`
-	if err := c.session.Query(query).Exec(); err != nil {
-		return &database.Error{OrigErr: err, Query: []byte(query)}
-	}
-
 	// Also re-write the schema version for nil dirty versions to prevent
 	// empty schema version for failed down migration on the first migration
 	// See: https://github.com/golang-migrate/migrate/issues/330
 	if version >= 0 || (version == database.NilVersion && dirty) {
-		query = `INSERT INTO "` + c.config.MigrationsTable + `" (version, dirty) VALUES (?, ?)`
+		query := `UPDATE "` + c.config.MigrationsTable + `" SET version = ?, dirty = ? WHERE dummy = 1`
 		if err := c.session.Query(query, version, dirty).Exec(); err != nil {
+			return &database.Error{OrigErr: err, Query: []byte(query)}
+		}
+	} else {
+		query := `DELETE FROM "` + c.config.MigrationsTable + `" WHERE dummy = 1`
+		if err := c.session.Query(query).Exec(); err != nil {
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
 	}
@@ -246,7 +246,7 @@ func (c *Cassandra) SetVersion(version int, dirty bool) error {
 
 // Return current keyspace version
 func (c *Cassandra) Version() (version int, dirty bool, err error) {
-	query := `SELECT version, dirty FROM "` + c.config.MigrationsTable + `" LIMIT 1`
+	query := `SELECT version, dirty FROM "` + c.config.MigrationsTable + `" WHERE dummy = 1 LIMIT 1`
 	err = c.session.Query(query).Scan(&version, &dirty)
 	switch {
 	case err == gocql.ErrNotFound:
@@ -296,14 +296,69 @@ func (c *Cassandra) ensureVersionTable() (err error) {
 		}
 	}()
 
-	err = c.session.Query(fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (version bigint, dirty boolean, PRIMARY KEY(version))", c.config.MigrationsTable)).Exec()
+	err = c.createVersionTable()
 	if err != nil {
 		return err
 	}
 	if _, _, err = c.Version(); err != nil {
+		var count int8
+		err = c.session.Query(`SELECT COUNT(*) FROM system_schema.columns WHERE keyspace_name = '` + c.config.KeyspaceName + `' AND table_name = '` + c.config.MigrationsTable + `' AND column_name = 'dummy'`).Scan(&count)
+		if err != nil {
+			return err
+		}
+
+		if count == 0 {
+			if err = c.upgradeVersionTable(); err != nil {
+				return err
+			}
+
+			if _, _, err = c.Version(); err != nil {
+				return err
+			}
+
+			return nil
+		}
 		return err
 	}
 	return nil
+}
+
+// upgradeVersionTable is responsible for upgrading legacy migrate users from the
+// older version table schema to the new one without disruption.
+// See: https://github.com/golang-migrate/migrate/issues/455
+func (c *Cassandra) upgradeVersionTable() (err error) {
+	version := -1
+	dirty := false
+	skip := false
+
+	query := `SELECT version, dirty FROM "` + c.config.MigrationsTable + `" LIMIT 1`
+	if err = c.session.Query(query).Scan(&version, &dirty); err != nil {
+		if err == gocql.ErrNotFound {
+			skip = true
+		} else {
+			return err
+		}
+	}
+
+	if err = c.session.Query(`DROP TABLE "` + c.config.MigrationsTable + `"`).Exec(); err != nil {
+		return err
+	}
+
+	if err = c.createVersionTable(); err != nil {
+		return err
+	}
+
+	if !skip {
+		if err = c.SetVersion(version, dirty); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (c *Cassandra) createVersionTable() (err error) {
+	return c.session.Query(fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (dummy tinyint, version bigint, dirty boolean, PRIMARY KEY(dummy))", c.config.MigrationsTable)).Exec()
 }
 
 // ParseConsistency wraps gocql.ParseConsistency
