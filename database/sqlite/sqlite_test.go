@@ -1,10 +1,9 @@
-package sqlite3
+package sqlite
 
 import (
 	"database/sql"
 	"fmt"
 	"io/ioutil"
-	"net/url"
 	"os"
 	"path/filepath"
 	"testing"
@@ -14,11 +13,11 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 func Test(t *testing.T) {
-	dir, err := ioutil.TempDir("", "sqlite3-driver-test")
+	dir, err := ioutil.TempDir("", "sqlite-driver-test")
 	if err != nil {
 		return
 	}
@@ -27,9 +26,9 @@ func Test(t *testing.T) {
 			t.Error(err)
 		}
 	}()
-	t.Logf("DB path : %s\n", filepath.Join(dir, "sqlite3.db"))
+	t.Logf("DB path : %s\n", filepath.Join(dir, "sqlite.db"))
 	p := &Sqlite{}
-	addr := fmt.Sprintf("sqlite3://%s", filepath.Join(dir, "sqlite3.db"))
+	addr := fmt.Sprintf("sqlite://%s", filepath.Join(dir, "sqlite.db"))
 	d, err := p.Open(addr)
 	if err != nil {
 		t.Fatal(err)
@@ -38,7 +37,7 @@ func Test(t *testing.T) {
 }
 
 func TestMigrate(t *testing.T) {
-	dir, err := ioutil.TempDir("", "sqlite3-driver-test")
+	dir, err := ioutil.TempDir("", "sqlite-driver-test")
 	if err != nil {
 		return
 	}
@@ -47,9 +46,9 @@ func TestMigrate(t *testing.T) {
 			t.Error(err)
 		}
 	}()
-	t.Logf("DB path : %s\n", filepath.Join(dir, "sqlite3.db"))
+	t.Logf("DB path : %s\n", filepath.Join(dir, "sqlite.db"))
 
-	db, err := sql.Open("sqlite3", filepath.Join(dir, "sqlite3.db"))
+	db, err := sql.Open("sqlite", filepath.Join(dir, "sqlite.db"))
 	if err != nil {
 		return
 	}
@@ -73,7 +72,7 @@ func TestMigrate(t *testing.T) {
 }
 
 func TestMigrationTable(t *testing.T) {
-	dir, err := ioutil.TempDir("", "sqlite3-driver-test-migration-table")
+	dir, err := ioutil.TempDir("", "sqlite-driver-test-migration-table")
 	if err != nil {
 		return
 	}
@@ -83,9 +82,9 @@ func TestMigrationTable(t *testing.T) {
 		}
 	}()
 
-	t.Logf("DB path : %s\n", filepath.Join(dir, "sqlite3.db"))
+	t.Logf("DB path : %s\n", filepath.Join(dir, "sqlite.db"))
 
-	db, err := sql.Open("sqlite3", filepath.Join(dir, "sqlite3.db"))
+	db, err := sql.Open("sqlite", filepath.Join(dir, "sqlite.db"))
 	if err != nil {
 		return
 	}
@@ -121,7 +120,7 @@ func TestMigrationTable(t *testing.T) {
 }
 
 func TestNoTxWrap(t *testing.T) {
-	dir, err := ioutil.TempDir("", "sqlite3-driver-test")
+	dir, err := ioutil.TempDir("", "sqlite-driver-test")
 	if err != nil {
 		return
 	}
@@ -130,9 +129,9 @@ func TestNoTxWrap(t *testing.T) {
 			t.Error(err)
 		}
 	}()
-	t.Logf("DB path : %s\n", filepath.Join(dir, "sqlite3.db"))
+	t.Logf("DB path : %s\n", filepath.Join(dir, "sqlite.db"))
 	p := &Sqlite{}
-	addr := fmt.Sprintf("sqlite3://%s?x-no-tx-wrap=true", filepath.Join(dir, "sqlite3.db"))
+	addr := fmt.Sprintf("sqlite://%s?x-no-tx-wrap=true", filepath.Join(dir, "sqlite.db"))
 	d, err := p.Open(addr)
 	if err != nil {
 		t.Fatal(err)
@@ -143,7 +142,7 @@ func TestNoTxWrap(t *testing.T) {
 }
 
 func TestNoTxWrapInvalidValue(t *testing.T) {
-	dir, err := ioutil.TempDir("", "sqlite3-driver-test")
+	dir, err := ioutil.TempDir("", "sqlite-driver-test")
 	if err != nil {
 		return
 	}
@@ -152,9 +151,9 @@ func TestNoTxWrapInvalidValue(t *testing.T) {
 			t.Error(err)
 		}
 	}()
-	t.Logf("DB path : %s\n", filepath.Join(dir, "sqlite3.db"))
+	t.Logf("DB path : %s\n", filepath.Join(dir, "sqlite.db"))
 	p := &Sqlite{}
-	addr := fmt.Sprintf("sqlite3://%s?x-no-tx-wrap=yeppers", filepath.Join(dir, "sqlite3.db"))
+	addr := fmt.Sprintf("sqlite://%s?x-no-tx-wrap=yeppers", filepath.Join(dir, "sqlite.db"))
 	_, err = p.Open(addr)
 	if assert.Error(t, err) {
 		assert.Contains(t, err.Error(), "x-no-tx-wrap")
@@ -172,55 +171,13 @@ func TestMigrateWithDirectoryNameContainsWhitespaces(t *testing.T) {
 			t.Error(err)
 		}
 	}()
-	dbPath := filepath.Join(dir, "sqlite3.db")
+	dbPath := filepath.Join(dir, "sqlite.db")
 	t.Logf("DB path : %s\n", dbPath)
 	p := &Sqlite{}
-	addr := fmt.Sprintf("sqlite3://file:%s", dbPath)
+	addr := fmt.Sprintf("sqlite://file:%s", dbPath)
 	d, err := p.Open(addr)
 	if err != nil {
 		t.Fatal(err)
 	}
 	dt.Test(t, d, []byte("CREATE TABLE t (Qty int, Name string);"))
-}
-
-func TestDbPathFromURLWithValidPathAndQueryOptions(t *testing.T) {
-
-	expected := "/Path/To/dbfilename.db?a=x&b=y"
-
-	inputStr := "sqlite3:///Path/To/dbfilename.db?a=x&b=y"
-	inputURL, _ := url.Parse(inputStr)
-
-	outputStr := dbPathFromURL(inputURL)
-
-	if outputStr != expected {
-		t.Fatalf("Expected:  %v  But actual value was: %v", expected, outputStr)
-	}
-}
-
-func TestDbPathFromURLWithPathOnly(t *testing.T) {
-
-	expected := "/Path/To/dbfilename.db"
-
-	inputStr := "sqlite3:///Path/To/dbfilename.db"
-	inputURL, _ := url.Parse(inputStr)
-
-	outputStr := dbPathFromURL(inputURL)
-
-	if outputStr != expected {
-		t.Fatalf("Expected:  %v,   But actual value was: %v", expected, outputStr)
-	}
-}
-
-func TestDbPathFromURLWithWhitespaceAndQueryOptions(t *testing.T) {
-
-	expected := "/Path/To/Directory With Spaces/AndMore/dbfilename.db?a=x&aQuery=aString&b=y"
-
-	inputStr := "sqlite3:///Path/To/Directory With Spaces/AndMore/dbfilename.db?a=x&b=y&aQuery=aString"
-	inputURL, _ := url.Parse(inputStr)
-
-	outputStr := dbPathFromURL(inputURL)
-
-	if outputStr != expected {
-		t.Fatalf("Expected:  %v,   But actual value was: %v", expected, outputStr)
-	}
 }

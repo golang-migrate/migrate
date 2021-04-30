@@ -1,4 +1,4 @@
-package sqlite3
+package sqlite
 
 import (
 	"database/sql"
@@ -7,15 +7,16 @@ import (
 	"io/ioutil"
 	nurl "net/url"
 	"strconv"
+	"strings"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/hashicorp/go-multierror"
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 func init() {
-	database.Register("sqlite3", &Sqlite{})
+	database.Register("sqlite", &Sqlite{})
 }
 
 var DefaultMigrationsTable = "schema_migrations"
@@ -95,8 +96,8 @@ func (m *Sqlite) Open(url string) (database.Driver, error) {
 	if err != nil {
 		return nil, err
 	}
-	dbfile := dbPathFromURL(purl)
-	db, err := sql.Open("sqlite3", dbfile)
+	dbfile := strings.Replace(migrate.FilterCustomQuery(purl).String(), "sqlite://", "", 1)
+	db, err := sql.Open("sqlite", dbfile)
 	if err != nil {
 		return nil, err
 	}
@@ -266,15 +267,4 @@ func (m *Sqlite) Version() (version int, dirty bool, err error) {
 		return database.NilVersion, false, nil
 	}
 	return version, dirty, nil
-}
-
-func dbPathFromURL(url *nurl.URL) string {
-	dbPath := url.Path
-	encodedQuery := migrate.FilterCustomQuery(url).Query().Encode()
-
-	if len(encodedQuery) > 0 {
-		dbPath = dbPath + "?" + encodedQuery
-	}
-
-	return dbPath
 }
