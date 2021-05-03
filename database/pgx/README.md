@@ -5,6 +5,7 @@
 | URL Query  | WithInstance Config | Description |
 |------------|---------------------|-------------|
 | `x-migrations-table` | `MigrationsTable` | Name of the migrations table |
+| `x-migrations-table-quoted` | `MigrationsTableQuoted` | By default, migrate quotes the migration table for SQL injection safety reasons. This option disable quoting and naively checks that you have quoted the migration table name. e.g. `"my_schema"."schema_migrations"` |
 | `x-statement-timeout` | `StatementTimeout` | Abort any statement that takes more than the specified number of milliseconds |
 | `x-multi-statement` | `MultiStatementEnabled` | Enable multi-statement execution (default: false) |
 | `x-multi-statement-max-size` | `MultiStatementMaxSize` | Maximum size of single statement in bytes (default: 10MB) |

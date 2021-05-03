@@ -5,6 +5,9 @@ import (
 	"database/sql"
 	sqldriver "database/sql/driver"
 	"fmt"
+	"log"
+	"testing"
+
 	_ "github.com/ClickHouse/clickhouse-go"
 	"github.com/dhui/dktest"
 	"github.com/golang-migrate/migrate/v4"
@@ -12,14 +15,13 @@ import (
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
 	"github.com/golang-migrate/migrate/v4/dktesting"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
-	"log"
-	"testing"
 )
 
 const defaultPort = 9000
 
 var (
-	opts = dktest.Options{
+	tableEngines = []string{"TinyLog", "MergeTree"}
+	opts         = dktest.Options{
 		Env:          map[string]string{"CLICKHOUSE_USER": "user", "CLICKHOUSE_PASSWORD": "password", "CLICKHOUSE_DB": "db"},
 		PortRequired: true, ReadyFunc: isReady,
 	}
@@ -28,8 +30,16 @@ var (
 	}
 )
 
-func clickhouseConnectionString(host, port string) string {
-	return fmt.Sprintf("clickhouse://%v:%v?username=user&password=password&database=db&x-multi-statement=true&debug=false", host, port)
+func clickhouseConnectionString(host, port, engine string) string {
+	if engine != "" {
+		return fmt.Sprintf(
+			"clickhouse://%v:%v?username=user&password=password&database=db&x-multi-statement=true&x-migrations-table-engine=%v&debug=false",
+			host, port, engine)
+	}
+
+	return fmt.Sprintf(
+		"clickhouse://%v:%v?username=user&password=password&database=db&x-multi-statement=true&debug=false",
+		host, port)
 }
 
 func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
@@ -38,7 +48,7 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 		return false
 	}
 
-	db, err := sql.Open("clickhouse", clickhouseConnectionString(ip, port))
+	db, err := sql.Open("clickhouse", clickhouseConnectionString(ip, port, ""))
 
 	if err != nil {
 		log.Println("open error", err)
@@ -63,14 +73,24 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 	return true
 }
 
-func Test(t *testing.T) {
+func TestCases(t *testing.T) {
+	for _, engine := range tableEngines {
+		t.Run("Test_"+engine, func(t *testing.T) { testSimple(t, engine) })
+		t.Run("Migrate_"+engine, func(t *testing.T) { testMigrate(t, engine) })
+		t.Run("Version_"+engine, func(t *testing.T) { testVersion(t, engine) })
+		t.Run("Drop_"+engine, func(t *testing.T) { testDrop(t, engine) })
+
+	}
+}
+
+func testSimple(t *testing.T, engine string) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.Port(defaultPort)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		addr := clickhouseConnectionString(ip, port)
+		addr := clickhouseConnectionString(ip, port, engine)
 		p := &clickhouse.ClickHouse{}
 		d, err := p.Open(addr)
 		if err != nil {
@@ -86,14 +106,14 @@ func Test(t *testing.T) {
 	})
 }
 
-func TestMigrate(t *testing.T) {
+func testMigrate(t *testing.T, engine string) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.Port(defaultPort)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		addr := clickhouseConnectionString(ip, port)
+		addr := clickhouseConnectionString(ip, port, engine)
 		p := &clickhouse.ClickHouse{}
 		d, err := p.Open(addr)
 		if err != nil {
@@ -113,7 +133,7 @@ func TestMigrate(t *testing.T) {
 	})
 }
 
-func TestVersion(t *testing.T) {
+func testVersion(t *testing.T, engine string) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		expectedVersion := 1
 
@@ -122,7 +142,7 @@ func TestVersion(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		addr := clickhouseConnectionString(ip, port)
+		addr := clickhouseConnectionString(ip, port, engine)
 		p := &clickhouse.ClickHouse{}
 		d, err := p.Open(addr)
 		if err != nil {
@@ -150,14 +170,14 @@ func TestVersion(t *testing.T) {
 	})
 }
 
-func TestDrop(t *testing.T) {
+func testDrop(t *testing.T, engine string) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.Port(defaultPort)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		addr := clickhouseConnectionString(ip, port)
+		addr := clickhouseConnectionString(ip, port, engine)
 		p := &clickhouse.ClickHouse{}
 		d, err := p.Open(addr)
 		if err != nil {
