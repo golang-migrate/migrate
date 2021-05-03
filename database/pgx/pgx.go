@@ -1,6 +1,6 @@
 // +build go1.9
 
-package postgres
+package pgx
 
 import (
 	"context"
@@ -18,13 +18,14 @@ import (
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/golang-migrate/migrate/v4/database/multistmt"
 	multierror "github.com/hashicorp/go-multierror"
-	"github.com/lib/pq"
+	"github.com/jackc/pgconn"
+	"github.com/jackc/pgerrcode"
+	_ "github.com/jackc/pgx/v4/stdlib"
 )
 
 func init() {
 	db := Postgres{}
-	database.Register("postgres", &db)
-	database.Register("postgresql", &db)
+	database.Register("pgx", &db)
 }
 
 var (
@@ -43,13 +44,13 @@ var (
 
 type Config struct {
 	MigrationsTable       string
-	MigrationsTableQuoted bool
-	MultiStatementEnabled bool
 	DatabaseName          string
 	SchemaName            string
 	migrationsSchemaName  string
 	migrationsTableName   string
 	StatementTimeout      time.Duration
+	MigrationsTableQuoted bool
+	MultiStatementEnabled bool
 	MultiStatementMaxSize int
 }
 
@@ -142,7 +143,12 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 		return nil, err
 	}
 
-	db, err := sql.Open("postgres", migrate.FilterCustomQuery(purl).String())
+	// Driver is registered as pgx, but connection string must use postgres schema
+	// when making actual connection
+	// i.e. pgx://user:password@host:port/db => postgres://user:password@host:port/db
+	purl.Scheme = "postgres"
+
+	db, err := sql.Open("pgx", migrate.FilterCustomQuery(purl).String())
 	if err != nil {
 		return nil, err
 	}
@@ -283,15 +289,12 @@ func (p *Postgres) runStatement(statement []byte) error {
 		return nil
 	}
 	if _, err := p.conn.ExecContext(ctx, query); err != nil {
-		if pgErr, ok := err.(*pq.Error); ok {
+
+		if pgErr, ok := err.(*pgconn.PgError); ok {
 			var line uint
 			var col uint
 			var lineColOK bool
-			if pgErr.Position != "" {
-				if pos, err := strconv.ParseUint(pgErr.Position, 10, 64); err == nil {
-					line, col, lineColOK = computeLineFromPos(query, int(pos))
-				}
-			}
+			line, col, lineColOK = computeLineFromPos(query, int(pgErr.Position))
 			message := fmt.Sprintf("migration failed: %s", pgErr.Message)
 			if lineColOK {
 				message = fmt.Sprintf("%s (column %d)", message, col)
@@ -347,7 +350,7 @@ func (p *Postgres) SetVersion(version int, dirty bool) error {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
 	}
 
-	query := `TRUNCATE ` + pq.QuoteIdentifier(p.config.migrationsSchemaName) + `.` + pq.QuoteIdentifier(p.config.migrationsTableName)
+	query := `TRUNCATE ` + quoteIdentifier(p.config.migrationsSchemaName) + `.` + quoteIdentifier(p.config.migrationsTableName)
 	if _, err := tx.Exec(query); err != nil {
 		if errRollback := tx.Rollback(); errRollback != nil {
 			err = multierror.Append(err, errRollback)
@@ -359,7 +362,7 @@ func (p *Postgres) SetVersion(version int, dirty bool) error {
 	// empty schema version for failed down migration on the first migration
 	// See: https://github.com/golang-migrate/migrate/issues/330
 	if version >= 0 || (version == database.NilVersion && dirty) {
-		query = `INSERT INTO ` + pq.QuoteIdentifier(p.config.migrationsSchemaName) + `.` + pq.QuoteIdentifier(p.config.migrationsTableName) + ` (version, dirty) VALUES ($1, $2)`
+		query = `INSERT INTO ` + quoteIdentifier(p.config.migrationsSchemaName) + `.` + quoteIdentifier(p.config.migrationsTableName) + ` (version, dirty) VALUES ($1, $2)`
 		if _, err := tx.Exec(query, version, dirty); err != nil {
 			if errRollback := tx.Rollback(); errRollback != nil {
 				err = multierror.Append(err, errRollback)
@@ -376,15 +379,15 @@ func (p *Postgres) SetVersion(version int, dirty bool) error {
 }
 
 func (p *Postgres) Version() (version int, dirty bool, err error) {
-	query := `SELECT version, dirty FROM ` + pq.QuoteIdentifier(p.config.migrationsSchemaName) + `.` + pq.QuoteIdentifier(p.config.migrationsTableName) + ` LIMIT 1`
+	query := `SELECT version, dirty FROM ` + quoteIdentifier(p.config.migrationsSchemaName) + `.` + quoteIdentifier(p.config.migrationsTableName) + ` LIMIT 1`
 	err = p.conn.QueryRowContext(context.Background(), query).Scan(&version, &dirty)
 	switch {
 	case err == sql.ErrNoRows:
 		return database.NilVersion, false, nil
 
 	case err != nil:
-		if e, ok := err.(*pq.Error); ok {
-			if e.Code.Name() == "undefined_table" {
+		if e, ok := err.(*pgconn.PgError); ok {
+			if e.SQLState() == pgerrcode.UndefinedTable {
 				return database.NilVersion, false, nil
 			}
 		}
@@ -426,39 +429,7 @@ func (p *Postgres) Drop() (err error) {
 	if len(tableNames) > 0 {
 		// delete one by one ...
 		for _, t := range tableNames {
-			query = `DROP TABLE IF EXISTS ` + pq.QuoteIdentifier(t) + ` CASCADE`
-			if _, err := p.conn.ExecContext(context.Background(), query); err != nil {
-				return &database.Error{OrigErr: err, Query: []byte(query)}
-			}
-		}
-	}
-	query = `SELECT typname FROM pg_type WHERE typcategory = 'E';`
-	types, err := p.conn.QueryContext(context.Background(), query)
-	if err != nil {
-		return &database.Error{OrigErr: err, Query: []byte(query)}
-	}
-	defer func() {
-		if errClose := types.Close(); errClose != nil {
-			err = multierror.Append(err, errClose)
-		}
-	}()
-	typeNames := []string{}
-	for types.Next() {
-		var enumName string
-		if err := types.Scan(&enumName); err != nil {
-			return err
-		}
-		if enumName != "" {
-			typeNames = append(typeNames, enumName)
-		}
-	}
-	if err := types.Err(); err != nil {
-		return &database.Error{OrigErr: err, Query: []byte(query)}
-	}
-	if len(typeNames) > 0 {
-		// delete one by one ...
-		for _, t := range typeNames {
-			query = `DROP TYPE IF EXISTS ` + pq.QuoteIdentifier(t) + ` CASCADE`
+			query = `DROP TABLE IF EXISTS ` + quoteIdentifier(t) + ` CASCADE`
 			if _, err := p.conn.ExecContext(context.Background(), query); err != nil {
 				return &database.Error{OrigErr: err, Query: []byte(query)}
 			}
@@ -503,10 +474,19 @@ func (p *Postgres) ensureVersionTable() (err error) {
 		return nil
 	}
 
-	query = `CREATE TABLE IF NOT EXISTS ` + pq.QuoteIdentifier(p.config.migrationsSchemaName) + `.` + pq.QuoteIdentifier(p.config.migrationsTableName) + ` (version bigint not null primary key, dirty boolean not null)`
+	query = `CREATE TABLE IF NOT EXISTS ` + quoteIdentifier(p.config.migrationsSchemaName) + `.` + quoteIdentifier(p.config.migrationsTableName) + ` (version bigint not null primary key, dirty boolean not null)`
 	if _, err = p.conn.ExecContext(context.Background(), query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 
 	return nil
+}
+
+// Copied from lib/pq implementation: https://github.com/lib/pq/blob/v1.9.0/conn.go#L1611
+func quoteIdentifier(name string) string {
+	end := strings.IndexRune(name, 0)
+	if end > -1 {
+		name = name[:end]
+	}
+	return `"` + strings.Replace(name, `"`, `""`, -1) + `"`
 }

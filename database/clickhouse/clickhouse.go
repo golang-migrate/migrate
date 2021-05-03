@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"go.uber.org/atomic"
+
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/golang-migrate/migrate/v4/database/multistmt"
@@ -20,6 +22,7 @@ var (
 	multiStmtDelimiter = []byte(";")
 
 	DefaultMigrationsTable       = "schema_migrations"
+	DefaultMigrationsTableEngine = "TinyLog"
 	DefaultMultiStatementMaxSize = 10 * 1 << 20 // 10 MB
 
 	ErrNilConfig = fmt.Errorf("no config")
@@ -28,6 +31,7 @@ var (
 type Config struct {
 	DatabaseName          string
 	MigrationsTable       string
+	MigrationsTableEngine string
 	MultiStatementEnabled bool
 	MultiStatementMaxSize int
 }
@@ -58,8 +62,9 @@ func WithInstance(conn *sql.DB, config *Config) (database.Driver, error) {
 }
 
 type ClickHouse struct {
-	conn   *sql.DB
-	config *Config
+	conn     *sql.DB
+	config   *Config
+	isLocked atomic.Bool
 }
 
 func (ch *ClickHouse) Open(dsn string) (database.Driver, error) {
@@ -82,10 +87,16 @@ func (ch *ClickHouse) Open(dsn string) (database.Driver, error) {
 		}
 	}
 
+	migrationsTableEngine := DefaultMigrationsTableEngine
+	if s := purl.Query().Get("x-migrations-table-engine"); len(s) > 0 {
+		migrationsTableEngine = s
+	}
+
 	ch = &ClickHouse{
 		conn: conn,
 		config: &Config{
 			MigrationsTable:       purl.Query().Get("x-migrations-table"),
+			MigrationsTableEngine: migrationsTableEngine,
 			DatabaseName:          purl.Query().Get("database"),
 			MultiStatementEnabled: purl.Query().Get("x-multi-statement") == "true",
 			MultiStatementMaxSize: multiStatementMaxSize,
@@ -214,14 +225,19 @@ func (ch *ClickHouse) ensureVersionTable() (err error) {
 	} else {
 		return nil
 	}
+
 	// if not, create the empty migration table
-	query = `
-		CREATE TABLE ` + ch.config.MigrationsTable + ` (
-			version    Int64, 
+	query = fmt.Sprintf(`
+		CREATE TABLE %s (
+			version    Int64,
 			dirty      UInt8,
 			sequence   UInt64
-		) Engine=TinyLog
-	`
+		) Engine=%s`, ch.config.MigrationsTable, ch.config.MigrationsTableEngine)
+
+	if strings.HasSuffix(ch.config.MigrationsTableEngine, "Tree") {
+		query = fmt.Sprintf(`%s ORDER BY sequence`, query)
+	}
+
 	if _, err := ch.conn.Exec(query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
@@ -260,6 +276,18 @@ func (ch *ClickHouse) Drop() (err error) {
 	return nil
 }
 
-func (ch *ClickHouse) Lock() error   { return nil }
-func (ch *ClickHouse) Unlock() error { return nil }
-func (ch *ClickHouse) Close() error  { return ch.conn.Close() }
+func (ch *ClickHouse) Lock() error {
+	if !ch.isLocked.CAS(false, true) {
+		return database.ErrLocked
+	}
+
+	return nil
+}
+func (ch *ClickHouse) Unlock() error {
+	if !ch.isLocked.CAS(true, false) {
+		return database.ErrLocked
+	}
+
+	return nil
+}
+func (ch *ClickHouse) Close() error { return ch.conn.Close() }

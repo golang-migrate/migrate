@@ -1,6 +1,6 @@
-package postgres
+package pgx
 
-// error codes https://github.com/lib/pq/blob/master/error.go
+// error codes https://github.com/jackc/pgerrcode/blob/master/errcode.go
 
 import (
 	"context"
@@ -8,8 +8,9 @@ import (
 	sqldriver "database/sql/driver"
 	"errors"
 	"fmt"
-	"io"
 	"log"
+
+	"io"
 	"strconv"
 	"strings"
 	"sync"
@@ -54,7 +55,7 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 		return false
 	}
 
-	db, err := sql.Open("postgres", pgConnectionString(ip, port))
+	db, err := sql.Open("pgx", pgConnectionString(ip, port))
 	if err != nil {
 		return false
 	}
@@ -124,41 +125,11 @@ func TestMigrate(t *testing.T) {
 				t.Error(err)
 			}
 		}()
-		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "postgres", d)
+		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "pgx", d)
 		if err != nil {
 			t.Fatal(err)
 		}
 		dt.TestMigrate(t, m)
-	})
-}
-
-func TestDrop(t *testing.T) {
-	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
-		ip, port, err := c.FirstPort()
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		addr := pgConnectionString(ip, port)
-		p := &Postgres{}
-		d, err := p.Open(addr)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func() {
-			if err := d.Close(); err != nil {
-				t.Error(err)
-			}
-		}()
-		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "postgres", d)
-		if err != nil {
-			t.Fatal(err)
-		}
-		dt.TestMigrate(t, m)
-		err = d.(*Postgres).Drop()
-		if err != nil {
-			t.Fatalf("Error When testing Drop: %s", err.Error())
-		}
 	})
 }
 
@@ -248,7 +219,7 @@ func TestErrorParsing(t *testing.T) {
 		}()
 
 		wantErr := `migration failed: syntax error at or near "TABLEE" (column 37) in line 1: CREATE TABLE foo ` +
-			`(foo text); CREATE TABLEE bar (bar text); (details: pq: syntax error at or near "TABLEE")`
+			`(foo text); CREATE TABLEE bar (bar text); (details: ERROR: syntax error at or near "TABLEE" (SQLSTATE 42601))`
 		if err := d.Run(strings.NewReader("CREATE TABLE foo (foo text); CREATE TABLEE bar (bar text);")); err == nil {
 			t.Fatal("expected err but got nil")
 		} else if err.Error() != wantErr {
@@ -264,8 +235,7 @@ func TestFilterCustomQuery(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		addr := fmt.Sprintf("postgres://postgres:%s@%v:%v/postgres?sslmode=disable&x-custom=foobar",
-			pgPassword, ip, port)
+		addr := pgConnectionString(ip, port, "x-custom=foobar")
 		p := &Postgres{}
 		d, err := p.Open(addr)
 		if err != nil {
@@ -307,8 +277,7 @@ func TestWithSchema(t *testing.T) {
 		}
 
 		// re-connect using that schema
-		d2, err := p.Open(fmt.Sprintf("postgres://postgres:%s@%v:%v/postgres?sslmode=disable&search_path=foobar",
-			pgPassword, ip, port))
+		d2, err := p.Open(pgConnectionString(ip, port, "search_path=foobar"))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -592,8 +561,7 @@ func TestParallelSchema(t *testing.T) {
 		}
 
 		// re-connect using that schemas
-		dfoo, err := p.Open(fmt.Sprintf("postgres://postgres:%s@%v:%v/postgres?sslmode=disable&search_path=foo",
-			pgPassword, ip, port))
+		dfoo, err := p.Open(pgConnectionString(ip, port, "search_path=foo"))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -603,8 +571,7 @@ func TestParallelSchema(t *testing.T) {
 			}
 		}()
 
-		dbar, err := p.Open(fmt.Sprintf("postgres://postgres:%s@%v:%v/postgres?sslmode=disable&search_path=bar",
-			pgPassword, ip, port))
+		dbar, err := p.Open(pgConnectionString(ip, port, "search_path=bar"))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -686,7 +653,7 @@ func TestWithInstance_Concurrent(t *testing.T) {
 		// actually a connection pool, and so, each of the below go
 		// routines will have a high probability of using a separate
 		// connection, which is something we want to exercise.
-		db, err := sql.Open("postgres", pgConnectionString(ip, port))
+		db, err := sql.Open("pgx", pgConnectionString(ip, port))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -714,7 +681,6 @@ func TestWithInstance_Concurrent(t *testing.T) {
 		}
 	})
 }
-
 func Test_computeLineFromPos(t *testing.T) {
 	testcases := []struct {
 		pos      int
