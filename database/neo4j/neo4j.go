@@ -87,7 +87,7 @@ func (n *Neo4j) Open(url string) (database.Driver, error) {
 
 	// Set scheme to +ssc if value is self-signed
 	switch strings.ToLower(tlsEncrypted) {
-	case "self-signed":
+	case "self-signed", "true":
 		uri.Scheme = "neo4j+ssc"
 	case "full":
 		uri.Scheme = "neo4j+s"
