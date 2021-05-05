@@ -24,7 +24,6 @@ require (
 	github.com/google/go-github v17.0.0+incompatible
 	github.com/gorilla/mux v1.7.4 // indirect
 	github.com/hashicorp/go-multierror v1.1.0
-	github.com/jackc/fake v0.0.0-20150926172116-812a484cc733 // indirect
 	github.com/jackc/pgconn v1.8.0
 	github.com/jackc/pgerrcode v0.0.0-20201024163028-a0d42d470451
 	github.com/jackc/pgproto3/v2 v2.0.7 // indirect
@@ -33,7 +32,7 @@ require (
 	github.com/ktrysmt/go-bitbucket v0.6.4
 	github.com/lib/pq v1.8.0
 	github.com/markbates/pkger v0.15.1
-	github.com/mattn/go-sqlite3 v1.10.0
+	github.com/mattn/go-sqlite3 v1.14.6
 	github.com/mutecomm/go-sqlcipher/v4 v4.4.0
 	github.com/nakagami/firebirdsql v0.0.0-20190310045651-3c02a58cfed8
 	github.com/neo4j/neo4j-go-driver v1.8.1-0.20200803113522-b626aa943eba
@@ -61,7 +60,7 @@ require (
 	modernc.org/lldb v1.0.0 // indirect
 	modernc.org/ql v1.0.0
 	modernc.org/sortutil v1.1.0 // indirect
-	modernc.org/strutil v1.1.0 // indirect
+	modernc.org/sqlite v1.10.4
 	modernc.org/zappy v1.0.0 // indirect
 )
 
