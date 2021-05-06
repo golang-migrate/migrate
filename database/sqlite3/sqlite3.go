@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	nurl "net/url"
 	"strconv"
-	"strings"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
@@ -96,7 +95,7 @@ func (m *Sqlite) Open(url string) (database.Driver, error) {
 	if err != nil {
 		return nil, err
 	}
-	dbfile := strings.Replace(migrate.FilterCustomQuery(purl).String(), "sqlite3://", "", 1)
+	dbfile := dbPathFromURL(purl)
 	db, err := sql.Open("sqlite3", dbfile)
 	if err != nil {
 		return nil, err
@@ -267,4 +266,15 @@ func (m *Sqlite) Version() (version int, dirty bool, err error) {
 		return database.NilVersion, false, nil
 	}
 	return version, dirty, nil
+}
+
+func dbPathFromURL(url *nurl.URL) string {
+	dbPath := url.Path
+	encodedQuery := migrate.FilterCustomQuery(url).Query().Encode()
+
+	if len(encodedQuery) > 0 {
+		dbPath = dbPath + "?" + encodedQuery
+	}
+
+	return dbPath
 }

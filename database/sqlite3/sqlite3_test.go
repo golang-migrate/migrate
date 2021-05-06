@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"io/ioutil"
+	nurl "net/url"
 	"os"
 	"path/filepath"
 	"testing"
@@ -180,4 +181,46 @@ func TestMigrateWithDirectoryNameContainsWhitespaces(t *testing.T) {
 		t.Fatal(err)
 	}
 	dt.Test(t, d, []byte("CREATE TABLE t (Qty int, Name string);"))
+}
+
+func TestDbPathFromURLWithSimpleURL(t *testing.T) {
+
+	expected := "/Path/To/A/DB/file.db"
+
+	inputStr := "sqlite3:///Path/To/A/DB/file.db"
+	inputURL, _ := nurl.Parse(inputStr)
+
+	output := dbPathFromURL(inputURL)
+
+	if output != expected {
+		t.Fatalf("Expected:  %v == %v", output, expected)
+	}
+}
+
+func TestDbPathFromURLWithSimpleURLWithWhitespaces(t *testing.T) {
+
+	expected := "/Path To/A DB/file name.db"
+
+	inputStr := "sqlite3:///Path To/A DB/file name.db"
+	inputURL, _ := nurl.Parse(inputStr)
+
+	output := dbPathFromURL(inputURL)
+
+	if output != expected {
+		t.Fatalf("Expected:  %v == %v", output, expected)
+	}
+}
+
+func TestDbPathFromURLWithURLWithQuery(t *testing.T) {
+
+	expected := "/Path To/A DB/file name.db?aQuery=something&bQuery=else&c=d"
+
+	inputStr := "sqlite3:///Path To/A DB/file name.db?aQuery=something&bQuery=else&c=d&x-custom-query-param=scrubbed"
+	inputURL, _ := nurl.Parse(inputStr)
+
+	output := dbPathFromURL(inputURL)
+
+	if output != expected {
+		t.Fatalf("Expected:  %v == %v", output, expected)
+	}
 }
