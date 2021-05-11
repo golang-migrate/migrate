@@ -3,7 +3,6 @@
 package iofs_test
 
 import (
-	"embed"
 	"testing"
 
 	"github.com/golang-migrate/migrate/v4/source/iofs"
@@ -11,8 +10,7 @@ import (
 )
 
 func Test(t *testing.T) {
-	//go:embed testdata/migrations/*.sql
-	var fs embed.FS
+	// reuse the embed.FS set in example_test.go
 	d, err := iofs.New(fs, "testdata/migrations")
 	if err != nil {
 		t.Fatal(err)
