@@ -183,44 +183,34 @@ func TestMigrateWithDirectoryNameContainsWhitespaces(t *testing.T) {
 	dt.Test(t, d, []byte("CREATE TABLE t (Qty int, Name string);"))
 }
 
-func TestDbPathFromURLWithSimpleURL(t *testing.T) {
+var pathTests = []struct {
+	in  string
+	out string
+}{
+	// simple valid path, no whitespaces
+	{"sqlite3:///Path/To/A/DB/file.db", "/Path/To/A/DB/file.db"},
+	// simple path, with whitespaces
+	{"sqlite3:///Path To/A DB/file name.db", "/Path To/A DB/file name.db"},
+	// path with whitespaces and query params
+	{"sqlite3:///Path To/A DB/file name.db?aQuery=something&bQuery=else&c=d", "/Path To/A DB/file name.db?aQuery=something&bQuery=else&c=d"},
+	// path with whitespaces and query params (including custom query param that should be filtered out)
+	{"sqlite3:///Path To/A DB/file name.db?aQuery=something&bQuery=else&c=d&x-custom-query-param=scrubbed", "/Path To/A DB/file name.db?aQuery=something&bQuery=else&c=d"},
 
-	expected := "/Path/To/A/DB/file.db"
-
-	inputStr := "sqlite3:///Path/To/A/DB/file.db"
-	inputURL, _ := nurl.Parse(inputStr)
-
-	output := dbPathFromURL(inputURL)
-
-	if output != expected {
-		t.Fatalf("Expected:  %v == %v", output, expected)
-	}
+	// path with % escaped characters
+	{"sqlite3:///Path%20To/A%20DB/file%20name.db", "/Path To/A DB/file name.db"},
+	// path with % escaped characters & escaped query params
+	{"sqlite3:///Path%20To/A%20DB/file%20name.db?aQuery=something%20else&c=d", "/Path To/A DB/file name.db?aQuery=something+else&c=d"},
 }
 
-func TestDbPathFromURLWithSimpleURLWithWhitespaces(t *testing.T) {
+func TestDbPathOutput(t *testing.T) {
 
-	expected := "/Path To/A DB/file name.db"
-
-	inputStr := "sqlite3:///Path To/A DB/file name.db"
-	inputURL, _ := nurl.Parse(inputStr)
-
-	output := dbPathFromURL(inputURL)
-
-	if output != expected {
-		t.Fatalf("Expected:  %v == %v", output, expected)
-	}
-}
-
-func TestDbPathFromURLWithURLWithQuery(t *testing.T) {
-
-	expected := "/Path To/A DB/file name.db?aQuery=something&bQuery=else&c=d"
-
-	inputStr := "sqlite3:///Path To/A DB/file name.db?aQuery=something&bQuery=else&c=d&x-custom-query-param=scrubbed"
-	inputURL, _ := nurl.Parse(inputStr)
-
-	output := dbPathFromURL(inputURL)
-
-	if output != expected {
-		t.Fatalf("Expected:  %v == %v", output, expected)
+	for _, tt := range pathTests {
+		t.Run(tt.in, func(t *testing.T) {
+			inputURL, _ := nurl.Parse(tt.in)
+			s := dbPathFromURL(inputURL)
+			if s != tt.out {
+				t.Errorf("expected: %q, actual: %q", tt.out, s)
+			}
+		})
 	}
 }

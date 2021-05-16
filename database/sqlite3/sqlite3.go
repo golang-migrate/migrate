@@ -272,9 +272,9 @@ func dbPathFromURL(url *nurl.URL) string {
 	dbPath := url.Path
 	encodedQuery := migrate.FilterCustomQuery(url).Query().Encode()
 
-	if len(encodedQuery) > 0 {
-		dbPath = dbPath + "?" + encodedQuery
+	if len(encodedQuery) == 0 {
+		return dbPath
 	}
 
-	return dbPath
+	return dbPath + "?" + encodedQuery
 }
