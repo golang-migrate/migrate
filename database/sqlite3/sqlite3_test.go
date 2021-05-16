@@ -183,29 +183,42 @@ func TestMigrateWithDirectoryNameContainsWhitespaces(t *testing.T) {
 	dt.Test(t, d, []byte("CREATE TABLE t (Qty int, Name string);"))
 }
 
-var pathTests = []struct {
-	in  string
-	out string
-}{
-	// simple valid path, no whitespaces
-	{"sqlite3:///Path/To/A/DB/file.db", "/Path/To/A/DB/file.db"},
-	// simple path, with whitespaces
-	{"sqlite3:///Path To/A DB/file name.db", "/Path To/A DB/file name.db"},
-	// path with whitespaces and query params
-	{"sqlite3:///Path To/A DB/file name.db?aQuery=something&bQuery=else&c=d", "/Path To/A DB/file name.db?aQuery=something&bQuery=else&c=d"},
-	// path with whitespaces and query params (including custom query param that should be filtered out)
-	{"sqlite3:///Path To/A DB/file name.db?aQuery=something&bQuery=else&c=d&x-custom-query-param=scrubbed", "/Path To/A DB/file name.db?aQuery=something&bQuery=else&c=d"},
-
-	// path with % escaped characters
-	{"sqlite3:///Path%20To/A%20DB/file%20name.db", "/Path To/A DB/file name.db"},
-	// path with % escaped characters & escaped query params
-	{"sqlite3:///Path%20To/A%20DB/file%20name.db?aQuery=something%20else&c=d", "/Path To/A DB/file name.db?aQuery=something+else&c=d"},
-}
-
 func TestDbPathOutput(t *testing.T) {
 
+	var pathTests = []struct {
+		name string
+		in   string
+		out  string
+	}{
+		// path tests - no schema
+		{"simple path with preceeding `/` (no schema)",
+			"/Path/To/A/DB/file.db", "/Path/To/A/DB/file.db"},
+		{"simple path with preceeding `/` (no schema), with whitespaces",
+			"/Path To/A DB/file name.db", "/Path To/A DB/file name.db"},
+
+		// simple path tests
+		{"simple valid path, no whitespaces",
+			"sqlite3:///Path/To/A/DB/file.db", "/Path/To/A/DB/file.db"},
+		{"simple path, with whitespaces",
+			"sqlite3:///Path To/A DB/file name.db", "/Path To/A DB/file name.db"},
+
+		// path w/query param tests
+		{"path with whitespaces and query params",
+			"sqlite3:///Path To/A DB/file name.db?aQuery=something&bQuery=else&c=d", "/Path To/A DB/file name.db?aQuery=something&bQuery=else&c=d"},
+		{"path with whitespaces and query params that require escaping",
+			"sqlite3:///Path To/A DB/file name.db?aQuery=\"something\"&bQuery=else&c=d", "/Path To/A DB/file name.db?aQuery=%22something%22&bQuery=else&c=d"},
+		{"path with whitespaces and query params (including custom query param that should be filtered out)",
+			"sqlite3:///Path To/A DB/file name.db?aQuery=something&bQuery=else&c=d&x-custom-query-param=scrubbed", "/Path To/A DB/file name.db?aQuery=something&bQuery=else&c=d"},
+
+		// path with % escaped character tests
+		{"path with % escaped characters",
+			"sqlite3:///Path%20To/A%20DB/file%20name.db", "/Path To/A DB/file name.db"},
+		{"path with % escaped characters & escaped query params",
+			"sqlite3:///Path%20To/A%20DB/file%20name.db?aQuery=something%20else&c=d", "/Path To/A DB/file name.db?aQuery=something+else&c=d"},
+	}
+
 	for _, tt := range pathTests {
-		t.Run(tt.in, func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			inputURL, _ := nurl.Parse(tt.in)
 			s := dbPathFromURL(inputURL)
 			if s != tt.out {
