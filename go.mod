@@ -60,8 +60,8 @@ require (
 	modernc.org/lldb v1.0.0 // indirect
 	modernc.org/ql v1.0.0
 	modernc.org/sortutil v1.1.0 // indirect
-	modernc.org/sqlite v1.10.4
+	modernc.org/sqlite v1.10.6
 	modernc.org/zappy v1.0.0 // indirect
 )
 
-go 1.13
+go 1.16
