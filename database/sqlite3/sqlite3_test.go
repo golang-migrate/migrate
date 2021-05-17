@@ -191,9 +191,9 @@ func TestDbPathOutput(t *testing.T) {
 		out  string
 	}{
 		// path tests - no schema
-		{"simple path with preceeding `/` (no schema)",
+		{"simple path with preceding `/` (no schema)",
 			"/Path/To/A/DB/file.db", "/Path/To/A/DB/file.db"},
-		{"simple path with preceeding `/` (no schema), with whitespaces",
+		{"simple path with preceding `/` (no schema), with whitespaces",
 			"/Path To/A DB/file name.db", "/Path To/A DB/file name.db"},
 
 		// simple path tests
