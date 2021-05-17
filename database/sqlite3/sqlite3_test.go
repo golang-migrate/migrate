@@ -7,6 +7,7 @@ import (
 	nurl "net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -190,13 +191,27 @@ func TestDbPathOutput(t *testing.T) {
 		in   string
 		out  string
 	}{
-		// path tests - no schema
-		{"simple path with preceding `/` (no schema)",
+		// Test inputs will be passed through `net/url` Parse()
+		// Outputs will be the URLs parsed by dbPathFromURL()
+		//
+		// When designing a test that will fail to be parsed (ie, expect net/url.Parse() to throw an error),
+		// we will match the `out` string as either the prefix or suffix of the error string, otherwise the test will fail.
+
+		// simple path tests - no schema
+		{"simple path (no schema)",
 			"/Path/To/A/DB/file.db", "/Path/To/A/DB/file.db"},
-		{"simple path with preceding `/` (no schema), with whitespaces",
+		{"simple path (no schema), with whitespaces",
 			"/Path To/A DB/file name.db", "/Path To/A DB/file name.db"},
 
-		// simple path tests
+		// simple path tests - relative
+		{"simple path (relative)",
+			"sqlite3://Path/To/A/DB/file.db", "Path/To/A/DB/file.db"},
+		{"simple path (relative), with whitespaces",
+			"sqlite3://Path/To/A DB/file name.db", "Path/To/A DB/file name.db"},
+		{"simple path (relative), with invalid host",
+			"sqlite3://Path To/A DB/file name.db", "invalid character \" \" in host name"},
+
+		// simple path tests - absolute
 		{"simple valid path, no whitespaces",
 			"sqlite3:///Path/To/A/DB/file.db", "/Path/To/A/DB/file.db"},
 		{"simple path, with whitespaces",
@@ -219,7 +234,18 @@ func TestDbPathOutput(t *testing.T) {
 
 	for _, tt := range pathTests {
 		t.Run(tt.name, func(t *testing.T) {
-			inputURL, _ := nurl.Parse(tt.in)
+			inputURL, err := nurl.Parse(tt.in)
+			if err != nil {
+				if strings.HasPrefix(err.Error(), tt.out) ||
+					strings.HasSuffix(err.Error(), tt.out) {
+					// The input string cannot be parsed by net/url and
+					// and the test case expected that.
+					return
+				}
+				t.Errorf("`in` string failed to parse into a valid URL:  %v", err)
+				return
+			}
+
 			s := dbPathFromURL(inputURL)
 			if s != tt.out {
 				t.Errorf("expected: %q, actual: %q", tt.out, s)

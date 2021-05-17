@@ -269,7 +269,7 @@ func (m *Sqlite) Version() (version int, dirty bool, err error) {
 }
 
 func dbPathFromURL(url *nurl.URL) string {
-	dbPath := url.Path
+	dbPath := url.Host + url.Path
 	encodedQuery := migrate.FilterCustomQuery(url).Query().Encode()
 
 	if len(encodedQuery) == 0 {
