@@ -1,8 +1,7 @@
 module github.com/golang-migrate/migrate/v4
 
 require (
-	cloud.google.com/go v0.64.0 // indirect
-	cloud.google.com/go/spanner v1.9.0
+	cloud.google.com/go/spanner v1.18.0
 	cloud.google.com/go/storage v1.10.0
 	github.com/ClickHouse/clickhouse-go v1.4.3
 	github.com/aws/aws-sdk-go v1.17.7
@@ -37,7 +36,7 @@ require (
 	github.com/nakagami/firebirdsql v0.0.0-20190310045651-3c02a58cfed8
 	github.com/neo4j/neo4j-go-driver v1.8.1-0.20200803113522-b626aa943eba
 	github.com/snowflakedb/gosnowflake v1.3.5
-	github.com/stretchr/testify v1.5.1
+	github.com/stretchr/testify v1.6.1
 	github.com/tidwall/pretty v0.0.0-20180105212114-65a9db5fad51 // indirect
 	github.com/xanzy/go-gitlab v0.15.0
 	github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c // indirect
@@ -46,11 +45,10 @@ require (
 	go.mongodb.org/mongo-driver v1.1.0
 	go.uber.org/atomic v1.6.0
 	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83 // indirect
-	golang.org/x/text v0.3.5 // indirect
 	golang.org/x/time v0.0.0-20200630173020-3af7569d3a1e // indirect
-	golang.org/x/tools v0.0.0-20210106214847-113979e3529a
-	google.golang.org/api v0.30.0
-	google.golang.org/genproto v0.0.0-20210207032614-bba0dbe2a9ea
+	golang.org/x/tools v0.1.0
+	google.golang.org/api v0.45.0
+	google.golang.org/genproto v0.0.0-20210427215850-f767ed18ee4d
 	modernc.org/b v1.0.0 // indirect
 	modernc.org/db v1.0.0 // indirect
 	modernc.org/file v1.0.0 // indirect
