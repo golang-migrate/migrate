@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/dhui/dktest"
-	"github.com/neo4j/neo4j-go-driver/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
 
 	"github.com/golang-migrate/migrate/v4"
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
@@ -28,7 +28,7 @@ var (
 )
 
 func neoConnectionString(host, port string) string {
-	return fmt.Sprintf("bolt://neo4j:migratetest@%s:%s", host, port)
+	return fmt.Sprintf("neo4j://neo4j:migratetest@%s:%s", host, port)
 }
 
 func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
@@ -39,10 +39,7 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 
 	driver, err := neo4j.NewDriver(
 		neoConnectionString(ip, port),
-		neo4j.BasicAuth("neo4j", "migratetest", ""),
-		func(config *neo4j.Config) {
-			config.Encrypted = false
-		})
+		neo4j.BasicAuth("neo4j", "migratetest", ""))
 	if err != nil {
 		return false
 	}
@@ -51,14 +48,8 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 			log.Println("close error:", err)
 		}
 	}()
-	session, err := driver.Session(neo4j.AccessModeRead)
-	if err != nil {
-		return false
-	}
-	result, err := session.Run("RETURN 1", nil)
-	if err != nil {
-		return false
-	} else if result.Err() != nil {
+
+	if err := driver.VerifyConnectivity(); err != nil {
 		return false
 	}
 

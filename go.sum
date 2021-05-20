@@ -341,8 +341,8 @@ github.com/mutecomm/go-sqlcipher/v4 v4.4.0 h1:sV1tWCWGAVlPhNGT95Q+z/txFxuhAYWwHD
 github.com/mutecomm/go-sqlcipher/v4 v4.4.0/go.mod h1:PyN04SaWalavxRGH9E8ZftG6Ju7rsPrGmQRjrEaVpiY=
 github.com/nakagami/firebirdsql v0.0.0-20190310045651-3c02a58cfed8 h1:P48LjvUQpTReR3TQRbxSeSBsMXzfK0uol7eRcr7VBYQ=
 github.com/nakagami/firebirdsql v0.0.0-20190310045651-3c02a58cfed8/go.mod h1:86wM1zFnC6/uDBfZGNwB65O+pR2OFi5q/YQaEUid1qA=
-github.com/neo4j/neo4j-go-driver v1.8.1-0.20200803113522-b626aa943eba h1:fhFP5RliM2HW/8XdcO5QngSfFli9GcRIpMXvypTQt6E=
-github.com/neo4j/neo4j-go-driver v1.8.1-0.20200803113522-b626aa943eba/go.mod h1:ncO5VaFWh0Nrt+4KT4mOZboaczBZcLuHrG+/sUeP8gI=
+github.com/neo4j/neo4j-go-driver/v4 v4.2.4 h1:wtgPkGL/xIiYBPBuye9670fhWspH6ngytx/NueD8OBs=
+github.com/neo4j/neo4j-go-driver/v4 v4.2.4/go.mod h1:4e45lVy4oHcgLEQQrGHcc4MbyCeEPIQ33DhXqxf9AT4=
 github.com/onsi/ginkgo v1.6.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
 github.com/onsi/ginkgo v1.12.0 h1:Iw5WCbBcaAAd0fpRb1c9r5YCylv4XDoCSigm1zLevwU=
 github.com/onsi/ginkgo v1.12.0/go.mod h1:oUhWkIvk5aDxtKvDDuw8gItl8pKl42LzjC9KZE0HfGg=

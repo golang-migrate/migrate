@@ -7,12 +7,13 @@ import (
 	"io/ioutil"
 	neturl "net/url"
 	"strconv"
+	"strings"
 	"sync/atomic"
 
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/golang-migrate/migrate/v4/database/multistmt"
 	"github.com/hashicorp/go-multierror"
-	"github.com/neo4j/neo4j-go-driver/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
 )
 
 func init() {
@@ -70,13 +71,13 @@ func (n *Neo4j) Open(url string) (database.Driver, error) {
 	password, _ := uri.User.Password()
 	authToken := neo4j.BasicAuth(uri.User.Username(), password, "")
 	uri.User = nil
-	uri.Scheme = "bolt"
+	uri.Scheme = "neo4j"
 	msQuery := uri.Query().Get("x-multi-statement")
 
 	// Whether to turn on/off TLS encryption.
 	tlsEncrypted := uri.Query().Get("x-tls-encrypted")
 	multi := false
-	encrypted := false
+
 	if msQuery != "" {
 		multi, err = strconv.ParseBool(uri.Query().Get("x-multi-statement"))
 		if err != nil {
@@ -84,11 +85,12 @@ func (n *Neo4j) Open(url string) (database.Driver, error) {
 		}
 	}
 
-	if tlsEncrypted != "" {
-		encrypted, err = strconv.ParseBool(tlsEncrypted)
-		if err != nil {
-			return nil, err
-		}
+	// Set scheme to +ssc if value is self-signed
+	switch strings.ToLower(tlsEncrypted) {
+	case "self-signed", "true":
+		uri.Scheme = "neo4j+ssc"
+	case "full":
+		uri.Scheme = "neo4j+s"
 	}
 
 	multiStatementMaxSize := DefaultMultiStatementMaxSize
@@ -101,9 +103,7 @@ func (n *Neo4j) Open(url string) (database.Driver, error) {
 
 	uri.RawQuery = ""
 
-	driver, err := neo4j.NewDriver(uri.String(), authToken, func(config *neo4j.Config) {
-		config.Encrypted = encrypted
-	})
+	driver, err := neo4j.NewDriver(uri.String(), authToken)
 	if err != nil {
 		return nil, err
 	}
@@ -136,10 +136,7 @@ func (n *Neo4j) Unlock() error {
 }
 
 func (n *Neo4j) Run(migration io.Reader) (err error) {
-	session, err := n.driver.Session(neo4j.AccessModeWrite)
-	if err != nil {
-		return err
-	}
+	session := n.driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer func() {
 		if cerr := session.Close(); cerr != nil {
 			err = multierror.Append(err, cerr)
@@ -183,10 +180,7 @@ func (n *Neo4j) Run(migration io.Reader) (err error) {
 }
 
 func (n *Neo4j) SetVersion(version int, dirty bool) (err error) {
-	session, err := n.driver.Session(neo4j.AccessModeWrite)
-	if err != nil {
-		return err
-	}
+	session := n.driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer func() {
 		if cerr := session.Close(); cerr != nil {
 			err = multierror.Append(err, cerr)
@@ -208,10 +202,7 @@ type MigrationRecord struct {
 }
 
 func (n *Neo4j) Version() (version int, dirty bool, err error) {
-	session, err := n.driver.Session(neo4j.AccessModeRead)
-	if err != nil {
-		return database.NilVersion, false, err
-	}
+	session := n.driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer func() {
 		if cerr := session.Close(); cerr != nil {
 			err = multierror.Append(err, cerr)
@@ -256,10 +247,7 @@ ORDER BY COALESCE(sm.ts, datetime({year: 0})) DESC, sm.version DESC LIMIT 1`,
 }
 
 func (n *Neo4j) Drop() (err error) {
-	session, err := n.driver.Session(neo4j.AccessModeWrite)
-	if err != nil {
-		return err
-	}
+	session := n.driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer func() {
 		if cerr := session.Close(); cerr != nil {
 			err = multierror.Append(err, cerr)
@@ -273,10 +261,7 @@ func (n *Neo4j) Drop() (err error) {
 }
 
 func (n *Neo4j) ensureVersionConstraint() (err error) {
-	session, err := n.driver.Session(neo4j.AccessModeWrite)
-	if err != nil {
-		return err
-	}
+	session := n.driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer func() {
 		if cerr := session.Close(); cerr != nil {
 			err = multierror.Append(err, cerr)
