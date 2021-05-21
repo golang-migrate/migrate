@@ -1,0 +1,70 @@
+project_name: migrate
+before:
+  hooks:
+    - go mod tidy
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm
+      - arm64
+      - 386
+    goarm:
+      - 7
+    main: ./cmd/migrate
+    ldflags:
+      - '-w -s -X main.Version={{ .Version }} -extldflags "static"'
+    flags:
+      - "-tags={{ .Env.DATABASE }}{{ .Env.SOURCE }}"
+      - "-trimpath"
+    ignore:
+      - goos: windows
+        goarch: arm
+nfpms:
+  - homepage: "https://github.com/golang-migrate/migrate"
+    maintainer: "dhui@users.noreply.github.com"
+    license: MIT
+    description: "Database migrations"
+    formats:
+      - deb
+    file_name_template: "{{ .ProjectName }}.{{ .Os }}-{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
+dockers:
+  - goarch: amd64
+    use_buildx: true
+    image_templates:
+      - 'migrate/migrate:{{ .Tag }}'
+    build_flag_templates:
+      - '--label=org.opencontainers.image.created={{ .Date }}'
+      - '--label=org.opencontainers.image.title={{ .ProjectName }}'
+      - '--label=org.opencontainers.image.revision={{ .FullCommit }}'
+      - '--label=org.opencontainers.image.version={{ .Version }}'
+      - "--label=org.opencontainers.image.source={{ .GitURL }}"
+      - "--platform=linux/amd64"
+    dockerfile: Dockerfile
+  - goarch: arm64
+    use_buildx: true
+    image_templates:
+      - 'migrate/migrate:{{ .Tag }}'
+    build_flag_templates:
+      - '--label=org.opencontainers.image.created={{ .Date }}'
+      - '--label=org.opencontainers.image.title={{ .ProjectName }}'
+      - '--label=org.opencontainers.image.revision={{ .FullCommit }}'
+      - '--label=org.opencontainers.image.version={{ .Version }}'
+      - "--label=org.opencontainers.image.source={{ .GitURL }}"
+      - "--platform=linux/arm64"
+    dockerfile: Dockerfile
+archives:
+  - name_template: "{{ .ProjectName }}.{{ .Os }}-{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
+checksum:
+  name_template: 'sha256sum.txt'
+release:
+  draft: true
+changelog:
+  skip: true
+snapshot:
+  name_template: "{{ .Tag }}-next"
