@@ -2,12 +2,12 @@ package sqlite3
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	nurl "net/url"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -190,6 +190,7 @@ func TestDbPathOutput(t *testing.T) {
 		name string
 		in   string
 		out  string
+		err  error
 	}{
 		// Test inputs will be passed through `net/url` Parse()
 		// Outputs will be the URLs parsed by dbPathFromURL()
@@ -199,50 +200,44 @@ func TestDbPathOutput(t *testing.T) {
 
 		// simple path tests - no schema
 		{"simple path (no schema)",
-			"/Path/To/A/DB/file.db", "/Path/To/A/DB/file.db"},
+			"/Path/To/A/DB/file.db", "/Path/To/A/DB/file.db", nil},
 		{"simple path (no schema), with whitespaces",
-			"/Path To/A DB/file name.db", "/Path To/A DB/file name.db"},
+			"/Path To/A DB/file name.db", "/Path To/A DB/file name.db", nil},
 
 		// simple path tests - relative
 		{"simple path (relative)",
-			"sqlite3://Path/To/A/DB/file.db", "Path/To/A/DB/file.db"},
+			"sqlite3://Path/To/A/DB/file.db", "Path/To/A/DB/file.db", nil},
 		{"simple path (relative), with whitespaces",
-			"sqlite3://Path/To/A DB/file name.db", "Path/To/A DB/file name.db"},
+			"sqlite3://Path/To/A DB/file name.db", "Path/To/A DB/file name.db", nil},
 		{"simple path (relative), with invalid host",
-			"sqlite3://Path To/A DB/file name.db", "invalid character \" \" in host name"},
+			"sqlite3://Path To/A DB/file name.db", "", errors.New("parse \"sqlite3://Path To/A DB/file name.db\": invalid character \" \" in host name")},
 
 		// simple path tests - absolute
 		{"simple valid path, no whitespaces",
-			"sqlite3:///Path/To/A/DB/file.db", "/Path/To/A/DB/file.db"},
+			"sqlite3:///Path/To/A/DB/file.db", "/Path/To/A/DB/file.db", nil},
 		{"simple path, with whitespaces",
-			"sqlite3:///Path To/A DB/file name.db", "/Path To/A DB/file name.db"},
+			"sqlite3:///Path To/A DB/file name.db", "/Path To/A DB/file name.db", nil},
 
 		// path w/query param tests
 		{"path with whitespaces and query params",
-			"sqlite3:///Path To/A DB/file name.db?aQuery=something&bQuery=else&c=d", "/Path To/A DB/file name.db?aQuery=something&bQuery=else&c=d"},
+			"sqlite3:///Path To/A DB/file name.db?aQuery=something&bQuery=else&c=d", "/Path To/A DB/file name.db?aQuery=something&bQuery=else&c=d", nil},
 		{"path with whitespaces and query params that require escaping",
-			"sqlite3:///Path To/A DB/file name.db?aQuery=\"something\"&bQuery=else&c=d", "/Path To/A DB/file name.db?aQuery=%22something%22&bQuery=else&c=d"},
+			"sqlite3:///Path To/A DB/file name.db?aQuery=\"something\"&bQuery=else&c=d", "/Path To/A DB/file name.db?aQuery=%22something%22&bQuery=else&c=d", nil},
 		{"path with whitespaces and query params (including custom query param that should be filtered out)",
-			"sqlite3:///Path To/A DB/file name.db?aQuery=something&bQuery=else&c=d&x-custom-query-param=scrubbed", "/Path To/A DB/file name.db?aQuery=something&bQuery=else&c=d"},
+			"sqlite3:///Path To/A DB/file name.db?aQuery=something&bQuery=else&c=d&x-custom-query-param=scrubbed", "/Path To/A DB/file name.db?aQuery=something&bQuery=else&c=d", nil},
 
 		// path with % escaped character tests
 		{"path with % escaped characters",
-			"sqlite3:///Path%20To/A%20DB/file%20name.db", "/Path To/A DB/file name.db"},
+			"sqlite3:///Path%20To/A%20DB/file%20name.db", "/Path To/A DB/file name.db", nil},
 		{"path with % escaped characters & escaped query params",
-			"sqlite3:///Path%20To/A%20DB/file%20name.db?aQuery=something%20else&c=d", "/Path To/A DB/file name.db?aQuery=something+else&c=d"},
+			"sqlite3:///Path%20To/A%20DB/file%20name.db?aQuery=something%20else&c=d", "/Path To/A DB/file name.db?aQuery=something+else&c=d", nil},
 	}
 
 	for _, tt := range pathTests {
 		t.Run(tt.name, func(t *testing.T) {
 			inputURL, err := nurl.Parse(tt.in)
-			if err != nil {
-				if strings.HasPrefix(err.Error(), tt.out) ||
-					strings.HasSuffix(err.Error(), tt.out) {
-					// The input string cannot be parsed by net/url and
-					// and the test case expected that.
-					return
-				}
-				t.Errorf("`in` string failed to parse into a valid URL:  %v", err)
+			if err != tt.err {
+				t.Errorf("`in` string failed to parse into a valid URL with an unexpected error:  %v", err)
 				return
 			}
 
