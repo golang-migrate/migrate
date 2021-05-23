@@ -210,7 +210,7 @@ func TestDbPathOutput(t *testing.T) {
 		{"simple path (relative), with whitespaces",
 			"sqlite3://Path/To/A DB/file name.db", "Path/To/A DB/file name.db", nil},
 		{"simple path (relative), with invalid host",
-			"sqlite3://Path To/A DB/file name.db", "", errors.New("parse \"sqlite3://Path To/A DB/file name.db\": invalid character \" \" in host name")},
+			"sqlite3://Path To/A DB/file name.db", "", nurl.InvalidHostError(" ")},
 
 		// simple path tests - absolute
 		{"simple valid path, no whitespaces",
@@ -236,8 +236,11 @@ func TestDbPathOutput(t *testing.T) {
 	for _, tt := range pathTests {
 		t.Run(tt.name, func(t *testing.T) {
 			inputURL, err := nurl.Parse(tt.in)
-			if err != tt.err {
-				t.Errorf("`in` string failed to parse into a valid URL with an unexpected error:  %v", err)
+			if !errors.Is(err, tt.err) {
+				t.Errorf("`in` string failed to parse into a valid URL with error:  <%v>    expected: <%v>", err, tt.err)
+				return
+			} else if err != nil {
+				// we did encouter an error, but it was expected, silently exit this test case.
 				return
 			}
 

@@ -278,3 +278,5 @@ func dbPathFromURL(url *nurl.URL) string {
 
 	return dbPath + "?" + encodedQuery
 }
+
+//errors.New("parse \"sqlite3://Path To/A DB/file name.db\": invalid character \" \" in host name")
