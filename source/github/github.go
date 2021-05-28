@@ -10,11 +10,9 @@ import (
 	"os"
 	"path"
 	"strings"
-)
 
-import (
 	"github.com/golang-migrate/migrate/v4/source"
-	"github.com/google/go-github/github"
+	"github.com/google/go-github/v35/github"
 )
 
 func init() {

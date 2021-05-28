@@ -23,7 +23,7 @@ require (
 	github.com/gocql/gocql v0.0.0-20190301043612-f6df8288f9b4
 	github.com/gofrs/uuid v4.0.0+incompatible // indirect
 	github.com/google/flatbuffers v2.0.0+incompatible // indirect
-	github.com/google/go-github v17.0.0+incompatible
+	github.com/google/go-github/v35 v35.2.0
 	github.com/google/uuid v1.2.0 // indirect
 	github.com/gorilla/mux v1.7.4 // indirect
 	github.com/hashicorp/go-multierror v1.1.0
