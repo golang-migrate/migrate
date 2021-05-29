@@ -53,17 +53,40 @@ type Config struct {
 	MultiStatementMaxSize int
 }
 
+type SQLWrapper struct {
+	*sql.DB
+}
+
+func (w *SQLWrapper) Conn(ctx context.Context) (Conn, error) {
+	return w.DB.Conn(ctx)
+}
+
+type Conn interface {
+	Close() error
+	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
+	BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error)
+	QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error)
+	QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row
+}
+
+type DB interface {
+	Close() error
+	Ping() error
+	QueryRow(query string, args ...interface{}) *sql.Row
+	Conn(ctx context.Context) (Conn, error)
+}
+
 type Postgres struct {
 	// Locking and unlocking need to use the same connection
-	conn     *sql.Conn
-	db       *sql.DB
+	conn     Conn
+	db       DB
 	isLocked bool
 
 	// Open and WithInstance need to guarantee that config is never nil
 	config *Config
 }
 
-func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
+func WithInterface(instance DB, config *Config) (database.Driver, error) {
 	if config == nil {
 		return nil, ErrNilConfig
 	}
@@ -134,6 +157,10 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	}
 
 	return px, nil
+}
+
+func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
+	return WithInterface(&SQLWrapper{instance}, config)
 }
 
 func (p *Postgres) Open(url string) (database.Driver, error) {
