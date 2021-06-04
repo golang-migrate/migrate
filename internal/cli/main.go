@@ -26,6 +26,7 @@ const (
 `
 	gotoUsage = `goto V       Migrate to version V`
 	upUsage   = `up [N]       Apply all or N up migrations`
+	seedUsage = `seed [N]	  Apply all migration File without version`
 	downUsage = `down [N] [-all]    Apply all or N down migrations
 	Use -all to apply all down migrations`
 	dropUsage = `drop [-f]    Drop everything inside database
@@ -91,10 +92,11 @@ Commands:
   %s
   %s
   %s
+  %s
   version      Print current migration version
 
 Source drivers: `+strings.Join(source.List(), ", ")+`
-Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoUsage, upUsage, downUsage, dropUsage, forceUsage)
+Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoUsage, upUsage, seedUsage, downUsage, dropUsage, forceUsage)
 	}
 
 	flag.Parse()
@@ -246,6 +248,35 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 		}
 
 		if err := upCmd(migrater, limit); err != nil {
+			log.fatalErr(err)
+		}
+
+		if log.verbose {
+			log.Println("Finished after", time.Since(startTime))
+		}
+	case "seed":
+		upSet, helpPtr := newFlagSetWithHelp("seed")
+
+		if err := upSet.Parse(args); err != nil {
+			log.fatalErr(err)
+		}
+
+		handleSubCmdHelp(*helpPtr, upUsage, upSet)
+
+		if migraterErr != nil {
+			log.fatalErr(migraterErr)
+		}
+
+		limit := -1
+		if upSet.NArg() > 0 {
+			n, err := strconv.ParseUint(upSet.Arg(0), 10, 64)
+			if err != nil {
+				log.fatal("error: can't read limit argument N")
+			}
+			limit = int(n)
+		}
+
+		if err := seedCmd(migrater, limit); err != nil {
 			log.fatalErr(err)
 		}
 

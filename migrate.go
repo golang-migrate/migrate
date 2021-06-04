@@ -284,6 +284,22 @@ func (m *Migrate) Up() error {
 	return m.unlockErr(m.runMigrations(ret))
 }
 
+// Up looks at the currently active migration version
+// and will migrate all the way up (applying all up migrations).
+func (m *Migrate) Seed() error {
+	if err := m.lock(); err != nil {
+		return err
+	}
+
+	curVersion := -1
+
+	ret := make(chan interface{}, m.PrefetchMigrations)
+
+	go m.readUp(curVersion, -1, ret)
+
+	return m.unlockErr(m.runSeedMigrations(ret))
+}
+
 // Down looks at the currently active migration version
 // and will migrate all the way down (applying all down migrations).
 func (m *Migrate) Down() error {
@@ -751,6 +767,47 @@ func (m *Migrate) runMigrations(ret <-chan interface{}) error {
 			// set clean state
 			if err := m.databaseDrv.SetVersion(migr.TargetVersion, false); err != nil {
 				return err
+			}
+
+			endTime := time.Now()
+			readTime := migr.FinishedReading.Sub(migr.StartedBuffering)
+			runTime := endTime.Sub(migr.FinishedReading)
+
+			// log either verbose or normal
+			if m.Log != nil {
+				if m.Log.Verbose() {
+					m.logPrintf("Finished %v (read %v, ran %v)\n", migr.LogString(), readTime, runTime)
+				} else {
+					m.logPrintf("%v (%v)\n", migr.LogString(), readTime+runTime)
+				}
+			}
+
+		default:
+			return fmt.Errorf("unknown type: %T with value: %+v", r, r)
+		}
+	}
+	return nil
+}
+
+func (m *Migrate) runSeedMigrations(ret <-chan interface{}) error {
+	for r := range ret {
+
+		if m.stop() {
+			return nil
+		}
+
+		switch r := r.(type) {
+		case error:
+			return r
+
+		case *Migration:
+			migr := r
+
+			if migr.Body != nil {
+				m.logVerbosePrintf("Read and execute %v\n", migr.LogString())
+				if err := m.databaseDrv.Run(migr.BufferedBody); err != nil {
+					return err
+				}
 			}
 
 			endTime := time.Now()

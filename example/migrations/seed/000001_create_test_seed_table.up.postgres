@@ -1,0 +1,8 @@
+DO $$
+BEGIN
+
+INSERT INTO foo(id, name)
+VALUES(1, 'Foo');
+
+END
+$$;

@@ -1,0 +1,4 @@
+create table foo(
+    "id" INTEGER,
+    "name" VARCHAR(255)
+);

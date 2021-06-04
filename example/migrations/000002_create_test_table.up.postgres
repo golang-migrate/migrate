@@ -1,0 +1,4 @@
+create table bar(
+    "id" INTEGER,
+    "name" VARCHAR(255)
+);

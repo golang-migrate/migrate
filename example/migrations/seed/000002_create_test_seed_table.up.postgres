@@ -1,0 +1,8 @@
+DO $$
+BEGIN
+
+INSERT INTO bar(id, name)
+VALUES(1, 'bar');
+
+END
+$$;
