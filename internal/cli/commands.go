@@ -176,7 +176,7 @@ func upCmd(m *migrate.Migrate, limit int) error {
 	return nil
 }
 
-func seedCmd(m *migrate.Migrate, limit int) error {
+func seedUpCmd(m *migrate.Migrate, limit int) error {
 	if limit >= 0 {
 		if err := m.Steps(limit); err != nil {
 			if err != migrate.ErrNoChange {
@@ -185,7 +185,26 @@ func seedCmd(m *migrate.Migrate, limit int) error {
 			log.Println(err)
 		}
 	} else {
-		if err := m.Seed(); err != nil {
+		if err := m.SeedUp(); err != nil {
+			if err != migrate.ErrNoChange {
+				return err
+			}
+			log.Println(err)
+		}
+	}
+	return nil
+}
+
+func seedDownCmd(m *migrate.Migrate, limit int) error {
+	if limit >= 0 {
+		if err := m.Steps(-limit); err != nil {
+			if err != migrate.ErrNoChange {
+				return err
+			}
+			log.Println(err)
+		}
+	} else {
+		if err := m.SeedDown(); err != nil {
 			if err != migrate.ErrNoChange {
 				return err
 			}

@@ -286,7 +286,7 @@ func (m *Migrate) Up() error {
 
 // Up looks at the currently active migration version
 // and will migrate all the way up (applying all up migrations).
-func (m *Migrate) Seed() error {
+func (m *Migrate) SeedUp() error {
 	if err := m.lock(); err != nil {
 		return err
 	}
@@ -297,6 +297,18 @@ func (m *Migrate) Seed() error {
 
 	go m.readUp(curVersion, -1, ret)
 
+	return m.unlockErr(m.runSeedMigrations(ret))
+}
+
+func (m *Migrate) SeedDown() error {
+	if err := m.lock(); err != nil {
+		return err
+	}
+
+	curVersion := 1
+
+	ret := make(chan interface{}, m.PrefetchMigrations)
+	go m.readDown(curVersion, -1, ret)
 	return m.unlockErr(m.runSeedMigrations(ret))
 }
 
