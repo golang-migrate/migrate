@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"go.uber.org/atomic"
 	"io"
 	"io/ioutil"
 	nurl "net/url"
@@ -58,7 +59,7 @@ type Postgres struct {
 	// Locking and unlocking need to use the same connection
 	conn     *sql.Conn
 	db       *sql.DB
-	isLocked bool
+	isLocked atomic.Bool
 
 	// Open and WithInstance need to guarantee that config is never nil
 	config *Config
@@ -220,7 +221,7 @@ func (p *Postgres) Close() error {
 
 // https://www.postgresql.org/docs/9.6/static/explicit-locking.html#ADVISORY-LOCKS
 func (p *Postgres) Lock() error {
-	if p.isLocked {
+	if p.isLocked.Load() {
 		return database.ErrLocked
 	}
 
@@ -235,12 +236,14 @@ func (p *Postgres) Lock() error {
 		return &database.Error{OrigErr: err, Err: "try lock failed", Query: []byte(query)}
 	}
 
-	p.isLocked = true
+	if !p.isLocked.CAS(false, true) {
+		return database.ErrLocked
+	}
 	return nil
 }
 
 func (p *Postgres) Unlock() error {
-	if !p.isLocked {
+	if !p.isLocked.Load() {
 		return nil
 	}
 
@@ -253,7 +256,9 @@ func (p *Postgres) Unlock() error {
 	if _, err := p.conn.ExecContext(context.Background(), query, aid); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
-	p.isLocked = false
+	if !p.isLocked.CAS(true, false) {
+		return database.ErrNotLocked
+	}
 	return nil
 }
 

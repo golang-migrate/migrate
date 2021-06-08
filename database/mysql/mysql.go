@@ -8,6 +8,7 @@ import (
 	"crypto/x509"
 	"database/sql"
 	"fmt"
+	"go.uber.org/atomic"
 	"io"
 	"io/ioutil"
 	nurl "net/url"
@@ -49,7 +50,7 @@ type Mysql struct {
 	// just do everything over a single conn anyway.
 	conn     *sql.Conn
 	db       *sql.DB
-	isLocked bool
+	isLocked atomic.Bool
 
 	config *Config
 }
@@ -251,12 +252,10 @@ func (m *Mysql) Close() error {
 }
 
 func (m *Mysql) Lock() error {
-	if m.isLocked {
-		return database.ErrLocked
-	}
-
 	if m.config.NoLock {
-		m.isLocked = true
+		if !m.isLocked.CAS(false, true) {
+			return database.ErrLocked
+		}
 		return nil
 	}
 
@@ -273,7 +272,9 @@ func (m *Mysql) Lock() error {
 	}
 
 	if success {
-		m.isLocked = true
+		if !m.isLocked.CAS(false, true) {
+			return database.ErrLocked
+		}
 		return nil
 	}
 
@@ -281,12 +282,14 @@ func (m *Mysql) Lock() error {
 }
 
 func (m *Mysql) Unlock() error {
-	if !m.isLocked {
+	if !m.isLocked.Load() {
 		return nil
 	}
 
 	if m.config.NoLock {
-		m.isLocked = false
+		if !m.isLocked.CAS(true, false) {
+			return database.ErrNotLocked
+		}
 		return nil
 	}
 
@@ -305,7 +308,9 @@ func (m *Mysql) Unlock() error {
 	// in which case isLocked should be true until the timeout expires -- synchronizing
 	// these states is likely not worth trying to do; reconsider the necessity of isLocked.
 
-	m.isLocked = false
+	if !m.isLocked.CAS(true, false) {
+		return database.ErrNotLocked
+	}
 	return nil
 }
 

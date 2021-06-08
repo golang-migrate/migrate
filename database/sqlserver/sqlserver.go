@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"go.uber.org/atomic"
 	"io"
 	"io/ioutil"
 	nurl "net/url"
@@ -47,7 +48,7 @@ type SQLServer struct {
 	// Locking and unlocking need to use the same connection
 	conn     *sql.Conn
 	db       *sql.DB
-	isLocked bool
+	isLocked atomic.Bool
 
 	// Open and WithInstance need to garantuee that config is never nil
 	config *Config
@@ -154,7 +155,7 @@ func (ss *SQLServer) Close() error {
 
 // Lock creates an advisory local on the database to prevent multiple migrations from running at the same time.
 func (ss *SQLServer) Lock() error {
-	if ss.isLocked {
+	if ss.isLocked.Load() {
 		return database.ErrLocked
 	}
 
@@ -170,7 +171,9 @@ func (ss *SQLServer) Lock() error {
 
 	var status mssql.ReturnStatus
 	if _, err = ss.conn.ExecContext(context.Background(), query, aid, &status); err == nil && status > -1 {
-		ss.isLocked = true
+		if !ss.isLocked.CAS(false, true) {
+			return database.ErrLocked
+		}
 		return nil
 	} else if err != nil {
 		return &database.Error{OrigErr: err, Err: "try lock failed", Query: []byte(query)}
@@ -181,7 +184,7 @@ func (ss *SQLServer) Lock() error {
 
 // Unlock froms the migration lock from the database
 func (ss *SQLServer) Unlock() error {
-	if !ss.isLocked {
+	if !ss.isLocked.Load() {
 		return nil
 	}
 
@@ -195,8 +198,9 @@ func (ss *SQLServer) Unlock() error {
 	if _, err := ss.conn.ExecContext(context.Background(), query, aid); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
-	ss.isLocked = false
-
+	if !ss.isLocked.CAS(true, false) {
+		return database.ErrNotLocked
+	}
 	return nil
 }
 

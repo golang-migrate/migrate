@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"go.uber.org/atomic"
 	"io"
 	"io/ioutil"
 	nurl "net/url"
@@ -46,7 +47,7 @@ type Config struct {
 
 type CockroachDb struct {
 	db       *sql.DB
-	isLocked bool
+	isLocked atomic.Bool
 
 	// Open and WithInstance need to guarantee that config is never nil
 	config *Config
@@ -186,7 +187,9 @@ func (c *CockroachDb) Lock() error {
 	if err != nil {
 		return err
 	} else {
-		c.isLocked = true
+		if !c.isLocked.CAS(false, true) {
+			return database.ErrLocked
+		}
 		return nil
 	}
 }
@@ -208,14 +211,18 @@ func (c *CockroachDb) Unlock() error {
 			// https://github.com/cockroachdb/cockroach/blob/master/pkg/sql/pgwire/pgerror/codes.go
 			if e.Code == "42P01" {
 				// On drops, the lock table is fully removed;  This is fine, and is a valid "unlocked" state for the schema
-				c.isLocked = false
+				if !c.isLocked.CAS(true, false) {
+					return database.ErrNotLocked
+				}
 				return nil
 			}
 		}
 		return database.Error{OrigErr: err, Err: "failed to release migration lock", Query: []byte(query)}
 	}
 
-	c.isLocked = false
+	if !c.isLocked.CAS(true, false) {
+		return database.ErrNotLocked
+	}
 	return nil
 }
 
