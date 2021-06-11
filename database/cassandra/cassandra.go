@@ -156,6 +156,10 @@ func (c *Cassandra) Open(url string) (database.Driver, error) {
 		}
 	}
 
+	if s := u.Query().Get("disable-host-lookup"); len(s) > 0 {
+		cluster.DisableInitialHostLookup = true
+	}
+
 	session, err := cluster.CreateSession()
 	if err != nil {
 		return nil, err
@@ -228,16 +232,24 @@ func (c *Cassandra) Run(migration io.Reader) error {
 }
 
 func (c *Cassandra) SetVersion(version int, dirty bool) error {
-	query := `TRUNCATE "` + c.config.MigrationsTable + `"`
-	if err := c.session.Query(query).Exec(); err != nil {
-		return &database.Error{OrigErr: err, Query: []byte(query)}
+	if previous, _, err := c.Version(); err == nil {
+		if previous != database.NilVersion {
+			// DELETE instead of TRUNCATE because AWS Keyspaces does not support it
+			// see: https://docs.aws.amazon.com/keyspaces/latest/devguide/cassandra-apis.html
+			query := `DELETE FROM "` + c.config.MigrationsTable + `" WHERE version = ?`
+			if err := c.session.Query(query, previous).Exec(); err != nil {
+				return &database.Error{OrigErr: err, Query: []byte(query)}
+			}
+		}
+	} else {
+		return err
 	}
 
 	// Also re-write the schema version for nil dirty versions to prevent
 	// empty schema version for failed down migration on the first migration
 	// See: https://github.com/golang-migrate/migrate/issues/330
 	if version >= 0 || (version == database.NilVersion && dirty) {
-		query = `INSERT INTO "` + c.config.MigrationsTable + `" (version, dirty) VALUES (?, ?)`
+		query := `INSERT INTO "` + c.config.MigrationsTable + `" (version, dirty) VALUES (?, ?)`
 		if err := c.session.Query(query, version, dirty).Exec(); err != nil {
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
