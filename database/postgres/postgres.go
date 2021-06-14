@@ -215,43 +215,41 @@ func (p *Postgres) Close() error {
 
 // https://www.postgresql.org/docs/9.6/static/explicit-locking.html#ADVISORY-LOCKS
 func (p *Postgres) Lock() error {
-	if p.isLocked.Load() {
+	if !p.isLocked.CAS(false, true) {
 		return database.ErrLocked
 	}
 
 	aid, err := database.GenerateAdvisoryLockId(p.config.DatabaseName, p.config.migrationsSchemaName, p.config.migrationsTableName)
 	if err != nil {
+		p.isLocked.Store(false)
 		return err
 	}
 
 	// This will wait indefinitely until the lock can be acquired.
 	query := `SELECT pg_advisory_lock($1)`
 	if _, err := p.conn.ExecContext(context.Background(), query, aid); err != nil {
+		p.isLocked.Store(false)
 		return &database.Error{OrigErr: err, Err: "try lock failed", Query: []byte(query)}
 	}
 
-	if !p.isLocked.CAS(false, true) {
-		return database.ErrLocked
-	}
 	return nil
 }
 
 func (p *Postgres) Unlock() error {
-	if !p.isLocked.Load() {
-		return nil
+	if !p.isLocked.CAS(true, false) {
+		return database.ErrNotLocked
 	}
 
 	aid, err := database.GenerateAdvisoryLockId(p.config.DatabaseName, p.config.migrationsSchemaName, p.config.migrationsTableName)
 	if err != nil {
+		p.isLocked.Store(true)
 		return err
 	}
 
 	query := `SELECT pg_advisory_unlock($1)`
 	if _, err := p.conn.ExecContext(context.Background(), query, aid); err != nil {
+		p.isLocked.Store(true)
 		return &database.Error{OrigErr: err, Query: []byte(query)}
-	}
-	if !p.isLocked.CAS(true, false) {
-		return database.ErrNotLocked
 	}
 	return nil
 }
