@@ -252,55 +252,55 @@ func (m *Mysql) Close() error {
 }
 
 func (m *Mysql) Lock() error {
+	if !m.isLocked.CAS(false, true) {
+		return database.ErrLocked
+	}
+
 	if m.config.NoLock {
-		if !m.isLocked.CAS(false, true) {
-			return database.ErrLocked
-		}
 		return nil
 	}
 
 	aid, err := database.GenerateAdvisoryLockId(
 		fmt.Sprintf("%s:%s", m.config.DatabaseName, m.config.MigrationsTable))
 	if err != nil {
+		m.isLocked.Store(false)
 		return err
 	}
 
 	query := "SELECT GET_LOCK(?, 10)"
 	var success bool
 	if err := m.conn.QueryRowContext(context.Background(), query, aid).Scan(&success); err != nil {
+		m.isLocked.Store(false)
 		return &database.Error{OrigErr: err, Err: "try lock failed", Query: []byte(query)}
 	}
 
-	if success {
-		if !m.isLocked.CAS(false, true) {
-			return database.ErrLocked
-		}
-		return nil
+	if !success {
+		m.isLocked.Store(false)
+		return database.ErrLocked
 	}
 
-	return database.ErrLocked
+	return nil
 }
 
 func (m *Mysql) Unlock() error {
-	if !m.isLocked.Load() {
-		return nil
+	if !m.isLocked.CAS(true, false) {
+		return database.ErrNotLocked
 	}
 
 	if m.config.NoLock {
-		if !m.isLocked.CAS(true, false) {
-			return database.ErrNotLocked
-		}
 		return nil
 	}
 
 	aid, err := database.GenerateAdvisoryLockId(
 		fmt.Sprintf("%s:%s", m.config.DatabaseName, m.config.MigrationsTable))
 	if err != nil {
+		m.isLocked.Store(true)
 		return err
 	}
 
 	query := `SELECT RELEASE_LOCK(?)`
 	if _, err := m.conn.ExecContext(context.Background(), query, aid); err != nil {
+		m.isLocked.Store(true)
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 
@@ -308,9 +308,6 @@ func (m *Mysql) Unlock() error {
 	// in which case isLocked should be true until the timeout expires -- synchronizing
 	// these states is likely not worth trying to do; reconsider the necessity of isLocked.
 
-	if !m.isLocked.CAS(true, false) {
-		return database.ErrNotLocked
-	}
 	return nil
 }
 
