@@ -151,6 +151,14 @@ func TestCleanStatements(t *testing.T) {
 			SET OPTIONS (allow_commit_timestamp=true);`,
 			expected: []string{"ALTER TABLE users ALTER COLUMN created SET OPTIONS (allow_commit_timestamp = true)"},
 		},
+		{
+			name: "column with NUMERIC type",
+			multiStatement: `CREATE TABLE table_name (
+				id STRING(255) NOT NULL,
+				sum NUMERIC,
+			) PRIMARY KEY (id)`,
+			expected: []string{"CREATE TABLE table_name (\n  id STRING(255) NOT NULL,\n  sum NUMERIC,\n) PRIMARY KEY(id)"},
+		},
 	}
 
 	for _, tc := range testCases {
