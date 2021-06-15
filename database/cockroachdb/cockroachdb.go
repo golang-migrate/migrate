@@ -153,15 +153,21 @@ func (c *CockroachDb) Close() error {
 // Locking is done manually with a separate lock table.  Implementing advisory locks in CRDB is being discussed
 // See: https://github.com/cockroachdb/cockroach/issues/13546
 func (c *CockroachDb) Lock() error {
+	if !c.isLocked.CAS(false, true) {
+		return database.ErrLocked
+	}
+
 	err := crdb.ExecuteTx(context.Background(), c.db, nil, func(tx *sql.Tx) (err error) {
 		aid, err := database.GenerateAdvisoryLockId(c.config.DatabaseName)
 		if err != nil {
+			c.isLocked.Store(false)
 			return err
 		}
 
 		query := "SELECT * FROM " + c.config.LockTable + " WHERE lock_id = $1"
 		rows, err := tx.Query(query, aid)
 		if err != nil {
+			c.isLocked.Store(false)
 			return database.Error{OrigErr: err, Err: "failed to fetch migration lock", Query: []byte(query)}
 		}
 		defer func() {
@@ -173,11 +179,13 @@ func (c *CockroachDb) Lock() error {
 		// If row exists at all, lock is present
 		locked := rows.Next()
 		if locked && !c.config.ForceLock {
+			c.isLocked.Store(false)
 			return database.ErrLocked
 		}
 
 		query = "INSERT INTO " + c.config.LockTable + " (lock_id) VALUES ($1)"
 		if _, err := tx.Exec(query, aid); err != nil {
+			c.isLocked.Store(false)
 			return database.Error{OrigErr: err, Err: "failed to set migration lock", Query: []byte(query)}
 		}
 
@@ -185,11 +193,9 @@ func (c *CockroachDb) Lock() error {
 	})
 
 	if err != nil {
+		c.isLocked.Store(false)
 		return err
 	} else {
-		if !c.isLocked.CAS(false, true) {
-			return database.ErrLocked
-		}
 		return nil
 	}
 }
@@ -197,8 +203,13 @@ func (c *CockroachDb) Lock() error {
 // Locking is done manually with a separate lock table.  Implementing advisory locks in CRDB is being discussed
 // See: https://github.com/cockroachdb/cockroach/issues/13546
 func (c *CockroachDb) Unlock() error {
+	if !c.isLocked.CAS(true, false) {
+		return database.ErrNotLocked
+	}
+
 	aid, err := database.GenerateAdvisoryLockId(c.config.DatabaseName)
 	if err != nil {
+		c.isLocked.Store(true)
 		return err
 	}
 
@@ -211,18 +222,14 @@ func (c *CockroachDb) Unlock() error {
 			// https://github.com/cockroachdb/cockroach/blob/master/pkg/sql/pgwire/pgerror/codes.go
 			if e.Code == "42P01" {
 				// On drops, the lock table is fully removed;  This is fine, and is a valid "unlocked" state for the schema
-				if !c.isLocked.CAS(true, false) {
-					return database.ErrNotLocked
-				}
 				return nil
 			}
 		}
+
+		c.isLocked.Store(true)
 		return database.Error{OrigErr: err, Err: "failed to release migration lock", Query: []byte(query)}
 	}
 
-	if !c.isLocked.CAS(true, false) {
-		return database.ErrNotLocked
-	}
 	return nil
 }
 
