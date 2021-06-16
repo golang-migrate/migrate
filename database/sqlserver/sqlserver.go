@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	nurl "net/url"
 
+	"github.com/Azure/go-autorest/autorest/adal"
 	mssql "github.com/denisenkom/go-mssqldb" // mssql support
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
@@ -116,16 +117,34 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	return ss, nil
 }
 
-// Open a connection to the database
+// Open a connection to the database. If no password is provided, MSI auth will be tried.
 func (ss *SQLServer) Open(url string) (database.Driver, error) {
 	purl, err := nurl.Parse(url)
 	if err != nil {
 		return nil, err
 	}
 
-	db, err := sql.Open("sqlserver", migrate.FilterCustomQuery(purl).String())
-	if err != nil {
-		return nil, err
+	var db *sql.DB
+	if _, exist := purl.User.Password(); !exist {
+		tokenProvider, err := getMSITokenProvider(fmt.Sprintf("%s%s", "https://", purl.Hostname()[1:]))
+		if err != nil {
+			return nil, err
+		}
+
+		connector, err := mssql.NewAccessTokenConnector(
+			migrate.FilterCustomQuery(purl).String(), tokenProvider)
+
+		if err != nil {
+			return nil, err
+		}
+
+		db = sql.OpenDB(connector)
+
+	} else {
+		db, err = sql.Open("sqlserver", migrate.FilterCustomQuery(purl).String())
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	migrationsTable := purl.Query().Get("x-migrations-table")
@@ -343,4 +362,22 @@ func (ss *SQLServer) ensureVersionTable() (err error) {
 	}
 
 	return nil
+}
+
+func getMSITokenProvider(resource string) (func() (string, error), error) {
+	msiEndpoint, err := adal.GetMSIEndpoint()
+	if err != nil {
+		return nil, err
+	}
+	msi, err := adal.NewServicePrincipalTokenFromMSI(
+		msiEndpoint, resource)
+	if err != nil {
+		return nil, err
+	}
+
+	return func() (string, error) {
+		msi.EnsureFresh()
+		token := msi.OAuthToken()
+		return token, nil
+	}, nil
 }
