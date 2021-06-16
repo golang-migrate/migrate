@@ -49,44 +49,43 @@ func TestGenerateAdvisoryLockId(t *testing.T) {
 
 func TestCasRestoreOnErr(t *testing.T) {
 	testcases := []struct {
-		name   string
-		lock   *atomic.Bool
-		from   bool
-		to     bool
-		casErr error
-		fErr   error
-		expectLock bool
+		name        string
+		lock        *atomic.Bool
+		from        bool
+		to          bool
+		casErr      error
+		fErr        error
+		expectLock  bool
 		expectError error
 	}{
 		{
-			name: "Test positive CAS lock",
-			lock: atomic.NewBool(false),
-			from: false,
-			to: true,
-			casErr: ErrLocked,
-			fErr: nil,
+			name:        "Test positive CAS lock",
+			lock:        atomic.NewBool(false),
+			from:        false,
+			to:          true,
+			casErr:      ErrLocked,
+			fErr:        nil,
 			expectError: nil,
-			expectLock: true,
-
+			expectLock:  true,
 		},
 		{
-			name: "Test negative CAS lock",
-			lock: atomic.NewBool(true),
-			from: false,
-			to: true,
-			casErr: ErrLocked,
-			fErr: nil,
-			expectLock: true,
+			name:        "Test negative CAS lock",
+			lock:        atomic.NewBool(true),
+			from:        false,
+			to:          true,
+			casErr:      ErrLocked,
+			fErr:        nil,
+			expectLock:  true,
 			expectError: ErrLocked,
 		},
 		{
-			name: "Test negative with callback lock",
-			lock: atomic.NewBool(false),
-			from: false,
-			to: true,
-			casErr: ErrLocked,
-			fErr: ErrNotLocked,
-			expectLock: false,
+			name:        "Test negative with callback lock",
+			lock:        atomic.NewBool(false),
+			from:        false,
+			to:          true,
+			casErr:      ErrLocked,
+			fErr:        ErrNotLocked,
+			expectLock:  false,
 			expectError: ErrNotLocked,
 		},
 	}
