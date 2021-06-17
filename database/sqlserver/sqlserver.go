@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	nurl "net/url"
+	"strings"
 
 	"github.com/Azure/go-autorest/autorest/adal"
 	mssql "github.com/denisenkom/go-mssqldb" // mssql support
@@ -126,7 +127,7 @@ func (ss *SQLServer) Open(url string) (database.Driver, error) {
 
 	var db *sql.DB
 	if _, exist := purl.User.Password(); !exist {
-		tokenProvider, err := getMSITokenProvider(fmt.Sprintf("%s%s", "https://", purl.Hostname()[1:]))
+		tokenProvider, err := getMSITokenProvider(fmt.Sprintf("%s%s", "https://", strings.Join(strings.Split(purl.Hostname(), ".")[1:], ".")))
 		if err != nil {
 			return nil, err
 		}
