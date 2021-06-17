@@ -54,6 +54,29 @@ type Mysql struct {
 	config *Config
 }
 
+// connection instance must have `multiStatements` set to true
+func WithConnection(conn *sql.Conn, config *Config) (database.Driver, error) {
+	if config == nil {
+		return nil, ErrNilConfig
+	}
+
+	mx := &Mysql{
+		conn:   conn,
+		db:     nil,
+		config: config,
+	}
+
+	if err := mx.setupDefaultConfig(); err != nil {
+		return nil, err
+	}
+
+	if err := mx.ensureVersionTable(); err != nil {
+		return nil, err
+	}
+
+	return mx, nil
+}
+
 // instance must have `multiStatements` set to true
 func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	if config == nil {
@@ -62,24 +85,6 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 
 	if err := instance.Ping(); err != nil {
 		return nil, err
-	}
-
-	if config.DatabaseName == "" {
-		query := `SELECT DATABASE()`
-		var databaseName sql.NullString
-		if err := instance.QueryRow(query).Scan(&databaseName); err != nil {
-			return nil, &database.Error{OrigErr: err, Query: []byte(query)}
-		}
-
-		if len(databaseName.String) == 0 {
-			return nil, ErrNoDatabaseName
-		}
-
-		config.DatabaseName = databaseName.String
-	}
-
-	if len(config.MigrationsTable) == 0 {
-		config.MigrationsTable = DefaultMigrationsTable
 	}
 
 	conn, err := instance.Conn(context.Background())
@@ -93,11 +98,37 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		config: config,
 	}
 
+	if err := mx.setupDefaultConfig(); err != nil {
+		return nil, err
+	}
+
 	if err := mx.ensureVersionTable(); err != nil {
 		return nil, err
 	}
 
 	return mx, nil
+}
+
+func (m *Mysql) setupDefaultConfig() error {
+	if m.config.DatabaseName == "" {
+		query := `SELECT DATABASE()`
+		var databaseName sql.NullString
+		if err := m.conn.QueryRowContext(context.Background(), query).Scan(&databaseName); err != nil {
+			return &database.Error{OrigErr: err, Query: []byte(query)}
+		}
+
+		if len(databaseName.String) == 0 {
+			return ErrNoDatabaseName
+		}
+
+		m.config.DatabaseName = databaseName.String
+	}
+
+	if len(m.config.MigrationsTable) == 0 {
+		m.config.MigrationsTable = DefaultMigrationsTable
+	}
+
+	return nil
 }
 
 // extractCustomQueryParams extracts the custom query params (ones that start with "x-") from
@@ -243,7 +274,11 @@ func (m *Mysql) Open(url string) (database.Driver, error) {
 
 func (m *Mysql) Close() error {
 	connErr := m.conn.Close()
-	dbErr := m.db.Close()
+	var dbErr error
+	if m.db != nil {
+		dbErr = m.db.Close()
+	}
+
 	if connErr != nil || dbErr != nil {
 		return fmt.Errorf("conn: %v, db: %v", connErr, dbErr)
 	}
