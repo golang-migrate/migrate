@@ -13,15 +13,10 @@ import (
 	nurl "net/url"
 	"strconv"
 	"strings"
-)
 
-import (
 	"github.com/go-sql-driver/mysql"
-	"github.com/hashicorp/go-multierror"
-)
-
-import (
 	"github.com/golang-migrate/migrate/v4/database"
+	"github.com/hashicorp/go-multierror"
 )
 
 func init() {
@@ -329,7 +324,7 @@ func (m *Mysql) SetVersion(version int, dirty bool) error {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
 	}
 
-	query := "TRUNCATE `" + m.config.MigrationsTable + "`"
+	query := "DELETE FROM `" + m.config.MigrationsTable + "`"
 	if _, err := tx.ExecContext(context.Background(), query); err != nil {
 		if errRollback := tx.Rollback(); errRollback != nil {
 			err = multierror.Append(err, errRollback)
