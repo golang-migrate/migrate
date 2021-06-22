@@ -366,12 +366,7 @@ func (ss *SQLServer) ensureVersionTable() (err error) {
 }
 
 func getMSITokenProvider(resource string) (func() (string, error), error) {
-	msiEndpoint, err := adal.GetMSIEndpoint()
-	if err != nil {
-		return nil, err
-	}
-	msi, err := adal.NewServicePrincipalTokenFromMSI(
-		msiEndpoint, resource)
+	msi, err := adal.NewServicePrincipalTokenFromManagedIdentity(resource, nil)
 	if err != nil {
 		return nil, err
 	}
