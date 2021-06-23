@@ -329,11 +329,11 @@ func (m *Mongo) ensureVersionTable() (err error) {
 // Utilizes advisory locking on the config.LockingCollection collection
 // This uses a unique index on the `locking_key` field.
 func (m *Mongo) Lock() error {
-	if !m.config.Locking.Enabled {
-		return nil
-	}
-
 	return database.CasRestoreOnErr(&m.isLocked, false, true, database.ErrLocked, func() error {
+		if !m.config.Locking.Enabled {
+			return nil
+		}
+
 		pid := os.Getpid()
 		hostname, err := os.Hostname()
 		if err != nil {
@@ -367,11 +367,11 @@ func (m *Mongo) Lock() error {
 }
 
 func (m *Mongo) Unlock() error {
-	if !m.config.Locking.Enabled {
-		return nil
-	}
-
 	return database.CasRestoreOnErr(&m.isLocked, true, false, database.ErrNotLocked, func() error {
+		if !m.config.Locking.Enabled {
+			return nil
+		}
+
 		filter := findFilter{
 			Key: lockKeyUniqueValue,
 		}
