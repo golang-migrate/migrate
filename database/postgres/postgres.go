@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"go.uber.org/atomic"
 	"io"
 	"io/ioutil"
 	nurl "net/url"
@@ -57,7 +58,7 @@ type Postgres struct {
 	// Locking and unlocking need to use the same connection
 	conn     *sql.Conn
 	db       *sql.DB
-	isLocked bool
+	isLocked atomic.Bool
 
 	// Open and WithInstance need to guarantee that config is never nil
 	config *Config
@@ -214,41 +215,35 @@ func (p *Postgres) Close() error {
 
 // https://www.postgresql.org/docs/9.6/static/explicit-locking.html#ADVISORY-LOCKS
 func (p *Postgres) Lock() error {
-	if p.isLocked {
-		return database.ErrLocked
-	}
+	return database.CasRestoreOnErr(&p.isLocked, false, true, database.ErrLocked, func() error {
+		aid, err := database.GenerateAdvisoryLockId(p.config.DatabaseName, p.config.migrationsSchemaName, p.config.migrationsTableName)
+		if err != nil {
+			return err
+		}
 
-	aid, err := database.GenerateAdvisoryLockId(p.config.DatabaseName, p.config.migrationsSchemaName, p.config.migrationsTableName)
-	if err != nil {
-		return err
-	}
+		// This will wait indefinitely until the lock can be acquired.
+		query := `SELECT pg_advisory_lock($1)`
+		if _, err := p.conn.ExecContext(context.Background(), query, aid); err != nil {
+			return &database.Error{OrigErr: err, Err: "try lock failed", Query: []byte(query)}
+		}
 
-	// This will wait indefinitely until the lock can be acquired.
-	query := `SELECT pg_advisory_lock($1)`
-	if _, err := p.conn.ExecContext(context.Background(), query, aid); err != nil {
-		return &database.Error{OrigErr: err, Err: "try lock failed", Query: []byte(query)}
-	}
-
-	p.isLocked = true
-	return nil
+		return nil
+	})
 }
 
 func (p *Postgres) Unlock() error {
-	if !p.isLocked {
+	return database.CasRestoreOnErr(&p.isLocked, true, false, database.ErrNotLocked, func() error {
+		aid, err := database.GenerateAdvisoryLockId(p.config.DatabaseName, p.config.migrationsSchemaName, p.config.migrationsTableName)
+		if err != nil {
+			return err
+		}
+
+		query := `SELECT pg_advisory_unlock($1)`
+		if _, err := p.conn.ExecContext(context.Background(), query, aid); err != nil {
+			return &database.Error{OrigErr: err, Query: []byte(query)}
+		}
 		return nil
-	}
-
-	aid, err := database.GenerateAdvisoryLockId(p.config.DatabaseName, p.config.migrationsSchemaName, p.config.migrationsTableName)
-	if err != nil {
-		return err
-	}
-
-	query := `SELECT pg_advisory_unlock($1)`
-	if _, err := p.conn.ExecContext(context.Background(), query, aid); err != nil {
-		return &database.Error{OrigErr: err, Query: []byte(query)}
-	}
-	p.isLocked = false
-	return nil
+	})
 }
 
 func (p *Postgres) Run(migration io.Reader) error {

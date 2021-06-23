@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"go.uber.org/atomic"
 	"io"
 	"io/ioutil"
 	nurl "net/url"
@@ -47,7 +48,7 @@ type SQLServer struct {
 	// Locking and unlocking need to use the same connection
 	conn     *sql.Conn
 	db       *sql.DB
-	isLocked bool
+	isLocked atomic.Bool
 
 	// Open and WithInstance need to garantuee that config is never nil
 	config *Config
@@ -154,50 +155,44 @@ func (ss *SQLServer) Close() error {
 
 // Lock creates an advisory local on the database to prevent multiple migrations from running at the same time.
 func (ss *SQLServer) Lock() error {
-	if ss.isLocked {
-		return database.ErrLocked
-	}
+	return database.CasRestoreOnErr(&ss.isLocked, false, true, database.ErrLocked, func() error {
+		aid, err := database.GenerateAdvisoryLockId(ss.config.DatabaseName, ss.config.SchemaName)
+		if err != nil {
+			return err
+		}
 
-	aid, err := database.GenerateAdvisoryLockId(ss.config.DatabaseName, ss.config.SchemaName)
-	if err != nil {
-		return err
-	}
+		// This will either obtain the lock immediately and return true,
+		// or return false if the lock cannot be acquired immediately.
+		// MS Docs: sp_getapplock: https://docs.microsoft.com/en-us/sql/relational-databases/system-stored-procedures/sp-getapplock-transact-sql?view=sql-server-2017
+		query := `EXEC sp_getapplock @Resource = @p1, @LockMode = 'Update', @LockOwner = 'Session', @LockTimeout = 0`
 
-	// This will either obtain the lock immediately and return true,
-	// or return false if the lock cannot be acquired immediately.
-	// MS Docs: sp_getapplock: https://docs.microsoft.com/en-us/sql/relational-databases/system-stored-procedures/sp-getapplock-transact-sql?view=sql-server-2017
-	query := `EXEC sp_getapplock @Resource = @p1, @LockMode = 'Update', @LockOwner = 'Session', @LockTimeout = 0`
-
-	var status mssql.ReturnStatus
-	if _, err = ss.conn.ExecContext(context.Background(), query, aid, &status); err == nil && status > -1 {
-		ss.isLocked = true
-		return nil
-	} else if err != nil {
-		return &database.Error{OrigErr: err, Err: "try lock failed", Query: []byte(query)}
-	} else {
-		return &database.Error{Err: fmt.Sprintf("try lock failed with error %v: %v", status, lockErrorMap[status]), Query: []byte(query)}
-	}
+		var status mssql.ReturnStatus
+		if _, err = ss.conn.ExecContext(context.Background(), query, aid, &status); err == nil && status > -1 {
+			return nil
+		} else if err != nil {
+			return &database.Error{OrigErr: err, Err: "try lock failed", Query: []byte(query)}
+		} else {
+			return &database.Error{Err: fmt.Sprintf("try lock failed with error %v: %v", status, lockErrorMap[status]), Query: []byte(query)}
+		}
+	})
 }
 
 // Unlock froms the migration lock from the database
 func (ss *SQLServer) Unlock() error {
-	if !ss.isLocked {
+	return database.CasRestoreOnErr(&ss.isLocked, true, false, database.ErrNotLocked, func() error {
+		aid, err := database.GenerateAdvisoryLockId(ss.config.DatabaseName, ss.config.SchemaName)
+		if err != nil {
+			return err
+		}
+
+		// MS Docs: sp_releaseapplock: https://docs.microsoft.com/en-us/sql/relational-databases/system-stored-procedures/sp-releaseapplock-transact-sql?view=sql-server-2017
+		query := `EXEC sp_releaseapplock @Resource = @p1, @LockOwner = 'Session'`
+		if _, err := ss.conn.ExecContext(context.Background(), query, aid); err != nil {
+			return &database.Error{OrigErr: err, Query: []byte(query)}
+		}
+
 		return nil
-	}
-
-	aid, err := database.GenerateAdvisoryLockId(ss.config.DatabaseName, ss.config.SchemaName)
-	if err != nil {
-		return err
-	}
-
-	// MS Docs: sp_releaseapplock: https://docs.microsoft.com/en-us/sql/relational-databases/system-stored-procedures/sp-releaseapplock-transact-sql?view=sql-server-2017
-	query := `EXEC sp_releaseapplock @Resource = @p1, @LockOwner = 'Session'`
-	if _, err := ss.conn.ExecContext(context.Background(), query, aid); err != nil {
-		return &database.Error{OrigErr: err, Query: []byte(query)}
-	}
-	ss.isLocked = false
-
-	return nil
+	})
 }
 
 // Run the migrations for the database
