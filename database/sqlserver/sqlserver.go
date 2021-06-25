@@ -126,9 +126,13 @@ func (ss *SQLServer) Open(url string) (database.Driver, error) {
 		return nil, err
 	}
 
-	useMsi, err := strconv.ParseBool(purl.Query().Get("useMsi"))
-	if err != nil {
-		return nil, err
+	useMsiParam := purl.Query().Get("useMsi")
+	useMsi := false
+	if len(useMsiParam) > 0 {
+		useMsi, err = strconv.ParseBool(useMsiParam)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var db *sql.DB
