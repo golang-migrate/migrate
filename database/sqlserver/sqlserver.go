@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	nurl "net/url"
+	"strconv"
 	"strings"
 
 	"github.com/Azure/go-autorest/autorest/adal"
@@ -125,8 +126,13 @@ func (ss *SQLServer) Open(url string) (database.Driver, error) {
 		return nil, err
 	}
 
+	useMsi, err := strconv.ParseBool(purl.Query().Get("useMsi"))
+	if err != nil {
+		return nil, err
+	}
+
 	var db *sql.DB
-	if _, exist := purl.User.Password(); !exist {
+	if useMsi {
 		tokenProvider, err := getMSITokenProvider(fmt.Sprintf("%s%s", "https://", strings.Join(strings.Split(purl.Hostname(), ".")[1:], ".")))
 		if err != nil {
 			return nil, err
