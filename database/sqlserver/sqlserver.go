@@ -119,7 +119,7 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	return ss, nil
 }
 
-// Open a connection to the database. If no password is provided, MSI auth will be tried.
+// Open a connection to the database.
 func (ss *SQLServer) Open(url string) (database.Driver, error) {
 	purl, err := nurl.Parse(url)
 	if err != nil {
