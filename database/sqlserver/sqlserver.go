@@ -137,14 +137,14 @@ func (ss *SQLServer) Open(url string) (database.Driver, error) {
 
 	var db *sql.DB
 	if useMsi {
-		tokenProvider, err := getMSITokenProvider(fmt.Sprintf("%s%s", "https://", strings.Join(strings.Split(purl.Hostname(), ".")[1:], ".")))
+		resource := getAADResourceFromServerUri(purl)
+		tokenProvider, err := getMSITokenProvider(resource)
 		if err != nil {
 			return nil, err
 		}
 
 		connector, err := mssql.NewAccessTokenConnector(
 			migrate.FilterCustomQuery(purl).String(), tokenProvider)
-
 		if err != nil {
 			return nil, err
 		}
@@ -386,4 +386,11 @@ func getMSITokenProvider(resource string) (func() (string, error), error) {
 		token := msi.OAuthToken()
 		return token, nil
 	}, nil
+}
+
+// The sql server resource can change across clouds so get it
+// dynamically based on the server uri.
+// ex. <server name>.database.windows.net -> https://database.windows.net
+func getAADResourceFromServerUri(purl *nurl.URL) string {
+	return fmt.Sprintf("%s%s", "https://", strings.Join(strings.Split(purl.Hostname(), ".")[1:], "."))
 }
