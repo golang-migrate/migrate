@@ -8,7 +8,10 @@ import (
 	"io"
 	"io/ioutil"
 	nurl "net/url"
+	"strconv"
+	"strings"
 
+	"github.com/Azure/go-autorest/autorest/adal"
 	mssql "github.com/denisenkom/go-mssqldb" // mssql support
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
@@ -117,16 +120,43 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	return ss, nil
 }
 
-// Open a connection to the database
+// Open a connection to the database.
 func (ss *SQLServer) Open(url string) (database.Driver, error) {
 	purl, err := nurl.Parse(url)
 	if err != nil {
 		return nil, err
 	}
 
-	db, err := sql.Open("sqlserver", migrate.FilterCustomQuery(purl).String())
-	if err != nil {
-		return nil, err
+	useMsiParam := purl.Query().Get("useMsi")
+	useMsi := false
+	if len(useMsiParam) > 0 {
+		useMsi, err = strconv.ParseBool(useMsiParam)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var db *sql.DB
+	if useMsi {
+		resource := getAADResourceFromServerUri(purl)
+		tokenProvider, err := getMSITokenProvider(resource)
+		if err != nil {
+			return nil, err
+		}
+
+		connector, err := mssql.NewAccessTokenConnector(
+			migrate.FilterCustomQuery(purl).String(), tokenProvider)
+		if err != nil {
+			return nil, err
+		}
+
+		db = sql.OpenDB(connector)
+
+	} else {
+		db, err = sql.Open("sqlserver", migrate.FilterCustomQuery(purl).String())
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	migrationsTable := purl.Query().Get("x-migrations-table")
@@ -338,4 +368,24 @@ func (ss *SQLServer) ensureVersionTable() (err error) {
 	}
 
 	return nil
+}
+
+func getMSITokenProvider(resource string) (func() (string, error), error) {
+	msi, err := adal.NewServicePrincipalTokenFromManagedIdentity(resource, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return func() (string, error) {
+		msi.EnsureFresh()
+		token := msi.OAuthToken()
+		return token, nil
+	}, nil
+}
+
+// The sql server resource can change across clouds so get it
+// dynamically based on the server uri.
+// ex. <server name>.database.windows.net -> https://database.windows.net
+func getAADResourceFromServerUri(purl *nurl.URL) string {
+	return fmt.Sprintf("%s%s", "https://", strings.Join(strings.Split(purl.Hostname(), ".")[1:], "."))
 }
