@@ -4,12 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"go.uber.org/atomic"
 	"io"
 	"io/ioutil"
 	nurl "net/url"
 	"strconv"
 	"strings"
+
+	"go.uber.org/atomic"
 
 	"github.com/Azure/go-autorest/autorest/adal"
 	mssql "github.com/denisenkom/go-mssqldb" // mssql support
@@ -377,7 +378,10 @@ func getMSITokenProvider(resource string) (func() (string, error), error) {
 	}
 
 	return func() (string, error) {
-		msi.EnsureFresh()
+		err := msi.EnsureFresh()
+		if err != nil {
+			return "", err
+		}
 		token := msi.OAuthToken()
 		return token, nil
 	}, nil
