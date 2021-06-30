@@ -157,7 +157,7 @@ func TestMultipleStatements(t *testing.T) {
 
 		// make sure second table exists
 		var exists bool
-		if err := d.(*Postgres).conn.QueryRowContext(context.Background(), "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'bar' AND table_schema = (SELECT current_schema()))").Scan(&exists); err != nil {
+		if err := d.(*Postgres).db.QueryRow(context.Background(), "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'bar' AND table_schema = (SELECT current_schema()))").Scan(&exists); err != nil {
 			t.Fatal(err)
 		}
 		if !exists {
@@ -190,7 +190,7 @@ func TestMultipleStatementsInMultiStatementMode(t *testing.T) {
 
 		// make sure created index exists
 		var exists bool
-		if err := d.(*Postgres).conn.QueryRowContext(context.Background(), "SELECT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = (SELECT current_schema()) AND indexname = 'idx_foo')").Scan(&exists); err != nil {
+		if err := d.(*Postgres).db.QueryRow(context.Background(), "SELECT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = (SELECT current_schema()) AND indexname = 'idx_foo')").Scan(&exists); err != nil {
 			t.Fatal(err)
 		}
 		if !exists {
@@ -364,7 +364,7 @@ func TestMigrationTableOption(t *testing.T) {
 
 		// make sure migrate.schema_migrations table exists
 		var exists bool
-		if err := d.(*Postgres).conn.QueryRowContext(context.Background(), "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'schema_migrations' AND table_schema = 'migrate')").Scan(&exists); err != nil {
+		if err := d.(*Postgres).db.QueryRow(context.Background(), "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'schema_migrations' AND table_schema = 'migrate')").Scan(&exists); err != nil {
 			t.Fatal(err)
 		}
 		if !exists {
@@ -376,7 +376,7 @@ func TestMigrationTableOption(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := d.(*Postgres).conn.QueryRowContext(context.Background(), "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'migrate.schema_migrations' AND table_schema = (SELECT current_schema()))").Scan(&exists); err != nil {
+		if err := d.(*Postgres).db.QueryRow(context.Background(), "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'migrate.schema_migrations' AND table_schema = (SELECT current_schema()))").Scan(&exists); err != nil {
 			t.Fatal(err)
 		}
 		if !exists {
