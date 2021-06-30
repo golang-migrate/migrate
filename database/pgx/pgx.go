@@ -395,7 +395,7 @@ func (p *Postgres) Version() (version int, dirty bool, err error) {
 	query := `SELECT version, dirty FROM ` + quoteIdentifier(p.config.migrationsSchemaName) + `.` + quoteIdentifier(p.config.migrationsTableName) + ` LIMIT 1`
 	err = p.db.QueryRow(context.Background(), query).Scan(&version, &dirty)
 	switch {
-	case err == sql.ErrNoRows:
+	case err == pgx.ErrNoRows:
 		return database.NilVersion, false, nil
 
 	case err != nil:
