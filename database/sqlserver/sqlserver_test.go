@@ -283,17 +283,9 @@ func TestMsiFalse(t *testing.T) {
 
 		addr := msConnectionStringMsi(ip, port, false)
 		p := &SQLServer{}
-		d, err := p.Open(addr)
-		if err != nil {
-			t.Fatalf("%v", err)
+		_, err = p.Open(addr)
+		if err == nil {
+			t.Fatal("Open should fail since no password was passed and useMsi is false.")
 		}
-
-		defer func() {
-			if err := d.Close(); err != nil {
-				t.Error(err)
-			}
-		}()
-
-		dt.Test(t, d, []byte("SELECT 1"))
 	})
 }
