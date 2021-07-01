@@ -27,10 +27,11 @@ func init() {
 var DefaultMigrationsTable = "schema_migrations"
 
 var (
-	ErrNilConfig      = fmt.Errorf("no config")
-	ErrNoDatabaseName = fmt.Errorf("no database name")
-	ErrNoSchema       = fmt.Errorf("no schema")
-	ErrDatabaseDirty  = fmt.Errorf("database is dirty")
+	ErrNilConfig                 = fmt.Errorf("no config")
+	ErrNoDatabaseName            = fmt.Errorf("no database name")
+	ErrNoSchema                  = fmt.Errorf("no schema")
+	ErrDatabaseDirty             = fmt.Errorf("database is dirty")
+	ErrMultipleAuthOptionsPassed = fmt.Errorf("both password and useMsi=true were passed.")
 )
 
 var lockErrorMap = map[mssql.ReturnStatus]string{
@@ -137,6 +138,12 @@ func (ss *SQLServer) Open(url string) (database.Driver, error) {
 		}
 	}
 
+	if _, isPasswordSet := purl.User.Password(); useMsi && isPasswordSet {
+		return nil, ErrMultipleAuthOptionsPassed
+	}
+
+	filteredURL := migrate.FilterCustomQuery(purl).String()
+
 	var db *sql.DB
 	if useMsi {
 		resource := getAADResourceFromServerUri(purl)
@@ -146,7 +153,7 @@ func (ss *SQLServer) Open(url string) (database.Driver, error) {
 		}
 
 		connector, err := mssql.NewAccessTokenConnector(
-			migrate.FilterCustomQuery(purl).String(), tokenProvider)
+			filteredURL, tokenProvider)
 		if err != nil {
 			return nil, err
 		}
@@ -154,7 +161,7 @@ func (ss *SQLServer) Open(url string) (database.Driver, error) {
 		db = sql.OpenDB(connector)
 
 	} else {
-		db, err = sql.Open("sqlserver", migrate.FilterCustomQuery(purl).String())
+		db, err = sql.Open("sqlserver", filteredURL)
 		if err != nil {
 			return nil, err
 		}
