@@ -58,10 +58,10 @@ type Config struct {
 }
 
 type Postgres struct {
-	db *pgx.Conn
+	conn *pgx.Conn
 	// We're storing the *sql.DB we got the conn from optionally,
 	// so that we can release it back into the pool when we're done.
-	stdlib   *sql.DB
+	db       *sql.DB
 	isLocked atomic.Bool
 
 	// Open and WithInstance need to guarantee that config is never nil
@@ -78,16 +78,16 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		return nil, err
 	}
 
-	px, err := WithPgxInstance(context.Background(), conn, config)
+	px, err := WithConnection(context.Background(), conn, config)
 	if err != nil {
 		return nil, err
 	}
 
-	px.(*Postgres).stdlib = instance
+	px.db = instance
 	return px, nil
 }
 
-func WithPgxInstance(ctx context.Context, conn *pgx.Conn, config *Config) (database.Driver, error) {
+func WithConnection(ctx context.Context, conn *pgx.Conn, config *Config) (*Postgres, error) {
 	if err := conn.Ping(ctx); err != nil {
 		return nil, err
 	}
@@ -138,7 +138,7 @@ func WithPgxInstance(ctx context.Context, conn *pgx.Conn, config *Config) (datab
 	}
 
 	px := &Postgres{
-		db:     conn,
+		conn:   conn,
 		config: config,
 	}
 
@@ -222,8 +222,8 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 }
 
 func (p *Postgres) Close() error {
-	if p.stdlib != nil {
-		err := stdlib.ReleaseConn(p.stdlib, p.db)
+	if p.db != nil {
+		err := stdlib.ReleaseConn(p.db, p.conn)
 		if err != nil {
 			return fmt.Errorf("release: %+v", err)
 		}
@@ -231,7 +231,7 @@ func (p *Postgres) Close() error {
 		return nil
 	}
 
-	dbErr := p.db.Close(context.Background())
+	dbErr := p.conn.Close(context.Background())
 	if dbErr != nil {
 		return fmt.Errorf("db: %v", dbErr)
 	}
@@ -249,7 +249,7 @@ func (p *Postgres) Lock() error {
 
 		// This will wait indefinitely until the lock can be acquired.
 		query := `SELECT pg_advisory_lock($1)`
-		if _, err := p.db.Exec(context.Background(), query, aid); err != nil {
+		if _, err := p.conn.Exec(context.Background(), query, aid); err != nil {
 			return &database.Error{OrigErr: err, Err: "try lock failed", Query: []byte(query)}
 		}
 		return nil
@@ -264,7 +264,7 @@ func (p *Postgres) Unlock() error {
 		}
 
 		query := `SELECT pg_advisory_unlock($1)`
-		if _, err := p.db.Exec(context.Background(), query, aid); err != nil {
+		if _, err := p.conn.Exec(context.Background(), query, aid); err != nil {
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
 		return nil
@@ -302,7 +302,7 @@ func (p *Postgres) runStatement(statement []byte) error {
 	if strings.TrimSpace(query) == "" {
 		return nil
 	}
-	if _, err := p.db.Exec(ctx, query); err != nil {
+	if _, err := p.conn.Exec(ctx, query); err != nil {
 		if pgErr, ok := err.(*pgconn.PgError); ok {
 			var line uint
 			var col uint
@@ -358,7 +358,7 @@ func runesLastIndex(input []rune, target rune) int {
 }
 
 func (p *Postgres) SetVersion(version int, dirty bool) error {
-	tx, err := p.db.BeginTx(context.Background(), pgx.TxOptions{})
+	tx, err := p.conn.BeginTx(context.Background(), pgx.TxOptions{})
 	if err != nil {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
 	}
@@ -393,7 +393,7 @@ func (p *Postgres) SetVersion(version int, dirty bool) error {
 
 func (p *Postgres) Version() (version int, dirty bool, err error) {
 	query := `SELECT version, dirty FROM ` + quoteIdentifier(p.config.migrationsSchemaName) + `.` + quoteIdentifier(p.config.migrationsTableName) + ` LIMIT 1`
-	err = p.db.QueryRow(context.Background(), query).Scan(&version, &dirty)
+	err = p.conn.QueryRow(context.Background(), query).Scan(&version, &dirty)
 	switch {
 	case err == pgx.ErrNoRows:
 		return database.NilVersion, false, nil
@@ -414,7 +414,7 @@ func (p *Postgres) Version() (version int, dirty bool, err error) {
 func (p *Postgres) Drop() (err error) {
 	// select all tables in current schema
 	query := `SELECT table_name FROM information_schema.tables WHERE table_schema=(SELECT current_schema()) AND table_type='BASE TABLE'`
-	tables, err := p.db.Query(context.Background(), query)
+	tables, err := p.conn.Query(context.Background(), query)
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
@@ -439,7 +439,7 @@ func (p *Postgres) Drop() (err error) {
 		// delete one by one ...
 		for _, t := range tableNames {
 			query = `DROP TABLE IF EXISTS ` + quoteIdentifier(t) + ` CASCADE`
-			if _, err := p.db.Exec(context.Background(), query); err != nil {
+			if _, err := p.conn.Exec(context.Background(), query); err != nil {
 				return &database.Error{OrigErr: err, Query: []byte(query)}
 			}
 		}
@@ -471,7 +471,7 @@ func (p *Postgres) ensureVersionTable() (err error) {
 	// `CREATE TABLE IF NOT EXISTS...` query would fail because the user does not have the CREATE permission.
 	// Taken from https://github.com/mattes/migrate/blob/master/database/postgres/postgres.go#L258
 	query := `SELECT COUNT(1) FROM information_schema.tables WHERE table_schema = $1 AND table_name = $2 LIMIT 1`
-	row := p.db.QueryRow(context.Background(), query, p.config.migrationsSchemaName, p.config.migrationsTableName)
+	row := p.conn.QueryRow(context.Background(), query, p.config.migrationsSchemaName, p.config.migrationsTableName)
 
 	var count int
 	err = row.Scan(&count)
@@ -484,7 +484,7 @@ func (p *Postgres) ensureVersionTable() (err error) {
 	}
 
 	query = `CREATE TABLE IF NOT EXISTS ` + quoteIdentifier(p.config.migrationsSchemaName) + `.` + quoteIdentifier(p.config.migrationsTableName) + ` (version bigint not null primary key, dirty boolean not null)`
-	if _, err = p.db.Exec(context.Background(), query); err != nil {
+	if _, err = p.conn.Exec(context.Background(), query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 
@@ -499,3 +499,5 @@ func quoteIdentifier(name string) string {
 	}
 	return `"` + strings.Replace(name, `"`, `""`, -1) + `"`
 }
+
+var _ database.Driver = (*Postgres)(nil) // explicit compile time type check
