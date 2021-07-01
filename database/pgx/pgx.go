@@ -160,7 +160,7 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 	// i.e. pgx://user:password@host:port/db => postgres://user:password@host:port/db
 	purl.Scheme = "postgres"
 
-	db, err := sql.Open("pgx", migrate.FilterCustomQuery(purl).String())
+	conn, err := pgx.Connect(context.Background(), migrate.FilterCustomQuery(purl).String())
 	if err != nil {
 		return nil, err
 	}
@@ -205,7 +205,7 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 		}
 	}
 
-	px, err := WithInstance(db, &Config{
+	px, err := WithConnection(context.Background(), conn, &Config{
 		DatabaseName:          purl.Path,
 		MigrationsTable:       migrationsTable,
 		MigrationsTableQuoted: migrationsTableQuoted,
