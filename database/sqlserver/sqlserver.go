@@ -4,11 +4,15 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"go.uber.org/atomic"
 	"io"
 	"io/ioutil"
 	nurl "net/url"
+	"strconv"
+	"strings"
 
+	"go.uber.org/atomic"
+
+	"github.com/Azure/go-autorest/autorest/adal"
 	mssql "github.com/denisenkom/go-mssqldb" // mssql support
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
@@ -23,10 +27,11 @@ func init() {
 var DefaultMigrationsTable = "schema_migrations"
 
 var (
-	ErrNilConfig      = fmt.Errorf("no config")
-	ErrNoDatabaseName = fmt.Errorf("no database name")
-	ErrNoSchema       = fmt.Errorf("no schema")
-	ErrDatabaseDirty  = fmt.Errorf("database is dirty")
+	ErrNilConfig                 = fmt.Errorf("no config")
+	ErrNoDatabaseName            = fmt.Errorf("no database name")
+	ErrNoSchema                  = fmt.Errorf("no schema")
+	ErrDatabaseDirty             = fmt.Errorf("database is dirty")
+	ErrMultipleAuthOptionsPassed = fmt.Errorf("both password and useMsi=true were passed.")
 )
 
 var lockErrorMap = map[mssql.ReturnStatus]string{
@@ -117,16 +122,49 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	return ss, nil
 }
 
-// Open a connection to the database
+// Open a connection to the database.
 func (ss *SQLServer) Open(url string) (database.Driver, error) {
 	purl, err := nurl.Parse(url)
 	if err != nil {
 		return nil, err
 	}
 
-	db, err := sql.Open("sqlserver", migrate.FilterCustomQuery(purl).String())
-	if err != nil {
-		return nil, err
+	useMsiParam := purl.Query().Get("useMsi")
+	useMsi := false
+	if len(useMsiParam) > 0 {
+		useMsi, err = strconv.ParseBool(useMsiParam)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if _, isPasswordSet := purl.User.Password(); useMsi && isPasswordSet {
+		return nil, ErrMultipleAuthOptionsPassed
+	}
+
+	filteredURL := migrate.FilterCustomQuery(purl).String()
+
+	var db *sql.DB
+	if useMsi {
+		resource := getAADResourceFromServerUri(purl)
+		tokenProvider, err := getMSITokenProvider(resource)
+		if err != nil {
+			return nil, err
+		}
+
+		connector, err := mssql.NewAccessTokenConnector(
+			filteredURL, tokenProvider)
+		if err != nil {
+			return nil, err
+		}
+
+		db = sql.OpenDB(connector)
+
+	} else {
+		db, err = sql.Open("sqlserver", filteredURL)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	migrationsTable := purl.Query().Get("x-migrations-table")
@@ -338,4 +376,27 @@ func (ss *SQLServer) ensureVersionTable() (err error) {
 	}
 
 	return nil
+}
+
+func getMSITokenProvider(resource string) (func() (string, error), error) {
+	msi, err := adal.NewServicePrincipalTokenFromManagedIdentity(resource, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return func() (string, error) {
+		err := msi.EnsureFresh()
+		if err != nil {
+			return "", err
+		}
+		token := msi.OAuthToken()
+		return token, nil
+	}, nil
+}
+
+// The sql server resource can change across clouds so get it
+// dynamically based on the server uri.
+// ex. <server name>.database.windows.net -> https://database.windows.net
+func getAADResourceFromServerUri(purl *nurl.URL) string {
+	return fmt.Sprintf("%s%s", "https://", strings.Join(strings.Split(purl.Hostname(), ".")[1:], "."))
 }

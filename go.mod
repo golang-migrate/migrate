@@ -3,6 +3,7 @@ module github.com/golang-migrate/migrate/v4
 require (
 	cloud.google.com/go/spanner v1.18.0
 	cloud.google.com/go/storage v1.10.0
+	github.com/Azure/go-autorest/autorest/adal v0.9.14
 	github.com/ClickHouse/clickhouse-go v1.4.3
 	github.com/apache/arrow/go/arrow v0.0.0-20210521153258-78c88a9f517b // indirect
 	github.com/aws/aws-sdk-go v1.17.7
@@ -12,7 +13,7 @@ require (
 	github.com/cenkalti/backoff/v4 v4.0.2
 	github.com/cockroachdb/cockroach-go v0.0.0-20190925194419-606b3d062051
 	github.com/cznic/mathutil v0.0.0-20180504122225-ca4c9f2c1369 // indirect
-	github.com/denisenkom/go-mssqldb v0.0.0-20200620013148-b91950f658ec
+	github.com/denisenkom/go-mssqldb v0.10.0
 	github.com/dhui/dktest v0.3.4
 	github.com/docker/docker v17.12.0-ce-rc1.0.20210128214336-420b1d36250f+incompatible
 	github.com/edsrzf/mmap-go v0.0.0-20170320065105-0bce6a688712 // indirect
