@@ -55,9 +55,13 @@ type Mysql struct {
 }
 
 // connection instance must have `multiStatements` set to true
-func WithConnection(conn *sql.Conn, config *Config) (*Mysql, error) {
+func WithConnection(ctx context.Context, conn *sql.Conn, config *Config) (*Mysql, error) {
 	if config == nil {
 		return nil, ErrNilConfig
+	}
+
+	if err := conn.PingContext(ctx); err != nil {
+		return nil, err
 	}
 
 	mx := &Mysql{
@@ -69,7 +73,7 @@ func WithConnection(conn *sql.Conn, config *Config) (*Mysql, error) {
 	if config.DatabaseName == "" {
 		query := `SELECT DATABASE()`
 		var databaseName sql.NullString
-		if err := conn.QueryRowContext(context.Background(), query).Scan(&databaseName); err != nil {
+		if err := conn.QueryRowContext(ctx, query).Scan(&databaseName); err != nil {
 			return nil, &database.Error{OrigErr: err, Query: []byte(query)}
 		}
 
@@ -93,16 +97,18 @@ func WithConnection(conn *sql.Conn, config *Config) (*Mysql, error) {
 
 // instance must have `multiStatements` set to true
 func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
+	ctx := context.Background()
+
 	if err := instance.Ping(); err != nil {
 		return nil, err
 	}
 
-	conn, err := instance.Conn(context.Background())
+	conn, err := instance.Conn(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	mx, err := WithConnection(conn, config)
+	mx, err := WithConnection(ctx, conn, config)
 	if err != nil {
 		return nil, err
 	}
