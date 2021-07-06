@@ -20,6 +20,8 @@ import (
 	"github.com/hashicorp/go-multierror"
 )
 
+var _ database.Driver = (*Mysql)(nil) // explicit compile time type check
+
 func init() {
 	database.Register("mysql", &Mysql{})
 }
@@ -50,20 +52,26 @@ type Mysql struct {
 	config *Config
 }
 
-// instance must have `multiStatements` set to true
-func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
+// connection instance must have `multiStatements` set to true
+func WithConnection(ctx context.Context, conn *sql.Conn, config *Config) (*Mysql, error) {
 	if config == nil {
 		return nil, ErrNilConfig
 	}
 
-	if err := instance.Ping(); err != nil {
+	if err := conn.PingContext(ctx); err != nil {
 		return nil, err
+	}
+
+	mx := &Mysql{
+		conn:   conn,
+		db:     nil,
+		config: config,
 	}
 
 	if config.DatabaseName == "" {
 		query := `SELECT DATABASE()`
 		var databaseName sql.NullString
-		if err := instance.QueryRow(query).Scan(&databaseName); err != nil {
+		if err := conn.QueryRowContext(ctx, query).Scan(&databaseName); err != nil {
 			return nil, &database.Error{OrigErr: err, Query: []byte(query)}
 		}
 
@@ -78,20 +86,32 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		config.MigrationsTable = DefaultMigrationsTable
 	}
 
-	conn, err := instance.Conn(context.Background())
+	if err := mx.ensureVersionTable(); err != nil {
+		return nil, err
+	}
+
+	return mx, nil
+}
+
+// instance must have `multiStatements` set to true
+func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
+	ctx := context.Background()
+
+	if err := instance.Ping(); err != nil {
+		return nil, err
+	}
+
+	conn, err := instance.Conn(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	mx := &Mysql{
-		conn:   conn,
-		db:     instance,
-		config: config,
-	}
-
-	if err := mx.ensureVersionTable(); err != nil {
+	mx, err := WithConnection(ctx, conn, config)
+	if err != nil {
 		return nil, err
 	}
+
+	mx.db = instance
 
 	return mx, nil
 }
@@ -239,7 +259,11 @@ func (m *Mysql) Open(url string) (database.Driver, error) {
 
 func (m *Mysql) Close() error {
 	connErr := m.conn.Close()
-	dbErr := m.db.Close()
+	var dbErr error
+	if m.db != nil {
+		dbErr = m.db.Close()
+	}
+
 	if connErr != nil || dbErr != nil {
 		return fmt.Errorf("conn: %v, db: %v", connErr, dbErr)
 	}
