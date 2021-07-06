@@ -24,6 +24,8 @@ import (
 	"github.com/golang-migrate/migrate/v4/database"
 )
 
+var _ database.Driver = (*Mysql)(nil) // explicit compile time type check
+
 func init() {
 	database.Register("mysql", &Mysql{})
 }
