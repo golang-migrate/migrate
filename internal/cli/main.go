@@ -122,6 +122,9 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 	// initialize migrate
 	// don't catch migraterErr here and let each command decide
 	// how it wants to handle the error
+	if databasePtr != nil {
+		*databasePtr = os.ExpandEnv(*databasePtr)
+	}
 	migrater, migraterErr := migrate.New(*sourcePtr, *databasePtr)
 	defer func() {
 		if migraterErr == nil {
