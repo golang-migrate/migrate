@@ -26,6 +26,7 @@ system_schema table which comes with 3.X
 | `sslkey` | | Key file location. The file must contain PEM encoded data. |
 | `sslrootcert` | | The location of the root certificate file. The file must contain PEM encoded data. |
 | `sslmode` | | Whether or not to use SSL (disable\|require\|verify-ca\|verify-full) |
+| `disable-host-lookup`| false | Disable initial host lookup. |
 
 `timeout` is parsed using [time.ParseDuration(s string)](https://golang.org/pkg/time/#ParseDuration)
 
