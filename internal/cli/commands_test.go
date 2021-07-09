@@ -165,6 +165,7 @@ func (s *CreateCmdSuite) TestCreateCmd() {
 		cwd           string   // path to chdir to before test. relative to baseDir.
 		existingFiles []string // file paths created before test. relative to baseDir.
 		expectedFiles []string // file paths expected to exist after test. paths relative to baseDir.
+		absentFiles   []string // file paths expected not to exist after test. paths relative to baseDir.
 		expectedErr   error
 		dir           string // `dir` parameter. if absolute path, will be converted to baseDir/dir.
 		startTime     time.Time
@@ -173,33 +174,35 @@ func (s *CreateCmdSuite) TestCreateCmd() {
 		seqDigits     int
 		ext           string
 		name          string
+		onlyUp        bool
 	}{
-		{"seq and format", nil, "", nil, nil, errIncompatibleSeqAndFormat, ".", ts, "unix", true, 4, "sql", "name"},
-		{"seq init dir dot", nil, "", nil, []string{"0001_name.up.sql", "0001_name.down.sql"}, nil, ".", ts, defaultTimeFormat, true, 4, "sql", "name"},
-		{"seq init dir dot trailing slash", nil, "", nil, []string{"0001_name.up.sql", "0001_name.down.sql"}, nil, "./", ts, defaultTimeFormat, true, 4, "sql", "name"},
-		{"seq init dir double dot", []string{"subdir"}, "subdir", nil, []string{"0001_name.up.sql", "0001_name.down.sql"}, nil, "..", ts, defaultTimeFormat, true, 4, "sql", "name"},
-		{"seq init dir double dot trailing slash", []string{"subdir"}, "subdir", nil, []string{"0001_name.up.sql", "0001_name.down.sql"}, nil, "../", ts, defaultTimeFormat, true, 4, "sql", "name"},
-		{"seq init dir absolute", []string{"subdir"}, "", nil, []string{"subdir/0001_name.up.sql", "subdir/0001_name.down.sql"}, nil, "/subdir", ts, defaultTimeFormat, true, 4, "sql", "name"},
-		{"seq init dir absolute trailing slash", []string{"subdir"}, "", nil, []string{"subdir/0001_name.up.sql", "subdir/0001_name.down.sql"}, nil, "/subdir/", ts, defaultTimeFormat, true, 4, "sql", "name"},
-		{"seq init dir relative", []string{"subdir"}, "", nil, []string{"subdir/0001_name.up.sql", "subdir/0001_name.down.sql"}, nil, "subdir", ts, defaultTimeFormat, true, 4, "sql", "name"},
-		{"seq init dir relative trailing slash", []string{"subdir"}, "", nil, []string{"subdir/0001_name.up.sql", "subdir/0001_name.down.sql"}, nil, "subdir/", ts, defaultTimeFormat, true, 4, "sql", "name"},
-		{"seq init dir dot relative", []string{"subdir"}, "", nil, []string{"subdir/0001_name.up.sql", "subdir/0001_name.down.sql"}, nil, "./subdir", ts, defaultTimeFormat, true, 4, "sql", "name"},
-		{"seq init dir dot relative trailing slash", []string{"subdir"}, "", nil, []string{"subdir/0001_name.up.sql", "subdir/0001_name.down.sql"}, nil, "./subdir/", ts, defaultTimeFormat, true, 4, "sql", "name"},
-		{"seq init dir double dot relative", []string{"subdir"}, "subdir", nil, []string{"subdir/0001_name.up.sql", "subdir/0001_name.down.sql"}, nil, "../subdir", ts, defaultTimeFormat, true, 4, "sql", "name"},
-		{"seq init dir double dot relative trailing slash", []string{"subdir"}, "subdir", nil, []string{"subdir/0001_name.up.sql", "subdir/0001_name.down.sql"}, nil, "../subdir/", ts, defaultTimeFormat, true, 4, "sql", "name"},
-		{"seq init dir maze", []string{"subdir"}, "subdir", nil, []string{"0001_name.up.sql", "0001_name.down.sql"}, nil, "..//subdir/./.././/subdir/..", ts, defaultTimeFormat, true, 4, "sql", "name"},
-		{"seq width invalid", nil, "", nil, nil, errInvalidSequenceWidth, ".", ts, defaultTimeFormat, true, 0, "sql", "name"},
-		{"seq malformed", nil, "", []string{"bad.sql"}, []string{"bad.sql"}, errors.New("Malformed migration filename: bad.sql"), ".", ts, defaultTimeFormat, true, 4, "sql", "name"},
-		{"seq not int", nil, "", []string{"bad_bad.sql"}, []string{"bad_bad.sql"}, errors.New(`strconv.ParseUint: parsing "bad": invalid syntax`), ".", ts, defaultTimeFormat, true, 4, "sql", "name"},
-		{"seq negative", nil, "", []string{"-5_negative.sql"}, []string{"-5_negative.sql"}, errors.New(`strconv.ParseUint: parsing "-5": invalid syntax`), ".", ts, defaultTimeFormat, true, 4, "sql", "name"},
-		{"seq increment", nil, "", []string{"3_three.sql", "4_four.sql"}, []string{"3_three.sql", "4_four.sql", "0005_five.up.sql", "0005_five.down.sql"}, nil, ".", ts, defaultTimeFormat, true, 4, "sql", "five"},
-		{"seq overflow", nil, "", []string{"9_nine.sql"}, []string{"9_nine.sql"}, errors.New(`Next sequence number 10 too large. At most 1 digits are allowed`), ".", ts, defaultTimeFormat, true, 1, "sql", "ten"},
-		{"time empty format", nil, "", nil, nil, errInvalidTimeFormat, ".", ts, "", false, 0, "sql", "name"},
-		{"time unix", nil, "", nil, []string{tsUnixStr + "_name.up.sql", tsUnixStr + "_name.down.sql"}, nil, ".", ts, "unix", false, 0, "sql", "name"},
-		{"time unixNano", nil, "", nil, []string{tsUnixNanoStr + "_name.up.sql", tsUnixNanoStr + "_name.down.sql"}, nil, ".", ts, "unixNano", false, 0, "sql", "name"},
-		{"time custom format", nil, "", nil, []string{"20001225000102_name.up.sql", "20001225000102_name.down.sql"}, nil, ".", ts, "20060102150405", false, 0, "sql", "name"},
-		{"time version collision", nil, "", []string{"20001225_name.up.sql", "20001225_name.down.sql"}, []string{"20001225_name.up.sql", "20001225_name.down.sql"}, errors.New("duplicate migration version: 20001225"), ".", ts, "20060102", false, 0, "sql", "name"},
-		{"dir invalid", nil, "", []string{"file"}, []string{"file"}, errors.New("mkdir 'test: this is invalid dir name'\x00: invalid argument"), "'test: this is invalid dir name'\000", ts, "unix", false, 0, "sql", "name"},
+		{"seq and format", nil, "", nil, nil, nil, errIncompatibleSeqAndFormat, ".", ts, "unix", true, 4, "sql", "name", false},
+		{"seq init dir dot", nil, "", nil, []string{"0001_name.up.sql", "0001_name.down.sql"}, nil, nil, ".", ts, defaultTimeFormat, true, 4, "sql", "name", false},
+		{"seq init dir dot trailing slash", nil, "", nil, []string{"0001_name.up.sql", "0001_name.down.sql"}, nil, nil, "./", ts, defaultTimeFormat, true, 4, "sql", "name", false},
+		{"seq init dir double dot", []string{"subdir"}, "subdir", nil, []string{"0001_name.up.sql", "0001_name.down.sql"}, nil, nil, "..", ts, defaultTimeFormat, true, 4, "sql", "name", false},
+		{"seq init dir double dot trailing slash", []string{"subdir"}, "subdir", nil, []string{"0001_name.up.sql", "0001_name.down.sql"}, nil, nil, "../", ts, defaultTimeFormat, true, 4, "sql", "name", false},
+		{"seq init dir absolute", []string{"subdir"}, "", nil, []string{"subdir/0001_name.up.sql", "subdir/0001_name.down.sql"}, nil, nil, "/subdir", ts, defaultTimeFormat, true, 4, "sql", "name", false},
+		{"seq init dir absolute trailing slash", []string{"subdir"}, "", nil, []string{"subdir/0001_name.up.sql", "subdir/0001_name.down.sql"}, nil, nil, "/subdir/", ts, defaultTimeFormat, true, 4, "sql", "name", false},
+		{"seq init dir relative", []string{"subdir"}, "", nil, []string{"subdir/0001_name.up.sql", "subdir/0001_name.down.sql"}, nil, nil, "subdir", ts, defaultTimeFormat, true, 4, "sql", "name", false},
+		{"seq init dir relative trailing slash", []string{"subdir"}, "", nil, []string{"subdir/0001_name.up.sql", "subdir/0001_name.down.sql"}, nil, nil, "subdir/", ts, defaultTimeFormat, true, 4, "sql", "name", false},
+		{"seq init dir dot relative", []string{"subdir"}, "", nil, []string{"subdir/0001_name.up.sql", "subdir/0001_name.down.sql"}, nil, nil, "./subdir", ts, defaultTimeFormat, true, 4, "sql", "name", false},
+		{"seq init dir dot relative trailing slash", []string{"subdir"}, "", nil, []string{"subdir/0001_name.up.sql", "subdir/0001_name.down.sql"}, nil, nil, "./subdir/", ts, defaultTimeFormat, true, 4, "sql", "name", false},
+		{"seq init dir double dot relative", []string{"subdir"}, "subdir", nil, []string{"subdir/0001_name.up.sql", "subdir/0001_name.down.sql"}, nil, nil, "../subdir", ts, defaultTimeFormat, true, 4, "sql", "name", false},
+		{"seq init dir double dot relative trailing slash", []string{"subdir"}, "subdir", nil, []string{"subdir/0001_name.up.sql", "subdir/0001_name.down.sql"}, nil, nil, "../subdir/", ts, defaultTimeFormat, true, 4, "sql", "name", false},
+		{"seq init dir maze", []string{"subdir"}, "subdir", nil, []string{"0001_name.up.sql", "0001_name.down.sql"}, nil, nil, "..//subdir/./.././/subdir/..", ts, defaultTimeFormat, true, 4, "sql", "name", false},
+		{"seq width invalid", nil, "", nil, nil, nil, errInvalidSequenceWidth, ".", ts, defaultTimeFormat, true, 0, "sql", "name", false},
+		{"seq malformed", nil, "", []string{"bad.sql"}, []string{"bad.sql"}, nil, errors.New("Malformed migration filename: bad.sql"), ".", ts, defaultTimeFormat, true, 4, "sql", "name", false},
+		{"seq not int", nil, "", []string{"bad_bad.sql"}, []string{"bad_bad.sql"}, nil, errors.New(`strconv.ParseUint: parsing "bad": invalid syntax`), ".", ts, defaultTimeFormat, true, 4, "sql", "name", false},
+		{"seq negative", nil, "", []string{"-5_negative.sql"}, []string{"-5_negative.sql"}, nil, errors.New(`strconv.ParseUint: parsing "-5": invalid syntax`), ".", ts, defaultTimeFormat, true, 4, "sql", "name", false},
+		{"seq increment", nil, "", []string{"3_three.sql", "4_four.sql"}, []string{"3_three.sql", "4_four.sql", "0005_five.up.sql", "0005_five.down.sql"}, nil, nil, ".", ts, defaultTimeFormat, true, 4, "sql", "five", false},
+		{"seq overflow", nil, "", []string{"9_nine.sql"}, []string{"9_nine.sql"}, nil, errors.New(`Next sequence number 10 too large. At most 1 digits are allowed`), ".", ts, defaultTimeFormat, true, 1, "sql", "ten", false},
+		{"time empty format", nil, "", nil, nil, nil, errInvalidTimeFormat, ".", ts, "", false, 0, "sql", "name", false},
+		{"time unix", nil, "", nil, []string{tsUnixStr + "_name.up.sql", tsUnixStr + "_name.down.sql"}, nil, nil, ".", ts, "unix", false, 0, "sql", "name", false},
+		{"time unixNano", nil, "", nil, []string{tsUnixNanoStr + "_name.up.sql", tsUnixNanoStr + "_name.down.sql"}, nil, nil, ".", ts, "unixNano", false, 0, "sql", "name", false},
+		{"time custom format", nil, "", nil, []string{"20001225000102_name.up.sql", "20001225000102_name.down.sql"}, nil, nil, ".", ts, "20060102150405", false, 0, "sql", "name", false},
+		{"time version collision", nil, "", []string{"20001225_name.up.sql", "20001225_name.down.sql"}, []string{"20001225_name.up.sql", "20001225_name.down.sql"}, nil, errors.New("duplicate migration version: 20001225"), ".", ts, "20060102", false, 0, "sql", "name", false},
+		{"dir invalid", nil, "", []string{"file"}, []string{"file"}, nil, errors.New("mkdir 'test: this is invalid dir name'\x00: invalid argument"), "'test: this is invalid dir name'\000", ts, "unix", false, 0, "sql", "name", false},
+		{"only up", nil, "", nil, []string{tsUnixStr + "_name.up.sql"}, []string{tsUnixStr + "_name.down.sql"}, nil, ".", ts, "unix", false, 0, "sql", "name", true},
 	}
 
 	for _, c := range cases {
@@ -232,7 +235,7 @@ func (s *CreateCmdSuite) TestCreateCmd() {
 				dir = filepath.Join(baseDir, dir)
 			}
 
-			err := createCmd(dir, c.startTime, c.format, c.name, c.ext, c.seq, c.seqDigits, false)
+			err := createCmd(dir, c.startTime, c.format, c.name, c.ext, c.seq, c.seqDigits, c.onlyUp, false)
 
 			if c.expectedErr != nil {
 				s.EqualError(err, c.expectedErr.Error())
@@ -245,6 +248,9 @@ func (s *CreateCmdSuite) TestCreateCmd() {
 			} else {
 				for _, f := range c.expectedFiles {
 					s.FileExists(filepath.Join(baseDir, f))
+				}
+				for _, f := range c.absentFiles {
+					s.NoFileExists(filepath.Join(baseDir, f))
 				}
 			}
 
