@@ -132,6 +132,36 @@ func TestMigrate(t *testing.T) {
 	})
 }
 
+func TestDrop(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := pgConnectionString(ip, port)
+		p := &Postgres{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
+		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "postgres", d)
+		if err != nil {
+			t.Fatal(err)
+		}
+		dt.TestMigrate(t, m)
+		err = d.(*Postgres).Drop()
+		if err != nil {
+			t.Fatalf("Error When testing Drop: %s", err.Error())
+		}
+	})
+}
+
 func TestMultipleStatements(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.FirstPort()
@@ -684,6 +714,7 @@ func TestWithInstance_Concurrent(t *testing.T) {
 		}
 	})
 }
+
 func Test_computeLineFromPos(t *testing.T) {
 	testcases := []struct {
 		pos      int
