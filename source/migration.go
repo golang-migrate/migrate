@@ -8,8 +8,10 @@ import (
 type Direction string
 
 const (
-	Down Direction = "down"
-	Up   Direction = "up"
+	Down       Direction = "down"
+	Up         Direction = "up"
+	AlwaysUp   Direction = "alwaysup"
+	AlwaysDown Direction = "alwaysdown"
 )
 
 // Migration is a helper struct for source drivers that need to
@@ -101,6 +103,9 @@ func (i *Migrations) Up(version uint) (m *Migration, ok bool) {
 		if mx, ok := i.migrations[version][Up]; ok {
 			return mx, true
 		}
+		if mx, ok := i.migrations[version][AlwaysUp]; ok {
+			return mx, true
+		}
 	}
 	return nil, false
 }
@@ -108,6 +113,11 @@ func (i *Migrations) Up(version uint) (m *Migration, ok bool) {
 func (i *Migrations) Down(version uint) (m *Migration, ok bool) {
 	if _, ok := i.migrations[version]; ok {
 		if mx, ok := i.migrations[version][Down]; ok {
+			return mx, true
+		}
+	}
+	if _, ok := i.migrations[version]; ok {
+		if mx, ok := i.migrations[version][AlwaysDown]; ok {
 			return mx, true
 		}
 	}
