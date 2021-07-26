@@ -735,10 +735,13 @@ func (m *Migrate) runMigrations(ret <-chan interface{}) error {
 
 		case *Migration:
 			migr := r
+			once := r.Direction == source.Up || r.Direction == source.Down
 
 			// set version with dirty state
-			if err := m.databaseDrv.SetVersion(migr.TargetVersion, true); err != nil {
-				return err
+			if once {
+				if err := m.databaseDrv.SetVersion(migr.TargetVersion, true); err != nil {
+					return err
+				}
 			}
 
 			if migr.Body != nil {
@@ -749,8 +752,10 @@ func (m *Migrate) runMigrations(ret <-chan interface{}) error {
 			}
 
 			// set clean state
-			if err := m.databaseDrv.SetVersion(migr.TargetVersion, false); err != nil {
-				return err
+			if once {
+				if err := m.databaseDrv.SetVersion(migr.TargetVersion, false); err != nil {
+					return err
+				}
 			}
 
 			endTime := time.Now()

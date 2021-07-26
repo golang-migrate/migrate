@@ -31,6 +31,26 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
+			name:      "1_foobar.alwaysup.sql",
+			expectErr: nil,
+			expectMigration: &Migration{
+				Version:    1,
+				Identifier: "foobar",
+				Direction:  AlwaysUp,
+				Raw:        "1_foobar.alwaysup.sql",
+			},
+		},
+		{
+			name:      "1_foobar.alwaysdown.sql",
+			expectErr: nil,
+			expectMigration: &Migration{
+				Version:    1,
+				Identifier: "foobar",
+				Direction:  AlwaysDown,
+				Raw:        "1_foobar.alwaysdown.sql",
+			},
+		},
+		{
 			name:      "1_f-o_ob+ar.up.sql",
 			expectErr: nil,
 			expectMigration: &Migration{
