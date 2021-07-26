@@ -25,7 +25,7 @@ type Migration struct {
 	// this migration in the source.
 	Identifier string
 
-	// Direction is either Up or Down.
+	// Direction is either Up, Down, AlwaysUp, or AlwaysDown.
 	Direction Direction
 
 	// Raw holds the raw location path to this migration in source.
