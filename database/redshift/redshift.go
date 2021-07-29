@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"go.uber.org/atomic"
 	"io"
 	"io/ioutil"
 	nurl "net/url"
@@ -36,7 +37,7 @@ type Config struct {
 }
 
 type Redshift struct {
-	isLocked bool
+	isLocked atomic.Bool
 	conn     *sql.Conn
 	db       *sql.DB
 
@@ -126,15 +127,16 @@ func (p *Redshift) Close() error {
 
 // Redshift does not support advisory lock functions: https://docs.aws.amazon.com/redshift/latest/dg/c_unsupported-postgresql-functions.html
 func (p *Redshift) Lock() error {
-	if p.isLocked {
+	if !p.isLocked.CAS(false, true) {
 		return database.ErrLocked
 	}
-	p.isLocked = true
 	return nil
 }
 
 func (p *Redshift) Unlock() error {
-	p.isLocked = false
+	if !p.isLocked.CAS(true, false) {
+		return database.ErrNotLocked
+	}
 	return nil
 }
 

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/hashicorp/go-multierror"
+	"go.uber.org/atomic"
 	"io"
 	"io/ioutil"
 	"strings"
@@ -34,7 +35,7 @@ type Config struct {
 
 type Ql struct {
 	db       *sql.DB
-	isLocked bool
+	isLocked atomic.Bool
 
 	config *Config
 }
@@ -166,17 +167,15 @@ func (m *Ql) Drop() (err error) {
 	return nil
 }
 func (m *Ql) Lock() error {
-	if m.isLocked {
+	if !m.isLocked.CAS(false, true) {
 		return database.ErrLocked
 	}
-	m.isLocked = true
 	return nil
 }
 func (m *Ql) Unlock() error {
-	if !m.isLocked {
-		return nil
+	if !m.isLocked.CAS(true, false) {
+		return database.ErrNotLocked
 	}
-	m.isLocked = false
 	return nil
 }
 func (m *Ql) Run(migration io.Reader) error {

@@ -1,6 +1,7 @@
 package stub
 
 import (
+	"go.uber.org/atomic"
 	"io"
 	"io/ioutil"
 	"reflect"
@@ -19,7 +20,7 @@ type Stub struct {
 	MigrationSequence []string
 	LastRunMigration  []byte // todo: make []string
 	IsDirty           bool
-	IsLocked          bool
+	isLocked          atomic.Bool
 
 	Config *Config
 }
@@ -49,15 +50,16 @@ func (s *Stub) Close() error {
 }
 
 func (s *Stub) Lock() error {
-	if s.IsLocked {
+	if !s.isLocked.CAS(false, true) {
 		return database.ErrLocked
 	}
-	s.IsLocked = true
 	return nil
 }
 
 func (s *Stub) Unlock() error {
-	s.IsLocked = false
+	if !s.isLocked.CAS(true, false) {
+		return database.ErrNotLocked
+	}
 	return nil
 }
 

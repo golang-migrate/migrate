@@ -3,6 +3,7 @@ package sqlite3
 import (
 	"database/sql"
 	"fmt"
+	"go.uber.org/atomic"
 	"io"
 	"io/ioutil"
 	nurl "net/url"
@@ -34,7 +35,7 @@ type Config struct {
 
 type Sqlite struct {
 	db       *sql.DB
-	isLocked bool
+	isLocked atomic.Bool
 
 	config *Config
 }
@@ -177,18 +178,16 @@ func (m *Sqlite) Drop() (err error) {
 }
 
 func (m *Sqlite) Lock() error {
-	if m.isLocked {
+	if !m.isLocked.CAS(false, true) {
 		return database.ErrLocked
 	}
-	m.isLocked = true
 	return nil
 }
 
 func (m *Sqlite) Unlock() error {
-	if !m.isLocked {
-		return nil
+	if !m.isLocked.CAS(true, false) {
+		return database.ErrNotLocked
 	}
-	m.isLocked = false
 	return nil
 }
 
