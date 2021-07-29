@@ -22,9 +22,6 @@ builds:
     flags:
       - "-tags={{ .Env.DATABASE }} {{ .Env.SOURCE }}"
       - "-trimpath"
-    ignore:
-      - goos: windows
-        goarch: arm
 nfpms:
   - homepage: "https://github.com/golang-migrate/migrate"
     maintainer: "dhui@users.noreply.github.com"
