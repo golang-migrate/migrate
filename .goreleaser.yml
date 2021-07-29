@@ -20,7 +20,7 @@ builds:
     ldflags:
       - '-w -s -X main.Version={{ .Version }} -extldflags "static"'
     flags:
-      - "-tags={{ .Env.DATABASE }}{{ .Env.SOURCE }}"
+      - "-tags={{ .Env.DATABASE }} {{ .Env.SOURCE }}"
       - "-trimpath"
     ignore:
       - goos: windows
@@ -34,10 +34,14 @@ nfpms:
       - deb
     file_name_template: "{{ .ProjectName }}.{{ .Os }}-{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
 dockers:
-  - goarch: amd64
-    use_buildx: true
+  - goos: linux
+    goarch: amd64
+    dockerfile: Dockerfile.github-actions
+    use: buildx
+    ids:
+      - migrate
     image_templates:
-      - 'migrate/migrate:{{ .Tag }}'
+      - 'migrate/migrate:{{ .Tag }}-amd64'
     build_flag_templates:
       - '--label=org.opencontainers.image.created={{ .Date }}'
       - '--label=org.opencontainers.image.title={{ .ProjectName }}'
@@ -45,11 +49,14 @@ dockers:
       - '--label=org.opencontainers.image.version={{ .Version }}'
       - "--label=org.opencontainers.image.source={{ .GitURL }}"
       - "--platform=linux/amd64"
-    dockerfile: Dockerfile
-  - goarch: arm64
-    use_buildx: true
+  - goos: linux
+    goarch: arm64
+    dockerfile: Dockerfile.github-actions
+    use: buildx
+    ids:
+      - migrate
     image_templates:
-      - 'migrate/migrate:{{ .Tag }}'
+      - 'migrate/migrate:{{ .Tag }}-arm64'
     build_flag_templates:
       - '--label=org.opencontainers.image.created={{ .Date }}'
       - '--label=org.opencontainers.image.title={{ .ProjectName }}'
@@ -57,7 +64,20 @@ dockers:
       - '--label=org.opencontainers.image.version={{ .Version }}'
       - "--label=org.opencontainers.image.source={{ .GitURL }}"
       - "--platform=linux/arm64"
-    dockerfile: Dockerfile
+
+docker_manifests:
+- name_template: 'migrate/migrate:{{ .Tag }}'
+  image_templates:
+  - 'migrate/migrate:{{ .Tag }}-amd64'
+  - 'migrate/migrate:{{ .Tag }}-arm64'
+- name_template: 'migrate/migrate:{{ .Major }}'
+  image_templates:
+  - 'migrate/migrate:{{ .Tag }}-amd64'
+  - 'migrate/migrate:{{ .Tag }}-arm64'
+- name_template: 'migrate/migrate:latest'
+  image_templates:
+  - 'migrate/migrate:{{ .Tag }}-amd64'
+  - 'migrate/migrate:{{ .Tag }}-arm64'
 archives:
   - name_template: "{{ .ProjectName }}.{{ .Os }}-{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
 checksum:
@@ -65,6 +85,14 @@ checksum:
 release:
   draft: true
 changelog:
-  skip: true
+  skip: false
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - Merge pull request
+      - Merge branch
+      - go mod tidy
 snapshot:
   name_template: "{{ .Tag }}-next"
