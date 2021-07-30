@@ -6,6 +6,12 @@ TEST_FLAGS ?=
 REPO_OWNER ?= $(shell cd .. && basename "$$(pwd)")
 COVERAGE_DIR ?= .coverage
 
+echo-source:
+	@echo "$(SOURCE)"
+
+echo-database:
+	@echo "$(DATABASE)"
+
 build:
 	CGO_ENABLED=0 go build -ldflags='-X main.Version=$(VERSION)' -tags '$(DATABASE) $(SOURCE)' ./cmd/migrate
 

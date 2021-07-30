@@ -26,14 +26,15 @@ jobs:
           username: golangmigrate
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - run: echo "::set-env name=SOURCE::$(make echo-source)"
+      - run: echo "::set-env name=DATABASE::$(make echo-database)"
+
       - uses: goreleaser/goreleaser-action@v2
         with:
           version: latest
           args: release --rm-dist
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SOURCE: "file go_bindata github github_ee bitbucket aws_s3 google_cloud_storage godoc_vfs gitlab"
-          DATABASE: "postgres mysql redshift cassandra spanner cockroachdb clickhouse mongodb sqlserver firebird neo4j pgx"
 
       - run: gem install package_cloud
       - run: package_cloud push golang-migrate/migrate/ubuntu/bionic dist/migrate.linux-amd64.deb
