@@ -26,8 +26,8 @@ jobs:
           username: golangmigrate
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - run: echo "::set-env name=SOURCE::$(make echo-source)"
-      - run: echo "::set-env name=DATABASE::$(make echo-database)"
+      - run: echo "SOURCE=$(make echo-source)" >> $GITHUB_ENV
+      - run: echo "DATABASE=$(make echo-database)" >> $GITHUB_ENV
 
       - uses: goreleaser/goreleaser-action@v2
         with:
