@@ -84,6 +84,7 @@ checksum:
   name_template: 'sha256sum.txt'
 release:
   draft: true
+  prerelease: auto
 changelog:
   skip: false
   sort: asc
