@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v2
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go: ["1.15.x", "1.16.x"]
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go }}
+
+      - name: Run test
+        run: make test COVERAGE_DIR=/tmp/coverage
+
+      - name: Send goveralls coverage
+        uses: shogo82148/actions-goveralls@v1
+        with:
+          path-to-profile: /tmp/coverage/combined.txt
+          flag-name: Go-${{ matrix.go }}
+          parallel: true
+
+  check-coverage:
+    name: Check coverage
+    needs: [test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: shogo82148/actions-goveralls@v1
+        with:
+          parallel-finished: true
