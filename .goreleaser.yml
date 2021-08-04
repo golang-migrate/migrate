@@ -85,6 +85,9 @@ checksum:
 release:
   draft: true
   prerelease: auto
+source:
+  enabled: true
+  format: zip
 changelog:
   skip: false
   sort: asc
