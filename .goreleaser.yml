@@ -38,7 +38,7 @@ dockers:
     ids:
       - migrate
     image_templates:
-      - 'migrate/migrate:{{ .Tag }}'
+      - 'migrate/migrate:{{ .Tag }}-amd64'
     build_flag_templates:
       - '--label=org.opencontainers.image.created={{ .Date }}'
       - '--label=org.opencontainers.image.title={{ .ProjectName }}'
@@ -53,7 +53,7 @@ dockers:
     ids:
       - migrate
     image_templates:
-      - 'migrate/migrate:{{ .Tag }}'
+      - 'migrate/migrate:{{ .Tag }}-arm64'
     build_flag_templates:
       - '--label=org.opencontainers.image.created={{ .Date }}'
       - '--label=org.opencontainers.image.title={{ .ProjectName }}'
@@ -65,13 +65,16 @@ dockers:
 docker_manifests:
 - name_template: 'migrate/migrate:{{ .Tag }}'
   image_templates:
-  - 'migrate/migrate:{{ .Tag }}'
+  - 'migrate/migrate:{{ .Tag }}-amd64'
+  - 'migrate/migrate:{{ .Tag }}-arm64'
 - name_template: 'migrate/migrate:{{ .Major }}'
   image_templates:
-  - 'migrate/migrate:{{ .Tag }}'
+  - 'migrate/migrate:{{ .Tag }}-amd64'
+  - 'migrate/migrate:{{ .Tag }}-arm64'
 - name_template: 'migrate/migrate:latest'
   image_templates:
-  - 'migrate/migrate:{{ .Tag }}'
+  - 'migrate/migrate:{{ .Tag }}-amd64'
+  - 'migrate/migrate:{{ .Tag }}-arm64'
 archives:
   - name_template: "{{ .ProjectName }}.{{ .Os }}-{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
     format_overrides:
