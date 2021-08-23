@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"go.uber.org/atomic"
 	"io"
 	"io/ioutil"
 	nurl "net/url"
@@ -37,7 +38,7 @@ type Config struct {
 }
 
 type Snowflake struct {
-	isLocked bool
+	isLocked atomic.Bool
 	conn     *sql.Conn
 	db       *sql.DB
 
@@ -158,15 +159,16 @@ func (p *Snowflake) Close() error {
 }
 
 func (p *Snowflake) Lock() error {
-	if p.isLocked {
+	if !p.isLocked.CAS(false, true) {
 		return database.ErrLocked
 	}
-	p.isLocked = true
 	return nil
 }
 
 func (p *Snowflake) Unlock() error {
-	p.isLocked = false
+	if !p.isLocked.CAS(true, false) {
+		return database.ErrNotLocked
+	}
 	return nil
 }
 

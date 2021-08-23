@@ -296,7 +296,7 @@ func (ch *ClickHouse) Lock() error {
 }
 func (ch *ClickHouse) Unlock() error {
 	if !ch.isLocked.CAS(true, false) {
-		return database.ErrLocked
+		return database.ErrNotLocked
 	}
 
 	return nil

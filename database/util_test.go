@@ -1,6 +1,8 @@
 package database
 
 import (
+	"errors"
+	"go.uber.org/atomic"
 	"testing"
 )
 
@@ -41,6 +43,63 @@ func TestGenerateAdvisoryLockId(t *testing.T) {
 				if tc.expectedID != "" {
 					t.Error("Got unexpected error:", err)
 				}
+			}
+		})
+	}
+}
+
+func TestCasRestoreOnErr(t *testing.T) {
+	casErr := errors.New("test lock CAS failure")
+	fErr := errors.New("test callback error")
+
+	testcases := []struct {
+		name        string
+		lock        *atomic.Bool
+		from        bool
+		to          bool
+		expectLock  bool
+		fErr        error
+		expectError error
+	}{
+		{
+			name:        "Test positive CAS lock",
+			lock:        atomic.NewBool(false),
+			from:        false,
+			to:          true,
+			expectLock:  true,
+			fErr:        nil,
+			expectError: nil,
+		},
+		{
+			name:        "Test negative CAS lock",
+			lock:        atomic.NewBool(true),
+			from:        false,
+			to:          true,
+			expectLock:  true,
+			fErr:        nil,
+			expectError: casErr,
+		},
+		{
+			name:        "Test negative with callback lock",
+			lock:        atomic.NewBool(false),
+			from:        false,
+			to:          true,
+			expectLock:  false,
+			fErr:        fErr,
+			expectError: fErr,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := CasRestoreOnErr(tc.lock, tc.from, tc.to, casErr, func() error {
+				return tc.fErr
+			}); err != tc.expectError {
+				t.Error("Incorrect error value returned")
+			}
+
+			if tc.lock.Load() != tc.expectLock {
+				t.Error("Incorrect state of lock")
 			}
 		})
 	}

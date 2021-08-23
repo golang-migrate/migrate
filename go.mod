@@ -1,8 +1,9 @@
 module github.com/golang-migrate/migrate/v4
 
 require (
-	cloud.google.com/go/spanner v1.18.0
+	cloud.google.com/go/spanner v1.24.0
 	cloud.google.com/go/storage v1.10.0
+	github.com/Azure/go-autorest/autorest/adal v0.9.14
 	github.com/ClickHouse/clickhouse-go v1.4.3
 	github.com/apache/arrow/go/arrow v0.0.0-20210521153258-78c88a9f517b // indirect
 	github.com/aws/aws-sdk-go v1.17.7
@@ -10,9 +11,9 @@ require (
 	github.com/bitly/go-hostpool v0.0.0-20171023180738-a3a6125de932 // indirect
 	github.com/bmizerany/assert v0.0.0-20160611221934-b7ed37b82869 // indirect
 	github.com/cenkalti/backoff/v4 v4.0.2
-	github.com/cockroachdb/cockroach-go v0.0.0-20190925194419-606b3d062051
+	github.com/cockroachdb/cockroach-go/v2 v2.1.1
 	github.com/cznic/mathutil v0.0.0-20180504122225-ca4c9f2c1369 // indirect
-	github.com/denisenkom/go-mssqldb v0.0.0-20200620013148-b91950f658ec
+	github.com/denisenkom/go-mssqldb v0.10.0
 	github.com/dhui/dktest v0.3.4
 	github.com/docker/docker v17.12.0-ce-rc1.0.20210128214336-420b1d36250f+incompatible
 	github.com/edsrzf/mmap-go v0.0.0-20170320065105-0bce6a688712 // indirect
@@ -34,7 +35,7 @@ require (
 	github.com/kardianos/osext v0.0.0-20190222173326-2bc1f35cddc0 // indirect
 	github.com/klauspost/compress v1.12.2 // indirect
 	github.com/ktrysmt/go-bitbucket v0.6.4
-	github.com/lib/pq v1.8.0
+	github.com/lib/pq v1.10.0
 	github.com/markbates/pkger v0.15.1
 	github.com/mattn/go-sqlite3 v1.14.6
 	github.com/mutecomm/go-sqlcipher/v4 v4.4.0
@@ -45,20 +46,16 @@ require (
 	github.com/sirupsen/logrus v1.8.1 // indirect
 	github.com/snowflakedb/gosnowflake v1.4.3
 	github.com/stretchr/testify v1.6.1
-	github.com/tidwall/pretty v0.0.0-20180105212114-65a9db5fad51 // indirect
 	github.com/xanzy/go-gitlab v0.15.0
-	github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c // indirect
-	github.com/xdg/stringprep v1.0.0 // indirect
 	gitlab.com/nyarla/go-crypt v0.0.0-20160106005555-d9a5dc2b789b // indirect
-	go.mongodb.org/mongo-driver v1.1.0
+	go.mongodb.org/mongo-driver v1.7.0
 	go.uber.org/atomic v1.6.0
 	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a // indirect
 	golang.org/x/net v0.0.0-20210520170846-37e1c6afe023 // indirect
-	golang.org/x/sys v0.0.0-20210521090106-6ca3eb03dfc2 // indirect
 	golang.org/x/time v0.0.0-20200630173020-3af7569d3a1e // indirect
-	golang.org/x/tools v0.1.0
-	google.golang.org/api v0.45.0
-	google.golang.org/genproto v0.0.0-20210427215850-f767ed18ee4d
+	golang.org/x/tools v0.1.5
+	google.golang.org/api v0.51.0
+	google.golang.org/genproto v0.0.0-20210726143408-b02e89920bf0
 	modernc.org/b v1.0.0 // indirect
 	modernc.org/db v1.0.0 // indirect
 	modernc.org/file v1.0.0 // indirect
