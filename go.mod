@@ -1,7 +1,7 @@
 module github.com/golang-migrate/migrate/v4
 
 require (
-	cloud.google.com/go/spanner v1.18.0
+	cloud.google.com/go/spanner v1.24.0
 	cloud.google.com/go/storage v1.10.0
 	github.com/Azure/go-autorest/autorest/adal v0.9.14
 	github.com/ClickHouse/clickhouse-go v1.4.3
@@ -52,11 +52,10 @@ require (
 	go.uber.org/atomic v1.6.0
 	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a // indirect
 	golang.org/x/net v0.0.0-20210520170846-37e1c6afe023 // indirect
-	golang.org/x/sys v0.0.0-20210521090106-6ca3eb03dfc2 // indirect
 	golang.org/x/time v0.0.0-20200630173020-3af7569d3a1e // indirect
-	golang.org/x/tools v0.1.0
-	google.golang.org/api v0.45.0
-	google.golang.org/genproto v0.0.0-20210427215850-f767ed18ee4d
+	golang.org/x/tools v0.1.5
+	google.golang.org/api v0.51.0
+	google.golang.org/genproto v0.0.0-20210726143408-b02e89920bf0
 	modernc.org/b v1.0.0 // indirect
 	modernc.org/db v1.0.0 // indirect
 	modernc.org/file v1.0.0 // indirect
