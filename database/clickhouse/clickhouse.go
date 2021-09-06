@@ -127,6 +127,10 @@ func (ch *ClickHouse) init() error {
 		ch.config.MultiStatementMaxSize = DefaultMultiStatementMaxSize
 	}
 
+	if len(ch.config.MigrationsTableEngine) == 0 {
+		ch.config.MigrationsTableEngine = DefaultMigrationsTableEngine
+	}
+
 	return ch.ensureVersionTable()
 }
 
