@@ -79,8 +79,8 @@ func TestCases(t *testing.T) {
 		t.Run("Migrate_"+engine, func(t *testing.T) { testMigrate(t, engine) })
 		t.Run("Version_"+engine, func(t *testing.T) { testVersion(t, engine) })
 		t.Run("Drop_"+engine, func(t *testing.T) { testDrop(t, engine) })
-
 	}
+	t.Run("WithInstanceDefaultConfigValues", func(t *testing.T) { testSimpleWithInstanceDefaultConfigValues(t) })
 }
 
 func testSimple(t *testing.T, engine string) {
@@ -94,6 +94,33 @@ func testSimple(t *testing.T, engine string) {
 		p := &clickhouse.ClickHouse{}
 		d, err := p.Open(addr)
 		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
+
+		dt.Test(t, d, []byte("SELECT 1"))
+	})
+}
+
+func testSimpleWithInstanceDefaultConfigValues(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.Port(defaultPort)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := clickhouseConnectionString(ip, port, "")
+		conn, err := sql.Open("clickhouse", addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		d, err := clickhouse.WithInstance(conn, &clickhouse.Config{})
+		if err != nil {
+			_ = conn.Close()
 			t.Fatal(err)
 		}
 		defer func() {
