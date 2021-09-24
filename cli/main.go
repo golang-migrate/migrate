@@ -2,14 +2,16 @@ package main
 
 import (
 	"fmt"
-	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
+	"net/url"
 	"os"
 	"os/signal"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
@@ -280,6 +282,6 @@ func main() {
 
 func dbMakeConnectionString(driver, user, password, address, name, ssl string) string {
 	return fmt.Sprintf("%s://%s:%s@%s/%s?sslmode=%s",
-		driver, user, password, address, name, ssl,
+		driver, url.QueryEscape(user), url.QueryEscape(password), address, name, ssl,
 	)
 }
