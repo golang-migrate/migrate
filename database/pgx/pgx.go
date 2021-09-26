@@ -66,6 +66,13 @@ type Postgres struct {
 	config *Config
 }
 
+type sqlElement string
+
+const (
+	tableSQL sqlElement = `TABLE`
+	typeSQL             = `TYPE`
+)
+
 func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	if config == nil {
 		return nil, ErrNilConfig
@@ -394,37 +401,68 @@ func (p *Postgres) Version() (version int, dirty bool, err error) {
 }
 
 func (p *Postgres) Drop() (err error) {
-	// select all tables in current schema
-	query := `SELECT table_name FROM information_schema.tables WHERE table_schema=(SELECT current_schema()) AND table_type='BASE TABLE'`
-	tables, err := p.conn.QueryContext(context.Background(), query)
+	// drop all tables in current schema
+	err = p.dropElement(tableSQL)
+	if err != nil {
+		return err
+	}
+
+	// drop all custom types in current schema
+	err = p.dropElement(typeSQL)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (p *Postgres) dropElement(element sqlElement) (err error) {
+	// select all of "element" in current schema
+	var query string
+	switch element {
+	case tableSQL:
+		query = `SELECT table_name FROM information_schema.tables WHERE table_schema=(SELECT current_schema()) AND table_type='BASE TABLE'`
+	case typeSQL:
+		query = `
+			SELECT t.typname as type
+			FROM pg_type t
+			LEFT JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace
+			WHERE (t.typrelid = 0 OR (SELECT c.relkind = 'c' FROM pg_catalog.pg_class c WHERE c.oid = t.typrelid))
+			AND NOT EXISTS(SELECT 1 FROM pg_catalog.pg_type el WHERE el.oid = t.typelem AND el.typarray = t.oid)
+			AND n.nspname=current_schema();
+		`
+	}
+
+	items, err := p.conn.QueryContext(context.Background(), query)
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
+
 	defer func() {
-		if errClose := tables.Close(); errClose != nil {
+		if errClose := items.Close(); errClose != nil {
 			err = multierror.Append(err, errClose)
 		}
 	}()
 
-	// delete one table after another
-	tableNames := make([]string, 0)
-	for tables.Next() {
-		var tableName string
-		if err := tables.Scan(&tableName); err != nil {
+	// drop one item after another
+	itemNames := make([]string, 0)
+	for items.Next() {
+		var name string
+		if err := items.Scan(&name); err != nil {
 			return err
 		}
-		if len(tableName) > 0 {
-			tableNames = append(tableNames, tableName)
+		if len(name) > 0 {
+			itemNames = append(itemNames, name)
 		}
 	}
-	if err := tables.Err(); err != nil {
+	if err := items.Err(); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 
-	if len(tableNames) > 0 {
+	if len(itemNames) > 0 {
 		// delete one by one ...
-		for _, t := range tableNames {
-			query = `DROP TABLE IF EXISTS ` + quoteIdentifier(t) + ` CASCADE`
+		for _, n := range itemNames {
+			query = `DROP ` + string(element) + ` IF EXISTS ` + quoteIdentifier(n) + ` CASCADE`
 			if _, err := p.conn.ExecContext(context.Background(), query); err != nil {
 				return &database.Error{OrigErr: err, Query: []byte(query)}
 			}
