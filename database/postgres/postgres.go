@@ -69,7 +69,7 @@ type sqlElement string
 
 const (
 	tableSQL sqlElement = `TABLE`
-	typeSQL             = `TYPE`
+	typeSQL  sqlElement = `TYPE`
 )
 
 func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
