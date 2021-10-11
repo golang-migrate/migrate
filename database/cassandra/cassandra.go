@@ -156,10 +156,12 @@ func (c *Cassandra) Open(url string) (database.Driver, error) {
 		}
 	}
 
-	if flag, err := strconv.ParseBool(u.Query().Get("disable-host-lookup")); err != nil && flag {
-		cluster.DisableInitialHostLookup = true
-	} else if err != nil {
-		return nil, err
+	if len(u.Query().Get("disable-host-lookup")) > 0 {
+		if flag, err := strconv.ParseBool(u.Query().Get("disable-host-lookup")); err != nil && flag {
+			cluster.DisableInitialHostLookup = true
+		} else if err != nil {
+			return nil, err
+		}
 	}
 
 	session, err := cluster.CreateSession()
