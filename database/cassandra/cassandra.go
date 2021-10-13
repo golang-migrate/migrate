@@ -3,6 +3,7 @@ package cassandra
 import (
 	"errors"
 	"fmt"
+	"go.uber.org/atomic"
 	"io"
 	"io/ioutil"
 	nurl "net/url"
@@ -45,7 +46,7 @@ type Config struct {
 
 type Cassandra struct {
 	session  *gocql.Session
-	isLocked bool
+	isLocked atomic.Bool
 
 	// Open and WithInstance need to guarantee that config is never nil
 	config *Config
@@ -182,15 +183,16 @@ func (c *Cassandra) Close() error {
 }
 
 func (c *Cassandra) Lock() error {
-	if c.isLocked {
+	if !c.isLocked.CAS(false, true) {
 		return database.ErrLocked
 	}
-	c.isLocked = true
 	return nil
 }
 
 func (c *Cassandra) Unlock() error {
-	c.isLocked = false
+	if !c.isLocked.CAS(true, false) {
+		return database.ErrNotLocked
+	}
 	return nil
 }
 

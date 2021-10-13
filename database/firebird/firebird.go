@@ -1,3 +1,4 @@
+//go:build go1.9
 // +build go1.9
 
 package firebird
@@ -10,6 +11,7 @@ import (
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/hashicorp/go-multierror"
 	_ "github.com/nakagami/firebirdsql"
+	"go.uber.org/atomic"
 	"io"
 	"io/ioutil"
 	nurl "net/url"
@@ -36,7 +38,7 @@ type Firebird struct {
 	// Locking and unlocking need to use the same connection
 	conn     *sql.Conn
 	db       *sql.DB
-	isLocked bool
+	isLocked atomic.Bool
 
 	// Open and WithInstance need to guarantee that config is never nil
 	config *Config
@@ -106,15 +108,16 @@ func (f *Firebird) Close() error {
 }
 
 func (f *Firebird) Lock() error {
-	if f.isLocked {
+	if !f.isLocked.CAS(false, true) {
 		return database.ErrLocked
 	}
-	f.isLocked = true
 	return nil
 }
 
 func (f *Firebird) Unlock() error {
-	f.isLocked = false
+	if !f.isLocked.CAS(true, false) {
+		return database.ErrNotLocked
+	}
 	return nil
 }
 

@@ -116,6 +116,7 @@ func (d *DockerContainer) Start() error {
 			PublishAllPorts: true,
 		},
 		&dockernetwork.NetworkingConfig{},
+		nil,
 		containerName)
 	if err != nil {
 		return err

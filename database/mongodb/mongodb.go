@@ -10,6 +10,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/x/mongo/driver/connstring"
+	"go.uber.org/atomic"
 	"io"
 	"io/ioutil"
 	"net/url"
@@ -40,9 +41,10 @@ var (
 )
 
 type Mongo struct {
-	client *mongo.Client
-	db     *mongo.Database
-	config *Config
+	client   *mongo.Client
+	db       *mongo.Database
+	config   *Config
+	isLocked atomic.Bool
 }
 
 type Locking struct {
@@ -327,55 +329,60 @@ func (m *Mongo) ensureVersionTable() (err error) {
 // Utilizes advisory locking on the config.LockingCollection collection
 // This uses a unique index on the `locking_key` field.
 func (m *Mongo) Lock() error {
-	if !m.config.Locking.Enabled {
+	return database.CasRestoreOnErr(&m.isLocked, false, true, database.ErrLocked, func() error {
+		if !m.config.Locking.Enabled {
+			return nil
+		}
+
+		pid := os.Getpid()
+		hostname, err := os.Hostname()
+		if err != nil {
+			hostname = fmt.Sprintf("Could not determine hostname. Error: %s", err.Error())
+		}
+
+		newLockObj := lockObj{
+			Key:       lockKeyUniqueValue,
+			Pid:       pid,
+			Hostname:  hostname,
+			CreatedAt: time.Now(),
+		}
+		operation := func() error {
+			timeout, cancelFunc := context.WithTimeout(context.Background(), contextWaitTimeout)
+			_, err := m.db.Collection(m.config.Locking.CollectionName).InsertOne(timeout, newLockObj)
+			defer cancelFunc()
+			return err
+		}
+		exponentialBackOff := backoff.NewExponentialBackOff()
+		duration := time.Duration(m.config.Locking.Timeout) * time.Second
+		exponentialBackOff.MaxElapsedTime = duration
+		exponentialBackOff.MaxInterval = time.Duration(m.config.Locking.Interval) * time.Second
+
+		err = backoff.Retry(operation, exponentialBackOff)
+		if err != nil {
+			return database.ErrLocked
+		}
+
 		return nil
-	}
-	pid := os.Getpid()
-	hostname, err := os.Hostname()
-	if err != nil {
-		hostname = fmt.Sprintf("Could not determine hostname. Error: %s", err.Error())
-	}
-
-	newLockObj := lockObj{
-		Key:       lockKeyUniqueValue,
-		Pid:       pid,
-		Hostname:  hostname,
-		CreatedAt: time.Now(),
-	}
-	operation := func() error {
-		timeout, cancelFunc := context.WithTimeout(context.Background(), contextWaitTimeout)
-		_, err := m.db.Collection(m.config.Locking.CollectionName).InsertOne(timeout, newLockObj)
-		defer cancelFunc()
-		return err
-	}
-	exponentialBackOff := backoff.NewExponentialBackOff()
-	duration := time.Duration(m.config.Locking.Timeout) * time.Second
-	exponentialBackOff.MaxElapsedTime = duration
-	exponentialBackOff.MaxInterval = time.Duration(m.config.Locking.Interval) * time.Second
-
-	err = backoff.Retry(operation, exponentialBackOff)
-	if err != nil {
-		return database.ErrLocked
-	}
-
-	return nil
-
+	})
 }
+
 func (m *Mongo) Unlock() error {
-	if !m.config.Locking.Enabled {
+	return database.CasRestoreOnErr(&m.isLocked, true, false, database.ErrNotLocked, func() error {
+		if !m.config.Locking.Enabled {
+			return nil
+		}
+
+		filter := findFilter{
+			Key: lockKeyUniqueValue,
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), contextWaitTimeout)
+		_, err := m.db.Collection(m.config.Locking.CollectionName).DeleteMany(ctx, filter)
+		defer cancel()
+
+		if err != nil {
+			return err
+		}
 		return nil
-	}
-
-	filter := findFilter{
-		Key: lockKeyUniqueValue,
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), contextWaitTimeout)
-	_, err := m.db.Collection(m.config.Locking.CollectionName).DeleteMany(ctx, filter)
-	defer cancel()
-
-	if err != nil {
-		return err
-	}
-	return nil
+	})
 }

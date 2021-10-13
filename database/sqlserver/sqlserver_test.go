@@ -38,6 +38,14 @@ func msConnectionString(host, port string) string {
 	return fmt.Sprintf("sqlserver://sa:%v@%v:%v?database=master", saPassword, host, port)
 }
 
+func msConnectionStringMsiWithPassword(host, port string, useMsi bool) string {
+	return fmt.Sprintf("sqlserver://sa:%v@%v:%v?database=master&useMsi=%t", saPassword, host, port, useMsi)
+}
+
+func msConnectionStringMsi(host, port string, useMsi bool) string {
+	return fmt.Sprintf("sqlserver://sa@%v:%v?database=master&useMsi=%t", host, port, useMsi)
+}
+
 func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 	ip, port, err := c.Port(defaultPort)
 	if err != nil {
@@ -215,6 +223,69 @@ func TestLockWorks(t *testing.T) {
 		err = ms.Unlock()
 		if err != nil {
 			t.Fatal(err)
+		}
+	})
+}
+
+func TestMsiTrue(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.Port(defaultPort)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := msConnectionStringMsi(ip, port, true)
+		p := &SQLServer{}
+		_, err = p.Open(addr)
+		if err == nil {
+			t.Fatal("MSI should fail when not running in an Azure context.")
+		}
+	})
+}
+
+func TestOpenWithPasswordAndMSI(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.Port(defaultPort)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := msConnectionStringMsiWithPassword(ip, port, true)
+		p := &SQLServer{}
+		_, err = p.Open(addr)
+		if err == nil {
+			t.Fatal("Open should fail when both password and useMsi=true are passed.")
+		}
+
+		addr = msConnectionStringMsiWithPassword(ip, port, false)
+		p = &SQLServer{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
+
+		dt.Test(t, d, []byte("SELECT 1"))
+	})
+}
+
+func TestMsiFalse(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.Port(defaultPort)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := msConnectionStringMsi(ip, port, false)
+		p := &SQLServer{}
+		_, err = p.Open(addr)
+		if err == nil {
+			t.Fatal("Open should fail since no password was passed and useMsi is false.")
 		}
 	})
 }

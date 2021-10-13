@@ -30,6 +30,7 @@ var (
 
 type Config struct {
 	DatabaseName          string
+	ClusterName           string
 	MigrationsTable       string
 	MigrationsTableEngine string
 	MultiStatementEnabled bool
@@ -98,6 +99,7 @@ func (ch *ClickHouse) Open(dsn string) (database.Driver, error) {
 			MigrationsTable:       purl.Query().Get("x-migrations-table"),
 			MigrationsTableEngine: migrationsTableEngine,
 			DatabaseName:          purl.Query().Get("database"),
+			ClusterName:           purl.Query().Get("x-cluster-name"),
 			MultiStatementEnabled: purl.Query().Get("x-multi-statement") == "true",
 			MultiStatementMaxSize: multiStatementMaxSize,
 		},
@@ -123,6 +125,10 @@ func (ch *ClickHouse) init() error {
 
 	if ch.config.MultiStatementMaxSize <= 0 {
 		ch.config.MultiStatementMaxSize = DefaultMultiStatementMaxSize
+	}
+
+	if len(ch.config.MigrationsTableEngine) == 0 {
+		ch.config.MigrationsTableEngine = DefaultMigrationsTableEngine
 	}
 
 	return ch.ensureVersionTable()
@@ -227,12 +233,21 @@ func (ch *ClickHouse) ensureVersionTable() (err error) {
 	}
 
 	// if not, create the empty migration table
-	query = fmt.Sprintf(`
-		CREATE TABLE %s (
-			version    Int64,
-			dirty      UInt8,
-			sequence   UInt64
-		) Engine=%s`, ch.config.MigrationsTable, ch.config.MigrationsTableEngine)
+	if len(ch.config.ClusterName) > 0 {
+		query = fmt.Sprintf(`
+			CREATE TABLE %s ON CLUSTER %s (
+				version    Int64,
+				dirty      UInt8,
+				sequence   UInt64
+			) Engine=%s`, ch.config.MigrationsTable, ch.config.ClusterName, ch.config.MigrationsTableEngine)
+	} else {
+		query = fmt.Sprintf(`
+			CREATE TABLE %s (
+				version    Int64,
+				dirty      UInt8,
+				sequence   UInt64
+			) Engine=%s`, ch.config.MigrationsTable, ch.config.MigrationsTableEngine)
+	}
 
 	if strings.HasSuffix(ch.config.MigrationsTableEngine, "Tree") {
 		query = fmt.Sprintf(`%s ORDER BY sequence`, query)
@@ -285,7 +300,7 @@ func (ch *ClickHouse) Lock() error {
 }
 func (ch *ClickHouse) Unlock() error {
 	if !ch.isLocked.CAS(true, false) {
-		return database.ErrLocked
+		return database.ErrNotLocked
 	}
 
 	return nil
