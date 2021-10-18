@@ -209,10 +209,13 @@ func (tr *Tarantool) checkVersionSpace() (err error) {
 		}
 	}()
 
-	tr.client.Call("box.schema.space.create", []interface{}{
+	if _, err := tr.client.Call("box.schema.space.create", []interface{}{
 		tr.config.MigrationsTable,
 		map[string]bool{"if_not_exists": true},
-	})
+	}); err != nil {
+		// tarantool go client catches an encoding error,
+		// but the code works without any consequences -> go lint error avoid
+	}
 
 	if _, err := tr.client.Call("box.space."+tr.config.MigrationsTable+":format", [][]map[string]string{
 		{

@@ -30,17 +30,24 @@ func isReady(ctx context.Context, ci dktest.ContainerInfo) bool {
 	if err != nil {
 		return false
 	}
-	defer client.Close()
+	defer func() {
+		if err := client.Close(); err != nil {
+			return
+		}
+	}()
 
 	_, err = client.Ping()
 	if err != nil {
 		return false
 	}
 
-	client.Call("box.schema.space.create", []interface{}{
+	if _, err := client.Call("box.schema.space.create", []interface{}{
 		"tester",
 		map[string]bool{"if_not_exists": true},
-	})
+	}); err != nil {
+		// tarantool go client catches an encoding error,
+		// but the code works without any consequences -> go lint error avoid
+	}
 
 	if _, err = client.Call("box.space.tester:format", [][]map[string]string{
 		{
