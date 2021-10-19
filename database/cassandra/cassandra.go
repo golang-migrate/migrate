@@ -1,6 +1,7 @@
 package cassandra
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"go.uber.org/atomic"
@@ -53,6 +54,9 @@ type Cassandra struct {
 }
 
 func WithInstance(session *gocql.Session, config *Config) (database.Driver, error) {
+	return WithInstanceContext(context.Background(), session, config)
+}
+func WithInstanceContext(ctx context.Context, session *gocql.Session, config *Config) (database.Driver, error) {
 	if config == nil {
 		return nil, ErrNilConfig
 	} else if len(config.KeyspaceName) == 0 {
@@ -76,7 +80,7 @@ func WithInstance(session *gocql.Session, config *Config) (database.Driver, erro
 		config:  config,
 	}
 
-	if err := c.ensureVersionTable(); err != nil {
+	if err := c.ensureVersionTable(ctx); err != nil {
 		return nil, err
 	}
 
@@ -84,6 +88,10 @@ func WithInstance(session *gocql.Session, config *Config) (database.Driver, erro
 }
 
 func (c *Cassandra) Open(url string) (database.Driver, error) {
+	return c.OpenWithContext(context.Background(), url)
+}
+
+func (c *Cassandra) OpenWithContext(ctx context.Context, url string) (database.Driver, error) {
 	u, err := nurl.Parse(url)
 	if err != nil {
 		return nil, err
@@ -169,7 +177,7 @@ func (c *Cassandra) Open(url string) (database.Driver, error) {
 		}
 	}
 
-	return WithInstance(session, &Config{
+	return WithInstanceContext(ctx, session, &Config{
 		KeyspaceName:          strings.TrimPrefix(u.Path, "/"),
 		MigrationsTable:       u.Query().Get("x-migrations-table"),
 		MultiStatementEnabled: u.Query().Get("x-multi-statement") == "true",
@@ -283,7 +291,7 @@ func (c *Cassandra) Drop() error {
 // ensureVersionTable checks if versions table exists and, if not, creates it.
 // Note that this function locks the database, which deviates from the usual
 // convention of "caller locks" in the Cassandra type.
-func (c *Cassandra) ensureVersionTable() (err error) {
+func (c *Cassandra) ensureVersionTable(ctx context.Context) (err error) {
 	if err = c.Lock(); err != nil {
 		return err
 	}
@@ -298,7 +306,7 @@ func (c *Cassandra) ensureVersionTable() (err error) {
 		}
 	}()
 
-	err = c.session.Query(fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (version bigint, dirty boolean, PRIMARY KEY(version))", c.config.MigrationsTable)).Exec()
+	err = c.session.Query(fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (version bigint, dirty boolean, PRIMARY KEY(version))", c.config.MigrationsTable)).WithContext(ctx).Exec()
 	if err != nil {
 		return err
 	}

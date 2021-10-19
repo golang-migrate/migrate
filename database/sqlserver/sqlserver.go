@@ -63,18 +63,21 @@ type SQLServer struct {
 //
 // Note that the deprecated `mssql` driver is not supported. Please use the newer `sqlserver` driver.
 func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
+	return WithInstanceContext(context.Background(), instance, config)
+}
+func WithInstanceContext(ctx context.Context, instance *sql.DB, config *Config) (database.Driver, error) {
 	if config == nil {
 		return nil, ErrNilConfig
 	}
 
-	if err := instance.Ping(); err != nil {
+	if err := instance.PingContext(ctx); err != nil {
 		return nil, err
 	}
 
 	if config.DatabaseName == "" {
 		query := `SELECT DB_NAME()`
 		var databaseName string
-		if err := instance.QueryRow(query).Scan(&databaseName); err != nil {
+		if err := instance.QueryRowContext(ctx, query).Scan(&databaseName); err != nil {
 			return nil, &database.Error{OrigErr: err, Query: []byte(query)}
 		}
 
@@ -88,7 +91,7 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	if config.SchemaName == "" {
 		query := `SELECT SCHEMA_NAME()`
 		var schemaName string
-		if err := instance.QueryRow(query).Scan(&schemaName); err != nil {
+		if err := instance.QueryRowContext(ctx, query).Scan(&schemaName); err != nil {
 			return nil, &database.Error{OrigErr: err, Query: []byte(query)}
 		}
 
@@ -115,7 +118,7 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		config: config,
 	}
 
-	if err := ss.ensureVersionTable(); err != nil {
+	if err := ss.ensureVersionTable(ctx); err != nil {
 		return nil, err
 	}
 
@@ -124,6 +127,9 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 
 // Open a connection to the database.
 func (ss *SQLServer) Open(url string) (database.Driver, error) {
+	return ss.OpenWithContext(context.Background(), url)
+}
+func (ss *SQLServer) OpenWithContext(ctx context.Context, url string) (database.Driver, error) {
 	purl, err := nurl.Parse(url)
 	if err != nil {
 		return nil, err
@@ -169,7 +175,7 @@ func (ss *SQLServer) Open(url string) (database.Driver, error) {
 
 	migrationsTable := purl.Query().Get("x-migrations-table")
 
-	px, err := WithInstance(db, &Config{
+	px, err := WithInstanceContext(ctx, db, &Config{
 		DatabaseName:    purl.Path,
 		MigrationsTable: migrationsTable,
 	})
@@ -348,7 +354,7 @@ func (ss *SQLServer) Drop() error {
 	return nil
 }
 
-func (ss *SQLServer) ensureVersionTable() (err error) {
+func (ss *SQLServer) ensureVersionTable(ctx context.Context) (err error) {
 	if err = ss.Lock(); err != nil {
 		return err
 	}
@@ -371,7 +377,7 @@ func (ss *SQLServer) ensureVersionTable() (err error) {
 	)
 	CREATE TABLE ` + ss.config.MigrationsTable + ` ( version BIGINT PRIMARY KEY NOT NULL, dirty BIT NOT NULL );`
 
-	if _, err = ss.conn.ExecContext(context.Background(), query); err != nil {
+	if _, err = ss.conn.ExecContext(ctx, query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 

@@ -5,6 +5,7 @@
 package migrate
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -114,6 +115,38 @@ func New(sourceURL, databaseURL string) (*Migrate, error) {
 	return m, nil
 }
 
+// NewWithContext returns a new Migrate instance from a source URL and a database URL.
+// The URL scheme is defined by each driver.
+func NewWithContext(ctx context.Context, sourceURL, databaseURL string) (*Migrate, error) {
+	m := newCommon()
+
+	sourceName, err := iurl.SchemeFromURL(sourceURL)
+	if err != nil {
+		return nil, err
+	}
+	m.sourceName = sourceName
+
+	databaseName, err := iurl.SchemeFromURL(databaseURL)
+	if err != nil {
+		return nil, err
+	}
+	m.databaseName = databaseName
+
+	sourceDrv, err := source.Open(sourceURL)
+	if err != nil {
+		return nil, err
+	}
+	m.sourceDrv = sourceDrv
+
+	databaseDrv, err := database.OpenWithContext(ctx, databaseURL)
+	if err != nil {
+		return nil, err
+	}
+	m.databaseDrv = databaseDrv
+
+	return m, nil
+}
+
 // NewWithDatabaseInstance returns a new Migrate instance from a source URL
 // and an existing database instance. The source URL scheme is defined by each driver.
 // Use any string that can serve as an identifier during logging as databaseName.
@@ -156,6 +189,32 @@ func NewWithSourceInstance(sourceName string, sourceInstance source.Driver, data
 	m.sourceName = sourceName
 
 	databaseDrv, err := database.Open(databaseURL)
+	if err != nil {
+		return nil, err
+	}
+	m.databaseDrv = databaseDrv
+
+	m.sourceDrv = sourceInstance
+
+	return m, nil
+}
+
+// NewWithSourceInstanceContext returns a new Migrate instance from an existing source instance
+// and a database URL. The database URL scheme is defined by each driver.
+// Use any string that can serve as an identifier during logging as sourceName.
+// You are responsible for closing the underlying source client if necessary.
+func NewWithSourceInstanceContext(ctx context.Context, sourceName string, sourceInstance source.Driver, databaseURL string) (*Migrate, error) {
+	m := newCommon()
+
+	databaseName, err := iurl.SchemeFromURL(databaseURL)
+	if err != nil {
+		return nil, err
+	}
+	m.databaseName = databaseName
+
+	m.sourceName = sourceName
+
+	databaseDrv, err := database.OpenWithContext(ctx, databaseURL)
 	if err != nil {
 		return nil, err
 	}

@@ -2,6 +2,7 @@ package migrate
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"errors"
 	"io/ioutil"
@@ -73,6 +74,15 @@ func ExampleNew() {
 	// Migrate all the way up ...
 	if err := m.Up(); err != nil && err != ErrNoChange {
 		log.Fatal(err)
+	}
+}
+
+func TestNewWithContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := NewWithContext(ctx, "stub://", "stub://")
+	if err == nil {
+		t.Fatal("expected context canceled error")
 	}
 }
 
@@ -182,6 +192,21 @@ func ExampleNewWithSourceInstance() {
 	// Migrate all the way up ...
 	if err := m.Up(); err != nil {
 		log.Fatal(err)
+	}
+}
+
+func TestNewWithSourceInstanceContext(t *testing.T) {
+	dummySource := &DummyInstance{"source"}
+	sInst, err := sStub.WithInstance(dummySource, &sStub.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err = NewWithSourceInstanceContext(ctx, srcDrvNameStub, sInst, "stub://")
+	if err == nil {
+		t.Fatal("expected context canceled error")
 	}
 }
 

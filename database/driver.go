@@ -5,6 +5,7 @@
 package database
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"sync"
@@ -29,13 +30,18 @@ var drivers = make(map[string]Driver)
 //   2. Optionally, add a function named `WithInstance`.
 //      This function should accept an existing DB instance and a Config{} struct
 //      and return a driver instance.
+//   3. Optionally, add functions named `WithInstanceContext` and `OpenWithContext`
+// 		that accept a context as their first argument. The context should be used
+//		when establishing the first connection to the database and pinging it,
+//		but should not be used for all future connections to the database.
 //   3. Add a test that calls database/testing.go:Test()
-//   4. Add own tests for Open(), WithInstance() (when provided) and Close().
-//      All other functions are tested by tests in database/testing.
+//   5. Add own tests for Open(), OpenWithContext() (when provided),
+// 		WithInstance() (when provided), WithInstanceContext() (when provided) and
+//		Close(). All other functions are tested by tests in database/testing.
 //      Saves you some time and makes sure all database drivers behave the same way.
-//   5. Call Register in init().
-//   6. Create a internal/cli/build_<driver-name>.go file
-//   7. Add driver name in 'DATABASE' variable in Makefile
+//   6. Call Register in init().
+//   7. Create a internal/cli/build_<driver-name>.go file
+//   8. Add driver name in 'DATABASE' variable in Makefile
 //
 // Guidelines:
 //   * Don't try to correct user input. Don't assume things.
@@ -81,8 +87,19 @@ type Driver interface {
 	Drop() error
 }
 
-// Open returns a new driver instance.
-func Open(url string) (Driver, error) {
+// DriverWithContext is a Driver that accepts a context for the connection
+type DriverWithContext interface {
+	Driver
+
+	// OpenWithContext returns a new driver instance configured with parameters
+	// coming from the URL string. The context is used to open the initial
+	// connection with the database. Migrate will call this function only once
+	// per instance.
+	OpenWithContext(ctx context.Context, url string) (Driver, error)
+}
+
+// OpenWithContext returns a new driver instance that has been opened with provided context
+func OpenWithContext(ctx context.Context, url string) (Driver, error) {
 	scheme, err := iurl.SchemeFromURL(url)
 	if err != nil {
 		return nil, err
@@ -95,7 +112,15 @@ func Open(url string) (Driver, error) {
 		return nil, fmt.Errorf("database driver: unknown driver %v (forgotten import?)", scheme)
 	}
 
+	if dc, ok := d.(DriverWithContext); ok {
+		return dc.OpenWithContext(ctx, url)
+	}
 	return d.Open(url)
+}
+
+// Open returns a new driver instance.
+func Open(url string) (Driver, error) {
+	return OpenWithContext(context.Background(), url)
 }
 
 // Register globally registers a driver.

@@ -1,6 +1,7 @@
 package ql
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"github.com/hashicorp/go-multierror"
@@ -41,11 +42,14 @@ type Ql struct {
 }
 
 func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
+	return WithInstanceContext(context.Background(), instance, config)
+}
+func WithInstanceContext(ctx context.Context, instance *sql.DB, config *Config) (database.Driver, error) {
 	if config == nil {
 		return nil, ErrNilConfig
 	}
 
-	if err := instance.Ping(); err != nil {
+	if err := instance.PingContext(ctx); err != nil {
 		return nil, err
 	}
 
@@ -57,7 +61,7 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		db:     instance,
 		config: config,
 	}
-	if err := mx.ensureVersionTable(); err != nil {
+	if err := mx.ensureVersionTable(ctx); err != nil {
 		return nil, err
 	}
 	return mx, nil
@@ -66,7 +70,7 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 // ensureVersionTable checks if versions table exists and, if not, creates it.
 // Note that this function locks the database, which deviates from the usual
 // convention of "caller locks" in the Ql type.
-func (m *Ql) ensureVersionTable() (err error) {
+func (m *Ql) ensureVersionTable(ctx context.Context) (err error) {
 	if err = m.Lock(); err != nil {
 		return err
 	}
@@ -85,7 +89,7 @@ func (m *Ql) ensureVersionTable() (err error) {
 	if err != nil {
 		return err
 	}
-	if _, err := tx.Exec(fmt.Sprintf(`
+	if _, err := tx.ExecContext(ctx, fmt.Sprintf(`
 	CREATE TABLE IF NOT EXISTS %s (version uint64, dirty bool);
 	CREATE UNIQUE INDEX IF NOT EXISTS version_unique ON %s (version);
 `, m.config.MigrationsTable, m.config.MigrationsTable)); err != nil {
@@ -101,6 +105,9 @@ func (m *Ql) ensureVersionTable() (err error) {
 }
 
 func (m *Ql) Open(url string) (database.Driver, error) {
+	return m.OpenWithContext(context.Background(), url)
+}
+func (m *Ql) OpenWithContext(ctx context.Context, url string) (database.Driver, error) {
 	purl, err := nurl.Parse(url)
 	if err != nil {
 		return nil, err
@@ -114,7 +121,7 @@ func (m *Ql) Open(url string) (database.Driver, error) {
 	if len(migrationsTable) == 0 {
 		migrationsTable = DefaultMigrationsTable
 	}
-	mx, err := WithInstance(db, &Config{
+	mx, err := WithInstanceContext(ctx, db, &Config{
 		DatabaseName:    purl.Path,
 		MigrationsTable: migrationsTable,
 	})

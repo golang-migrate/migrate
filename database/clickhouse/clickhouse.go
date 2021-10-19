@@ -1,6 +1,7 @@
 package clickhouse
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"io"
@@ -42,11 +43,14 @@ func init() {
 }
 
 func WithInstance(conn *sql.DB, config *Config) (database.Driver, error) {
+	return WithInstanceContext(context.Background(), conn, config)
+}
+func WithInstanceContext(ctx context.Context, conn *sql.DB, config *Config) (database.Driver, error) {
 	if config == nil {
 		return nil, ErrNilConfig
 	}
 
-	if err := conn.Ping(); err != nil {
+	if err := conn.PingContext(ctx); err != nil {
 		return nil, err
 	}
 
@@ -55,7 +59,7 @@ func WithInstance(conn *sql.DB, config *Config) (database.Driver, error) {
 		config: config,
 	}
 
-	if err := ch.init(); err != nil {
+	if err := ch.init(ctx); err != nil {
 		return nil, err
 	}
 
@@ -69,6 +73,9 @@ type ClickHouse struct {
 }
 
 func (ch *ClickHouse) Open(dsn string) (database.Driver, error) {
+	return ch.OpenWithContext(context.Background(), dsn)
+}
+func (ch *ClickHouse) OpenWithContext(ctx context.Context, dsn string) (database.Driver, error) {
 	purl, err := url.Parse(dsn)
 	if err != nil {
 		return nil, err
@@ -105,16 +112,16 @@ func (ch *ClickHouse) Open(dsn string) (database.Driver, error) {
 		},
 	}
 
-	if err := ch.init(); err != nil {
+	if err := ch.init(ctx); err != nil {
 		return nil, err
 	}
 
 	return ch, nil
 }
 
-func (ch *ClickHouse) init() error {
+func (ch *ClickHouse) init(ctx context.Context) error {
 	if len(ch.config.DatabaseName) == 0 {
-		if err := ch.conn.QueryRow("SELECT currentDatabase()").Scan(&ch.config.DatabaseName); err != nil {
+		if err := ch.conn.QueryRowContext(ctx, "SELECT currentDatabase()").Scan(&ch.config.DatabaseName); err != nil {
 			return err
 		}
 	}
@@ -131,7 +138,7 @@ func (ch *ClickHouse) init() error {
 		ch.config.MigrationsTableEngine = DefaultMigrationsTableEngine
 	}
 
-	return ch.ensureVersionTable()
+	return ch.ensureVersionTable(ctx)
 }
 
 func (ch *ClickHouse) Run(r io.Reader) error {
@@ -204,7 +211,7 @@ func (ch *ClickHouse) SetVersion(version int, dirty bool) error {
 // ensureVersionTable checks if versions table exists and, if not, creates it.
 // Note that this function locks the database, which deviates from the usual
 // convention of "caller locks" in the ClickHouse type.
-func (ch *ClickHouse) ensureVersionTable() (err error) {
+func (ch *ClickHouse) ensureVersionTable(ctx context.Context) (err error) {
 	if err = ch.Lock(); err != nil {
 		return err
 	}
@@ -224,7 +231,7 @@ func (ch *ClickHouse) ensureVersionTable() (err error) {
 		query = "SHOW TABLES FROM " + ch.config.DatabaseName + " LIKE '" + ch.config.MigrationsTable + "'"
 	)
 	// check if migration table exists
-	if err := ch.conn.QueryRow(query).Scan(&table); err != nil {
+	if err := ch.conn.QueryRowContext(ctx, query).Scan(&table); err != nil {
 		if err != sql.ErrNoRows {
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
@@ -253,7 +260,7 @@ func (ch *ClickHouse) ensureVersionTable() (err error) {
 		query = fmt.Sprintf(`%s ORDER BY sequence`, query)
 	}
 
-	if _, err := ch.conn.Exec(query); err != nil {
+	if _, err := ch.conn.ExecContext(ctx, query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 	return nil

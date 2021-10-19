@@ -100,7 +100,24 @@ func Test(t *testing.T) {
 		dt.Test(t, d, []byte("SELECT 1"))
 	})
 }
+func TestContextCancellation(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, ci dktest.ContainerInfo) {
 
+		ip, port, err := ci.Port(26257)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := fmt.Sprintf("cockroach://root@%v:%v/migrate?sslmode=disable", ip, port)
+		c := &CockroachDb{}
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		_, err = c.OpenWithContext(ctx, addr)
+		if err == nil {
+			t.Fatal("Should fail when opened with a canceled context")
+		}
+	})
+}
 func TestMigrate(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, ci dktest.ContainerInfo) {
 		createDB(t, ci)

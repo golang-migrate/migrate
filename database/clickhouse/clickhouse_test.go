@@ -79,8 +79,26 @@ func TestCases(t *testing.T) {
 		t.Run("Migrate_"+engine, func(t *testing.T) { testMigrate(t, engine) })
 		t.Run("Version_"+engine, func(t *testing.T) { testVersion(t, engine) })
 		t.Run("Drop_"+engine, func(t *testing.T) { testDrop(t, engine) })
+		t.Run("ContextCancel_"+engine, func(t *testing.T) { testContextCancellation(t, engine) })
 	}
 	t.Run("WithInstanceDefaultConfigValues", func(t *testing.T) { testSimpleWithInstanceDefaultConfigValues(t) })
+}
+func testContextCancellation(t *testing.T, engine string) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.Port(defaultPort)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := clickhouseConnectionString(ip, port, engine)
+		p := &clickhouse.ClickHouse{}
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		_, err = p.OpenWithContext(ctx, addr)
+		if err == nil {
+			t.Fatal("Should fail when opened with a canceled context")
+		}
+	})
 }
 
 func testSimple(t *testing.T, engine string) {

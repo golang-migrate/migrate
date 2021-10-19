@@ -98,6 +98,24 @@ func Test(t *testing.T) {
 	})
 }
 
+func TestContextCancellation(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.Port(defaultPort)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := msConnectionString(ip, port)
+		ctx, cancel := context.WithCancel(context.Background())
+		p := &SQLServer{}
+		cancel()
+		_, err = p.OpenWithContext(ctx, addr)
+		if err == nil {
+			t.Fatal("Should fail when opened with a canceled context")
+		}
+	})
+}
+
 func TestMigrate(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.Port(defaultPort)

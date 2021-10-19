@@ -110,16 +110,32 @@ func Test(t *testing.T) {
 		dt.Test(t, d, []byte("SELECT 1"))
 
 		// check ensureVersionTable
-		if err := d.(*Mysql).ensureVersionTable(); err != nil {
+		if err := d.(*Mysql).ensureVersionTable(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		// check again
-		if err := d.(*Mysql).ensureVersionTable(); err != nil {
+		if err := d.(*Mysql).ensureVersionTable(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 	})
 }
 
+func TestContextCancellation(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
+		addr := fmt.Sprintf("mysql://root:root@tcp(%v:%v)/public", ip, port)
+		p := &Mysql{}
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		_, err = p.OpenWithContext(ctx, addr)
+		if err == nil {
+			t.Fatal("Should fail when opened with a canceled context")
+		}
+	})
+}
 func TestMigrate(t *testing.T) {
 	// mysql.SetLogger(mysql.Logger(log.New(ioutil.Discard, "", log.Ltime)))
 
@@ -148,11 +164,11 @@ func TestMigrate(t *testing.T) {
 		dt.TestMigrate(t, m)
 
 		// check ensureVersionTable
-		if err := d.(*Mysql).ensureVersionTable(); err != nil {
+		if err := d.(*Mysql).ensureVersionTable(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		// check again
-		if err := d.(*Mysql).ensureVersionTable(); err != nil {
+		if err := d.(*Mysql).ensureVersionTable(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -186,11 +202,11 @@ func TestMigrateAnsiQuotes(t *testing.T) {
 		dt.TestMigrate(t, m)
 
 		// check ensureVersionTable
-		if err := d.(*Mysql).ensureVersionTable(); err != nil {
+		if err := d.(*Mysql).ensureVersionTable(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		// check again
-		if err := d.(*Mysql).ensureVersionTable(); err != nil {
+		if err := d.(*Mysql).ensureVersionTable(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 	})

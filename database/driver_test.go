@@ -1,6 +1,8 @@
 package database
 
 import (
+	"context"
+	"errors"
 	"io"
 	"testing"
 )
@@ -50,6 +52,19 @@ func (m *mockDriver) Version() (version int, dirty bool, err error) {
 
 func (m *mockDriver) Drop() error {
 	return nil
+}
+
+type mockDriverWithContext struct {
+	*mockDriver
+}
+
+func (m *mockDriverWithContext) OpenWithContext(ctx context.Context, url string) (Driver, error) {
+	select {
+	case <-ctx.Done():
+		return nil, errors.New("context canceled")
+	default:
+		return m.mockDriver.Open(url)
+	}
 }
 
 func TestRegisterTwice(t *testing.T) {
@@ -111,5 +126,21 @@ func TestOpen(t *testing.T) {
 				t.Fatalf("did not expect %q", err)
 			}
 		})
+	}
+}
+
+func TestOpenContextCanceled(t *testing.T) {
+	func() {
+		defer func() {
+			_ = recover()
+		}()
+		Register("mockctx", &mockDriverWithContext{})
+	}()
+	host := "mockctx://user:pass@tcp(host:1337)/db"
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := OpenWithContext(ctx, host)
+	if err == nil {
+		t.Fatal("expected an error for context canceled")
 	}
 }
