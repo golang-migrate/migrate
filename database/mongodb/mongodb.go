@@ -137,7 +137,16 @@ func (m *Mongo) Open(dsn string) (database.Driver, error) {
 	if err != nil {
 		return nil, err
 	}
-	maxLockingIntervals, err := parseInt(unknown.Get("x-advisory-lock-timout-interval"), DefaultLockTimeoutInterval)
+
+	lockTimeout := unknown.Get("x-advisory-lock-timeout-interval")
+
+	if lockTimeout == "" {
+		// The initial release had a typo for this argument but for backwards compatibility sake, we will keep supporting it.
+		lockTimeout = unknown.Get("x-advisory-lock-timout-interval")
+	}
+
+	maxLockCheckInterval, err := parseInt(lockTimeout, DefaultLockTimeoutInterval)
+
 	if err != nil {
 		return nil, err
 	}
@@ -157,7 +166,7 @@ func (m *Mongo) Open(dsn string) (database.Driver, error) {
 			CollectionName: lockCollection,
 			Timeout:        lockingTimout,
 			Enabled:        advisoryLockingFlag,
-			Interval:       maxLockingIntervals,
+			Interval:       maxLockCheckInterval,
 		},
 	})
 	if err != nil {
