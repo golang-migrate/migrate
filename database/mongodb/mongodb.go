@@ -36,8 +36,9 @@ const LockIndexName = "lock_unique_key"                  // the name of the inde
 const contextWaitTimeout = 5 * time.Second               // how long to wait for the request to mongo to block/wait for.
 
 var (
-	ErrNoDatabaseName = fmt.Errorf("no database name")
-	ErrNilConfig      = fmt.Errorf("no config")
+	ErrNoDatabaseName            = fmt.Errorf("no database name")
+	ErrNilConfig                 = fmt.Errorf("no config")
+	ErrLockTimeoutConfigConflict = fmt.Errorf("both x-advisory-lock-timeout-interval and x-advisory-lock-timout-interval were specified")
 )
 
 type Mongo struct {
@@ -137,7 +138,22 @@ func (m *Mongo) Open(dsn string) (database.Driver, error) {
 	if err != nil {
 		return nil, err
 	}
-	maxLockingIntervals, err := parseInt(unknown.Get("x-advisory-lock-timout-interval"), DefaultLockTimeoutInterval)
+
+	lockTimeoutIntervalValue := unknown.Get("x-advisory-lock-timeout-interval")
+	// The initial release had a typo for this argument but for backwards compatibility sake, we will keep supporting it
+	// and we will error out if both values are set.
+	lockTimeoutIntervalValueFromTypo := unknown.Get("x-advisory-lock-timout-interval")
+
+	lockTimeout := lockTimeoutIntervalValue
+
+	if lockTimeoutIntervalValue != "" && lockTimeoutIntervalValueFromTypo != "" {
+		return nil, ErrLockTimeoutConfigConflict
+	} else if lockTimeoutIntervalValueFromTypo != "" {
+		lockTimeout = lockTimeoutIntervalValueFromTypo
+	}
+
+	maxLockCheckInterval, err := parseInt(lockTimeout, DefaultLockTimeoutInterval)
+
 	if err != nil {
 		return nil, err
 	}
@@ -157,7 +173,7 @@ func (m *Mongo) Open(dsn string) (database.Driver, error) {
 			CollectionName: lockCollection,
 			Timeout:        lockingTimout,
 			Enabled:        advisoryLockingFlag,
-			Interval:       maxLockingIntervals,
+			Interval:       maxLockCheckInterval,
 		},
 	})
 	if err != nil {

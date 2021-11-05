@@ -15,8 +15,8 @@
 | `x-transaction-mode` | `TransactionMode` | If set to `true` wrap commands in [transaction](https://docs.mongodb.com/manual/core/transactions). Available only for replica set. Driver is using [strconv.ParseBool](https://golang.org/pkg/strconv/#ParseBool) for parsing|
 | `x-advisory-locking` | `true` | Feature flag for advisory locking, if set to false, disable advisory locking |
 | `x-advisory-lock-collection` | `migrate_advisory_lock` | The name of the collection to use for advisory locking.|
-| `x-advisory-lock-timout` | `15` | The max time in seconds that the advisory lock will wait if the db is already locked. |
-| `x-advisory-lock-timout-interval` | `10` | The max timeout in seconds interval that the advisory lock will wait if the db is already locked. |
+| `x-advisory-lock-timeout` | `15` | The max time in seconds that migrate will wait to acquire a lock before failing. |
+| `x-advisory-lock-timeout-interval` | `10` | The max time in seconds between attempts to acquire the advisory lock, the lock is attempted to be acquired using an exponential backoff algorithm. |
 | `dbname` | `DatabaseName` | The name of the database to connect to |
 | `user` | | The user to sign in as. Can be omitted |
 | `password` | | The user's password. Can be omitted | 
