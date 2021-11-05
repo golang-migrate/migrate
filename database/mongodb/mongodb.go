@@ -37,8 +37,8 @@ const contextWaitTimeout = 5 * time.Second               // how long to wait for
 
 var (
 	ErrNoDatabaseName        = fmt.Errorf("no database name")
-	ErrNilConfig             = fmt.Errorf("no config")
-	ErrTypoAndNotNonTypoUsed = fmt.Errorf("both x-advisory-lock-timeout-interval and x-advisory-lock-timout-interval were specified")
+	ErrNilConfig                 = fmt.Errorf("no config")
+	ErrLockTimeoutConfigConflict = fmt.Errorf("both x-advisory-lock-timeout-interval and x-advisory-lock-timout-interval were specified")
 )
 
 type Mongo struct {
@@ -147,7 +147,7 @@ func (m *Mongo) Open(dsn string) (database.Driver, error) {
 	lockTimeout := lockTimeoutIntervalValue
 
 	if lockTimeoutIntervalValue != "" && lockTimeoutIntervalValueFromTypo != "" {
-		return nil, ErrTypoAndNotNonTypoUsed
+		return nil, ErrLockTimeoutConfigConflict
 	} else if lockTimeoutIntervalValueFromTypo != "" {
 		lockTimeout = lockTimeoutIntervalValueFromTypo
 	}

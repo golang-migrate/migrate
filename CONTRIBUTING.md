@@ -11,7 +11,6 @@
   1. Write awesome code ...
   1. `make test` to run all tests against all database versions
   1. Push code and open Pull Request
- :wq
 Some more helpful commands:
 
   * You can specify which database/ source tests to run:
