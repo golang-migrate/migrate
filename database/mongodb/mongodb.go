@@ -36,7 +36,7 @@ const LockIndexName = "lock_unique_key"                  // the name of the inde
 const contextWaitTimeout = 5 * time.Second               // how long to wait for the request to mongo to block/wait for.
 
 var (
-	ErrNoDatabaseName        = fmt.Errorf("no database name")
+	ErrNoDatabaseName            = fmt.Errorf("no database name")
 	ErrNilConfig                 = fmt.Errorf("no config")
 	ErrLockTimeoutConfigConflict = fmt.Errorf("both x-advisory-lock-timeout-interval and x-advisory-lock-timout-interval were specified")
 )
