@@ -3,7 +3,7 @@ module github.com/golang-migrate/migrate/v4
 require (
 	cloud.google.com/go/spanner v1.24.0
 	cloud.google.com/go/storage v1.10.0
-	github.com/Azure/go-autorest/autorest/adal v0.9.14
+	github.com/Azure/go-autorest/autorest/adal v0.9.16
 	github.com/ClickHouse/clickhouse-go v1.4.3
 	github.com/Microsoft/go-winio v0.5.0 // indirect
 	github.com/apache/arrow/go/arrow v0.0.0-20211013220434-5962184e7a30 // indirect
@@ -22,7 +22,8 @@ require (
 	github.com/gobuffalo/here v0.6.0
 	github.com/gocql/gocql v0.0.0-20210515062232-b7ef815b4556
 	github.com/gofrs/uuid v4.0.0+incompatible // indirect
-	github.com/google/go-github/v35 v35.2.0
+	github.com/google/go-github/v39 v39.2.0
+	github.com/golang-jwt/jwt/v4 v4.1.0 // indirect
 	github.com/gorilla/mux v1.7.4 // indirect
 	github.com/hashicorp/go-multierror v1.1.0
 	github.com/jackc/pgconn v1.8.0
@@ -49,6 +50,7 @@ require (
 	go.uber.org/atomic v1.6.0
 	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519 // indirect
 	golang.org/x/net v0.0.0-20211013171255-e13a2654a71e // indirect
+	golang.org/x/oauth2 v0.0.0-20210628180205-a41e5a781914
 	golang.org/x/sys v0.0.0-20211013075003-97ac67df715c // indirect
 	golang.org/x/tools v0.1.5
 	google.golang.org/api v0.51.0
