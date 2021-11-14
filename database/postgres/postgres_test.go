@@ -763,3 +763,119 @@ func Test_computeLineFromPos(t *testing.T) {
 		})
 	}
 }
+
+func TestDrop(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := pgConnectionString(ip, port)
+		p := &Postgres{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		p = d.(*Postgres)
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
+
+		// create foo and bar schemas with some elements
+		mig := `
+			CREATE SCHEMA schema_name AUTHORIZATION postgres;
+			CREATE TYPE schema_name.employee_type AS (name text, salary numeric);
+			CREATE TYPE schema_name.mood AS ENUM ('sad', 'ok', 'happy');
+			CREATE TABLE schema_name.employees OF schema_name.employee_type (
+				PRIMARY KEY (name),
+				salary WITH OPTIONS DEFAULT 1000
+			);
+			CREATE TABLE schema_name.person (
+				name text,
+				current_mood schema_name.mood
+			);
+		`
+		if err := d.Run(strings.NewReader(strings.Replace(mig, "schema_name", "foo", -1))); err != nil {
+			t.Fatal(err)
+		}
+		if err := d.Run(strings.NewReader(strings.Replace(mig, "schema_name", "bar", -1))); err != nil {
+			t.Fatal(err)
+		}
+
+		// re-connect using foo and Drop()
+		dfoo, err := p.Open(fmt.Sprintf("postgres://postgres:%s@%v:%v/postgres?sslmode=disable&search_path=foo",
+			pgPassword, ip, port))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := dfoo.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
+
+		if err := dfoo.Drop(); err != nil {
+			t.Fatal(err)
+		}
+
+		elementCount := func(db *sql.DB, element sqlElement, schema string) (count int, err error) {
+			var query string
+			switch element {
+			case tableSQL:
+				query = `SELECT count(*) FROM information_schema.tables WHERE table_schema = $1`
+			case typeSQL:
+				query = `
+					SELECT  count(t.typname)
+					FROM pg_type t
+					LEFT JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace
+					WHERE (t.typrelid = 0 OR (SELECT c.relkind = 'c' FROM pg_catalog.pg_class c WHERE c.oid = t.typrelid))
+					AND NOT EXISTS(SELECT 1 FROM pg_catalog.pg_type el WHERE el.oid = t.typelem AND el.typarray = t.oid)
+					AND n.nspname = $1;
+				`
+			}
+
+			err = db.QueryRow(query, schema).Scan(&count)
+			return count, err
+		}
+
+		// check foo is empty
+		want := 0
+		count, err := elementCount(p.db, tableSQL, "foo")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if count != want {
+			t.Errorf("expected %d tables in foo but got %d", want, count)
+		}
+
+		count, err = elementCount(p.db, typeSQL, "foo")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if count != want {
+			t.Errorf("expected %d types in foo but got %d", want, count)
+		}
+
+		// check bar is untouched
+		want = 2
+		count, err = elementCount(p.db, tableSQL, "bar")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if count != want {
+			t.Errorf("expected %d tables in bar but got %d", want, count)
+		}
+
+		count, err = elementCount(p.db, typeSQL, "bar")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if count != want {
+			t.Errorf("expected %d types in bar but got %d", want, count)
+		}
+
+	})
+}
