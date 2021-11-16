@@ -1,0 +1,8 @@
+{
+    "alter": [
+        {
+            "drop_op": "ATTR",
+            "drop_value": "User.city"
+        }
+    ]
+}

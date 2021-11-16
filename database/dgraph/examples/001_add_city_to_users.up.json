@@ -1,0 +1,12 @@
+{
+    "alter": [
+        {
+            "schema": [
+                "<User.city>: string .",
+                "type <User> {",
+                    "User.name",
+                    "User.city",
+                "}"]
+        }
+    ]
+}

@@ -1,0 +1,22 @@
+{
+    "alter": [
+      {
+        "schema": ["<User.books>: [uid] @reverse .",
+          "<Book.owner>: uid @reverse .",
+          "<Book.name>: string .",
+          "<Book.author>: string .",
+          "type <Book> {",
+            "Book.owner",
+            "Book.name",
+            "Book.author",
+            "<~User.books>",
+          "}",
+          "type <User> {",
+            "User.name",
+            "User.email",
+            "User.books",
+            "<~Book.owner>",
+          "}"]
+      }
+    ]
+  }

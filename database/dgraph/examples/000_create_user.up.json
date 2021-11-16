@@ -1,0 +1,13 @@
+{
+  "alter": [
+    {
+      "schema": [
+        "<User.name>: string .",
+        "<User.email>: string .",
+        "type <User> {",
+          "User.name",
+          "User.email",
+        "}"]
+    }
+  ]
+}

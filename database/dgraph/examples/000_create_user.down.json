@@ -1,0 +1,16 @@
+{
+    "alter": [
+        {
+            "drop_op": "TYPE",
+            "drop_value": "User"
+        },
+        {
+            "drop_op": "ATTR",
+            "drop_value": "User.name"
+        },
+        {
+            "drop_op": "ATTR",
+            "drop_value": "User.email"
+        }
+    ]
+}
