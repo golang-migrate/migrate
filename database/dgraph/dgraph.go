@@ -248,27 +248,27 @@ func (d *DGraph) Open(url string) (database.Driver, error) {
 	}
 	username := purl.User.Username()
 	password, passwordSet := purl.User.Password()
-	cloud := purl.Query().Has("cloud")
+	cloud := purl.Query().Get("cloud")
 	apiKey := purl.Query().Get("api-key")
-	ssl := purl.Query().Has("ssl")
+	ssl := purl.Query().Get("ssl")
 	gqlPort := purl.Query().Get("gql-port")
 	if gqlPort == "" {
 		gqlPort = "8080"
 	}
 	var namespace uint64
-	hasNamespace := purl.Query().Has("namespace")
-	if hasNamespace {
-		namespace, err = strconv.ParseUint(purl.Query().Get("namespace"), 10, 64)
+	namespaceStr := purl.Query().Get("namespace")
+	if namespaceStr != "" {
+		namespace, err = strconv.ParseUint(namespaceStr, 10, 64)
 		if err != nil {
 			return nil, err
 		}
 	}
-	conformGraphql := purl.Query().Has("graphql")
+	conformGraphql := purl.Query().Get("graphql")
 	graphQLTokenHeader := purl.Query().Get("graphql-token-header")
 	graphQLTokenValue := purl.Query().Get("graphql-token-value")
 
 	var dqlGrpc *grpc.ClientConn
-	if cloud {
+	if cloud != "" {
 		dqlGrpc, err = dgo.DialCloud(fmt.Sprintf("https://%s", hostname), apiKey)
 	} else {
 		dqlGrpc, err = grpc.Dial(
@@ -285,7 +285,7 @@ func (d *DGraph) Open(url string) (database.Driver, error) {
 		api.NewDgraphClient(dqlGrpc),
 	)
 
-	if username != "" && passwordSet && hasNamespace {
+	if username != "" && passwordSet && namespace != 0 {
 		err := dql.LoginIntoNamespace(ctx, username, password, namespace)
 		if err != nil {
 			return nil, err
@@ -293,7 +293,7 @@ func (d *DGraph) Open(url string) (database.Driver, error) {
 	}
 
 	var gqlConn string
-	if ssl {
+	if ssl != "" {
 		gqlConn = fmt.Sprintf("https://%s:%s/admin", hostname, gqlPort)
 	} else {
 		gqlConn = fmt.Sprintf("http://%s:%s/admin", hostname, gqlPort)
@@ -304,7 +304,7 @@ func (d *DGraph) Open(url string) (database.Driver, error) {
 		log.Println(s)
 	}*/
 	return WithInstance(NewDB(gql, dql), &Config{
-		GraphQL:            conformGraphql,
+		GraphQL:            conformGraphql != "",
 		GraphQLTokenHeader: graphQLTokenHeader,
 		GraphQLTokenValue:  graphQLTokenValue,
 	})
