@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	nurl "net/url"
+	"strconv"
 	"strings"
 
 	"github.com/dgraph-io/dgo/v210"
@@ -18,6 +19,7 @@ import (
 	"github.com/machinebox/graphql"
 	uatomic "go.uber.org/atomic"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/encoding/gzip"
 )
 
 const (
@@ -158,10 +160,9 @@ type Migration struct {
 
 // Config used for a DGraph instance
 type Config struct {
-	GraphQL bool // Should the version be available in GraphQL? Uses GraphQL naming conventions
+	GraphQL bool // Use GraphQL naming conventions? (Type.field)
 }
 
-// DGraph implements database.Driver for DGraph
 type DGraph struct {
 	db *DB
 
@@ -182,7 +183,6 @@ func NewDB(graphql *graphql.Client, dql *dgo.Dgraph) *DB {
 	}
 }
 
-// WithInstance implements database.Driver
 func WithInstance(instance *DB, config *Config) (database.Driver, error) {
 	if config == nil {
 		return nil, ErrNilConfig
@@ -232,24 +232,42 @@ func (d *DGraph) ensureMigrationNode(conformGraphQL bool) (err error) {
 }
 
 func (d *DGraph) Open(url string) (database.Driver, error) {
+	ctx := context.Background()
+
 	purl, err := nurl.Parse(url)
 	if err != nil {
 		return nil, err
 	}
 
 	hostname := purl.Hostname()
-	dqlPort := purl.Port()
-	conformGraphql := purl.Query().Has("graphql")
-	graphqlPort := purl.Query().Get("graphqlPort")
-	sslmode := purl.Query().Get("sslmode")
-	if sslmode == "disable" {
-		sslmode = "http"
-	} else {
-		sslmode = "https"
+	port := purl.Port()
+	if port == "" {
+		port = "9080"
 	}
+	username := purl.User.Username()
+	password, passwordSet := purl.User.Password()
+	cloud := purl.Query().Has("cloud")
+	apiKey := purl.Query().Get("api-key")
 
-	client := graphql.NewClient(fmt.Sprintf("%s%s:%s/graphql", sslmode, hostname, graphqlPort))
-	dqlGrpc, err := grpc.Dial(fmt.Sprintf("%s:%s", hostname, dqlPort), grpc.WithInsecure())
+	var namespace uint64
+	hasNamespace := purl.Query().Has("namespace")
+	if hasNamespace {
+		namespace, err = strconv.ParseUint(purl.Query().Get("namespace"), 10, 64)
+		if err != nil {
+			return nil, err
+		}
+	}
+	conformGraphql := purl.Query().Has("graphql")
+
+	var dqlGrpc *grpc.ClientConn
+	if cloud {
+		dqlGrpc, err = dgo.DialCloud(fmt.Sprintf("https://%s", hostname), apiKey)
+	} else {
+		dqlGrpc, err = grpc.Dial(
+			fmt.Sprintf("%s:%s", hostname, port),
+			grpc.WithInsecure(),
+			grpc.WithDefaultCallOptions(grpc.UseCompressor(gzip.Name)))
+	}
 	if err != nil {
 		log.Println(err.Error())
 	}
@@ -258,7 +276,14 @@ func (d *DGraph) Open(url string) (database.Driver, error) {
 		api.NewDgraphClient(dqlGrpc),
 	)
 
-	return WithInstance(NewDB(client, dql), &Config{
+	if username != "" && passwordSet && hasNamespace {
+		err := dql.LoginIntoNamespace(ctx, username, password, namespace)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return WithInstance(NewDB(nil, dql), &Config{
 		GraphQL: conformGraphql,
 	})
 }
@@ -268,11 +293,17 @@ func (d *DGraph) Close() error {
 }
 
 func (d *DGraph) Lock() error {
-	return nil
+	if swapped := d.lock.CAS(unlockedVal, lockedVal); swapped {
+		return nil
+	}
+	return ErrLockHeld
 }
 
 func (d *DGraph) Unlock() error {
-	return nil
+	if swapped := d.lock.CAS(lockedVal, unlockedVal); swapped {
+		return nil
+	}
+	return ErrLockNotHeld
 }
 
 func (d *DGraph) Run(migration io.Reader) error {
@@ -283,7 +314,6 @@ func (d *DGraph) Run(migration io.Reader) error {
 	var operations Operations
 	err := decoder.Decode(&operations)
 	if err != nil {
-		fmt.Println(err.Error())
 		return &database.Error{OrigErr: err, Err: "migration failed! could not parse operations"}
 	}
 
@@ -351,13 +381,12 @@ func (d *DGraph) SetVersion(version int, dirty bool) error {
 	if err != nil {
 		return &database.Error{OrigErr: err}
 	}
-	fmt.Println(string(migrationJson))
 
 	mu := &api.Mutation{
 		SetJson: migrationJson,
 	}
 
-	res, err := d.db.dql.NewTxn().Do(ctx, &api.Request{
+	_, err = d.db.dql.NewTxn().Do(ctx, &api.Request{
 		Query: `query {
 			q(func: type(Migration)) {
 				v as uid
@@ -368,8 +397,6 @@ func (d *DGraph) SetVersion(version int, dirty bool) error {
 	if err != nil {
 		return &database.Error{OrigErr: err}
 	}
-	fmt.Println(string(res.GetJson()))
-
 	return nil
 }
 
