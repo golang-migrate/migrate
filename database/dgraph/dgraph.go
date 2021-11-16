@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	nurl "net/url"
 	"strconv"
 	"strings"
@@ -266,10 +265,11 @@ func (d *DGraph) Open(url string) (database.Driver, error) {
 		dqlGrpc, err = grpc.Dial(
 			fmt.Sprintf("%s:%s", hostname, port),
 			grpc.WithInsecure(),
-			grpc.WithDefaultCallOptions(grpc.UseCompressor(gzip.Name)))
+			grpc.WithDefaultCallOptions(grpc.UseCompressor(gzip.Name)),
+		)
 	}
 	if err != nil {
-		log.Println(err.Error())
+		return nil, err
 	}
 
 	dql := dgo.NewDgraphClient(
