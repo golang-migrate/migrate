@@ -1,6 +1,7 @@
 package dgraph
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -159,7 +160,9 @@ type Migration struct {
 
 // Config used for a DGraph instance
 type Config struct {
-	GraphQL bool // Use GraphQL naming conventions? (Type.field)
+	GraphQL            bool // Use GraphQL naming conventions? (Type.field)
+	GraphQLTokenHeader string
+	GraphQLTokenValue  string
 }
 
 type DGraph struct {
@@ -247,7 +250,11 @@ func (d *DGraph) Open(url string) (database.Driver, error) {
 	password, passwordSet := purl.User.Password()
 	cloud := purl.Query().Has("cloud")
 	apiKey := purl.Query().Get("api-key")
-
+	ssl := purl.Query().Has("ssl")
+	gqlPort := purl.Query().Get("gql-port")
+	if gqlPort == "" {
+		gqlPort = "8080"
+	}
 	var namespace uint64
 	hasNamespace := purl.Query().Has("namespace")
 	if hasNamespace {
@@ -257,6 +264,8 @@ func (d *DGraph) Open(url string) (database.Driver, error) {
 		}
 	}
 	conformGraphql := purl.Query().Has("graphql")
+	graphQLTokenHeader := purl.Query().Get("graphql-token-header")
+	graphQLTokenValue := purl.Query().Get("graphql-token-value")
 
 	var dqlGrpc *grpc.ClientConn
 	if cloud {
@@ -283,8 +292,21 @@ func (d *DGraph) Open(url string) (database.Driver, error) {
 		}
 	}
 
-	return WithInstance(NewDB(nil, dql), &Config{
-		GraphQL: conformGraphql,
+	var gqlConn string
+	if ssl {
+		gqlConn = fmt.Sprintf("https://%s:%s/admin", hostname, gqlPort)
+	} else {
+		gqlConn = fmt.Sprintf("http://%s:%s/admin", hostname, gqlPort)
+	}
+
+	gql := graphql.NewClient(gqlConn)
+	/*gql.Log = func(s string) {
+		log.Println(s)
+	}*/
+	return WithInstance(NewDB(gql, dql), &Config{
+		GraphQL:            conformGraphql,
+		GraphQLTokenHeader: graphQLTokenHeader,
+		GraphQLTokenValue:  graphQLTokenValue,
 	})
 }
 
@@ -309,12 +331,37 @@ func (d *DGraph) Unlock() error {
 func (d *DGraph) Run(migration io.Reader) error {
 	ctx := context.Background()
 
-	decoder := json.NewDecoder(migration)
+	buf := new(bytes.Buffer)
+	_, err := buf.ReadFrom(migration)
+	if err != nil {
+		return err
+	}
+	req := buf.Bytes()
 
 	var operations Operations
-	err := decoder.Decode(&operations)
+	err = json.Unmarshal(req, &operations)
 	if err != nil {
-		return &database.Error{OrigErr: err, Err: "migration failed! could not parse operations"}
+		// This is a graphql file? -> send to server
+		gql := graphql.NewRequest(`mutation($schema: String!) {
+				updateGQLSchema(
+					input: { set: { schema: $schema}})
+					{
+					gqlSchema {
+						schema
+						generatedSchema
+					}
+				}
+		}`)
+		if d.config.GraphQLTokenHeader != "" {
+			gql.Header.Set(d.config.GraphQLTokenHeader, d.config.GraphQLTokenValue)
+		}
+		gql.Var("schema", buf.String())
+
+		var resp interface{}
+		if err := d.db.graphql.Run(ctx, gql, &resp); err != nil {
+			return &database.Error{OrigErr: err, Err: "migration failed! could not parse operations"}
+		}
+		return nil
 	}
 
 	for _, alter := range operations.Alter {

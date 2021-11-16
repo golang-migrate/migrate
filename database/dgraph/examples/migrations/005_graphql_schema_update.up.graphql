@@ -1,0 +1,12 @@
+type User {
+    name: String!
+    email: String! @search(by: [exact])
+    city: String
+    books: [Book]
+}
+
+type Book {
+    name: String!
+    author: String!
+    owner: User! @hasInverse(field: books)
+}

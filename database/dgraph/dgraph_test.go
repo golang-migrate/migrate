@@ -14,8 +14,8 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
-func dgraphConnectionString(host string, port string) string {
-	return fmt.Sprintf("dgraph://%s:%s?graphql=true", host, port)
+func dgraphConnectionString(host string, port string, gqlPort string) string {
+	return fmt.Sprintf("dgraph://%s:%s?graphql=true&gql-port=%s", host, port, gqlPort)
 }
 
 var (
@@ -34,7 +34,11 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 	if err != nil {
 		return false
 	}
-	addr := dgraphConnectionString(ip, port)
+	_, gqlPort, err := c.Port(8080)
+	if err != nil {
+		return false
+	}
+	addr := dgraphConnectionString(ip, port, gqlPort)
 	p := &DGraph{}
 	d, err := p.Open(addr)
 	if err != nil {
@@ -54,8 +58,11 @@ func Test(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-
-		addr := dgraphConnectionString(ip, port)
+		_, gqlPort, err := c.Port(8080)
+		if err != nil {
+			t.Fatal(err)
+		}
+		addr := dgraphConnectionString(ip, port, gqlPort)
 		p := &DGraph{}
 		d, err := p.Open(addr)
 		if err != nil {
@@ -79,8 +86,12 @@ func TestMigrate(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		_, gqlPort, err := c.Port(8080)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-		addr := dgraphConnectionString(ip, port)
+		addr := dgraphConnectionString(ip, port, gqlPort)
 		p := &DGraph{}
 		d, err := p.Open(addr)
 		if err != nil {
