@@ -1,0 +1,7 @@
+mutation($filter: UserFilter! = {
+     email: { eq: "jane.doe@mail.com" } }
+) {
+    deleteUser(filter: $filter) {
+        msg
+    }
+}

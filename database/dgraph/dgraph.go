@@ -161,6 +161,8 @@ type Migration struct {
 // Config used for a DGraph instance
 type Config struct {
 	GraphQL            bool // Use GraphQL naming conventions? (Type.field)
+	AdminTokenHeader   string
+	AdminTokenValue    string
 	GraphQLTokenHeader string
 	GraphQLTokenValue  string
 }
@@ -174,12 +176,14 @@ type DGraph struct {
 }
 
 type DB struct {
+	admin   *graphql.Client
 	graphql *graphql.Client
 	dql     *dgo.Dgraph
 }
 
-func NewDB(graphql *graphql.Client, dql *dgo.Dgraph) *DB {
+func NewDB(admin *graphql.Client, graphql *graphql.Client, dql *dgo.Dgraph) *DB {
 	return &DB{
+		admin:   admin,
 		graphql: graphql,
 		dql:     dql,
 	}
@@ -264,6 +268,9 @@ func (d *DGraph) Open(url string) (database.Driver, error) {
 		}
 	}
 	conformGraphql := purl.Query().Get("graphql")
+	adminTokenHeader := purl.Query().Get("admin-token-header")
+	adminTokenValue := purl.Query().Get("admin-token-value")
+
 	graphQLTokenHeader := purl.Query().Get("graphql-token-header")
 	graphQLTokenValue := purl.Query().Get("graphql-token-value")
 
@@ -294,17 +301,23 @@ func (d *DGraph) Open(url string) (database.Driver, error) {
 
 	var gqlConn string
 	if ssl != "" {
-		gqlConn = fmt.Sprintf("https://%s:%s/admin", hostname, gqlPort)
+		gqlConn = fmt.Sprintf("https://%s:%s", hostname, gqlPort)
 	} else {
-		gqlConn = fmt.Sprintf("http://%s:%s/admin", hostname, gqlPort)
+		gqlConn = fmt.Sprintf("http://%s:%s", hostname, gqlPort)
 	}
 
-	gql := graphql.NewClient(gqlConn)
-	/*gql.Log = func(s string) {
+	gqlAdmin := graphql.NewClient(fmt.Sprintf("%s/%s", gqlConn, "admin"))
+	gqlGraphql := graphql.NewClient(fmt.Sprintf("%s/%s", gqlConn, "graphql"))
+	/*gqlAdmin.Log = func(s string) {
 		log.Println(s)
 	}*/
-	return WithInstance(NewDB(gql, dql), &Config{
+	/*gqlGraphql.Log = func(s string) {
+		log.Println(s)
+	}*/
+	return WithInstance(NewDB(gqlAdmin, gqlGraphql, dql), &Config{
 		GraphQL:            conformGraphql != "",
+		AdminTokenHeader:   adminTokenHeader,
+		AdminTokenValue:    adminTokenValue,
 		GraphQLTokenHeader: graphQLTokenHeader,
 		GraphQLTokenValue:  graphQLTokenValue,
 	})
@@ -341,8 +354,20 @@ func (d *DGraph) Run(migration io.Reader) error {
 	var operations Operations
 	err = json.Unmarshal(req, &operations)
 	if err != nil {
-		// This is a graphql file? -> send to server
-		gql := graphql.NewRequest(`mutation($schema: String!) {
+		// This is a graphql mutation?
+		if strings.HasPrefix(buf.String(), "mutation") {
+			gql := graphql.NewRequest(buf.String())
+
+			if d.config.GraphQLTokenHeader != "" {
+				gql.Header.Set(d.config.GraphQLTokenHeader, d.config.GraphQLTokenValue)
+			}
+			var resp interface{}
+			if err := d.db.graphql.Run(ctx, gql, &resp); err != nil {
+				return &database.Error{OrigErr: err, Err: "migration failed! could not run graphql mutation"}
+			}
+		} else {
+			// This is a graphql schema?
+			gql := graphql.NewRequest(`mutation($schema: String!) {
 				updateGQLSchema(
 					input: { set: { schema: $schema}})
 					{
@@ -351,15 +376,16 @@ func (d *DGraph) Run(migration io.Reader) error {
 						generatedSchema
 					}
 				}
-		}`)
-		if d.config.GraphQLTokenHeader != "" {
-			gql.Header.Set(d.config.GraphQLTokenHeader, d.config.GraphQLTokenValue)
-		}
-		gql.Var("schema", buf.String())
+			}`)
+			if d.config.AdminTokenHeader != "" {
+				gql.Header.Set(d.config.AdminTokenHeader, d.config.AdminTokenValue)
+			}
+			gql.Var("schema", buf.String())
 
-		var resp interface{}
-		if err := d.db.graphql.Run(ctx, gql, &resp); err != nil {
-			return &database.Error{OrigErr: err, Err: "migration failed! could not parse operations"}
+			var resp interface{}
+			if err := d.db.admin.Run(ctx, gql, &resp); err != nil {
+				return &database.Error{OrigErr: err, Err: "migration failed! could not update graphql schema"}
+			}
 		}
 		return nil
 	}

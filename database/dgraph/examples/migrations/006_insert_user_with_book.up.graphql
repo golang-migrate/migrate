@@ -1,0 +1,15 @@
+mutation($user: [AddUserInput!]! = [{
+    name: "Jane Doe",
+    email: "jane.doe@mail.com",
+    city: "BigCity",
+    books: [{
+        name:"DGraph Whitepaper",
+        author:"Manish Jain"
+    }]
+}]) {
+    addUser(input: $user) {
+        user {
+          name
+        }
+    }
+}
