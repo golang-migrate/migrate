@@ -1,3 +1,4 @@
+//go:build redshift
 // +build redshift
 
 package cli
