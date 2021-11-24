@@ -1,0 +1,56 @@
+# Golang CircleCI 2.0 configuration file
+#
+# Check https://circleci.com/docs/2.0/language-go/ for more details
+version: 2.1
+
+jobs:
+  "golang-1_15": &template
+    machine:
+      # https://circleci.com/docs/2.0/configuration-reference/#available-machine-images
+      image: ubuntu-2004:202010-01
+      # docker_layer_caching: true
+
+    # https://circleci.com/docs/2.0/configuration-reference/#resource_class
+    resource_class: medium
+
+    # Leave working directory unspecified and use defaults:
+    # https://circleci.com/blog/go-v1.11-modules-and-circleci/
+    # working_directory: /go/src/github.com/golang-migrate/migrate
+
+    environment:
+      GO111MODULE: "on"
+      GO_VERSION: "1.15.x"
+
+    steps:
+      # - setup_remote_docker:
+      #    version: 19.03.13
+          # docker_layer_caching: true
+      - run: curl -sL -o ~/bin/gimme https://raw.githubusercontent.com/travis-ci/gimme/master/gimme
+      - run: curl -sfL -o ~/bin/golangci-lint.sh https://install.goreleaser.com/github.com/golangci/golangci-lint.sh
+      - run: chmod +x ~/bin/gimme ~/bin/golangci-lint.sh
+      - run: eval "$(gimme $GO_VERSION)"
+      - run: golangci-lint.sh -b ~/bin v1.37.0
+      - checkout
+      - restore_cache:
+          keys:
+            - go-mod-v1-{{ arch }}-{{ checksum "go.sum" }}
+      - run: golangci-lint run
+      - run: make test COVERAGE_DIR=/tmp/coverage
+      - save_cache:
+          key: go-mod-v1-{{ arch }}-{{ checksum "go.sum" }}
+          paths:
+            - "/go/pkg/mod"
+      - run: go get github.com/mattn/goveralls
+      - run: goveralls -service=circle-ci -coverprofile /tmp/coverage/combined.txt
+
+  "golang-1_16":
+    <<: *template
+    environment:
+      GO_VERSION: "1.16.x"
+
+workflows:
+  version: 2
+  build:
+    jobs:
+      - "golang-1_15"
+      - "golang-1_16"

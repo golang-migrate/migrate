@@ -1,16 +1,20 @@
 // Package migrate reads migrations from sources and runs them against databases.
 // Sources are defined by the `source.Driver` and databases by the `database.Driver`
-// interface. The driver interfaces are kept "dump", all migration logic is kept
+// interface. The driver interfaces are kept "dumb", all migration logic is kept
 // in this package.
 package migrate
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"sync"
 	"time"
 
+	"github.com/hashicorp/go-multierror"
+
 	"github.com/golang-migrate/migrate/v4/database"
+	iurl "github.com/golang-migrate/migrate/v4/internal/url"
 	"github.com/golang-migrate/migrate/v4/source"
 )
 
@@ -25,10 +29,11 @@ var DefaultPrefetchMigrations = uint(10)
 var DefaultLockTimeout = 15 * time.Second
 
 var (
-	ErrNoChange    = fmt.Errorf("no change")
-	ErrNilVersion  = fmt.Errorf("no migration")
-	ErrLocked      = fmt.Errorf("database locked")
-	ErrLockTimeout = fmt.Errorf("timeout: can't acquire database lock")
+	ErrNoChange       = errors.New("no change")
+	ErrNilVersion     = errors.New("no migration")
+	ErrInvalidVersion = errors.New("version must be >= -1")
+	ErrLocked         = errors.New("database locked")
+	ErrLockTimeout    = errors.New("timeout: can't acquire database lock")
 )
 
 // ErrShortLimit is an error returned when not enough migrations
@@ -62,11 +67,11 @@ type Migrate struct {
 	// GracefulStop accepts `true` and will stop executing migrations
 	// as soon as possible at a safe break point, so that the database
 	// is not corrupted.
-	GracefulStop   chan bool
-	isGracefulStop bool
+	GracefulStop chan bool
+	isLockedMu   *sync.Mutex
 
-	isLockedMu *sync.Mutex
-	isLocked   bool
+	isGracefulStop bool
+	isLocked       bool
 
 	// PrefetchMigrations defaults to DefaultPrefetchMigrations,
 	// but can be set per Migrate instance.
@@ -79,28 +84,28 @@ type Migrate struct {
 
 // New returns a new Migrate instance from a source URL and a database URL.
 // The URL scheme is defined by each driver.
-func New(sourceUrl, databaseUrl string) (*Migrate, error) {
+func New(sourceURL, databaseURL string) (*Migrate, error) {
 	m := newCommon()
 
-	sourceName, err := sourceSchemeFromUrl(sourceUrl)
+	sourceName, err := iurl.SchemeFromURL(sourceURL)
 	if err != nil {
 		return nil, err
 	}
 	m.sourceName = sourceName
 
-	databaseName, err := databaseSchemeFromUrl(databaseUrl)
+	databaseName, err := iurl.SchemeFromURL(databaseURL)
 	if err != nil {
 		return nil, err
 	}
 	m.databaseName = databaseName
 
-	sourceDrv, err := source.Open(sourceUrl)
+	sourceDrv, err := source.Open(sourceURL)
 	if err != nil {
 		return nil, err
 	}
 	m.sourceDrv = sourceDrv
 
-	databaseDrv, err := database.Open(databaseUrl)
+	databaseDrv, err := database.Open(databaseURL)
 	if err != nil {
 		return nil, err
 	}
@@ -113,10 +118,10 @@ func New(sourceUrl, databaseUrl string) (*Migrate, error) {
 // and an existing database instance. The source URL scheme is defined by each driver.
 // Use any string that can serve as an identifier during logging as databaseName.
 // You are responsible for closing the underlying database client if necessary.
-func NewWithDatabaseInstance(sourceUrl string, databaseName string, databaseInstance database.Driver) (*Migrate, error) {
+func NewWithDatabaseInstance(sourceURL string, databaseName string, databaseInstance database.Driver) (*Migrate, error) {
 	m := newCommon()
 
-	sourceName, err := schemeFromUrl(sourceUrl)
+	sourceName, err := iurl.SchemeFromURL(sourceURL)
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +129,7 @@ func NewWithDatabaseInstance(sourceUrl string, databaseName string, databaseInst
 
 	m.databaseName = databaseName
 
-	sourceDrv, err := source.Open(sourceUrl)
+	sourceDrv, err := source.Open(sourceURL)
 	if err != nil {
 		return nil, err
 	}
@@ -139,10 +144,10 @@ func NewWithDatabaseInstance(sourceUrl string, databaseName string, databaseInst
 // and a database URL. The database URL scheme is defined by each driver.
 // Use any string that can serve as an identifier during logging as sourceName.
 // You are responsible for closing the underlying source client if necessary.
-func NewWithSourceInstance(sourceName string, sourceInstance source.Driver, databaseUrl string) (*Migrate, error) {
+func NewWithSourceInstance(sourceName string, sourceInstance source.Driver, databaseURL string) (*Migrate, error) {
 	m := newCommon()
 
-	databaseName, err := schemeFromUrl(databaseUrl)
+	databaseName, err := iurl.SchemeFromURL(databaseURL)
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +155,7 @@ func NewWithSourceInstance(sourceName string, sourceInstance source.Driver, data
 
 	m.sourceName = sourceName
 
-	databaseDrv, err := database.Open(databaseUrl)
+	databaseDrv, err := database.Open(databaseURL)
 	if err != nil {
 		return nil, err
 	}
@@ -345,7 +350,11 @@ func (m *Migrate) Run(migration ...*Migration) error {
 			}
 
 			ret <- migr
-			go migr.Buffer()
+			go func(migr *Migration) {
+				if err := migr.Buffer(); err != nil {
+					m.logErr(err)
+				}
+			}(migr)
 		}
 	}()
 
@@ -357,7 +366,7 @@ func (m *Migrate) Run(migration ...*Migration) error {
 // It resets the dirty state to false.
 func (m *Migrate) Force(version int) error {
 	if version < -1 {
-		panic("version must be >= -1")
+		return ErrInvalidVersion
 	}
 
 	if err := m.lock(); err != nil {
@@ -432,7 +441,12 @@ func (m *Migrate) read(from int, to int, ret chan<- interface{}) {
 			}
 
 			ret <- migr
-			go migr.Buffer()
+			go func() {
+				if err := migr.Buffer(); err != nil {
+					m.logErr(err)
+				}
+			}()
+
 			from = int(firstVersion)
 		}
 
@@ -455,7 +469,12 @@ func (m *Migrate) read(from int, to int, ret chan<- interface{}) {
 			}
 
 			ret <- migr
-			go migr.Buffer()
+			go func() {
+				if err := migr.Buffer(); err != nil {
+					m.logErr(err)
+				}
+			}()
+
 			from = int(next)
 		}
 
@@ -468,7 +487,7 @@ func (m *Migrate) read(from int, to int, ret chan<- interface{}) {
 			}
 
 			prev, err := m.sourceDrv.Prev(suint(from))
-			if os.IsNotExist(err) && to == -1 {
+			if errors.Is(err, os.ErrNotExist) && to == -1 {
 				// apply nil migration
 				migr, err := m.newMigration(suint(from), -1)
 				if err != nil {
@@ -476,7 +495,12 @@ func (m *Migrate) read(from int, to int, ret chan<- interface{}) {
 					return
 				}
 				ret <- migr
-				go migr.Buffer()
+				go func() {
+					if err := migr.Buffer(); err != nil {
+						m.logErr(err)
+					}
+				}()
+
 				return
 
 			} else if err != nil {
@@ -491,7 +515,12 @@ func (m *Migrate) read(from int, to int, ret chan<- interface{}) {
 			}
 
 			ret <- migr
-			go migr.Buffer()
+			go func() {
+				if err := migr.Buffer(); err != nil {
+					m.logErr(err)
+				}
+			}()
+
 			from = int(prev)
 		}
 	}
@@ -539,7 +568,11 @@ func (m *Migrate) readUp(from int, limit int, ret chan<- interface{}) {
 			}
 
 			ret <- migr
-			go migr.Buffer()
+			go func() {
+				if err := migr.Buffer(); err != nil {
+					m.logErr(err)
+				}
+			}()
 			from = int(firstVersion)
 			count++
 			continue
@@ -547,7 +580,7 @@ func (m *Migrate) readUp(from int, limit int, ret chan<- interface{}) {
 
 		// apply next migration
 		next, err := m.sourceDrv.Next(suint(from))
-		if os.IsNotExist(err) {
+		if errors.Is(err, os.ErrNotExist) {
 			// no limit, but no migrations applied?
 			if limit == -1 && count == 0 {
 				ret <- ErrNoChange
@@ -583,7 +616,11 @@ func (m *Migrate) readUp(from int, limit int, ret chan<- interface{}) {
 		}
 
 		ret <- migr
-		go migr.Buffer()
+		go func() {
+			if err := migr.Buffer(); err != nil {
+				m.logErr(err)
+			}
+		}()
 		from = int(next)
 		count++
 	}
@@ -629,7 +666,7 @@ func (m *Migrate) readDown(from int, limit int, ret chan<- interface{}) {
 		}
 
 		prev, err := m.sourceDrv.Prev(suint(from))
-		if os.IsNotExist(err) {
+		if errors.Is(err, os.ErrNotExist) {
 			// no limit or haven't reached limit, apply "first" migration
 			if limit == -1 || limit-count > 0 {
 				firstVersion, err := m.sourceDrv.First()
@@ -644,7 +681,11 @@ func (m *Migrate) readDown(from int, limit int, ret chan<- interface{}) {
 					return
 				}
 				ret <- migr
-				go migr.Buffer()
+				go func() {
+					if err := migr.Buffer(); err != nil {
+						m.logErr(err)
+					}
+				}()
 				count++
 			}
 
@@ -665,7 +706,11 @@ func (m *Migrate) readDown(from int, limit int, ret chan<- interface{}) {
 		}
 
 		ret <- migr
-		go migr.Buffer()
+		go func() {
+			if err := migr.Buffer(); err != nil {
+				m.logErr(err)
+			}
+		}()
 		from = int(prev)
 		count++
 	}
@@ -684,12 +729,12 @@ func (m *Migrate) runMigrations(ret <-chan interface{}) error {
 			return nil
 		}
 
-		switch r.(type) {
+		switch r := r.(type) {
 		case error:
-			return r.(error)
+			return r
 
 		case *Migration:
-			migr := r.(*Migration)
+			migr := r
 
 			// set version with dirty state
 			if err := m.databaseDrv.SetVersion(migr.TargetVersion, true); err != nil {
@@ -722,7 +767,7 @@ func (m *Migrate) runMigrations(ret <-chan interface{}) error {
 			}
 
 		default:
-			panic("unknown type")
+			return fmt.Errorf("unknown type: %T with value: %+v", r, r)
 		}
 	}
 	return nil
@@ -730,30 +775,40 @@ func (m *Migrate) runMigrations(ret <-chan interface{}) error {
 
 // versionExists checks the source if either the up or down migration for
 // the specified migration version exists.
-func (m *Migrate) versionExists(version uint) error {
+func (m *Migrate) versionExists(version uint) (result error) {
 	// try up migration first
 	up, _, err := m.sourceDrv.ReadUp(version)
 	if err == nil {
-		defer up.Close()
+		defer func() {
+			if errClose := up.Close(); errClose != nil {
+				result = multierror.Append(result, errClose)
+			}
+		}()
 	}
-	if os.IsExist(err) {
+	if errors.Is(err, os.ErrExist) {
 		return nil
-	} else if !os.IsNotExist(err) {
+	} else if !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
 
 	// then try down migration
 	down, _, err := m.sourceDrv.ReadDown(version)
 	if err == nil {
-		defer down.Close()
+		defer func() {
+			if errClose := down.Close(); errClose != nil {
+				result = multierror.Append(result, errClose)
+			}
+		}()
 	}
-	if os.IsExist(err) {
+	if errors.Is(err, os.ErrExist) {
 		return nil
-	} else if !os.IsNotExist(err) {
+	} else if !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
 
-	return os.ErrNotExist
+	err = fmt.Errorf("no migration found for version %d: %w", version, err)
+	m.logErr(err)
+	return err
 }
 
 // stop returns true if no more migrations should be run against the database
@@ -781,7 +836,7 @@ func (m *Migrate) newMigration(version uint, targetVersion int) (*Migration, err
 
 	if targetVersion >= int(version) {
 		r, identifier, err := m.sourceDrv.ReadUp(version)
-		if os.IsNotExist(err) {
+		if errors.Is(err, os.ErrNotExist) {
 			// create "empty" migration
 			migr, err = NewMigration(nil, "", version, targetVersion)
 			if err != nil {
@@ -801,7 +856,7 @@ func (m *Migrate) newMigration(version uint, targetVersion int) (*Migration, err
 
 	} else {
 		r, identifier, err := m.sourceDrv.ReadDown(version)
-		if os.IsNotExist(err) {
+		if errors.Is(err, os.ErrNotExist) {
 			// create "empty" migration
 			migr, err = NewMigration(nil, "", version, targetVersion)
 			if err != nil {
@@ -869,10 +924,9 @@ func (m *Migrate) lock() error {
 		} else {
 			errchan <- nil
 		}
-		return
 	}()
 
-	// wait until we either recieve ErrLockTimeout or error from Lock operation
+	// wait until we either receive ErrLockTimeout or error from Lock operation
 	err := <-errchan
 	if err == nil {
 		m.isLocked = true
@@ -900,7 +954,7 @@ func (m *Migrate) unlock() error {
 // if a prevErr is not nil.
 func (m *Migrate) unlockErr(prevErr error) error {
 	if err := m.unlock(); err != nil {
-		return NewMultiError(prevErr, err)
+		return multierror.Append(prevErr, err)
 	}
 	return prevErr
 }
@@ -916,5 +970,12 @@ func (m *Migrate) logPrintf(format string, v ...interface{}) {
 func (m *Migrate) logVerbosePrintf(format string, v ...interface{}) {
 	if m.Log != nil && m.Log.Verbose() {
 		m.Log.Printf(format, v...)
+	}
+}
+
+// logErr writes error to m.Log if not nil
+func (m *Migrate) logErr(err error) {
+	if m.Log != nil {
+		m.Log.Printf("error: %v", err)
 	}
 }

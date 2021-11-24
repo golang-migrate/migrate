@@ -1,22 +1,27 @@
 package spanner
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
 	nurl "net/url"
 	"regexp"
+	"strconv"
 	"strings"
 
-	"golang.org/x/net/context"
+	"context"
 
 	"cloud.google.com/go/spanner"
 	sdb "cloud.google.com/go/spanner/admin/database/apiv1"
+	"cloud.google.com/go/spanner/spansql"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 
+	"github.com/hashicorp/go-multierror"
+	uatomic "go.uber.org/atomic"
 	"google.golang.org/api/iterator"
 	adminpb "google.golang.org/genproto/googleapis/spanner/admin/database/v1"
 )
@@ -29,18 +34,30 @@ func init() {
 // DefaultMigrationsTable is used if no custom table is specified
 const DefaultMigrationsTable = "SchemaMigrations"
 
+const (
+	unlockedVal = 0
+	lockedVal   = 1
+)
+
 // Driver errors
 var (
-	ErrNilConfig      = fmt.Errorf("no config")
-	ErrNoDatabaseName = fmt.Errorf("no database name")
-	ErrNoSchema       = fmt.Errorf("no schema")
-	ErrDatabaseDirty  = fmt.Errorf("database is dirty")
+	ErrNilConfig      = errors.New("no config")
+	ErrNoDatabaseName = errors.New("no database name")
+	ErrNoSchema       = errors.New("no schema")
+	ErrDatabaseDirty  = errors.New("database is dirty")
+	ErrLockHeld       = errors.New("unable to obtain lock")
+	ErrLockNotHeld    = errors.New("unable to release already released lock")
 )
 
 // Config used for a Spanner instance
 type Config struct {
 	MigrationsTable string
 	DatabaseName    string
+	// Whether to parse the migration DDL with spansql before
+	// running them towards Spanner.
+	// Parsing outputs clean DDL statements such as reformatted
+	// and void of comments.
+	CleanStatements bool
 }
 
 // Spanner implements database.Driver for Google Cloud Spanner
@@ -48,11 +65,20 @@ type Spanner struct {
 	db *DB
 
 	config *Config
+
+	lock *uatomic.Uint32
 }
 
 type DB struct {
 	admin *sdb.DatabaseAdminClient
 	data  *spanner.Client
+}
+
+func NewDB(admin sdb.DatabaseAdminClient, data spanner.Client) *DB {
+	return &DB{
+		admin: &admin,
+		data:  &data,
+	}
 }
 
 // WithInstance implements database.Driver
@@ -72,6 +98,7 @@ func WithInstance(instance *DB, config *Config) (database.Driver, error) {
 	sx := &Spanner{
 		db:     instance,
 		config: config,
+		lock:   uatomic.NewUint32(unlockedVal),
 	}
 
 	if err := sx.ensureVersionTable(); err != nil {
@@ -101,14 +128,21 @@ func (s *Spanner) Open(url string) (database.Driver, error) {
 	}
 
 	migrationsTable := purl.Query().Get("x-migrations-table")
-	if len(migrationsTable) == 0 {
-		migrationsTable = DefaultMigrationsTable
+
+	cleanQuery := purl.Query().Get("x-clean-statements")
+	clean := false
+	if cleanQuery != "" {
+		clean, err = strconv.ParseBool(cleanQuery)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	db := &DB{admin: adminClient, data: dataClient}
 	return WithInstance(db, &Config{
 		DatabaseName:    dbname,
 		MigrationsTable: migrationsTable,
+		CleanStatements: clean,
 	})
 }
 
@@ -121,12 +155,18 @@ func (s *Spanner) Close() error {
 // Lock implements database.Driver but doesn't do anything because Spanner only
 // enqueues the UpdateDatabaseDdlRequest.
 func (s *Spanner) Lock() error {
-	return nil
+	if swapped := s.lock.CAS(unlockedVal, lockedVal); swapped {
+		return nil
+	}
+	return ErrLockHeld
 }
 
 // Unlock implements database.Driver but no action required, see Lock.
 func (s *Spanner) Unlock() error {
-	return nil
+	if swapped := s.lock.CAS(lockedVal, unlockedVal); swapped {
+		return nil
+	}
+	return ErrLockNotHeld
 }
 
 // Run implements database.Driver
@@ -136,10 +176,15 @@ func (s *Spanner) Run(migration io.Reader) error {
 		return err
 	}
 
-	// run migration
-	stmts := migrationStatements(migr)
-	ctx := context.Background()
+	stmts := []string{string(migr)}
+	if s.config.CleanStatements {
+		stmts, err = cleanStatements(migr)
+		if err != nil {
+			return err
+		}
+	}
 
+	ctx := context.Background()
 	op, err := s.db.admin.UpdateDatabaseDdl(ctx, &adminpb.UpdateDatabaseDdlRequest{
 		Database:   s.config.DatabaseName,
 		Statements: stmts,
@@ -204,6 +249,8 @@ func (s *Spanner) Version() (version int, dirty bool, err error) {
 	return version, dirty, nil
 }
 
+var nameMatcher = regexp.MustCompile(`(CREATE TABLE\s(\S+)\s)|(CREATE.+INDEX\s(\S+)\s)`)
+
 // Drop implements database.Driver. Retrieves the database schema first and
 // creates statements to drop the indexes and tables accordingly.
 // Note: The drop statements are created in reverse order to how they're
@@ -222,11 +269,10 @@ func (s *Spanner) Drop() error {
 		return nil
 	}
 
-	r := regexp.MustCompile(`(CREATE TABLE\s(\S+)\s)|(CREATE.+INDEX\s(\S+)\s)`)
 	stmts := make([]string, 0)
 	for i := len(res.Statements) - 1; i >= 0; i-- {
 		s := res.Statements[i]
-		m := r.FindSubmatch([]byte(s))
+		m := nameMatcher.FindSubmatch([]byte(s))
 
 		if len(m) == 0 {
 			continue
@@ -248,14 +294,27 @@ func (s *Spanner) Drop() error {
 		return &database.Error{OrigErr: err, Query: []byte(strings.Join(stmts, "; "))}
 	}
 
-	if err := s.ensureVersionTable(); err != nil {
-		return err
-	}
-
 	return nil
 }
 
-func (s *Spanner) ensureVersionTable() error {
+// ensureVersionTable checks if versions table exists and, if not, creates it.
+// Note that this function locks the database, which deviates from the usual
+// convention of "caller locks" in the Spanner type.
+func (s *Spanner) ensureVersionTable() (err error) {
+	if err = s.Lock(); err != nil {
+		return err
+	}
+
+	defer func() {
+		if e := s.Unlock(); e != nil {
+			if err == nil {
+				err = e
+			} else {
+				err = multierror.Append(err, e)
+			}
+		}
+	}()
+
 	ctx := context.Background()
 	tbl := s.config.MigrationsTable
 	iter := s.db.data.Single().Read(ctx, tbl, spanner.AllKeys(), []string{"Version"})
@@ -283,12 +342,17 @@ func (s *Spanner) ensureVersionTable() error {
 	return nil
 }
 
-func migrationStatements(migration []byte) []string {
-	regex := regexp.MustCompile(";$")
-	migrationString := string(migration[:])
-	migrationString = strings.TrimSpace(migrationString)
-	migrationString = regex.ReplaceAllString(migrationString, "")
-
-	statements := strings.Split(migrationString, ";")
-	return statements
+func cleanStatements(migration []byte) ([]string, error) {
+	// The Spanner GCP backend does not yet support comments for the UpdateDatabaseDdl RPC
+	// (see https://issuetracker.google.com/issues/159730604) we use
+	// spansql to parse the DDL and output valid stamements without comments
+	ddl, err := spansql.ParseDDL("", string(migration))
+	if err != nil {
+		return nil, err
+	}
+	stmts := make([]string, 0, len(ddl.List))
+	for _, stmt := range ddl.List {
+		stmts = append(stmts, stmt.SQL())
+	}
+	return stmts, nil
 }

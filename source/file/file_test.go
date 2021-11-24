@@ -1,6 +1,7 @@
 package file
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -16,7 +17,11 @@ func Test(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	// write files that meet driver test requirements
 	mustWriteFile(t, tmpDir, "1_foobar.up.sql", "1 up")
@@ -46,7 +51,11 @@ func TestOpen(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	mustWriteFile(t, tmpDir, "1_foobar.up.sql", "")
 	mustWriteFile(t, tmpDir, "1_foobar.down.sql", "")
@@ -67,13 +76,22 @@ func TestOpenWithRelativePath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	wd, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Chdir(wd) // rescue working dir after we are done
+	defer func() {
+		// rescue working dir after we are done
+		if err := os.Chdir(wd); err != nil {
+			t.Log(err)
+		}
+	}()
 
 	if err := os.Chdir(tmpDir); err != nil {
 		t.Fatal(err)
@@ -130,7 +148,11 @@ func TestOpenWithDuplicateVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	mustWriteFile(t, tmpDir, "1_foo.up.sql", "") // 1 up
 	mustWriteFile(t, tmpDir, "1_bar.up.sql", "") // 1 up
@@ -147,7 +169,11 @@ func TestClose(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	f := &File{}
 	d, err := f.Open("file://" + tmpDir)
@@ -182,24 +208,35 @@ func mustCreateBenchmarkDir(t *testing.B) (dir string) {
 
 func BenchmarkOpen(b *testing.B) {
 	dir := mustCreateBenchmarkDir(b)
-	defer os.RemoveAll(dir)
+	defer func() {
+		if err := os.RemoveAll(dir); err != nil {
+			b.Error(err)
+		}
+	}()
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		f := &File{}
-		f.Open("file://" + dir)
+		_, err := f.Open("file://" + dir)
+		if err != nil {
+			b.Error(err)
+		}
 	}
 	b.StopTimer()
 }
 
 func BenchmarkNext(b *testing.B) {
 	dir := mustCreateBenchmarkDir(b)
-	defer os.RemoveAll(dir)
+	defer func() {
+		if err := os.RemoveAll(dir); err != nil {
+			b.Error(err)
+		}
+	}()
 	f := &File{}
 	d, _ := f.Open("file://" + dir)
 	b.ResetTimer()
 	v, err := d.First()
 	for n := 0; n < b.N; n++ {
-		for !os.IsNotExist(err) {
+		for !errors.Is(err, os.ErrNotExist) {
 			v, err = d.Next(v)
 		}
 	}

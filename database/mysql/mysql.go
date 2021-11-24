@@ -1,3 +1,4 @@
+//go:build go1.9
 // +build go1.9
 
 package mysql
@@ -8,21 +9,19 @@ import (
 	"crypto/x509"
 	"database/sql"
 	"fmt"
+	"go.uber.org/atomic"
 	"io"
 	"io/ioutil"
 	nurl "net/url"
 	"strconv"
 	"strings"
-)
 
-import (
 	"github.com/go-sql-driver/mysql"
+	"github.com/golang-migrate/migrate/v4/database"
+	"github.com/hashicorp/go-multierror"
 )
 
-import (
-	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database"
-)
+var _ database.Driver = (*Mysql)(nil) // explicit compile time type check
 
 func init() {
 	database.Register("mysql", &Mysql{})
@@ -41,6 +40,7 @@ var (
 type Config struct {
 	MigrationsTable string
 	DatabaseName    string
+	NoLock          bool
 }
 
 type Mysql struct {
@@ -48,46 +48,43 @@ type Mysql struct {
 	// just do everything over a single conn anyway.
 	conn     *sql.Conn
 	db       *sql.DB
-	isLocked bool
+	isLocked atomic.Bool
 
 	config *Config
 }
 
-// instance must have `multiStatements` set to true
-func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
+// connection instance must have `multiStatements` set to true
+func WithConnection(ctx context.Context, conn *sql.Conn, config *Config) (*Mysql, error) {
 	if config == nil {
 		return nil, ErrNilConfig
 	}
 
-	if err := instance.Ping(); err != nil {
-		return nil, err
-	}
-
-	query := `SELECT DATABASE()`
-	var databaseName sql.NullString
-	if err := instance.QueryRow(query).Scan(&databaseName); err != nil {
-		return nil, &database.Error{OrigErr: err, Query: []byte(query)}
-	}
-
-	if len(databaseName.String) == 0 {
-		return nil, ErrNoDatabaseName
-	}
-
-	config.DatabaseName = databaseName.String
-
-	if len(config.MigrationsTable) == 0 {
-		config.MigrationsTable = DefaultMigrationsTable
-	}
-
-	conn, err := instance.Conn(context.Background())
-	if err != nil {
+	if err := conn.PingContext(ctx); err != nil {
 		return nil, err
 	}
 
 	mx := &Mysql{
 		conn:   conn,
-		db:     instance,
+		db:     nil,
 		config: config,
+	}
+
+	if config.DatabaseName == "" {
+		query := `SELECT DATABASE()`
+		var databaseName sql.NullString
+		if err := conn.QueryRowContext(ctx, query).Scan(&databaseName); err != nil {
+			return nil, &database.Error{OrigErr: err, Query: []byte(query)}
+		}
+
+		if len(databaseName.String) == 0 {
+			return nil, ErrNoDatabaseName
+		}
+
+		config.DatabaseName = databaseName.String
+	}
+
+	if len(config.MigrationsTable) == 0 {
+		config.MigrationsTable = DefaultMigrationsTable
 	}
 
 	if err := mx.ensureVersionTable(); err != nil {
@@ -97,95 +94,162 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	return mx, nil
 }
 
-// urlToMySQLConfig takes a net/url URL and returns a go-sql-driver/mysql Config.
-// Manually sets username and password to avoid net/url from url-encoding the reserved URL characters
-func urlToMySQLConfig(u nurl.URL) (*mysql.Config, error) {
-	origUserInfo := u.User
-	u.User = nil
+// instance must have `multiStatements` set to true
+func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
+	ctx := context.Background()
 
-	c, err := mysql.ParseDSN(strings.TrimPrefix(u.String(), "mysql://"))
+	if err := instance.Ping(); err != nil {
+		return nil, err
+	}
+
+	conn, err := instance.Conn(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if origUserInfo != nil {
-		c.User = origUserInfo.Username()
-		if p, ok := origUserInfo.Password(); ok {
-			c.Passwd = p
+
+	mx, err := WithConnection(ctx, conn, config)
+	if err != nil {
+		return nil, err
+	}
+
+	mx.db = instance
+
+	return mx, nil
+}
+
+// extractCustomQueryParams extracts the custom query params (ones that start with "x-") from
+// mysql.Config.Params (connection parameters) as to not interfere with connecting to MySQL
+func extractCustomQueryParams(c *mysql.Config) (map[string]string, error) {
+	if c == nil {
+		return nil, ErrNilConfig
+	}
+	customQueryParams := map[string]string{}
+
+	for k, v := range c.Params {
+		if strings.HasPrefix(k, "x-") {
+			customQueryParams[k] = v
+			delete(c.Params, k)
 		}
 	}
-	return c, nil
+	return customQueryParams, nil
+}
+
+func urlToMySQLConfig(url string) (*mysql.Config, error) {
+	// Need to parse out custom TLS parameters and call
+	// mysql.RegisterTLSConfig() before mysql.ParseDSN() is called
+	// which consumes the registered tls.Config
+	// Fixes: https://github.com/golang-migrate/migrate/issues/411
+	//
+	// Can't use url.Parse() since it fails to parse MySQL DSNs
+	// mysql.ParseDSN() also searches for "?" to find query parameters:
+	// https://github.com/go-sql-driver/mysql/blob/46351a8/dsn.go#L344
+	if idx := strings.LastIndex(url, "?"); idx > 0 {
+		rawParams := url[idx+1:]
+		parsedParams, err := nurl.ParseQuery(rawParams)
+		if err != nil {
+			return nil, err
+		}
+
+		ctls := parsedParams.Get("tls")
+		if len(ctls) > 0 {
+			if _, isBool := readBool(ctls); !isBool && strings.ToLower(ctls) != "skip-verify" {
+				rootCertPool := x509.NewCertPool()
+				pem, err := ioutil.ReadFile(parsedParams.Get("x-tls-ca"))
+				if err != nil {
+					return nil, err
+				}
+
+				if ok := rootCertPool.AppendCertsFromPEM(pem); !ok {
+					return nil, ErrAppendPEM
+				}
+
+				clientCert := make([]tls.Certificate, 0, 1)
+				if ccert, ckey := parsedParams.Get("x-tls-cert"), parsedParams.Get("x-tls-key"); ccert != "" || ckey != "" {
+					if ccert == "" || ckey == "" {
+						return nil, ErrTLSCertKeyConfig
+					}
+					certs, err := tls.LoadX509KeyPair(ccert, ckey)
+					if err != nil {
+						return nil, err
+					}
+					clientCert = append(clientCert, certs)
+				}
+
+				insecureSkipVerify := false
+				insecureSkipVerifyStr := parsedParams.Get("x-tls-insecure-skip-verify")
+				if len(insecureSkipVerifyStr) > 0 {
+					x, err := strconv.ParseBool(insecureSkipVerifyStr)
+					if err != nil {
+						return nil, err
+					}
+					insecureSkipVerify = x
+				}
+
+				err = mysql.RegisterTLSConfig(ctls, &tls.Config{
+					RootCAs:            rootCertPool,
+					Certificates:       clientCert,
+					InsecureSkipVerify: insecureSkipVerify,
+				})
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+	}
+
+	config, err := mysql.ParseDSN(strings.TrimPrefix(url, "mysql://"))
+	if err != nil {
+		return nil, err
+	}
+
+	config.MultiStatements = true
+
+	// Keep backwards compatibility from when we used net/url.Parse() to parse the DSN.
+	// net/url.Parse() would automatically unescape it for us.
+	// See: https://play.golang.org/p/q9j1io-YICQ
+	user, err := nurl.QueryUnescape(config.User)
+	if err != nil {
+		return nil, err
+	}
+	config.User = user
+
+	password, err := nurl.QueryUnescape(config.Passwd)
+	if err != nil {
+		return nil, err
+	}
+	config.Passwd = password
+
+	return config, nil
 }
 
 func (m *Mysql) Open(url string) (database.Driver, error) {
-	purl, err := nurl.Parse(url)
+	config, err := urlToMySQLConfig(url)
 	if err != nil {
 		return nil, err
 	}
 
-	q := purl.Query()
-	q.Set("multiStatements", "true")
-	purl.RawQuery = q.Encode()
-
-	migrationsTable := purl.Query().Get("x-migrations-table")
-	if len(migrationsTable) == 0 {
-		migrationsTable = DefaultMigrationsTable
+	customParams, err := extractCustomQueryParams(config)
+	if err != nil {
+		return nil, err
 	}
 
-	// use custom TLS?
-	ctls := purl.Query().Get("tls")
-	if len(ctls) > 0 {
-		if _, isBool := readBool(ctls); !isBool && strings.ToLower(ctls) != "skip-verify" {
-			rootCertPool := x509.NewCertPool()
-			pem, err := ioutil.ReadFile(purl.Query().Get("x-tls-ca"))
-			if err != nil {
-				return nil, err
-			}
-
-			if ok := rootCertPool.AppendCertsFromPEM(pem); !ok {
-				return nil, ErrAppendPEM
-			}
-
-			clientCert := make([]tls.Certificate, 0, 1)
-			if ccert, ckey := purl.Query().Get("x-tls-cert"), purl.Query().Get("x-tls-key"); ccert != "" || ckey != "" {
-				if ccert == "" || ckey == "" {
-					return nil, ErrTLSCertKeyConfig
-				}
-				certs, err := tls.LoadX509KeyPair(ccert, ckey)
-				if err != nil {
-					return nil, err
-				}
-				clientCert = append(clientCert, certs)
-			}
-
-			insecureSkipVerify := false
-			if len(purl.Query().Get("x-tls-insecure-skip-verify")) > 0 {
-				x, err := strconv.ParseBool(purl.Query().Get("x-tls-insecure-skip-verify"))
-				if err != nil {
-					return nil, err
-				}
-				insecureSkipVerify = x
-			}
-
-			mysql.RegisterTLSConfig(ctls, &tls.Config{
-				RootCAs:            rootCertPool,
-				Certificates:       clientCert,
-				InsecureSkipVerify: insecureSkipVerify,
-			})
+	noLockParam, noLock := customParams["x-no-lock"], false
+	if noLockParam != "" {
+		noLock, err = strconv.ParseBool(noLockParam)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse x-no-lock as bool: %w", err)
 		}
 	}
 
-	c, err := urlToMySQLConfig(*migrate.FilterCustomQuery(purl))
-	if err != nil {
-		return nil, err
-	}
-	db, err := sql.Open("mysql", c.FormatDSN())
+	db, err := sql.Open("mysql", config.FormatDSN())
 	if err != nil {
 		return nil, err
 	}
 
 	mx, err := WithInstance(db, &Config{
-		DatabaseName:    purl.Path,
-		MigrationsTable: migrationsTable,
+		DatabaseName:    config.DBName,
+		MigrationsTable: customParams["x-migrations-table"],
+		NoLock:          noLock,
 	})
 	if err != nil {
 		return nil, err
@@ -196,7 +260,11 @@ func (m *Mysql) Open(url string) (database.Driver, error) {
 
 func (m *Mysql) Close() error {
 	connErr := m.conn.Close()
-	dbErr := m.db.Close()
+	var dbErr error
+	if m.db != nil {
+		dbErr = m.db.Close()
+	}
+
 	if connErr != nil || dbErr != nil {
 		return fmt.Errorf("conn: %v, db: %v", connErr, dbErr)
 	}
@@ -204,52 +272,53 @@ func (m *Mysql) Close() error {
 }
 
 func (m *Mysql) Lock() error {
-	if m.isLocked {
-		return database.ErrLocked
-	}
+	return database.CasRestoreOnErr(&m.isLocked, false, true, database.ErrLocked, func() error {
+		if m.config.NoLock {
+			return nil
+		}
+		aid, err := database.GenerateAdvisoryLockId(
+			fmt.Sprintf("%s:%s", m.config.DatabaseName, m.config.MigrationsTable))
+		if err != nil {
+			return err
+		}
 
-	aid, err := database.GenerateAdvisoryLockId(
-		fmt.Sprintf("%s:%s", m.config.DatabaseName, m.config.MigrationsTable))
-	if err != nil {
-		return err
-	}
+		query := "SELECT GET_LOCK(?, 10)"
+		var success bool
+		if err := m.conn.QueryRowContext(context.Background(), query, aid).Scan(&success); err != nil {
+			return &database.Error{OrigErr: err, Err: "try lock failed", Query: []byte(query)}
+		}
 
-	query := "SELECT GET_LOCK(?, 10)"
-	var success bool
-	if err := m.conn.QueryRowContext(context.Background(), query, aid).Scan(&success); err != nil {
-		return &database.Error{OrigErr: err, Err: "try lock failed", Query: []byte(query)}
-	}
+		if !success {
+			return database.ErrLocked
+		}
 
-	if success {
-		m.isLocked = true
 		return nil
-	}
-
-	return database.ErrLocked
+	})
 }
 
 func (m *Mysql) Unlock() error {
-	if !m.isLocked {
+	return database.CasRestoreOnErr(&m.isLocked, true, false, database.ErrNotLocked, func() error {
+		if m.config.NoLock {
+			return nil
+		}
+
+		aid, err := database.GenerateAdvisoryLockId(
+			fmt.Sprintf("%s:%s", m.config.DatabaseName, m.config.MigrationsTable))
+		if err != nil {
+			return err
+		}
+
+		query := `SELECT RELEASE_LOCK(?)`
+		if _, err := m.conn.ExecContext(context.Background(), query, aid); err != nil {
+			return &database.Error{OrigErr: err, Query: []byte(query)}
+		}
+
+		// NOTE: RELEASE_LOCK could return NULL or (or 0 if the code is changed),
+		// in which case isLocked should be true until the timeout expires -- synchronizing
+		// these states is likely not worth trying to do; reconsider the necessity of isLocked.
+
 		return nil
-	}
-
-	aid, err := database.GenerateAdvisoryLockId(
-		fmt.Sprintf("%s:%s", m.config.DatabaseName, m.config.MigrationsTable))
-	if err != nil {
-		return err
-	}
-
-	query := `SELECT RELEASE_LOCK(?)`
-	if _, err := m.conn.ExecContext(context.Background(), query, aid); err != nil {
-		return &database.Error{OrigErr: err, Query: []byte(query)}
-	}
-
-	// NOTE: RELEASE_LOCK could return NULL or (or 0 if the code is changed),
-	// in which case isLocked should be true until the timeout expires -- synchronizing
-	// these states is likely not worth trying to do; reconsider the necessity of isLocked.
-
-	m.isLocked = false
-	return nil
+	})
 }
 
 func (m *Mysql) Run(migration io.Reader) error {
@@ -274,14 +343,21 @@ func (m *Mysql) SetVersion(version int, dirty bool) error {
 
 	query := "TRUNCATE `" + m.config.MigrationsTable + "`"
 	if _, err := tx.ExecContext(context.Background(), query); err != nil {
-		tx.Rollback()
+		if errRollback := tx.Rollback(); errRollback != nil {
+			err = multierror.Append(err, errRollback)
+		}
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 
-	if version >= 0 {
+	// Also re-write the schema version for nil dirty versions to prevent
+	// empty schema version for failed down migration on the first migration
+	// See: https://github.com/golang-migrate/migrate/issues/330
+	if version >= 0 || (version == database.NilVersion && dirty) {
 		query := "INSERT INTO `" + m.config.MigrationsTable + "` (version, dirty) VALUES (?, ?)"
 		if _, err := tx.ExecContext(context.Background(), query, version, dirty); err != nil {
-			tx.Rollback()
+			if errRollback := tx.Rollback(); errRollback != nil {
+				err = multierror.Append(err, errRollback)
+			}
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
 	}
@@ -313,14 +389,18 @@ func (m *Mysql) Version() (version int, dirty bool, err error) {
 	}
 }
 
-func (m *Mysql) Drop() error {
+func (m *Mysql) Drop() (err error) {
 	// select all tables
 	query := `SHOW TABLES LIKE '%'`
 	tables, err := m.conn.QueryContext(context.Background(), query)
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
-	defer tables.Close()
+	defer func() {
+		if errClose := tables.Close(); errClose != nil {
+			err = multierror.Append(err, errClose)
+		}
+	}()
 
 	// delete one table after another
 	tableNames := make([]string, 0)
@@ -333,27 +413,55 @@ func (m *Mysql) Drop() error {
 			tableNames = append(tableNames, tableName)
 		}
 	}
+	if err := tables.Err(); err != nil {
+		return &database.Error{OrigErr: err, Query: []byte(query)}
+	}
 
 	if len(tableNames) > 0 {
+		// disable checking foreign key constraints until finished
+		query = `SET foreign_key_checks = 0`
+		if _, err := m.conn.ExecContext(context.Background(), query); err != nil {
+			return &database.Error{OrigErr: err, Query: []byte(query)}
+		}
+
+		defer func() {
+			// enable foreign key checks
+			_, _ = m.conn.ExecContext(context.Background(), `SET foreign_key_checks = 1`)
+		}()
+
 		// delete one by one ...
 		for _, t := range tableNames {
-			query = "DROP TABLE IF EXISTS `" + t + "` CASCADE"
+			query = "DROP TABLE IF EXISTS `" + t + "`"
 			if _, err := m.conn.ExecContext(context.Background(), query); err != nil {
 				return &database.Error{OrigErr: err, Query: []byte(query)}
 			}
-		}
-		if err := m.ensureVersionTable(); err != nil {
-			return err
 		}
 	}
 
 	return nil
 }
 
-func (m *Mysql) ensureVersionTable() error {
+// ensureVersionTable checks if versions table exists and, if not, creates it.
+// Note that this function locks the database, which deviates from the usual
+// convention of "caller locks" in the Mysql type.
+func (m *Mysql) ensureVersionTable() (err error) {
+	if err = m.Lock(); err != nil {
+		return err
+	}
+
+	defer func() {
+		if e := m.Unlock(); e != nil {
+			if err == nil {
+				err = e
+			} else {
+				err = multierror.Append(err, e)
+			}
+		}
+	}()
+
 	// check if migration table exists
 	var result string
-	query := `SHOW TABLES LIKE "` + m.config.MigrationsTable + `"`
+	query := `SHOW TABLES LIKE '` + m.config.MigrationsTable + `'`
 	if err := m.conn.QueryRowContext(context.Background(), query).Scan(&result); err != nil {
 		if err != sql.ErrNoRows {
 			return &database.Error{OrigErr: err, Query: []byte(query)}

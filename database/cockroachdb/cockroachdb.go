@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"go.uber.org/atomic"
 	"io"
 	"io/ioutil"
 	nurl "net/url"
@@ -12,7 +13,8 @@ import (
 )
 
 import (
-	"github.com/cockroachdb/cockroach-go/crdb"
+	"github.com/cockroachdb/cockroach-go/v2/crdb"
+	"github.com/hashicorp/go-multierror"
 	"github.com/lib/pq"
 )
 
@@ -45,7 +47,7 @@ type Config struct {
 
 type CockroachDb struct {
 	db       *sql.DB
-	isLocked bool
+	isLocked atomic.Bool
 
 	// Open and WithInstance need to guarantee that config is never nil
 	config *Config
@@ -60,17 +62,19 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		return nil, err
 	}
 
-	query := `SELECT current_database()`
-	var databaseName string
-	if err := instance.QueryRow(query).Scan(&databaseName); err != nil {
-		return nil, &database.Error{OrigErr: err, Query: []byte(query)}
-	}
+	if config.DatabaseName == "" {
+		query := `SELECT current_database()`
+		var databaseName string
+		if err := instance.QueryRow(query).Scan(&databaseName); err != nil {
+			return nil, &database.Error{OrigErr: err, Query: []byte(query)}
+		}
 
-	if len(databaseName) == 0 {
-		return nil, ErrNoDatabaseName
-	}
+		if len(databaseName) == 0 {
+			return nil, ErrNoDatabaseName
+		}
 
-	config.DatabaseName = databaseName
+		config.DatabaseName = databaseName
+	}
 
 	if len(config.MigrationsTable) == 0 {
 		config.MigrationsTable = DefaultMigrationsTable
@@ -85,11 +89,12 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		config: config,
 	}
 
-	if err := px.ensureVersionTable(); err != nil {
+	// ensureVersionTable is a locking operation, so we need to ensureLockTable before we ensureVersionTable.
+	if err := px.ensureLockTable(); err != nil {
 		return nil, err
 	}
 
-	if err := px.ensureLockTable(); err != nil {
+	if err := px.ensureVersionTable(); err != nil {
 		return nil, err
 	}
 
@@ -148,67 +153,67 @@ func (c *CockroachDb) Close() error {
 // Locking is done manually with a separate lock table.  Implementing advisory locks in CRDB is being discussed
 // See: https://github.com/cockroachdb/cockroach/issues/13546
 func (c *CockroachDb) Lock() error {
-	err := crdb.ExecuteTx(context.Background(), c.db, nil, func(tx *sql.Tx) error {
-		aid, err := database.GenerateAdvisoryLockId(c.config.DatabaseName)
-		if err != nil {
-			return err
-		}
+	return database.CasRestoreOnErr(&c.isLocked, false, true, database.ErrLocked, func() (err error) {
+		return crdb.ExecuteTx(context.Background(), c.db, nil, func(tx *sql.Tx) (err error) {
+			aid, err := database.GenerateAdvisoryLockId(c.config.DatabaseName)
+			if err != nil {
+				return err
+			}
 
-		query := "SELECT * FROM " + c.config.LockTable + " WHERE lock_id = $1"
-		rows, err := tx.Query(query, aid)
-		if err != nil {
-			return database.Error{OrigErr: err, Err: "failed to fetch migration lock", Query: []byte(query)}
-		}
-		defer rows.Close()
+			query := "SELECT * FROM " + c.config.LockTable + " WHERE lock_id = $1"
+			rows, err := tx.Query(query, aid)
+			if err != nil {
+				return database.Error{OrigErr: err, Err: "failed to fetch migration lock", Query: []byte(query)}
+			}
+			defer func() {
+				if errClose := rows.Close(); errClose != nil {
+					err = multierror.Append(err, errClose)
+				}
+			}()
 
-		// If row exists at all, lock is present
-		locked := rows.Next()
-		if locked && !c.config.ForceLock {
-			return database.ErrLocked
-		}
+			// If row exists at all, lock is present
+			locked := rows.Next()
+			if locked && !c.config.ForceLock {
+				return database.ErrLocked
+			}
 
-		query = "INSERT INTO " + c.config.LockTable + " (lock_id) VALUES ($1)"
-		if _, err := tx.Exec(query, aid); err != nil {
-			return database.Error{OrigErr: err, Err: "failed to set migration lock", Query: []byte(query)}
-		}
+			query = "INSERT INTO " + c.config.LockTable + " (lock_id) VALUES ($1)"
+			if _, err := tx.Exec(query, aid); err != nil {
+				return database.Error{OrigErr: err, Err: "failed to set migration lock", Query: []byte(query)}
+			}
 
-		return nil
+			return nil
+		})
 	})
-
-	if err != nil {
-		return err
-	} else {
-		c.isLocked = true
-		return nil
-	}
 }
 
 // Locking is done manually with a separate lock table.  Implementing advisory locks in CRDB is being discussed
 // See: https://github.com/cockroachdb/cockroach/issues/13546
 func (c *CockroachDb) Unlock() error {
-	aid, err := database.GenerateAdvisoryLockId(c.config.DatabaseName)
-	if err != nil {
-		return err
-	}
-
-	// In the event of an implementation (non-migration) error, it is possible for the lock to not be released.  Until
-	// a better locking mechanism is added, a manual purging of the lock table may be required in such circumstances
-	query := "DELETE FROM " + c.config.LockTable + " WHERE lock_id = $1"
-	if _, err := c.db.Exec(query, aid); err != nil {
-		if e, ok := err.(*pq.Error); ok {
-			// 42P01 is "UndefinedTableError" in CockroachDB
-			// https://github.com/cockroachdb/cockroach/blob/master/pkg/sql/pgwire/pgerror/codes.go
-			if e.Code == "42P01" {
-				// On drops, the lock table is fully removed;  This is fine, and is a valid "unlocked" state for the schema
-				c.isLocked = false
-				return nil
-			}
+	return database.CasRestoreOnErr(&c.isLocked, true, false, database.ErrNotLocked, func() (err error) {
+		aid, err := database.GenerateAdvisoryLockId(c.config.DatabaseName)
+		if err != nil {
+			return err
 		}
-		return database.Error{OrigErr: err, Err: "failed to release migration lock", Query: []byte(query)}
-	}
 
-	c.isLocked = false
-	return nil
+		// In the event of an implementation (non-migration) error, it is possible for the lock to not be released.  Until
+		// a better locking mechanism is added, a manual purging of the lock table may be required in such circumstances
+		query := "DELETE FROM " + c.config.LockTable + " WHERE lock_id = $1"
+		if _, err := c.db.Exec(query, aid); err != nil {
+			if e, ok := err.(*pq.Error); ok {
+				// 42P01 is "UndefinedTableError" in CockroachDB
+				// https://github.com/cockroachdb/cockroach/blob/master/pkg/sql/pgwire/pgerror/codes.go
+				if e.Code == "42P01" {
+					// On drops, the lock table is fully removed;  This is fine, and is a valid "unlocked" state for the schema
+					return nil
+				}
+			}
+
+			return database.Error{OrigErr: err, Err: "failed to release migration lock", Query: []byte(query)}
+		}
+
+		return nil
+	})
 }
 
 func (c *CockroachDb) Run(migration io.Reader) error {
@@ -232,7 +237,10 @@ func (c *CockroachDb) SetVersion(version int, dirty bool) error {
 			return err
 		}
 
-		if version >= 0 {
+		// Also re-write the schema version for nil dirty versions to prevent
+		// empty schema version for failed down migration on the first migration
+		// See: https://github.com/golang-migrate/migrate/issues/330
+		if version >= 0 || (version == database.NilVersion && dirty) {
 			if _, err := tx.Exec(`INSERT INTO "`+c.config.MigrationsTable+`" (version, dirty) VALUES ($1, $2)`, version, dirty); err != nil {
 				return err
 			}
@@ -265,14 +273,18 @@ func (c *CockroachDb) Version() (version int, dirty bool, err error) {
 	}
 }
 
-func (c *CockroachDb) Drop() error {
+func (c *CockroachDb) Drop() (err error) {
 	// select all tables in current schema
 	query := `SELECT table_name FROM information_schema.tables WHERE table_schema=(SELECT current_schema())`
 	tables, err := c.db.Query(query)
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
-	defer tables.Close()
+	defer func() {
+		if errClose := tables.Close(); errClose != nil {
+			err = multierror.Append(err, errClose)
+		}
+	}()
 
 	// delete one table after another
 	tableNames := make([]string, 0)
@@ -285,6 +297,9 @@ func (c *CockroachDb) Drop() error {
 			tableNames = append(tableNames, tableName)
 		}
 	}
+	if err := tables.Err(); err != nil {
+		return &database.Error{OrigErr: err, Query: []byte(query)}
+	}
 
 	if len(tableNames) > 0 {
 		// delete one by one ...
@@ -294,15 +309,29 @@ func (c *CockroachDb) Drop() error {
 				return &database.Error{OrigErr: err, Query: []byte(query)}
 			}
 		}
-		if err := c.ensureVersionTable(); err != nil {
-			return err
-		}
 	}
 
 	return nil
 }
 
-func (c *CockroachDb) ensureVersionTable() error {
+// ensureVersionTable checks if versions table exists and, if not, creates it.
+// Note that this function locks the database, which deviates from the usual
+// convention of "caller locks" in the CockroachDb type.
+func (c *CockroachDb) ensureVersionTable() (err error) {
+	if err = c.Lock(); err != nil {
+		return err
+	}
+
+	defer func() {
+		if e := c.Unlock(); e != nil {
+			if err == nil {
+				err = e
+			} else {
+				err = multierror.Append(err, e)
+			}
+		}
+	}()
+
 	// check if migration table exists
 	var count int
 	query := `SELECT COUNT(1) FROM information_schema.tables WHERE table_name = $1 AND table_schema = (SELECT current_schema()) LIMIT 1`

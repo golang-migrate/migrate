@@ -1,4 +1,6 @@
-// Package testing is used in driver tests.
+// Package testing is used in driver tests and should only be used by migrate tests.
+//
+// Deprecated: If you'd like to test using Docker images, use package github.com/dhui/dktest instead
 package testing
 
 import (
@@ -11,6 +13,7 @@ import (
 	dockercontainer "github.com/docker/docker/api/types/container"
 	dockernetwork "github.com/docker/docker/api/types/network"
 	dockerclient "github.com/docker/docker/client"
+	"github.com/hashicorp/go-multierror"
 	"io"
 	"math/rand"
 	"strconv"
@@ -20,7 +23,10 @@ import (
 )
 
 func NewDockerContainer(t testing.TB, image string, env []string, cmd []string) (*DockerContainer, error) {
-	c, err := dockerclient.NewEnvClient()
+	c, err := dockerclient.NewClientWithOpts(
+		dockerclient.FromEnv,
+		dockerclient.WithAPIVersionNegotiation(),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +68,7 @@ type DockerContainer struct {
 	keepForDebugging   bool
 }
 
-func (d *DockerContainer) PullImage() error {
+func (d *DockerContainer) PullImage() (err error) {
 	if d == nil {
 		return errors.New("Cannot pull image on a nil *DockerContainer")
 	}
@@ -71,7 +77,11 @@ func (d *DockerContainer) PullImage() error {
 	if err != nil {
 		return err
 	}
-	defer r.Close()
+	defer func() {
+		if errClose := r.Close(); errClose != nil {
+			err = multierror.Append(errClose)
+		}
+	}()
 
 	// read output and log relevant lines
 	bf := bufio.NewScanner(r)
@@ -106,6 +116,7 @@ func (d *DockerContainer) Start() error {
 			PublishAllPorts: true,
 		},
 		&dockernetwork.NetworkingConfig{},
+		nil,
 		containerName)
 	if err != nil {
 		return err
@@ -189,7 +200,7 @@ func (d *DockerContainer) Logs() (io.ReadCloser, error) {
 	})
 }
 
-func (d *DockerContainer) portMapping(selectFirst bool, cPort int) (containerPort uint, hostIP string, hostPort uint, err error) {
+func (d *DockerContainer) portMapping(selectFirst bool, cPort int) (containerPort uint, hostIP string, hostPort uint, err error) { // nolint:unparam
 	if !d.containerInspected {
 		if err := d.Inspect(); err != nil {
 			d.t.Fatal(err)
@@ -208,7 +219,7 @@ func (d *DockerContainer) portMapping(selectFirst bool, cPort int) (containerPor
 				return 0, "", 0, err
 			}
 
-			return uint(port.Int()), binding.HostIP, uint(hostPortUint), nil
+			return uint(port.Int()), binding.HostIP, uint(hostPortUint), nil // nolint: staticcheck
 		}
 	}
 

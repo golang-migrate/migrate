@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v2
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go: ["1.16.x", "1.17.x"]
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go }}
+
+      - name: Run test
+        run: make test COVERAGE_DIR=/tmp/coverage
+
+      - name: Send goveralls coverage
+        uses: shogo82148/actions-goveralls@v1
+        with:
+          path-to-profile: /tmp/coverage/combined.txt
+          flag-name: Go-${{ matrix.go }}
+          parallel: true
+
+  check-coverage:
+    name: Check coverage
+    needs: [test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: shogo82148/actions-goveralls@v1
+        with:
+          parallel-finished: true
+
+  goreleaser:
+    name: Release a new version
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    environment: GoReleaser
+    # This job only runs when
+    # 1. When the previous `lint` and `test` jobs has completed successfully
+    # 2. When the repository is not a fork, i.e. it will only run on the official golang-migrate/migrate
+    # 3. When the workflow is triggered by a tag with `v` prefix
+    if: ${{ success() && github.repository == 'golang-migrate/migrate' && startsWith(github.ref, 'refs/tags/v') }}
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 2.7
+      - uses: actions/setup-go@v2
+        with:
+          go-version: "1.17.x"
+
+      - uses: docker/setup-qemu-action@v1
+      - uses: docker/setup-buildx-action@v1
+      - uses: docker/login-action@v1
+        with:
+          username: golangmigrate
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - run: echo "SOURCE=$(make echo-source)" >> $GITHUB_ENV
+      - run: echo "DATABASE=$(make echo-database)" >> $GITHUB_ENV
+
+      - uses: goreleaser/goreleaser-action@v2
+        with:
+          version: latest
+          args: release --rm-dist
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - run: gem install package_cloud
+      - run: package_cloud push golang-migrate/migrate/ubuntu/bionic dist/migrate.linux-amd64.deb
+        env:
+          PACKAGECLOUD_TOKEN: ${{ secrets.PACKAGECLOUD_TOKEN }}
+      - run: package_cloud push golang-migrate/migrate/ubuntu/focal dist/migrate.linux-amd64.deb
+        env:
+          PACKAGECLOUD_TOKEN: ${{ secrets.PACKAGECLOUD_TOKEN }}
+      - run: package_cloud push golang-migrate/migrate/debian/buster dist/migrate.linux-amd64.deb
+        env:
+          PACKAGECLOUD_TOKEN: ${{ secrets.PACKAGECLOUD_TOKEN }}
+      - run: package_cloud push golang-migrate/migrate/debian/bullseye dist/migrate.linux-amd64.deb
+        env:
+          PACKAGECLOUD_TOKEN: ${{ secrets.PACKAGECLOUD_TOKEN }}

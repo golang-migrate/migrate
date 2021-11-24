@@ -1,30 +1,49 @@
 package cassandra
 
 import (
+	"context"
 	"fmt"
+	"github.com/golang-migrate/migrate/v4"
 	"strconv"
 	"testing"
-
-	"github.com/gocql/gocql"
-
-	dt "github.com/golang-migrate/migrate/v4/database/testing"
-	mt "github.com/golang-migrate/migrate/v4/testing"
 )
 
-var versions = []mt.Version{
-	{Image: "cassandra:3.0.10"},
-	{Image: "cassandra:3.0"},
-}
+import (
+	"github.com/dhui/dktest"
+	"github.com/gocql/gocql"
+)
 
-func isReady(i mt.Instance) bool {
+import (
+	dt "github.com/golang-migrate/migrate/v4/database/testing"
+	"github.com/golang-migrate/migrate/v4/dktesting"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
+)
+
+var (
+	opts = dktest.Options{PortRequired: true, ReadyFunc: isReady}
+	// Supported versions: http://cassandra.apache.org/download/
+	// Although Cassandra 2.x is supported by the Apache Foundation,
+	// the migrate db driver only supports Cassandra 3.x since it uses
+	// the system_schema keyspace.
+	specs = []dktesting.ContainerSpec{
+		{ImageName: "cassandra:3.0", Options: opts},
+		{ImageName: "cassandra:3.11", Options: opts},
+	}
+)
+
+func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 	// Cassandra exposes 5 ports (7000, 7001, 7199, 9042 & 9160)
-	// We only need the port bound to 9042, but we can only access to the first one
-	// through 'i.Port()' (which calls DockerContainer.firstPortMapping())
-	// So we need to get port mapping to retrieve correct port number bound to 9042
-	portMap := i.NetworkSettings().Ports
-	port, _ := strconv.Atoi(portMap["9042/tcp"][0].HostPort)
+	// We only need the port bound to 9042
+	ip, portStr, err := c.Port(9042)
+	if err != nil {
+		return false
+	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return false
+	}
 
-	cluster := gocql.NewCluster(i.Host())
+	cluster := gocql.NewCluster(ip)
 	cluster.Port = port
 	cluster.Consistency = gocql.All
 	p, err := cluster.CreateSession()
@@ -40,17 +59,48 @@ func isReady(i mt.Instance) bool {
 }
 
 func Test(t *testing.T) {
-	mt.ParallelTest(t, versions, isReady,
-		func(t *testing.T, i mt.Instance) {
-			p := &Cassandra{}
-			portMap := i.NetworkSettings().Ports
-			port, _ := strconv.Atoi(portMap["9042/tcp"][0].HostPort)
-			addr := fmt.Sprintf("cassandra://%v:%v/testks", i.Host(), port)
-			d, err := p.Open(addr)
-			if err != nil {
-				t.Fatalf("%v", err)
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.Port(9042)
+		if err != nil {
+			t.Fatal("Unable to get mapped port:", err)
+		}
+		addr := fmt.Sprintf("cassandra://%v:%v/testks", ip, port)
+		p := &Cassandra{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
 			}
-			defer d.Close()
-			dt.Test(t, d, []byte("SELECT table_name from system_schema.tables"))
-		})
+		}()
+		dt.Test(t, d, []byte("SELECT table_name from system_schema.tables"))
+	})
+}
+
+func TestMigrate(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.Port(9042)
+		if err != nil {
+			t.Fatal("Unable to get mapped port:", err)
+		}
+		addr := fmt.Sprintf("cassandra://%v:%v/testks", ip, port)
+		p := &Cassandra{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
+
+		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "testks", d)
+		if err != nil {
+			t.Fatal(err)
+		}
+		dt.TestMigrate(t, m)
+	})
 }

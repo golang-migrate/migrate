@@ -7,12 +7,14 @@ package database
 import (
 	"fmt"
 	"io"
-	nurl "net/url"
 	"sync"
+
+	iurl "github.com/golang-migrate/migrate/v4/internal/url"
 )
 
 var (
-	ErrLocked = fmt.Errorf("can't acquire lock")
+	ErrLocked    = fmt.Errorf("can't acquire lock")
+	ErrNotLocked = fmt.Errorf("can't unlock, as not currently locked")
 )
 
 const NilVersion int = -1
@@ -32,7 +34,7 @@ var drivers = make(map[string]Driver)
 //      All other functions are tested by tests in database/testing.
 //      Saves you some time and makes sure all database drivers behave the same way.
 //   5. Call Register in init().
-//   6. Create a migrate/cli/build_<driver-name>.go file
+//   6. Create a internal/cli/build_<driver-name>.go file
 //   7. Add driver name in 'DATABASE' variable in Makefile
 //
 // Guidelines:
@@ -60,7 +62,7 @@ type Driver interface {
 	// all migrations have been run.
 	Unlock() error
 
-	// Run applies a migration to the database. migration is garantueed to be not nil.
+	// Run applies a migration to the database. migration is guaranteed to be not nil.
 	Run(migration io.Reader) error
 
 	// SetVersion saves version and dirty state.
@@ -74,26 +76,23 @@ type Driver interface {
 	Version() (version int, dirty bool, err error)
 
 	// Drop deletes everything in the database.
+	// Note that this is a breaking action, a new call to Open() is necessary to
+	// ensure subsequent calls work as expected.
 	Drop() error
 }
 
 // Open returns a new driver instance.
 func Open(url string) (Driver, error) {
-	u, err := nurl.Parse(url)
+	scheme, err := iurl.SchemeFromURL(url)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to parse URL. Did you escape all reserved URL characters? "+
-			"See: https://github.com/golang-migrate/migrate#database-urls Error: %v", err)
-	}
-
-	if u.Scheme == "" {
-		return nil, fmt.Errorf("database driver: invalid URL scheme")
+		return nil, err
 	}
 
 	driversMu.RLock()
-	d, ok := drivers[u.Scheme]
+	d, ok := drivers[scheme]
 	driversMu.RUnlock()
 	if !ok {
-		return nil, fmt.Errorf("database driver: unknown driver %v (forgotten import?)", u.Scheme)
+		return nil, fmt.Errorf("database driver: unknown driver %v (forgotten import?)", scheme)
 	}
 
 	return d.Open(url)

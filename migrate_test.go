@@ -3,11 +3,15 @@ package migrate
 import (
 	"bytes"
 	"database/sql"
+	"errors"
 	"io/ioutil"
 	"log"
 	"os"
+	"strings"
 	"testing"
+)
 
+import (
 	dStub "github.com/golang-migrate/migrate/v4/database/stub"
 	"github.com/golang-migrate/migrate/v4/source"
 	sStub "github.com/golang-migrate/migrate/v4/source/stub"
@@ -18,6 +22,11 @@ import (
 //  |  1  |  -  |  3  |  4  |  5  |  -  |  7  |
 //  | u d |  -  | u   | u d |   d |  -  | u d |
 var sourceStubMigrations *source.Migrations
+
+const (
+	srcDrvNameStub = "stub"
+	dbDrvNameStub  = "stub"
+)
 
 func init() {
 	sourceStubMigrations = source.NewMigrations()
@@ -39,14 +48,14 @@ func TestNew(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if m.sourceName != "stub" {
+	if m.sourceName != srcDrvNameStub {
 		t.Errorf("expected stub, got %v", m.sourceName)
 	}
 	if m.sourceDrv == nil {
 		t.Error("expected sourceDrv not to be nil")
 	}
 
-	if m.databaseName != "stub" {
+	if m.databaseName != dbDrvNameStub {
 		t.Errorf("expected stub, got %v", m.databaseName)
 	}
 	if m.databaseDrv == nil {
@@ -62,7 +71,7 @@ func ExampleNew() {
 	}
 
 	// Migrate all the way up ...
-	if err := m.Up(); err != nil {
+	if err := m.Up(); err != nil && err != ErrNoChange {
 		log.Fatal(err)
 	}
 }
@@ -74,19 +83,19 @@ func TestNewWithDatabaseInstance(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	m, err := NewWithDatabaseInstance("stub://", "stub", dbInst)
+	m, err := NewWithDatabaseInstance("stub://", dbDrvNameStub, dbInst)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if m.sourceName != "stub" {
+	if m.sourceName != srcDrvNameStub {
 		t.Errorf("expected stub, got %v", m.sourceName)
 	}
 	if m.sourceDrv == nil {
 		t.Error("expected sourceDrv not to be nil")
 	}
 
-	if m.databaseName != "stub" {
+	if m.databaseName != dbDrvNameStub {
 		t.Errorf("expected stub, got %v", m.databaseName)
 	}
 	if m.databaseDrv == nil {
@@ -100,7 +109,11 @@ func ExampleNewWithDatabaseInstance() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Fatal(err)
+		}
+	}()
 
 	// Create driver instance from db.
 	// Check each driver if it supports the WithInstance function.
@@ -129,19 +142,19 @@ func TestNewWithSourceInstance(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	m, err := NewWithSourceInstance("stub", sInst, "stub://")
+	m, err := NewWithSourceInstance(srcDrvNameStub, sInst, "stub://")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if m.sourceName != "stub" {
+	if m.sourceName != srcDrvNameStub {
 		t.Errorf("expected stub, got %v", m.sourceName)
 	}
 	if m.sourceDrv == nil {
 		t.Error("expected sourceDrv not to be nil")
 	}
 
-	if m.databaseName != "stub" {
+	if m.databaseName != dbDrvNameStub {
 		t.Errorf("expected stub, got %v", m.databaseName)
 	}
 	if m.databaseDrv == nil {
@@ -161,7 +174,7 @@ func ExampleNewWithSourceInstance() {
 	}
 
 	// Read migrations from Stub and connect to a local postgres database.
-	m, err := NewWithSourceInstance("stub", instance, "postgres://mattes:secret@localhost:5432/database?sslmode=disable")
+	m, err := NewWithSourceInstance(srcDrvNameStub, instance, "postgres://mattes:secret@localhost:5432/database?sslmode=disable")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -185,19 +198,19 @@ func TestNewWithInstance(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	m, err := NewWithInstance("stub", sInst, "stub", dbInst)
+	m, err := NewWithInstance(srcDrvNameStub, sInst, dbDrvNameStub, dbInst)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if m.sourceName != "stub" {
+	if m.sourceName != srcDrvNameStub {
 		t.Errorf("expected stub, got %v", m.sourceName)
 	}
 	if m.sourceDrv == nil {
 		t.Error("expected sourceDrv not to be nil")
 	}
 
-	if m.databaseName != "stub" {
+	if m.databaseName != dbDrvNameStub {
 		t.Errorf("expected stub, got %v", m.databaseName)
 	}
 	if m.databaseDrv == nil {
@@ -456,7 +469,7 @@ func TestMigrate(t *testing.T) {
 
 	for i, v := range tt {
 		err := m.Migrate(v.version)
-		if (v.expectErr == os.ErrNotExist && !os.IsNotExist(err)) ||
+		if (v.expectErr == os.ErrNotExist && !errors.Is(err, os.ErrNotExist)) ||
 			(v.expectErr != os.ErrNotExist && err != v.expectErr) {
 			t.Errorf("expected err %v, got %v, in %v", v.expectErr, err, i)
 
@@ -719,7 +732,7 @@ func TestSteps(t *testing.T) {
 
 	for i, v := range tt {
 		err := m.Steps(v.steps)
-		if (v.expectErr == os.ErrNotExist && !os.IsNotExist(err)) ||
+		if (v.expectErr == os.ErrNotExist && !errors.Is(err, os.ErrNotExist)) ||
 			(v.expectErr != os.ErrNotExist && err != v.expectErr) {
 			t.Errorf("expected err %v, got %v, in %v", v.expectErr, err, i)
 
@@ -1131,7 +1144,7 @@ func TestRead(t *testing.T) {
 		go m.read(v.from, v.to, ret)
 		migrations, err := migrationsFromChannel(ret)
 
-		if (v.expectErr == os.ErrNotExist && !os.IsNotExist(err)) ||
+		if (v.expectErr == os.ErrNotExist && !errors.Is(err, os.ErrNotExist)) ||
 			(v.expectErr != os.ErrNotExist && v.expectErr != err) {
 			t.Errorf("expected %v, got %v, in %v", v.expectErr, err, i)
 			t.Logf("%v, in %v", migrations, i)
@@ -1208,7 +1221,7 @@ func TestReadUp(t *testing.T) {
 		go m.readUp(v.from, v.limit, ret)
 		migrations, err := migrationsFromChannel(ret)
 
-		if (v.expectErr == os.ErrNotExist && !os.IsNotExist(err)) ||
+		if (v.expectErr == os.ErrNotExist && !errors.Is(err, os.ErrNotExist)) ||
 			(v.expectErr != os.ErrNotExist && v.expectErr != err) {
 			t.Errorf("expected %v, got %v, in %v", v.expectErr, err, i)
 			t.Logf("%v, in %v", migrations, i)
@@ -1285,7 +1298,7 @@ func TestReadDown(t *testing.T) {
 		go m.readDown(v.from, v.limit, ret)
 		migrations, err := migrationsFromChannel(ret)
 
-		if (v.expectErr == os.ErrNotExist && !os.IsNotExist(err)) ||
+		if (v.expectErr == os.ErrNotExist && !errors.Is(err, os.ErrNotExist)) ||
 			(v.expectErr != os.ErrNotExist && v.expectErr != err) {
 			t.Errorf("expected %v, got %v, in %v", v.expectErr, err, i)
 			t.Logf("%v, in %v", migrations, i)
@@ -1310,12 +1323,12 @@ func TestLock(t *testing.T) {
 func migrationsFromChannel(ret chan interface{}) ([]*Migration, error) {
 	slice := make([]*Migration, 0)
 	for r := range ret {
-		switch r.(type) {
+		switch t := r.(type) {
 		case error:
-			return slice, r.(error)
+			return slice, t
 
 		case *Migration:
-			slice = append(slice, r.(*Migration))
+			slice = append(slice, t)
 		}
 	}
 	return slice, nil
@@ -1327,7 +1340,7 @@ func newMigSeq(migr ...*Migration) migrationSequence {
 	return migr
 }
 
-func (m *migrationSequence) add(migr ...*Migration) migrationSequence {
+func (m *migrationSequence) add(migr ...*Migration) migrationSequence { // nolint:unused
 	*m = append(*m, migr...)
 	return *m
 }
@@ -1375,7 +1388,7 @@ func M(version uint, targetVersion ...int) *Migration {
 // mr is a convenience func to create a new *Migration from the raw database query
 func mr(value string) *Migration {
 	return &Migration{
-		Body: ioutil.NopCloser(bytes.NewReader([]byte(value))),
+		Body: ioutil.NopCloser(strings.NewReader(value)),
 	}
 }
 

@@ -5,6 +5,7 @@ package testing
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"testing"
@@ -16,14 +17,15 @@ import (
 // Test runs tests against database implementations.
 func Test(t *testing.T, d database.Driver, migration []byte) {
 	if migration == nil {
-		panic("test must provide migration reader")
+		t.Fatal("test must provide migration reader")
 	}
 
 	TestNilVersion(t, d) // test first
 	TestLockAndUnlock(t, d)
 	TestRun(t, d, bytes.NewReader(migration))
-	TestDrop(t, d)
 	TestSetVersion(t, d) // also tests Version()
+	// Drop breaks the driver, so test it last.
+	TestDrop(t, d)
 }
 
 func TestNilVersion(t *testing.T, d database.Driver) {
@@ -38,7 +40,9 @@ func TestNilVersion(t *testing.T, d database.Driver) {
 
 func TestLockAndUnlock(t *testing.T, d database.Driver) {
 	// add a timeout, in case there is a deadlock
-	done := make(chan bool, 1)
+	done := make(chan struct{})
+	errs := make(chan error)
+
 	go func() {
 		timeout := time.After(15 * time.Second)
 		for {
@@ -46,42 +50,58 @@ func TestLockAndUnlock(t *testing.T, d database.Driver) {
 			case <-done:
 				return
 			case <-timeout:
-				panic(fmt.Sprintf("Timeout after 15 seconds. Looks like a deadlock in Lock/UnLock.\n%#v", d))
+				errs <- fmt.Errorf("Timeout after 15 seconds. Looks like a deadlock in Lock/UnLock.\n%#v", d)
+				return
 			}
 		}
 	}()
-	defer func() {
-		done <- true
-	}()
 
 	// run the locking test ...
+	go func() {
+		if err := d.Lock(); err != nil {
+			errs <- err
+			return
+		}
 
-	if err := d.Lock(); err != nil {
-		t.Fatal(err)
-	}
+		// try to acquire lock again
+		if err := d.Lock(); err == nil {
+			errs <- errors.New("lock: expected err not to be nil")
+			return
+		}
 
-	// try to acquire lock again
-	if err := d.Lock(); err == nil {
-		t.Fatal("Lock: expected err not to be nil")
-	}
+		// unlock
+		if err := d.Unlock(); err != nil {
+			errs <- err
+			return
+		}
 
-	// unlock
-	if err := d.Unlock(); err != nil {
-		t.Fatal(err)
-	}
+		// try to lock
+		if err := d.Lock(); err != nil {
+			errs <- err
+			return
+		}
+		if err := d.Unlock(); err != nil {
+			errs <- err
+			return
+		}
+		// notify everyone
+		close(done)
+	}()
 
-	// try to lock
-	if err := d.Lock(); err != nil {
-		t.Fatal(err)
-	}
-	if err := d.Unlock(); err != nil {
-		t.Fatal(err)
+	// wait for done or any error
+	for {
+		select {
+		case <-done:
+			return
+		case err := <-errs:
+			t.Fatal(err)
+		}
 	}
 }
 
 func TestRun(t *testing.T, d database.Driver, migration io.Reader) {
 	if migration == nil {
-		panic("migration can't be nil")
+		t.Fatal("migration can't be nil")
 	}
 
 	if err := d.Run(migration); err != nil {
@@ -96,43 +116,40 @@ func TestDrop(t *testing.T, d database.Driver) {
 }
 
 func TestSetVersion(t *testing.T, d database.Driver) {
-	if err := d.SetVersion(1, true); err != nil {
-		t.Fatal(err)
+	// nolint:maligned
+	testCases := []struct {
+		name            string
+		version         int
+		dirty           bool
+		expectedErr     error
+		expectedReadErr error
+		expectedVersion int
+		expectedDirty   bool
+	}{
+		{name: "set 1 dirty", version: 1, dirty: true, expectedErr: nil, expectedReadErr: nil, expectedVersion: 1, expectedDirty: true},
+		{name: "re-set 1 dirty", version: 1, dirty: true, expectedErr: nil, expectedReadErr: nil, expectedVersion: 1, expectedDirty: true},
+		{name: "set 2 clean", version: 2, dirty: false, expectedErr: nil, expectedReadErr: nil, expectedVersion: 2, expectedDirty: false},
+		{name: "re-set 2 clean", version: 2, dirty: false, expectedErr: nil, expectedReadErr: nil, expectedVersion: 2, expectedDirty: false},
+		{name: "last migration dirty", version: database.NilVersion, dirty: true, expectedErr: nil, expectedReadErr: nil, expectedVersion: database.NilVersion, expectedDirty: true},
+		{name: "last migration clean", version: database.NilVersion, dirty: false, expectedErr: nil, expectedReadErr: nil, expectedVersion: database.NilVersion, expectedDirty: false},
 	}
 
-	// call again
-	if err := d.SetVersion(1, true); err != nil {
-		t.Fatal(err)
-	}
-
-	v, dirty, err := d.Version()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !dirty {
-		t.Fatal("expected dirty")
-	}
-	if v != 1 {
-		t.Fatal("expected version to be 1")
-	}
-
-	if err := d.SetVersion(2, false); err != nil {
-		t.Fatal(err)
-	}
-
-	// call again
-	if err := d.SetVersion(2, false); err != nil {
-		t.Fatal(err)
-	}
-
-	v, dirty, err = d.Version()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if dirty {
-		t.Fatal("expected not dirty")
-	}
-	if v != 2 {
-		t.Fatal("expected version to be 2")
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := d.SetVersion(tc.version, tc.dirty)
+			if err != tc.expectedErr {
+				t.Fatal("Got unexpected error:", err, "!=", tc.expectedErr)
+			}
+			v, dirty, readErr := d.Version()
+			if readErr != tc.expectedReadErr {
+				t.Fatal("Got unexpected error:", readErr, "!=", tc.expectedReadErr)
+			}
+			if v != tc.expectedVersion {
+				t.Error("Got unexpected version:", v, "!=", tc.expectedVersion)
+			}
+			if dirty != tc.expectedDirty {
+				t.Error("Got unexpected dirty value:", dirty, "!=", tc.dirty)
+			}
+		})
 	}
 }

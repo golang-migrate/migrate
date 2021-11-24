@@ -26,5 +26,8 @@ func Example_mapfs() {
 	if err != nil {
 		panic("error creating the migrations")
 	}
-	m.Up()
+	err = m.Up()
+	if err != nil {
+		panic("up failed")
+	}
 }

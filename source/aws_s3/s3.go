@@ -21,37 +21,64 @@ func init() {
 
 type s3Driver struct {
 	s3client   s3iface.S3API
-	bucket     string
-	prefix     string
+	config     *Config
 	migrations *source.Migrations
 }
 
+type Config struct {
+	Bucket string
+	Prefix string
+}
+
 func (s *s3Driver) Open(folder string) (source.Driver, error) {
-	u, err := url.Parse(folder)
+	config, err := parseURI(folder)
 	if err != nil {
 		return nil, err
 	}
+
 	sess, err := session.NewSession()
 	if err != nil {
 		return nil, err
 	}
-	driver := s3Driver{
-		bucket:     u.Host,
-		prefix:     strings.Trim(u.Path, "/") + "/",
-		s3client:   s3.New(sess),
+
+	return WithInstance(s3.New(sess), config)
+}
+
+func WithInstance(s3client s3iface.S3API, config *Config) (source.Driver, error) {
+	driver := &s3Driver{
+		config:     config,
+		s3client:   s3client,
 		migrations: source.NewMigrations(),
 	}
-	err = driver.loadMigrations()
+
+	if err := driver.loadMigrations(); err != nil {
+		return nil, err
+	}
+
+	return driver, nil
+}
+
+func parseURI(uri string) (*Config, error) {
+	u, err := url.Parse(uri)
 	if err != nil {
 		return nil, err
 	}
-	return &driver, nil
+
+	prefix := strings.Trim(u.Path, "/")
+	if prefix != "" {
+		prefix += "/"
+	}
+
+	return &Config{
+		Bucket: u.Host,
+		Prefix: prefix,
+	}, nil
 }
 
 func (s *s3Driver) loadMigrations() error {
 	output, err := s.s3client.ListObjects(&s3.ListObjectsInput{
-		Bucket:    aws.String(s.bucket),
-		Prefix:    aws.String(s.prefix),
+		Bucket:    aws.String(s.config.Bucket),
+		Prefix:    aws.String(s.config.Prefix),
 		Delimiter: aws.String("/"),
 	})
 	if err != nil {
@@ -113,9 +140,9 @@ func (s *s3Driver) ReadDown(version uint) (io.ReadCloser, string, error) {
 }
 
 func (s *s3Driver) open(m *source.Migration) (io.ReadCloser, string, error) {
-	key := path.Join(s.prefix, m.Raw)
+	key := path.Join(s.config.Prefix, m.Raw)
 	object, err := s.s3client.GetObject(&s3.GetObjectInput{
-		Bucket: aws.String(s.bucket),
+		Bucket: aws.String(s.config.Bucket),
 		Key:    aws.String(key),
 	})
 	if err != nil {
