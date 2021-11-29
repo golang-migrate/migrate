@@ -684,6 +684,44 @@ func TestWithInstance_Concurrent(t *testing.T) {
 		}
 	})
 }
+
+func TestWithConnection(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		db, err := sql.Open("postgres", pgConnectionString(ip, port))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := db.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
+
+		ctx := context.Background()
+		conn, err := db.Conn(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		p, err := WithConnection(ctx, conn, &Config{})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		defer func() {
+			if err := p.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
+		dt.Test(t, p, []byte("SELECT 1"))
+	})
+}
+
 func Test_computeLineFromPos(t *testing.T) {
 	testcases := []struct {
 		pos      int
