@@ -1,5 +1,5 @@
 # pkger
-```
+```go
 package main
 
 import (

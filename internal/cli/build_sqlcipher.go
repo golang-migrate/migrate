@@ -1,3 +1,4 @@
+//go:build sqlcipher
 // +build sqlcipher
 
 package cli

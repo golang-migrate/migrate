@@ -69,6 +69,7 @@ Source drivers read migrations from local or remote sources. [Add a new source?]
 
 * [Filesystem](source/file) - read from filesystem
 * [Go-Bindata](source/go_bindata) - read from embedded binary data ([jteeuwen/go-bindata](https://github.com/jteeuwen/go-bindata))
+* [pkger](source/pkger) - read from embedded binary data ([markbates/pkger](https://github.com/markbates/pkger))
 * [GitHub](source/github) - read from remote GitHub repositories
 * [GitHub Enterprise](source/github_ee) - read from remote GitHub Enterprise repositories
 * [Bitbucket](source/bitbucket) - read from remote Bitbucket repositories
