@@ -1,4 +1,7 @@
-# google_cloud_storage
+# Google Cloud Storage
+
+
+## Import
 
 ```go
 import (
@@ -6,5 +9,6 @@ import (
  )
  ```
 
+## Connection String
 
 `gcs://<bucket>/<prefix>`
