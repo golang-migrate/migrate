@@ -1,0 +1,31 @@
+{
+    "alter": [
+      {
+        "schema": [
+            "type <User> {",
+                "User.name",
+                "User.email",
+            "}"]
+      },
+      {
+          "drop_op": "ATTR",
+          "drop_value": "Book.name"
+      },
+      {
+          "drop_op": "ATTR",
+          "drop_value": "Book.author"
+      },
+      {
+          "drop_op": "ATTR",
+          "drop_value": "Book.owner"
+      },
+      {
+          "drop_op": "ATTR",
+          "drop_value": "User.books"
+      },
+      {
+          "drop_op": "TYPE",
+          "drop_value": "Book"
+      }
+    ]
+  }

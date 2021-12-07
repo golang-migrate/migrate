@@ -1,0 +1,7 @@
+{
+    "alter": [
+        {
+            "schema": ["<User.email>: string @index(exact) ."]
+        }
+    ]
+}

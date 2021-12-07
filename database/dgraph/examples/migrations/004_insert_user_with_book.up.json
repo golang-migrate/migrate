@@ -1,0 +1,16 @@
+{
+    "mutation": [
+      {
+        "set_json": {
+            "User.name":"JohnDoe",
+            "User.email":"john.doe@mail.com",
+            "dgraph.type":"User",
+            "User.books": [{
+                "Book.name":"DGraph Whitepaper",
+                "Book.author":"Manish Jain",
+                "dgraph.type":"Book"
+            }]
+        }
+      }
+    ]
+  }

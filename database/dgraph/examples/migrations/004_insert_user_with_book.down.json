@@ -1,0 +1,26 @@
+{
+  "upsert": [
+    {
+      "query": "query {\nq(func: has(Book.name)) {\nv as uid\n}}",
+      "mutations": [
+        {
+          "delete_json": {
+            "uid": "uid(v)",
+            "Book.owner": null
+          }
+        }
+      ]
+    },
+    {
+      "query": "query {\nq(func: eq(User.email,\"john.doe@mail.com\")) {\nv as uid\n}}",
+      "mutations": [
+        {
+          "delete_json": {
+            "uid": "uid(v)",
+            "User.books": null
+          }
+        }
+      ]
+    }
+  ]
+}
