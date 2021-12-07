@@ -88,7 +88,7 @@ __[CLI Documentation](cmd/migrate)__
 ### Basic usage
 
 ```bash
-$ migrate -source file://path/to/migrations -database postgres://localhost:5432/database up 2
+$ migrate -source file://path/to/migrations -database "postgres://localhost:5432/database" up 2
 ```
 
 ### Docker usage
