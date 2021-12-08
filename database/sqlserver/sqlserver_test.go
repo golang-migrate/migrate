@@ -183,6 +183,49 @@ func TestMultiStatement(t *testing.T) {
 	})
 }
 
+func TestBatchedStatement(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := msConnectionString(ip, port)
+		ms := &SQLServer{}
+		d, err := ms.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
+		if err := d.Run(strings.NewReader(`CREATE PROCEDURE uspA
+AS
+BEGIN
+    SELECT 1;
+END;
+GO
+CREATE PROCEDURE uspB
+AS
+BEGIN
+    SELECT 2;
+END`)); err != nil {
+			t.Fatalf("expected err to be nil, got %v", err)
+		}
+
+		// make sure second proc exists
+		var exists int
+		if err := d.(*SQLServer).conn.QueryRowContext(context.Background(), "Select COUNT(1) from sysobjects where type = 'P' and category = 0 and [NAME] = 'uspB'").Scan(&exists); err != nil {
+			t.Fatal(err)
+		}
+		if exists != 1 {
+			t.Fatalf("expected proc uspB to exist")
+		}
+	})
+}
+
 func TestErrorParsing(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		SkipIfUnsupportedArch(t, c)
