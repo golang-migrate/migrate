@@ -251,9 +251,9 @@ func (ss *SQLServer) Run(migration io.Reader) error {
 				if msErr.ProcName != "" {
 					message = fmt.Sprintf("%s (proc name %s)", msErr.Message, msErr.ProcName)
 				}
-				return database.Error{OrigErr: err, Err: message, Query: migr, Line: uint(msErr.LineNo)}
+				return database.Error{OrigErr: err, Err: message, Query: []byte(script), Line: uint(msErr.LineNo)}
 			}
-			return database.Error{OrigErr: err, Err: "migration failed", Query: migr}
+			return database.Error{OrigErr: err, Err: "migration failed", Query: []byte(script)}
 		}
 	}
 
