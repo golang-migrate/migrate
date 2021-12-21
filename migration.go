@@ -101,12 +101,19 @@ func NewMigration(body io.ReadCloser, identifier string,
 		return m, nil
 	}
 
-	_, f := filepath.Split(body.(*os.File).Name())
-	mp, mpErr := source.Parse(f)
-	if mpErr != nil {
-		return m, mpErr
+	m.Direction = source.Up
+	if version > uint(targetVersion) {
+		m.Direction = source.Down
 	}
-	m.Direction = mp.Direction
+
+	if ft, ok := body.(*os.File); ok {
+		_, f := filepath.Split(ft.Name())
+		mp, mpErr := source.Parse(f)
+		if mpErr != nil {
+			return m, mpErr
+		}
+		m.Direction = mp.Direction
+	}
 
 	br, bw := io.Pipe()
 	m.Body = body // want to simulate low latency? newSlowReader(body)

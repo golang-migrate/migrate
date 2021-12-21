@@ -9,7 +9,7 @@ import (
 
 func ExampleNewMigration() {
 	// Create a dummy migration body, this is coming from the source usually.
-	body := ioutil.NopCloser(strings.NewReader("dumy migration that creates users table"))
+	body := ioutil.NopCloser(strings.NewReader("dummy migration that creates users table"))
 
 	// Create a new Migration that represents version 1486686016.
 	// Once this migration has been applied to the database, the new
@@ -40,7 +40,7 @@ func ExampleNewMigration_nilMigration() {
 
 func ExampleNewMigration_nilVersion() {
 	// Create a dummy migration body, this is coming from the source usually.
-	body := ioutil.NopCloser(strings.NewReader("dumy migration that deletes users table"))
+	body := ioutil.NopCloser(strings.NewReader("dummy migration that deletes users table"))
 
 	// Create a new Migration that represents version 1486686016.
 	// This is the last available down migration, so the migration version
