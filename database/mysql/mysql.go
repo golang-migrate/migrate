@@ -9,16 +9,17 @@ import (
 	"crypto/x509"
 	"database/sql"
 	"fmt"
-	"go.uber.org/atomic"
 	"io"
 	"io/ioutil"
 	nurl "net/url"
 	"strconv"
 	"strings"
 
+	"go.uber.org/atomic"
+
 	"github.com/go-sql-driver/mysql"
-	"github.com/sundayfun/migrate/v4/database"
 	"github.com/hashicorp/go-multierror"
+	"github.com/sundayfun/migrate/v4/database"
 )
 
 var _ database.Driver = (*Mysql)(nil) // explicit compile time type check
@@ -41,6 +42,8 @@ type Config struct {
 	MigrationsTable string
 	DatabaseName    string
 	NoLock          bool
+	// 执行 migration 后触发
+	Hooks []database.Hook
 }
 
 type Mysql struct {
@@ -331,7 +334,9 @@ func (m *Mysql) Run(migration io.Reader) error {
 	if _, err := m.conn.ExecContext(context.Background(), query); err != nil {
 		return database.Error{OrigErr: err, Err: "migration failed", Query: migr}
 	}
-
+	for _, hook := range m.config.Hooks {
+		hook(m.conn, query)
+	}
 	return nil
 }
 
