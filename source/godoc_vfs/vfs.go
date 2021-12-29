@@ -7,8 +7,8 @@
 package godoc_vfs
 
 import (
-	"github.com/golang-migrate/migrate/v4/source"
-	"github.com/golang-migrate/migrate/v4/source/httpfs"
+	"github.com/sundayfun/migrate/v4/source"
+	"github.com/sundayfun/migrate/v4/source/httpfs"
 
 	"golang.org/x/tools/godoc/vfs"
 	vfs_httpfs "golang.org/x/tools/godoc/vfs/httpfs"

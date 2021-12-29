@@ -12,9 +12,9 @@ import (
 
 	"go.uber.org/atomic"
 
-	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database"
-	"github.com/golang-migrate/migrate/v4/database/multistmt"
+	"github.com/sundayfun/migrate/v4"
+	"github.com/sundayfun/migrate/v4/database"
+	"github.com/sundayfun/migrate/v4/database/multistmt"
 	"github.com/hashicorp/go-multierror"
 )
 

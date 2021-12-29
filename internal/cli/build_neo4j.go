@@ -4,5 +4,5 @@
 package cli
 
 import (
-	_ "github.com/golang-migrate/migrate/v4/database/neo4j"
+	_ "github.com/sundayfun/migrate/v4/database/neo4j"
 )

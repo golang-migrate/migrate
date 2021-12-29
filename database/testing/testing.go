@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang-migrate/migrate/v4/database"
+	"github.com/sundayfun/migrate/v4/database"
 )
 
 // Test runs tests against database implementations.
