@@ -68,6 +68,7 @@ $
 Source drivers read migrations from local or remote sources. [Add a new source?](source/driver.go)
 
 * [Filesystem](source/file) - read from filesystem
+* [io/fs](source/iofs) - read from a Go [io/fs](https://pkg.go.dev/io/fs#FS)
 * [Go-Bindata](source/go_bindata) - read from embedded binary data ([jteeuwen/go-bindata](https://github.com/jteeuwen/go-bindata))
 * [pkger](source/pkger) - read from embedded binary data ([markbates/pkger](https://github.com/markbates/pkger))
 * [GitHub](source/github) - read from remote GitHub repositories
