@@ -20,7 +20,7 @@ jobs:
         with:
           # optional: set the branch to checkout,
           # sync action checks out your 'target_sync_branch' anyway
-          ref:  master
+          ref:  upstream-sync
           # REQUIRED if your upstream repo is private (see wiki)
           persist-credentials: false
 
@@ -38,7 +38,7 @@ jobs:
           # upstream_repo_access_token: ${{ secrets.UPSTREAM_REPO_SECRET }}
 
           # Set test_mode true to run tests instead of the true action!!
-          test_mode: false
+          test_mode: true
 
       # Step 3: Display a sample message based on the sync output var 'has_new_commits'
       - name: New commits found
