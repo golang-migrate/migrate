@@ -36,7 +36,6 @@ jobs:
           upstream_sync_branch: master
           upstream_sync_repo: golang-migrate/migrate
           # upstream_repo_access_token: ${{ secrets.UPSTREAM_REPO_SECRET }}
-          upstream_pull_args: '--allow-unrelated-histories'
 
           # Set test_mode true to run tests instead of the true action!!
           test_mode: false
