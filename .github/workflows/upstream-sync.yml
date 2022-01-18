@@ -1,0 +1,53 @@
+name: 'Upstream Sync'
+
+on:
+  schedule:
+    # scheduled at 10:00 every Monday and Thursday
+    - cron:  '0 10 * * 1,4'
+
+  workflow_dispatch:  # click the button on GitHub repo!
+
+jobs:
+  sync_latest_from_upstream:
+    runs-on: ubuntu-latest
+    name: Sync latest commits from upstream repo
+
+    steps:
+      # REQUIRED
+      # Step 1: run a standard checkout action, provided by GitHub
+      - name: Checkout target repo
+        uses: actions/checkout@v2
+        with:
+          # optional: set the branch to checkout,
+          # sync action checks out your 'target_sync_branch' anyway
+          ref:  master
+          # REQUIRED if your upstream repo is private (see wiki)
+          persist-credentials: false
+
+      # REQUIRED
+      # Step 2: run the sync action
+      - name: Sync upstream changes
+        id: sync
+        uses: aormsby/Fork-Sync-With-Upstream-action@v3.2
+        with:
+          target_sync_branch: master
+          # REQUIRED 'target_repo_token' exactly like this!
+          target_repo_token: ${{ secrets.GITHUB_TOKEN }}
+          upstream_sync_branch: master
+          upstream_sync_repo: golang-migrate/migrate
+          # upstream_repo_access_token: ${{ secrets.UPSTREAM_REPO_SECRET }}
+
+          # Set test_mode true to run tests instead of the true action!!
+          test_mode: false
+
+      # Step 3: Display a sample message based on the sync output var 'has_new_commits'
+      - name: New commits found
+        if: steps.sync.outputs.has_new_commits == 'true'
+        run: echo "New commits were found to sync."
+
+      - name: No new commits
+        if: steps.sync.outputs.has_new_commits == 'false'
+        run: echo "There were no new commits."
+
+      - name: Show value of 'has_new_commits'
+        run: echo ${{ steps.sync.outputs.has_new_commits }}
