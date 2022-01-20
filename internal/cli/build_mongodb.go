@@ -4,5 +4,5 @@
 package cli
 
 import (
-	_ "github.com/golang-migrate/migrate/v4/database/mongodb"
+	_ "github.com/getoutreach/migrate/v4/database/mongodb"
 )
