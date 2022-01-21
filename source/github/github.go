@@ -12,7 +12,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/golang-migrate/migrate/v4/source"
+	"github.com/getoutreach/migrate/v4/source"
 	"github.com/google/go-github/v39/github"
 )
 
