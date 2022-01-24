@@ -35,19 +35,19 @@ func splitWithDelimiter(delimiter []byte) func(d []byte, atEOF bool) (int, []byt
 func Parse(reader io.Reader, delimiter []byte, maxMigrationSize int, h Handler) error {
 	var err error = nil
 	// buf is the bytes read from input reader
-	buf := make([]byte, 4096)
+	buf := make([]byte, 1024)
 	// true when we're ignoring input(during comments)
 	discard := false
 	// accumulate statements intermediate buffer, this buffer will be incomplete
 	// until end-of-statement char ';'
 	accum := make([]byte, 0, 1024)
 	// completed statements, contents of accum will be dumped in here
-	stmts := make([][]byte, 0, 2048)
+	stmts := make([][]byte, 0, 1000)
 	for err == nil {
 		n, err := reader.Read(buf)
 		if n > 0 {
 			for i := range buf[:n] {
-				if len(buf) > 2 &&  buf[i] == '-' && buf[i+1] == '-' && buf[i+2] == '-' {
+				if len(buf) > 1 &&  buf[i] == '-' && buf[i+1] == '-' {
 					discard = true
 				}
 				fmt.Printf("%c", buf[i])
@@ -56,7 +56,9 @@ func Parse(reader io.Reader, delimiter []byte, maxMigrationSize int, h Handler) 
 					if !discard {
 						// include ';' in accum
 						accum = append(accum, ch)
-						stmts = append(stmts, accum)
+						c1 := make([]byte, len(accum))
+						copy(c1, accum)
+						stmts = append(stmts, c1)
 						// reset accum, maintain allocated memory
 						accum = accum[:0]
 					}
@@ -80,7 +82,8 @@ func Parse(reader io.Reader, delimiter []byte, maxMigrationSize int, h Handler) 
 		}
 	}
 
-	for _, stmt := range stmts {
+	for i, stmt := range stmts {
+		fmt.Println(i, string(stmt))
 		h(stmt)
 	}
 	return nil
