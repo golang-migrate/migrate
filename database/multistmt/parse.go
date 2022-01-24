@@ -2,8 +2,8 @@
 package multistmt
 
 import (
-	"bufio"
 	"bytes"
+	"fmt"
 	"io"
 )
 
@@ -33,14 +33,65 @@ func splitWithDelimiter(delimiter []byte) func(d []byte, atEOF bool) (int, []byt
 
 // Parse parses the given multi-statement migration
 func Parse(reader io.Reader, delimiter []byte, maxMigrationSize int, h Handler) error {
-	scanner := bufio.NewScanner(reader)
-	scanner.Buffer(make([]byte, 0, StartBufSize), maxMigrationSize)
-	scanner.Split(splitWithDelimiter(delimiter))
-	for scanner.Scan() {
-		cont := h(scanner.Bytes())
-		if !cont {
+	// notes:
+	// 1. comment chars will be detected anywhere, a '--' in the middle of a 
+	//    line will start comment mode(good and bad)
+	// 2. input can be arbitrarily large, but the internal buffers will be 
+	//    problems(like statements)
+	// 3. could be converted to work with logger, for now fmt is still used
+	// 4. doesn't support /* */ c-style comments (future)
+	// 5. doesn't support nested comments (future)
+	var err error = nil
+	// buf is the bytes read from input reader
+	buf := make([]byte, 1024)
+	// true when we're ignoring input(during comments)
+	discard := false
+	// accumulate statements intermediate buffer, this buffer will be incomplete
+	// until end-of-statement char ';'
+	accum := make([]byte, 0, 1024)
+	// completed statements, contents of accum will be dumped in here
+	stmts := make([][]byte, 0, 1000)
+	for err == nil {
+		n, err := reader.Read(buf)
+		if n > 0 {
+			for i := range buf[:n] {
+				// when first two chars are comment indicators.
+				if len(buf) > 1 &&  buf[i] == '-' && buf[i+1] == '-' {
+					discard = true
+				}
+				fmt.Printf("%c", buf[i])
+				switch ch := buf[i]; ch {
+				case ';':
+					if !discard {
+						// include ';' in accum
+						accum = append(accum, ch)
+						c1 := make([]byte, len(accum))
+						copy(c1, accum)
+						stmts = append(stmts, c1)
+						// reset accum, maintain allocated memory
+						accum = accum[:0]
+					}
+				case '\n':
+					// at end of line, reset discard
+					discard = false
+				default:
+					if !discard {
+						accum = append(accum, ch)
+					}
+				}
+			}
+		}
+		if err == io.EOF {
 			break
 		}
+		if err != nil {
+			return err
+		}
 	}
-	return scanner.Err()
+
+	for i, stmt := range stmts {
+		fmt.Println(i, string(stmt))
+		h(stmt)
+	}
+	return nil
 }
