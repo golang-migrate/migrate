@@ -33,6 +33,14 @@ func splitWithDelimiter(delimiter []byte) func(d []byte, atEOF bool) (int, []byt
 
 // Parse parses the given multi-statement migration
 func Parse(reader io.Reader, delimiter []byte, maxMigrationSize int, h Handler) error {
+	// notes:
+	// 1. comment chars will be detected anywhere, a '--' in the middle of a 
+	//    line will start comment mode(good and bad)
+	// 2. input can be arbitrarily large, but the internal buffers will be 
+	//    problems(like statements)
+	// 3. could be converted to work with logger, for now fmt is still used
+	// 4. doesn't support /* */ c-style comments (future)
+	// 5. doesn't support nested comments (future)
 	var err error = nil
 	// buf is the bytes read from input reader
 	buf := make([]byte, 1024)
@@ -47,6 +55,7 @@ func Parse(reader io.Reader, delimiter []byte, maxMigrationSize int, h Handler) 
 		n, err := reader.Read(buf)
 		if n > 0 {
 			for i := range buf[:n] {
+				// when first two chars are comment indicators.
 				if len(buf) > 1 &&  buf[i] == '-' && buf[i+1] == '-' {
 					discard = true
 				}
@@ -72,11 +81,9 @@ func Parse(reader io.Reader, delimiter []byte, maxMigrationSize int, h Handler) 
 				}
 			}
 		}
-
 		if err == io.EOF {
 			break
 		}
-
 		if err != nil {
 			return err
 		}
