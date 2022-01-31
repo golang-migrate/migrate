@@ -4,10 +4,11 @@
 package postgres
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"database/sql"
 	"fmt"
-	"go.uber.org/atomic"
 	"io"
 	"io/ioutil"
 	nurl "net/url"
@@ -16,11 +17,13 @@ import (
 	"strings"
 	"time"
 
+	multierror "github.com/hashicorp/go-multierror"
+	"github.com/lib/pq"
+	"go.uber.org/atomic"
+
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/golang-migrate/migrate/v4/database/multistmt"
-	multierror "github.com/hashicorp/go-multierror"
-	"github.com/lib/pq"
 )
 
 func init() {
@@ -248,9 +251,20 @@ func (p *Postgres) Unlock() error {
 }
 
 func (p *Postgres) Run(migration io.Reader) error {
-	if p.config.MultiStatementEnabled {
+	migr, err := ioutil.ReadAll(migration)
+	if err != nil {
+		return err
+	}
+	seekReader := bytes.NewReader(migr)
+
+	hasMultiStatementFlag, err := p.checkForMultiStatementComment(seekReader)
+	if err != nil {
+		return err
+	}
+
+	if p.config.MultiStatementEnabled || hasMultiStatementFlag {
 		var err error
-		if e := multistmt.Parse(migration, multiStmtDelimiter, p.config.MultiStatementMaxSize, func(m []byte) bool {
+		if e := multistmt.Parse(seekReader, multiStmtDelimiter, p.config.MultiStatementMaxSize, func(m []byte) bool {
 			if err = p.runStatement(m); err != nil {
 				return false
 			}
@@ -260,11 +274,49 @@ func (p *Postgres) Run(migration io.Reader) error {
 		}
 		return err
 	}
-	migr, err := ioutil.ReadAll(migration)
-	if err != nil {
-		return err
-	}
+
 	return p.runStatement(migr)
+}
+
+func (p *Postgres) checkForMultiStatementComment(migration io.ReadSeeker) (enabled bool, err error) {
+	var (
+		scanner            = bufio.NewScanner(migration)
+		inMultiLineComment = false
+
+		line string
+	)
+	// its important to reset the buffer back to start after the scanning process has been finished
+	defer func() {
+		if _, e := migration.Seek(0, 0); e != nil {
+			err = fmt.Errorf("migration multi-statement check could not reset buffer: %w", e)
+		}
+	}()
+
+	// each line of the first block of comments (if there are any) should be checked for the flag
+	// comments are denoted by a `--` (single line) or `/*` ... `/*` (multi-line)
+	for scanner.Scan() {
+		line = strings.TrimSpace(scanner.Text())
+		if line == "" {
+			// this is a new line, ignore
+			continue
+		}
+		if !strings.HasPrefix(line, "--") && !strings.HasPrefix(line, "/*") && !inMultiLineComment {
+			// scanning has progressed from the start of file to here and we are no longer in a comment
+			// block or newlines, so it can safely be assumed the multi-statement comment is not present
+			return false, nil
+		}
+		if strings.Contains(line, multistmt.MultiStatementCommentFlag) {
+			return true, nil
+		}
+		if strings.HasPrefix(line, "/*") {
+			inMultiLineComment = true
+		}
+		if strings.HasSuffix(line, "*/") && inMultiLineComment {
+			inMultiLineComment = false
+		}
+	}
+
+	return false, nil
 }
 
 func (p *Postgres) runStatement(statement []byte) error {
