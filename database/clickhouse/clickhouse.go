@@ -80,6 +80,11 @@ func (ch *ClickHouse) Open(dsn string) (database.Driver, error) {
 		return nil, err
 	}
 
+	database := purl.Query().Get("database")
+	if db := strings.TrimPrefix(purl.Path, "/"); len(database) == 0 && len(db) != 0 {
+		database = db
+	}
+
 	multiStatementMaxSize := DefaultMultiStatementMaxSize
 	if s := purl.Query().Get("x-multi-statement-max-size"); len(s) > 0 {
 		multiStatementMaxSize, err = strconv.Atoi(s)
@@ -98,7 +103,7 @@ func (ch *ClickHouse) Open(dsn string) (database.Driver, error) {
 		config: &Config{
 			MigrationsTable:       purl.Query().Get("x-migrations-table"),
 			MigrationsTableEngine: migrationsTableEngine,
-			DatabaseName:          purl.Query().Get("database"),
+			DatabaseName:          database,
 			ClusterName:           purl.Query().Get("x-cluster-name"),
 			MultiStatementEnabled: purl.Query().Get("x-multi-statement") == "true",
 			MultiStatementMaxSize: multiStatementMaxSize,
@@ -193,8 +198,12 @@ func (ch *ClickHouse) SetVersion(version int, dirty bool) error {
 		return err
 	}
 
-	query := "INSERT INTO " + ch.config.MigrationsTable + " (version, dirty, sequence) VALUES (?, ?, ?)"
-	if _, err := tx.Exec(query, version, bool(dirty), time.Now().UnixNano()); err != nil {
+	query := "INSERT INTO " + ch.config.MigrationsTable + " (version, dirty, sequence) VALUES"
+	batch, err := tx.Prepare(query)
+	if err != nil {
+		return err
+	}
+	if _, err := batch.Exec(int64(version), bool(dirty), uint64(time.Now().UnixNano())); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 

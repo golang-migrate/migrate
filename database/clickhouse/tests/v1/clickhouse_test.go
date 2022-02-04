@@ -151,7 +151,7 @@ func testMigrate(t *testing.T, engine string) {
 				t.Error(err)
 			}
 		}()
-		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "db", d)
+		m, err := migrate.NewWithDatabaseInstance("file://./../../examples/migrations", "db", d)
 
 		if err != nil {
 			t.Fatal(err)
