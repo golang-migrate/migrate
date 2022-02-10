@@ -763,3 +763,85 @@ func Test_computeLineFromPos(t *testing.T) {
 		})
 	}
 }
+
+func Test_checkForMultiStatementComment(t *testing.T) {
+	multiLineCommentFlag := "migrate:x-multi-statement" // mirrored from `multistmt.MultiStatementCommentFlag`
+	t.Run("returns correct value", func(t *testing.T) {
+		cases := []struct {
+			name string
+			sql  string
+			want bool
+		}{{
+			name: "returns false when no comments",
+			sql:  `SELECT 1`,
+			want: false,
+		}, {
+			name: "returns false when comments but flag not present",
+			sql: `
+				-- an uninteresting comment
+				SELECT 1`,
+			want: false,
+		}, {
+			name: "returns true when flag present in single line comment",
+			sql: `
+				-- an uninteresting comment
+				-- ` + multiLineCommentFlag + `
+				SELECT 1`,
+			want: true,
+		}, {
+			name: "returns true when flag present in multi-line comment",
+			sql: `
+				-- an uninteresting comment
+				/*
+				` + multiLineCommentFlag + ` */
+				SELECT 1`,
+			want: true,
+		}, {
+			name: "returns true when flag present in multi-line comment",
+			sql: `
+				-- an uninteresting comment
+				/*
+				` + multiLineCommentFlag + ` */
+				SELECT 1`,
+			want: true,
+		}, {
+			name: "returns true when flag present in middle of comment",
+			sql: `-- this is a long comment that has the flag ` + multiLineCommentFlag + ` in the middle
+				SELECT 1`,
+			want: true,
+		}}
+
+		for _, tt := range cases {
+			t.Run(tt.name, func(t *testing.T) {
+				got, err := (&Postgres{}).checkForMultiStatementComment(strings.NewReader(tt.sql))
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				if tt.want != got {
+					t.Fatalf("expected %t but got %t", tt.want, got)
+				}
+			})
+		}
+	})
+
+	t.Run("correctly seeks buffer back to start", func(t *testing.T) {
+		var (
+			sql = `SELECT 1`
+			buf = strings.NewReader(sql)
+		)
+		got, err := (&Postgres{}).checkForMultiStatementComment(buf)
+		if err != nil {
+			t.Fatalf("unexpected error when checking for multi statement comment: %v", err)
+		}
+		if got != false {
+			t.Fatalf("expected %t but got %t", false, got)
+		}
+		curOffset, err := buf.Seek(0, io.SeekCurrent)
+		if err != nil {
+			t.Fatalf("unexpected error when seeking: %v", err)
+		}
+		if curOffset != 0 {
+			t.Fatalf("buffer was not at expected position: want 0, got %d", curOffset)
+		}
+	})
+}

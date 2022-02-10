@@ -12,14 +12,14 @@
 | `dbname` | `DatabaseName` | The name of the database to connect to |
 | `search_path` | | This variable specifies the order in which schemas are searched when an object is referenced by a simple name with no schema specified. |
 | `user` | | The user to sign in as |
-| `password` | | The user's password | 
+| `password` | | The user's password |
 | `host` | | The host to connect to. Values that start with / are for unix domain sockets. (default is localhost) |
 | `port` | | The port to bind to. (default is 5432) |
 | `fallback_application_name` | | An application_name to fall back to if one isn't provided. |
 | `connect_timeout` | | Maximum wait for connection, in seconds. Zero or not specified means wait indefinitely. |
 | `sslcert` | | Cert file location. The file must contain PEM encoded data. |
 | `sslkey` | | Key file location. The file must contain PEM encoded data. |
-| `sslrootcert` | | The location of the root certificate file. The file must contain PEM encoded data. | 
+| `sslrootcert` | | The location of the root certificate file. The file must contain PEM encoded data. |
 | `sslmode` | | Whether or not to use SSL (disable\|require\|verify-ca\|verify-full) |
 
 
@@ -37,3 +37,6 @@ In PostgreSQL running multiple SQL statements in one `Exec` executes them inside
 behavior is not desirable because some statements can be only run outside of transaction (e.g.
 `CREATE INDEX CONCURRENTLY`). If you want to use `CREATE INDEX CONCURRENTLY` without activating multi-statement mode
 you have to put such statements in a separate migration files.
+
+To activate multi-statement mode for a specific migration, before the migration SQL include the string `migrate:x-multi-statement` anywhere in a comment (single line or multi-line).
+To activate multi-statement mode for every migration, append the url query param above to your db dsn or use the WithInstance config option.
