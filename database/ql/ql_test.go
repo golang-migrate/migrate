@@ -1,6 +1,7 @@
 package ql
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"path/filepath"
@@ -32,6 +33,27 @@ func Test(t *testing.T) {
 		}
 	}()
 	dt.Test(t, d, []byte("CREATE TABLE t (Qty int, Name string);"))
+}
+
+func TestContextCancellation(t *testing.T) {
+	dir, err := ioutil.TempDir("", "ql-driver-test")
+	if err != nil {
+		return
+	}
+	defer func() {
+		if err := os.RemoveAll(dir); err != nil {
+			t.Fatal(err)
+		}
+	}()
+	t.Logf("DB path : %s\n", filepath.Join(dir, "ql.db"))
+	p := &Ql{}
+	addr := fmt.Sprintf("ql://%s", filepath.Join(dir, "ql.db"))
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err = p.OpenWithContext(ctx, addr)
+	if err == nil {
+		t.Fatal("Should fail when opened with a canceled context")
+	}
 }
 
 func TestMigrate(t *testing.T) {

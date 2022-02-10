@@ -1,6 +1,8 @@
 package stub
 
 import (
+	"context"
+	"errors"
 	"go.uber.org/atomic"
 	"io"
 	"io/ioutil"
@@ -26,23 +28,40 @@ type Stub struct {
 }
 
 func (s *Stub) Open(url string) (database.Driver, error) {
-	return &Stub{
-		Url:               url,
-		CurrentVersion:    database.NilVersion,
-		MigrationSequence: make([]string, 0),
-		Config:            &Config{},
-	}, nil
+	return s.OpenWithContext(context.Background(), url)
+}
+func (s *Stub) OpenWithContext(ctx context.Context, url string) (database.Driver, error) {
+	select {
+	case <-ctx.Done():
+		return nil, errors.New("context canceled")
+	default:
+		return &Stub{
+			Url:               url,
+			CurrentVersion:    database.NilVersion,
+			MigrationSequence: make([]string, 0),
+			Config:            &Config{},
+		}, nil
+	}
 }
 
 type Config struct{}
 
 func WithInstance(instance interface{}, config *Config) (database.Driver, error) {
-	return &Stub{
-		Instance:          instance,
-		CurrentVersion:    database.NilVersion,
-		MigrationSequence: make([]string, 0),
-		Config:            config,
-	}, nil
+	return WithInstanceContext(context.Background(), instance, config)
+}
+func WithInstanceContext(ctx context.Context, instance interface{}, config *Config) (database.Driver, error) {
+	select {
+	case <-ctx.Done():
+		return nil, errors.New("context canceled")
+	default:
+		return &Stub{
+			Instance:          instance,
+			CurrentVersion:    database.NilVersion,
+			MigrationSequence: make([]string, 0),
+			Config:            config,
+		}, nil
+
+	}
 }
 
 func (s *Stub) Close() error {

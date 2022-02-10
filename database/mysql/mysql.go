@@ -87,7 +87,7 @@ func WithConnection(ctx context.Context, conn *sql.Conn, config *Config) (*Mysql
 		config.MigrationsTable = DefaultMigrationsTable
 	}
 
-	if err := mx.ensureVersionTable(); err != nil {
+	if err := mx.ensureVersionTable(ctx); err != nil {
 		return nil, err
 	}
 
@@ -96,9 +96,10 @@ func WithConnection(ctx context.Context, conn *sql.Conn, config *Config) (*Mysql
 
 // instance must have `multiStatements` set to true
 func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
-	ctx := context.Background()
-
-	if err := instance.Ping(); err != nil {
+	return WithInstanceContext(context.Background(), instance, config)
+}
+func WithInstanceContext(ctx context.Context, instance *sql.DB, config *Config) (database.Driver, error) {
+	if err := instance.PingContext(ctx); err != nil {
 		return nil, err
 	}
 
@@ -223,6 +224,9 @@ func urlToMySQLConfig(url string) (*mysql.Config, error) {
 }
 
 func (m *Mysql) Open(url string) (database.Driver, error) {
+	return m.OpenWithContext(context.Background(), url)
+}
+func (m *Mysql) OpenWithContext(ctx context.Context, url string) (database.Driver, error) {
 	config, err := urlToMySQLConfig(url)
 	if err != nil {
 		return nil, err
@@ -246,7 +250,7 @@ func (m *Mysql) Open(url string) (database.Driver, error) {
 		return nil, err
 	}
 
-	mx, err := WithInstance(db, &Config{
+	mx, err := WithInstanceContext(ctx, db, &Config{
 		DatabaseName:    config.DBName,
 		MigrationsTable: customParams["x-migrations-table"],
 		NoLock:          noLock,
@@ -444,7 +448,7 @@ func (m *Mysql) Drop() (err error) {
 // ensureVersionTable checks if versions table exists and, if not, creates it.
 // Note that this function locks the database, which deviates from the usual
 // convention of "caller locks" in the Mysql type.
-func (m *Mysql) ensureVersionTable() (err error) {
+func (m *Mysql) ensureVersionTable(ctx context.Context) (err error) {
 	if err = m.Lock(); err != nil {
 		return err
 	}
@@ -462,7 +466,7 @@ func (m *Mysql) ensureVersionTable() (err error) {
 	// check if migration table exists
 	var result string
 	query := `SHOW TABLES LIKE '` + m.config.MigrationsTable + `'`
-	if err := m.conn.QueryRowContext(context.Background(), query).Scan(&result); err != nil {
+	if err := m.conn.QueryRowContext(ctx, query).Scan(&result); err != nil {
 		if err != sql.ErrNoRows {
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
@@ -472,7 +476,7 @@ func (m *Mysql) ensureVersionTable() (err error) {
 
 	// if not, create the empty migration table
 	query = "CREATE TABLE `" + m.config.MigrationsTable + "` (version bigint not null primary key, dirty boolean not null)"
-	if _, err := m.conn.ExecContext(context.Background(), query); err != nil {
+	if _, err := m.conn.ExecContext(ctx, query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 	return nil

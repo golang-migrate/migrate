@@ -1,6 +1,7 @@
 package sqlite3
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"go.uber.org/atomic"
@@ -41,11 +42,14 @@ type Sqlite struct {
 }
 
 func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
+	return WithInstanceContext(context.Background(), instance, config)
+}
+func WithInstanceContext(ctx context.Context, instance *sql.DB, config *Config) (database.Driver, error) {
 	if config == nil {
 		return nil, ErrNilConfig
 	}
 
-	if err := instance.Ping(); err != nil {
+	if err := instance.PingContext(ctx); err != nil {
 		return nil, err
 	}
 
@@ -57,7 +61,7 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		db:     instance,
 		config: config,
 	}
-	if err := mx.ensureVersionTable(); err != nil {
+	if err := mx.ensureVersionTable(ctx); err != nil {
 		return nil, err
 	}
 	return mx, nil
@@ -66,7 +70,7 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 // ensureVersionTable checks if versions table exists and, if not, creates it.
 // Note that this function locks the database, which deviates from the usual
 // convention of "caller locks" in the Sqlite type.
-func (m *Sqlite) ensureVersionTable() (err error) {
+func (m *Sqlite) ensureVersionTable(ctx context.Context) (err error) {
 	if err = m.Lock(); err != nil {
 		return err
 	}
@@ -86,13 +90,16 @@ func (m *Sqlite) ensureVersionTable() (err error) {
   CREATE UNIQUE INDEX IF NOT EXISTS version_unique ON %s (version);
   `, m.config.MigrationsTable, m.config.MigrationsTable)
 
-	if _, err := m.db.Exec(query); err != nil {
+	if _, err := m.db.ExecContext(ctx, query); err != nil {
 		return err
 	}
 	return nil
 }
 
 func (m *Sqlite) Open(url string) (database.Driver, error) {
+	return m.OpenWithContext(context.Background(), url)
+}
+func (m *Sqlite) OpenWithContext(ctx context.Context, url string) (database.Driver, error) {
 	purl, err := nurl.Parse(url)
 	if err != nil {
 		return nil, err
@@ -118,7 +125,7 @@ func (m *Sqlite) Open(url string) (database.Driver, error) {
 		}
 	}
 
-	mx, err := WithInstance(db, &Config{
+	mx, err := WithInstanceContext(ctx, db, &Config{
 		DatabaseName:    purl.Path,
 		MigrationsTable: migrationsTable,
 		NoTxWrap:        noTxWrap,

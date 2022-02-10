@@ -1,6 +1,7 @@
 package sqlcipher
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"path/filepath"
@@ -25,7 +26,26 @@ func Test(t *testing.T) {
 	}
 	dt.Test(t, d, []byte("CREATE TABLE t (Qty int, Name string);"))
 }
-
+func TestContextCancellation(t *testing.T) {
+	dir, err := ioutil.TempDir("", "sqlite3-driver-test")
+	if err != nil {
+		return
+	}
+	defer func() {
+		if err := os.RemoveAll(dir); err != nil {
+			t.Error(err)
+		}
+	}()
+	t.Logf("DB path : %s\n", filepath.Join(dir, "sqlite3.db"))
+	p := &Sqlite{}
+	addr := fmt.Sprintf("sqlite3://%s", filepath.Join(dir, "sqlite3.db"))
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err = p.OpenWithContext(ctx, addr)
+	if err == nil {
+		t.Fatal("Should fail when opened with a canceled context")
+	}
+}
 func TestMigrate(t *testing.T) {
 	dir := t.TempDir()
 	t.Logf("DB path : %s\n", filepath.Join(dir, "sqlite3.db"))

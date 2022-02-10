@@ -45,11 +45,14 @@ type Firebird struct {
 }
 
 func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
+	return WithInstanceContext(context.Background(), instance, config)
+}
+func WithInstanceContext(ctx context.Context, instance *sql.DB, config *Config) (database.Driver, error) {
 	if config == nil {
 		return nil, ErrNilConfig
 	}
 
-	if err := instance.Ping(); err != nil {
+	if err := instance.PingContext(ctx); err != nil {
 		return nil, err
 	}
 
@@ -68,7 +71,7 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		config: config,
 	}
 
-	if err := fb.ensureVersionTable(); err != nil {
+	if err := fb.ensureVersionTable(ctx); err != nil {
 		return nil, err
 	}
 
@@ -76,6 +79,9 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 }
 
 func (f *Firebird) Open(dsn string) (database.Driver, error) {
+	return f.OpenWithContext(context.Background(), dsn)
+}
+func (f *Firebird) OpenWithContext(ctx context.Context, dsn string) (database.Driver, error) {
 	purl, err := nurl.Parse(dsn)
 	if err != nil {
 		return nil, err
@@ -86,7 +92,7 @@ func (f *Firebird) Open(dsn string) (database.Driver, error) {
 		return nil, err
 	}
 
-	px, err := WithInstance(db, &Config{
+	px, err := WithInstanceContext(ctx, db, &Config{
 		MigrationsTable: purl.Query().Get("x-migrations-table"),
 		DatabaseName:    purl.Path,
 	})
@@ -217,7 +223,7 @@ func (f *Firebird) Drop() (err error) {
 }
 
 // ensureVersionTable checks if versions table exists and, if not, creates it.
-func (f *Firebird) ensureVersionTable() (err error) {
+func (f *Firebird) ensureVersionTable(ctx context.Context) (err error) {
 	if err = f.Lock(); err != nil {
 		return err
 	}
@@ -238,7 +244,7 @@ func (f *Firebird) ensureVersionTable() (err error) {
 		END;`,
 		f.config.MigrationsTable, f.config.MigrationsTable)
 
-	if _, err = f.conn.ExecContext(context.Background(), query); err != nil {
+	if _, err = f.conn.ExecContext(ctx, query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 

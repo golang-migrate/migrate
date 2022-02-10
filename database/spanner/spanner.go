@@ -83,6 +83,10 @@ func NewDB(admin sdb.DatabaseAdminClient, data spanner.Client) *DB {
 
 // WithInstance implements database.Driver
 func WithInstance(instance *DB, config *Config) (database.Driver, error) {
+	return WithInstanceContext(context.Background(), instance, config)
+}
+
+func WithInstanceContext(ctx context.Context, instance *DB, config *Config) (database.Driver, error) {
 	if config == nil {
 		return nil, ErrNilConfig
 	}
@@ -101,7 +105,7 @@ func WithInstance(instance *DB, config *Config) (database.Driver, error) {
 		lock:   uatomic.NewUint32(unlockedVal),
 	}
 
-	if err := sx.ensureVersionTable(); err != nil {
+	if err := sx.ensureVersionTable(ctx); err != nil {
 		return nil, err
 	}
 
@@ -110,19 +114,21 @@ func WithInstance(instance *DB, config *Config) (database.Driver, error) {
 
 // Open implements database.Driver
 func (s *Spanner) Open(url string) (database.Driver, error) {
+	return s.OpenWithContext(context.Background(), url)
+}
+func (s *Spanner) OpenWithContext(ctx context.Context, url string) (database.Driver, error) {
 	purl, err := nurl.Parse(url)
 	if err != nil {
 		return nil, err
 	}
 
-	ctx := context.Background()
-
-	adminClient, err := sdb.NewDatabaseAdminClient(ctx)
+	backgroundCtx := context.Background()
+	adminClient, err := sdb.NewDatabaseAdminClient(backgroundCtx)
 	if err != nil {
 		return nil, err
 	}
 	dbname := strings.Replace(migrate.FilterCustomQuery(purl).String(), "spanner://", "", 1)
-	dataClient, err := spanner.NewClient(ctx, dbname)
+	dataClient, err := spanner.NewClient(backgroundCtx, dbname)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -139,7 +145,7 @@ func (s *Spanner) Open(url string) (database.Driver, error) {
 	}
 
 	db := &DB{admin: adminClient, data: dataClient}
-	return WithInstance(db, &Config{
+	return WithInstanceContext(ctx, db, &Config{
 		DatabaseName:    dbname,
 		MigrationsTable: migrationsTable,
 		CleanStatements: clean,
@@ -300,7 +306,7 @@ func (s *Spanner) Drop() error {
 // ensureVersionTable checks if versions table exists and, if not, creates it.
 // Note that this function locks the database, which deviates from the usual
 // convention of "caller locks" in the Spanner type.
-func (s *Spanner) ensureVersionTable() (err error) {
+func (s *Spanner) ensureVersionTable(ctx context.Context) (err error) {
 	if err = s.Lock(); err != nil {
 		return err
 	}
@@ -315,7 +321,6 @@ func (s *Spanner) ensureVersionTable() (err error) {
 		}
 	}()
 
-	ctx := context.Background()
 	tbl := s.config.MigrationsTable
 	iter := s.db.data.Single().Read(ctx, tbl, spanner.AllKeys(), []string{"Version"})
 	if err := iter.Do(func(r *spanner.Row) error { return nil }); err == nil {

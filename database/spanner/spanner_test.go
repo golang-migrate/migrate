@@ -1,6 +1,7 @@
 package spanner
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"testing"
@@ -42,6 +43,19 @@ func Test(t *testing.T) {
 			t.Fatal(err)
 		}
 		dt.Test(t, d, []byte("CREATE TABLE test (id BOOL) PRIMARY KEY (id)"))
+	})
+}
+
+func TestContextCancellation(t *testing.T) {
+	withSpannerEmulator(t, func(t *testing.T) {
+		s := &Spanner{}
+		uri := fmt.Sprintf("spanner://%s", db)
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		_, err := s.OpenWithContext(ctx, uri)
+		if err == nil {
+			t.Fatal("Should fail when opened with a canceled context")
+		}
 	})
 }
 

@@ -96,7 +96,22 @@ func Test(t *testing.T) {
 		dt.Test(t, d, []byte("SELECT 1"))
 	})
 }
-
+func TestContextCancellation(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
+		addr := redshiftConnectionString(ip, port)
+		p := &Redshift{}
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		_, err = p.OpenWithContext(ctx, addr)
+		if err == nil {
+			t.Fatal("Should fail when opened with a canceled context")
+		}
+	})
+}
 func TestMigrate(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.FirstPort()

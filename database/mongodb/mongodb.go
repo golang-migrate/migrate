@@ -76,6 +76,9 @@ type findFilter struct {
 }
 
 func WithInstance(instance *mongo.Client, config *Config) (database.Driver, error) {
+	return WithInstanceContext(context.TODO(), instance, config)
+}
+func WithInstanceContext(ctx context.Context, instance *mongo.Client, config *Config) (database.Driver, error) {
 	if config == nil {
 		return nil, ErrNilConfig
 	}
@@ -102,11 +105,11 @@ func WithInstance(instance *mongo.Client, config *Config) (database.Driver, erro
 	}
 
 	if mc.config.Locking.Enabled {
-		if err := mc.ensureLockTable(); err != nil {
+		if err := mc.ensureLockTable(ctx); err != nil {
 			return nil, err
 		}
 	}
-	if err := mc.ensureVersionTable(); err != nil {
+	if err := mc.ensureVersionTable(ctx); err != nil {
 		return nil, err
 	}
 
@@ -114,6 +117,9 @@ func WithInstance(instance *mongo.Client, config *Config) (database.Driver, erro
 }
 
 func (m *Mongo) Open(dsn string) (database.Driver, error) {
+	return m.OpenWithContext(context.TODO(), dsn)
+}
+func (m *Mongo) OpenWithContext(ctx context.Context, dsn string) (database.Driver, error) {
 	//connstring is experimental package, but it used for parse connection string in mongo.Connect function
 	uri, err := connstring.Parse(dsn)
 	if err != nil {
@@ -162,10 +168,10 @@ func (m *Mongo) Open(dsn string) (database.Driver, error) {
 		return nil, err
 	}
 
-	if err = client.Ping(context.TODO(), nil); err != nil {
+	if err = client.Ping(ctx, nil); err != nil {
 		return nil, err
 	}
-	mc, err := WithInstance(client, &Config{
+	mc, err := WithInstanceContext(ctx, client, &Config{
 		DatabaseName:         uri.Database,
 		MigrationsCollection: migrationsCollection,
 		TransactionMode:      transactionMode,
@@ -228,8 +234,11 @@ func (m *Mongo) SetVersion(version int, dirty bool) error {
 }
 
 func (m *Mongo) Version() (version int, dirty bool, err error) {
+	return m.versionWithContext(context.TODO())
+}
+func (m *Mongo) versionWithContext(ctx context.Context) (version int, dirty bool, err error) {
 	var versionInfo versionInfo
-	err = m.db.Collection(m.config.MigrationsCollection).FindOne(context.TODO(), bson.M{}).Decode(&versionInfo)
+	err = m.db.Collection(m.config.MigrationsCollection).FindOne(ctx, bson.M{}).Decode(&versionInfo)
 	switch {
 	case err == mongo.ErrNoDocuments:
 		return database.NilVersion, false, nil
@@ -301,11 +310,11 @@ func (m *Mongo) Drop() error {
 	return m.db.Drop(context.TODO())
 }
 
-func (m *Mongo) ensureLockTable() error {
+func (m *Mongo) ensureLockTable(ctx context.Context) error {
 	indexes := m.db.Collection(m.config.Locking.CollectionName).Indexes()
 
 	indexOptions := options.Index().SetUnique(true).SetName(LockIndexName)
-	_, err := indexes.CreateOne(context.TODO(), mongo.IndexModel{
+	_, err := indexes.CreateOne(ctx, mongo.IndexModel{
 		Options: indexOptions,
 		Keys:    findFilter{Key: -1},
 	})
@@ -318,7 +327,7 @@ func (m *Mongo) ensureLockTable() error {
 // ensureVersionTable checks if versions table exists and, if not, creates it.
 // Note that this function locks the database, which deviates from the usual
 // convention of "caller locks" in the MongoDb type.
-func (m *Mongo) ensureVersionTable() (err error) {
+func (m *Mongo) ensureVersionTable(ctx context.Context) (err error) {
 	if err = m.Lock(); err != nil {
 		return err
 	}
@@ -336,7 +345,7 @@ func (m *Mongo) ensureVersionTable() (err error) {
 	if err != nil {
 		return err
 	}
-	if _, _, err = m.Version(); err != nil {
+	if _, _, err = m.versionWithContext(ctx); err != nil {
 		return err
 	}
 	return nil

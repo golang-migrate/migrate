@@ -47,18 +47,22 @@ type Redshift struct {
 }
 
 func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
+	return WithInstanceContext(context.Background(), instance, config)
+}
+
+func WithInstanceContext(ctx context.Context, instance *sql.DB, config *Config) (database.Driver, error) {
 	if config == nil {
 		return nil, ErrNilConfig
 	}
 
-	if err := instance.Ping(); err != nil {
+	if err := instance.PingContext(ctx); err != nil {
 		return nil, err
 	}
 
 	if config.DatabaseName == "" {
 		query := `SELECT CURRENT_DATABASE()`
 		var databaseName string
-		if err := instance.QueryRow(query).Scan(&databaseName); err != nil {
+		if err := instance.QueryRowContext(ctx, query).Scan(&databaseName); err != nil {
 			return nil, &database.Error{OrigErr: err, Query: []byte(query)}
 		}
 
@@ -85,7 +89,7 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		config: config,
 	}
 
-	if err := px.ensureVersionTable(); err != nil {
+	if err := px.ensureVersionTable(ctx); err != nil {
 		return nil, err
 	}
 
@@ -93,6 +97,9 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 }
 
 func (p *Redshift) Open(url string) (database.Driver, error) {
+	return p.OpenWithContext(context.Background(), url)
+}
+func (p *Redshift) OpenWithContext(ctx context.Context, url string) (database.Driver, error) {
 	purl, err := nurl.Parse(url)
 	if err != nil {
 		return nil, err
@@ -106,7 +113,7 @@ func (p *Redshift) Open(url string) (database.Driver, error) {
 
 	migrationsTable := purl.Query().Get("x-migrations-table")
 
-	px, err := WithInstance(db, &Config{
+	px, err := WithInstanceContext(ctx, db, &Config{
 		DatabaseName:    purl.Path,
 		MigrationsTable: migrationsTable,
 	})
@@ -307,7 +314,7 @@ func (p *Redshift) Drop() (err error) {
 // ensureVersionTable checks if versions table exists and, if not, creates it.
 // Note that this function locks the database, which deviates from the usual
 // convention of "caller locks" in the Redshift type.
-func (p *Redshift) ensureVersionTable() (err error) {
+func (p *Redshift) ensureVersionTable(ctx context.Context) (err error) {
 	if err = p.Lock(); err != nil {
 		return err
 	}
@@ -325,7 +332,7 @@ func (p *Redshift) ensureVersionTable() (err error) {
 	// check if migration table exists
 	var count int
 	query := `SELECT COUNT(1) FROM information_schema.tables WHERE table_name = $1 AND table_schema = (SELECT current_schema()) LIMIT 1`
-	if err := p.conn.QueryRowContext(context.Background(), query, p.config.MigrationsTable).Scan(&count); err != nil {
+	if err := p.conn.QueryRowContext(ctx, query, p.config.MigrationsTable).Scan(&count); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 	if count == 1 {
@@ -334,7 +341,7 @@ func (p *Redshift) ensureVersionTable() (err error) {
 
 	// if not, create the empty migration table
 	query = `CREATE TABLE "` + p.config.MigrationsTable + `" (version bigint not null primary key, dirty boolean not null)`
-	if _, err := p.conn.ExecContext(context.Background(), query); err != nil {
+	if _, err := p.conn.ExecContext(ctx, query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 	return nil

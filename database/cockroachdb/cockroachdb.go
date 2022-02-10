@@ -54,18 +54,21 @@ type CockroachDb struct {
 }
 
 func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
+	return WithInstanceContext(context.Background(), instance, config)
+}
+func WithInstanceContext(ctx context.Context, instance *sql.DB, config *Config) (database.Driver, error) {
 	if config == nil {
 		return nil, ErrNilConfig
 	}
 
-	if err := instance.Ping(); err != nil {
+	if err := instance.PingContext(ctx); err != nil {
 		return nil, err
 	}
 
 	if config.DatabaseName == "" {
 		query := `SELECT current_database()`
 		var databaseName string
-		if err := instance.QueryRow(query).Scan(&databaseName); err != nil {
+		if err := instance.QueryRowContext(ctx, query).Scan(&databaseName); err != nil {
 			return nil, &database.Error{OrigErr: err, Query: []byte(query)}
 		}
 
@@ -90,11 +93,11 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	}
 
 	// ensureVersionTable is a locking operation, so we need to ensureLockTable before we ensureVersionTable.
-	if err := px.ensureLockTable(); err != nil {
+	if err := px.ensureLockTable(ctx); err != nil {
 		return nil, err
 	}
 
-	if err := px.ensureVersionTable(); err != nil {
+	if err := px.ensureVersionTable(ctx); err != nil {
 		return nil, err
 	}
 
@@ -102,6 +105,10 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 }
 
 func (c *CockroachDb) Open(url string) (database.Driver, error) {
+	return c.OpenWithContext(context.Background(), url)
+}
+
+func (c *CockroachDb) OpenWithContext(ctx context.Context, url string) (database.Driver, error) {
 	purl, err := nurl.Parse(url)
 	if err != nil {
 		return nil, err
@@ -133,7 +140,7 @@ func (c *CockroachDb) Open(url string) (database.Driver, error) {
 		forceLock = false
 	}
 
-	px, err := WithInstance(db, &Config{
+	px, err := WithInstanceContext(ctx, db, &Config{
 		DatabaseName:    purl.Path,
 		MigrationsTable: migrationsTable,
 		LockTable:       lockTable,
@@ -317,7 +324,7 @@ func (c *CockroachDb) Drop() (err error) {
 // ensureVersionTable checks if versions table exists and, if not, creates it.
 // Note that this function locks the database, which deviates from the usual
 // convention of "caller locks" in the CockroachDb type.
-func (c *CockroachDb) ensureVersionTable() (err error) {
+func (c *CockroachDb) ensureVersionTable(ctx context.Context) (err error) {
 	if err = c.Lock(); err != nil {
 		return err
 	}
@@ -335,7 +342,7 @@ func (c *CockroachDb) ensureVersionTable() (err error) {
 	// check if migration table exists
 	var count int
 	query := `SELECT COUNT(1) FROM information_schema.tables WHERE table_name = $1 AND table_schema = (SELECT current_schema()) LIMIT 1`
-	if err := c.db.QueryRow(query, c.config.MigrationsTable).Scan(&count); err != nil {
+	if err := c.db.QueryRowContext(ctx, query, c.config.MigrationsTable).Scan(&count); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 	if count == 1 {
@@ -344,17 +351,17 @@ func (c *CockroachDb) ensureVersionTable() (err error) {
 
 	// if not, create the empty migration table
 	query = `CREATE TABLE "` + c.config.MigrationsTable + `" (version INT NOT NULL PRIMARY KEY, dirty BOOL NOT NULL)`
-	if _, err := c.db.Exec(query); err != nil {
+	if _, err := c.db.ExecContext(ctx, query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 	return nil
 }
 
-func (c *CockroachDb) ensureLockTable() error {
+func (c *CockroachDb) ensureLockTable(ctx context.Context) error {
 	// check if lock table exists
 	var count int
 	query := `SELECT COUNT(1) FROM information_schema.tables WHERE table_name = $1 AND table_schema = (SELECT current_schema()) LIMIT 1`
-	if err := c.db.QueryRow(query, c.config.LockTable).Scan(&count); err != nil {
+	if err := c.db.QueryRowContext(ctx, query, c.config.LockTable).Scan(&count); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 	if count == 1 {
@@ -363,7 +370,7 @@ func (c *CockroachDb) ensureLockTable() error {
 
 	// if not, create the empty lock table
 	query = `CREATE TABLE "` + c.config.LockTable + `" (lock_id INT NOT NULL PRIMARY KEY)`
-	if _, err := c.db.Exec(query); err != nil {
+	if _, err := c.db.ExecContext(ctx, query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 
