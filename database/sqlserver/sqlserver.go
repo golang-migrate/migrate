@@ -369,7 +369,7 @@ func (ss *SQLServer) ensureVersionTable() (err error) {
 		WHERE id = object_id(N'[dbo].[` + ss.config.MigrationsTable + `]')
 			AND OBJECTPROPERTY(id, N'IsUserTable') = 1
 	)
-	CREATE TABLE ` + ss.config.MigrationsTable + ` ( version BIGINT PRIMARY KEY NOT NULL, dirty BIT NOT NULL );`
+	CREATE TABLE [` + ss.config.MigrationsTable + `] ( version BIGINT PRIMARY KEY NOT NULL, dirty BIT NOT NULL );`
 
 	if _, err = ss.conn.ExecContext(context.Background(), query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
