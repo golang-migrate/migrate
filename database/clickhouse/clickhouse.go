@@ -200,7 +200,7 @@ func (ch *ClickHouse) SetVersion(version int, dirty bool) error {
 		bool(dirty),
 		time.Now().UnixNano(),
 	)
-	if _, err := tx.Exec(query, version, bool(dirty), time.Now().UnixNano()); err != nil {
+	if _, err := tx.Exec(query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 
