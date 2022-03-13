@@ -23,6 +23,7 @@ jobs:
           ref:  master
           # REQUIRED if your upstream repo is private (see wiki)
           persist-credentials: false
+          fetch-depth: 0
 
       # REQUIRED
       # Step 2: run the sync action
@@ -35,6 +36,7 @@ jobs:
           target_repo_token: ${{ secrets.GITHUB_TOKEN }}
           upstream_sync_branch: master
           upstream_sync_repo: golang-migrate/migrate
+          upstream_pull_args: '--allow-unrelated-histories'
           # upstream_repo_access_token: ${{ secrets.UPSTREAM_REPO_SECRET }}
 
           # Set test_mode true to run tests instead of the true action!!
