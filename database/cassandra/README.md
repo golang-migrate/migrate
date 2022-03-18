@@ -20,6 +20,7 @@ system_schema table which comes with 3.X
 | `consistency` | ALL | Migration consistency
 | `protocol` |  | Cassandra protocol version (3 or 4)
 | `timeout` | 1 minute | Migration timeout
+| `connect-timeout` | 600ms | Initial connection timeout to the cluster |
 | `username` | nil | Username to use when authenticating. |
 | `password` | nil | Password to use when authenticating. |
 | `sslcert` | | Cert file location. The file must contain PEM encoded data. |

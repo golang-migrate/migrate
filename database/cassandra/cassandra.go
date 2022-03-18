@@ -133,6 +133,14 @@ func (c *Cassandra) Open(url string) (database.Driver, error) {
 		}
 		cluster.Timeout = timeout
 	}
+	if len(u.Query().Get("connect-timeout")) > 0 {
+		var connectTimeout time.Duration
+		connectTimeout, err = time.ParseDuration(u.Query().Get("connect-timeout"))
+		if err != nil {
+			return nil, err
+		}
+		cluster.ConnectTimeout = connectTimeout
+	}
 
 	if len(u.Query().Get("sslmode")) > 0 {
 		if u.Query().Get("sslmode") != "disable" {

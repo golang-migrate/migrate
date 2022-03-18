@@ -3,8 +3,6 @@ package ql
 import (
 	"database/sql"
 	"fmt"
-	"io/ioutil"
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -15,15 +13,7 @@ import (
 )
 
 func Test(t *testing.T) {
-	dir, err := ioutil.TempDir("", "ql-driver-test")
-	if err != nil {
-		return
-	}
-	defer func() {
-		if err := os.RemoveAll(dir); err != nil {
-			t.Fatal(err)
-		}
-	}()
+	dir := t.TempDir()
 	t.Logf("DB path : %s\n", filepath.Join(dir, "ql.db"))
 	p := &Ql{}
 	addr := fmt.Sprintf("ql://%s", filepath.Join(dir, "ql.db"))
@@ -45,15 +35,7 @@ func Test(t *testing.T) {
 }
 
 func TestMigrate(t *testing.T) {
-	dir, err := ioutil.TempDir("", "ql-driver-test")
-	if err != nil {
-		return
-	}
-	defer func() {
-		if err := os.RemoveAll(dir); err != nil {
-			t.Error(err)
-		}
-	}()
+	dir := t.TempDir()
 	t.Logf("DB path : %s\n", filepath.Join(dir, "ql.db"))
 
 	db, err := sql.Open("ql", filepath.Join(dir, "ql.db"))
