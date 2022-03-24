@@ -3,6 +3,7 @@ package cassandra
 import (
 	"errors"
 	"fmt"
+	"go.uber.org/atomic"
 	"io"
 	"io/ioutil"
 	nurl "net/url"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/gocql/gocql"
 	"github.com/golang-migrate/migrate/v4/database"
+	"github.com/golang-migrate/migrate/v4/database/multistmt"
 	"github.com/hashicorp/go-multierror"
 )
 
@@ -19,6 +21,12 @@ func init() {
 	db := new(Cassandra)
 	database.Register("cassandra", db)
 }
+
+var (
+	multiStmtDelimiter = []byte(";")
+
+	DefaultMultiStatementMaxSize = 10 * 1 << 20 // 10 MB
+)
 
 var DefaultMigrationsTable = "schema_migrations"
 
@@ -33,11 +41,12 @@ type Config struct {
 	MigrationsTable       string
 	KeyspaceName          string
 	MultiStatementEnabled bool
+	MultiStatementMaxSize int
 }
 
 type Cassandra struct {
 	session  *gocql.Session
-	isLocked bool
+	isLocked atomic.Bool
 
 	// Open and WithInstance need to guarantee that config is never nil
 	config *Config
@@ -56,6 +65,10 @@ func WithInstance(session *gocql.Session, config *Config) (database.Driver, erro
 
 	if len(config.MigrationsTable) == 0 {
 		config.MigrationsTable = DefaultMigrationsTable
+	}
+
+	if config.MultiStatementMaxSize <= 0 {
+		config.MultiStatementMaxSize = DefaultMultiStatementMaxSize
 	}
 
 	c := &Cassandra{
@@ -120,17 +133,42 @@ func (c *Cassandra) Open(url string) (database.Driver, error) {
 		}
 		cluster.Timeout = timeout
 	}
+	if len(u.Query().Get("connect-timeout")) > 0 {
+		var connectTimeout time.Duration
+		connectTimeout, err = time.ParseDuration(u.Query().Get("connect-timeout"))
+		if err != nil {
+			return nil, err
+		}
+		cluster.ConnectTimeout = connectTimeout
+	}
 
-	if len(u.Query().Get("sslmode")) > 0 && len(u.Query().Get("sslrootcert")) > 0 && len(u.Query().Get("sslcert")) > 0 && len(u.Query().Get("sslkey")) > 0 {
+	if len(u.Query().Get("sslmode")) > 0 {
 		if u.Query().Get("sslmode") != "disable" {
-			cluster.SslOpts = &gocql.SslOptions{
-				CaPath:   u.Query().Get("sslrootcert"),
-				CertPath: u.Query().Get("sslcert"),
-				KeyPath:  u.Query().Get("sslkey"),
+			sslOpts := &gocql.SslOptions{}
+
+			if len(u.Query().Get("sslrootcert")) > 0 {
+				sslOpts.CaPath = u.Query().Get("sslrootcert")
 			}
+			if len(u.Query().Get("sslcert")) > 0 {
+				sslOpts.CertPath = u.Query().Get("sslcert")
+			}
+			if len(u.Query().Get("sslkey")) > 0 {
+				sslOpts.KeyPath = u.Query().Get("sslkey")
+			}
+
 			if u.Query().Get("sslmode") == "verify-full" {
-				cluster.SslOpts.EnableHostVerification = true
+				sslOpts.EnableHostVerification = true
 			}
+
+			cluster.SslOpts = sslOpts
+		}
+	}
+
+	if len(u.Query().Get("disable-host-lookup")) > 0 {
+		if flag, err := strconv.ParseBool(u.Query().Get("disable-host-lookup")); err != nil && flag {
+			cluster.DisableInitialHostLookup = true
+		} else if err != nil {
+			return nil, err
 		}
 	}
 
@@ -139,10 +177,19 @@ func (c *Cassandra) Open(url string) (database.Driver, error) {
 		return nil, err
 	}
 
+	multiStatementMaxSize := DefaultMultiStatementMaxSize
+	if s := u.Query().Get("x-multi-statement-max-size"); len(s) > 0 {
+		multiStatementMaxSize, err = strconv.Atoi(s)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return WithInstance(session, &Config{
 		KeyspaceName:          strings.TrimPrefix(u.Path, "/"),
 		MigrationsTable:       u.Query().Get("x-migrations-table"),
 		MultiStatementEnabled: u.Query().Get("x-multi-statement") == "true",
+		MultiStatementMaxSize: multiStatementMaxSize,
 	})
 }
 
@@ -152,44 +199,44 @@ func (c *Cassandra) Close() error {
 }
 
 func (c *Cassandra) Lock() error {
-	if c.isLocked {
+	if !c.isLocked.CAS(false, true) {
 		return database.ErrLocked
 	}
-	c.isLocked = true
 	return nil
 }
 
 func (c *Cassandra) Unlock() error {
-	c.isLocked = false
+	if !c.isLocked.CAS(true, false) {
+		return database.ErrNotLocked
+	}
 	return nil
 }
 
 func (c *Cassandra) Run(migration io.Reader) error {
+	if c.config.MultiStatementEnabled {
+		var err error
+		if e := multistmt.Parse(migration, multiStmtDelimiter, c.config.MultiStatementMaxSize, func(m []byte) bool {
+			tq := strings.TrimSpace(string(m))
+			if tq == "" {
+				return true
+			}
+			if e := c.session.Query(tq).Exec(); e != nil {
+				err = database.Error{OrigErr: e, Err: "migration failed", Query: m}
+				return false
+			}
+			return true
+		}); e != nil {
+			return e
+		}
+		return err
+	}
+
 	migr, err := ioutil.ReadAll(migration)
 	if err != nil {
 		return err
 	}
 	// run migration
-	query := string(migr[:])
-
-	if c.config.MultiStatementEnabled {
-		// split query by semi-colon
-		queries := strings.Split(query, ";")
-
-		for _, q := range queries {
-			tq := strings.TrimSpace(q)
-			if tq == "" {
-				continue
-			}
-			if err := c.session.Query(tq).Exec(); err != nil {
-				// TODO: cast to Cassandra error and get line number
-				return database.Error{OrigErr: err, Err: "migration failed", Query: migr}
-			}
-		}
-		return nil
-	}
-
-	if err := c.session.Query(query).Exec(); err != nil {
+	if err := c.session.Query(string(migr)).Exec(); err != nil {
 		// TODO: cast to Cassandra error and get line number
 		return database.Error{OrigErr: err, Err: "migration failed", Query: migr}
 	}
@@ -197,12 +244,26 @@ func (c *Cassandra) Run(migration io.Reader) error {
 }
 
 func (c *Cassandra) SetVersion(version int, dirty bool) error {
-	query := `TRUNCATE "` + c.config.MigrationsTable + `"`
-	if err := c.session.Query(query).Exec(); err != nil {
-		return &database.Error{OrigErr: err, Query: []byte(query)}
+	// DELETE instead of TRUNCATE because AWS Keyspaces does not support it
+	// see: https://docs.aws.amazon.com/keyspaces/latest/devguide/cassandra-apis.html
+	squery := `SELECT version FROM "` + c.config.MigrationsTable + `"`
+	dquery := `DELETE FROM "` + c.config.MigrationsTable + `" WHERE version = ?`
+	iter := c.session.Query(squery).Iter()
+	var previous int
+	for iter.Scan(&previous) {
+		if err := c.session.Query(dquery, previous).Exec(); err != nil {
+			return &database.Error{OrigErr: err, Query: []byte(dquery)}
+		}
 	}
-	if version >= 0 {
-		query = `INSERT INTO "` + c.config.MigrationsTable + `" (version, dirty) VALUES (?, ?)`
+	if err := iter.Close(); err != nil {
+		return &database.Error{OrigErr: err, Query: []byte(squery)}
+	}
+
+	// Also re-write the schema version for nil dirty versions to prevent
+	// empty schema version for failed down migration on the first migration
+	// See: https://github.com/golang-migrate/migrate/issues/330
+	if version >= 0 || (version == database.NilVersion && dirty) {
+		query := `INSERT INTO "` + c.config.MigrationsTable + `" (version, dirty) VALUES (?, ?)`
 		if err := c.session.Query(query, version, dirty).Exec(); err != nil {
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}

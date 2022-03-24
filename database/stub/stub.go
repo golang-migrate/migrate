@@ -1,6 +1,7 @@
 package stub
 
 import (
+	"go.uber.org/atomic"
 	"io"
 	"io/ioutil"
 	"reflect"
@@ -19,7 +20,7 @@ type Stub struct {
 	MigrationSequence []string
 	LastRunMigration  []byte // todo: make []string
 	IsDirty           bool
-	IsLocked          bool
+	isLocked          atomic.Bool
 
 	Config *Config
 }
@@ -27,7 +28,7 @@ type Stub struct {
 func (s *Stub) Open(url string) (database.Driver, error) {
 	return &Stub{
 		Url:               url,
-		CurrentVersion:    -1,
+		CurrentVersion:    database.NilVersion,
 		MigrationSequence: make([]string, 0),
 		Config:            &Config{},
 	}, nil
@@ -38,7 +39,7 @@ type Config struct{}
 func WithInstance(instance interface{}, config *Config) (database.Driver, error) {
 	return &Stub{
 		Instance:          instance,
-		CurrentVersion:    -1,
+		CurrentVersion:    database.NilVersion,
 		MigrationSequence: make([]string, 0),
 		Config:            config,
 	}, nil
@@ -49,15 +50,16 @@ func (s *Stub) Close() error {
 }
 
 func (s *Stub) Lock() error {
-	if s.IsLocked {
+	if !s.isLocked.CAS(false, true) {
 		return database.ErrLocked
 	}
-	s.IsLocked = true
 	return nil
 }
 
 func (s *Stub) Unlock() error {
-	s.IsLocked = false
+	if !s.isLocked.CAS(true, false) {
+		return database.ErrNotLocked
+	}
 	return nil
 }
 
@@ -84,7 +86,7 @@ func (s *Stub) Version() (version int, dirty bool, err error) {
 const DROP = "DROP"
 
 func (s *Stub) Drop() error {
-	s.CurrentVersion = -1
+	s.CurrentVersion = database.NilVersion
 	s.LastRunMigration = nil
 	s.MigrationSequence = append(s.MigrationSequence, DROP)
 	return nil

@@ -7,16 +7,13 @@ import (
 	"database/sql"
 	"fmt"
 	"io"
-	"io/ioutil"
 	nurl "net/url"
 	"strings"
 
 	"github.com/godror/godror"
-
-	_ "github.com/godror/godror"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
-	multierror "github.com/hashicorp/go-multierror"
+	"github.com/hashicorp/go-multierror"
 )
 
 func init() {
@@ -25,10 +22,11 @@ func init() {
 }
 
 const (
-	defaultMigrationsTable         = "SCHEMA_MIGRATIONS"
-	defaultStatementSeparator      = ";"
-	plsqlDefaultStatementSeparator = "---"
-	plsqlStatementEndToken         = "END;"
+	migrationsTableQueryKey    = "x-migrations-table"
+	multiStmtEnableQueryKey    = "x-multi-stmt-enabled"
+	multiStmtSeparatorQueryKey = "x-multi-stmt-separator"
+	defaultMigrationsTable     = "SCHEMA_MIGRATIONS"
+	defaultMultiStmtSeparator  = "---"
 )
 
 var (
@@ -37,9 +35,9 @@ var (
 )
 
 type Config struct {
-	MigrationsTable         string
-	DisableMultiStatements  bool
-	PLSQLStatementSeparator string
+	MigrationsTable    string
+	MultiStmtEnabled   bool
+	MultiStmtSeparator string
 
 	databaseName string
 }
@@ -79,8 +77,8 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		config.MigrationsTable = defaultMigrationsTable
 	}
 
-	if config.PLSQLStatementSeparator == "" {
-		config.PLSQLStatementSeparator = plsqlDefaultStatementSeparator
+	if config.MultiStmtSeparator == "" {
+		config.MultiStmtSeparator = defaultMultiStmtSeparator
 	}
 
 	conn, err := instance.Conn(context.Background())
@@ -112,18 +110,18 @@ func (ora *Oracle) Open(url string) (database.Driver, error) {
 		return nil, err
 	}
 
-	migrationsTable := strings.ToUpper(purl.Query().Get("x-migrations-table"))
-	statementSeparator := purl.Query().Get("x-statement-separator")
-	disableMultiStatement := false
-	if purl.Query().Get("x-disable-multi-statements") == "true" {
-		disableMultiStatement = true
+	migrationsTable := strings.ToUpper(purl.Query().Get(migrationsTableQueryKey))
+	multiStmtEnabled := false
+	if purl.Query().Get(multiStmtEnableQueryKey) == "true" {
+		multiStmtEnabled = true
 	}
+	multiStmtSeparator := purl.Query().Get(multiStmtSeparatorQueryKey)
 
 	oraInst, err := WithInstance(db, &Config{
-		databaseName:            purl.Path,
-		MigrationsTable:         migrationsTable,
-		DisableMultiStatements:  disableMultiStatement,
-		PLSQLStatementSeparator: statementSeparator,
+		databaseName:       purl.Path,
+		MigrationsTable:    migrationsTable,
+		MultiStmtEnabled:   multiStmtEnabled,
+		MultiStmtSeparator: multiStmtSeparator,
 	})
 
 	if err != nil {
@@ -215,10 +213,30 @@ end;
 }
 
 func (ora *Oracle) Run(migration io.Reader) error {
-	queries, err := parseStatements(migration, ora.config)
-	if err != nil {
-		return err
+	var queries []string
+	if !ora.config.MultiStmtEnabled {
+		// If multi-statements is not enabled explicitly,
+		// i.e, there is no multi-statement enabled(neither normal multi-statements nor multi-PL/SQL-statements),
+		// consider the whole migration as a blob.
+		query, err := removeComments(migration)
+		if err != nil {
+			return err
+		}
+		if query == "" {
+			// empty query, do nothing
+			return nil
+		}
+		queries = append(queries, query)
+	} else {
+		// If multi-statements is enabled explicitly,
+		// there could be multi-statements or multi-PL/SQL-statements in a single migration.
+		var err error
+		queries, err = parseMultiStatements(migration, ora.config.MultiStmtSeparator)
+		if err != nil {
+			return err
+		}
 	}
+
 	for _, query := range queries {
 		if _, err := ora.conn.ExecContext(context.Background(), query); err != nil {
 			if oraErr, ok := godror.AsOraErr(err); ok {
@@ -245,7 +263,7 @@ func (ora *Oracle) SetVersion(version int, dirty bool) error {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 
-	if version >= 0 {
+	if version >= 0 || (version == database.NilVersion && dirty) {
 		query = `INSERT INTO ` + ora.config.MigrationsTable + ` (VERSION, DIRTY) VALUES (:1, :2)`
 		if _, err := tx.Exec(query, version, b2i(dirty)); err != nil {
 			if errRollback := tx.Rollback(); errRollback != nil {
@@ -373,74 +391,70 @@ END;
 	return nil
 }
 
-func parseStatements(rd io.Reader, c *Config) ([]string, error) {
-	migr, err := ioutil.ReadAll(rd)
-	if err != nil {
-		return nil, err
-	}
-
-	// If multi-statements has been disable explicitly,
-	// i.e, there is no multi-statement enabled(neither normal multi-statements nor multi-PL/SQL-statements),
-	// return the whole migration as a blob.
-	if c.DisableMultiStatements {
-		return []string{string(migr)}, nil
-	}
-
-	// Either normal multi-statements or multi-PL/SQL-statements has been enabled.
-	plsqlEnabled := false
-	if strings.Contains(string(migr), plsqlStatementEndToken) {
-		plsqlEnabled = true
-	}
-	var queries []string
-	var buf bytes.Buffer
-	scanner := bufio.NewScanner(bytes.NewBuffer(migr))
-	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if plsqlEnabled && line == c.PLSQLStatementSeparator {
-			query := buf.String()
-			if query != "" {
-				queries = append(queries, query)
-			}
-			buf.Reset()
-		}
-		// ignore comment
-		if strings.HasPrefix(line, "--") {
-			continue
-		}
-		if _, err := buf.WriteString(line + "\n"); err != nil {
-			return nil, err
-		}
-	}
-	if plsqlEnabled {
-		query := buf.String()
-		if query != "" {
-			queries = append(queries, query)
-		}
-	} else {
-		queries = strings.Split(buf.String(), defaultStatementSeparator)
-	}
-
-	results := make([]string, 0)
-	sLen := len(plsqlStatementEndToken)
-	for _, query := range queries {
-		query = strings.TrimSpace(query)
-		query = strings.TrimPrefix(query, "\n")
-		query = strings.TrimSuffix(query, "\n")
-		if len(query) > sLen && strings.ToUpper(query[len(query)-sLen:]) != plsqlStatementEndToken {
-			query = strings.TrimSuffix(query, ";")
-		}
-		if query == "" {
-			continue
-		}
-		results = append(results, query)
-	}
-	return results, nil
-}
-
 func b2i(b bool) int {
 	if b {
 		return 1
 	}
 	return 0
+}
+
+func removeComments(rd io.Reader) (string, error) {
+	buf := bytes.Buffer{}
+	scanner := bufio.NewScanner(rd)
+	for scanner.Scan() {
+		line := scanner.Text()
+		// ignore comment
+		if strings.HasPrefix(line, "--") {
+			continue
+		}
+		if _, err := buf.WriteString(line + "\n"); err != nil {
+			return "", err
+		}
+	}
+	return buf.String(), nil
+}
+
+func parseMultiStatements(rd io.Reader, plsqlStmtSeparator string) ([]string, error) {
+	var results []string
+	var buf bytes.Buffer
+	scanner := bufio.NewScanner(rd)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == plsqlStmtSeparator {
+			results = append(results, buf.String())
+			buf.Reset()
+			continue
+		}
+		if line == "" || strings.HasPrefix(line, "--") {
+			continue // ignore empty and comment line
+		}
+		if _, err := buf.WriteString(line + "\n"); err != nil {
+			return nil, err
+		}
+	}
+	if buf.Len() > 0 {
+		// append the final result if it's not empty
+		results = append(results, buf.String())
+	}
+
+	queries := make([]string, 0, len(results))
+	for _, result := range results {
+		result = strings.TrimSpace(result)
+		result = strings.TrimPrefix(result, "\n")
+		result = strings.TrimSuffix(result, "\n")
+		if !isPLSQLTail(result) {
+			// remove the ";" from the tail if it's not PL/SQL stmt
+			result = strings.TrimSuffix(result, ";")
+		}
+		if result == "" {
+			continue // if
+		}
+		queries = append(queries, result)
+	}
+	return queries, nil
+}
+
+func isPLSQLTail(s string) bool {
+	s = strings.ReplaceAll(s, " ", "")
+	return strings.EqualFold(s, "end;")
 }

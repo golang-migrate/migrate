@@ -1,3 +1,4 @@
+//go:build spanner
 // +build spanner
 
 package cli

@@ -1,3 +1,4 @@
+//go:build firebird
 // +build firebird
 
 package cli

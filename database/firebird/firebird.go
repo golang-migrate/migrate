@@ -1,3 +1,4 @@
+//go:build go1.9
 // +build go1.9
 
 package firebird
@@ -10,6 +11,7 @@ import (
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/hashicorp/go-multierror"
 	_ "github.com/nakagami/firebirdsql"
+	"go.uber.org/atomic"
 	"io"
 	"io/ioutil"
 	nurl "net/url"
@@ -36,7 +38,7 @@ type Firebird struct {
 	// Locking and unlocking need to use the same connection
 	conn     *sql.Conn
 	db       *sql.DB
-	isLocked bool
+	isLocked atomic.Bool
 
 	// Open and WithInstance need to guarantee that config is never nil
 	config *Config
@@ -106,15 +108,16 @@ func (f *Firebird) Close() error {
 }
 
 func (f *Firebird) Lock() error {
-	if f.isLocked {
+	if !f.isLocked.CAS(false, true) {
 		return database.ErrLocked
 	}
-	f.isLocked = true
 	return nil
 }
 
 func (f *Firebird) Unlock() error {
-	f.isLocked = false
+	if !f.isLocked.CAS(true, false) {
+		return database.ErrNotLocked
+	}
 	return nil
 }
 
@@ -134,9 +137,9 @@ func (f *Firebird) Run(migration io.Reader) error {
 }
 
 func (f *Firebird) SetVersion(version int, dirty bool) error {
-	if version < 0 {
-		return nil
-	}
+	// Always re-write the schema version to prevent empty schema version
+	// for failed down migration on the first migration
+	// See: https://github.com/golang-migrate/migrate/issues/330
 
 	// TODO: parameterize this SQL statement
 	//       https://firebirdsql.org/refdocs/langrefupd20-execblock.html
@@ -192,6 +195,9 @@ func (f *Firebird) Drop() (err error) {
 		if len(tableName) > 0 {
 			tableNames = append(tableNames, tableName)
 		}
+	}
+	if err := tables.Err(); err != nil {
+		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 
 	// delete one by one ...

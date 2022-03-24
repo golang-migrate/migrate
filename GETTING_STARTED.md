@@ -23,7 +23,7 @@ This way if one of commands fails, our database will remain unchanged.
 Run your migrations through the CLI or your app and check if they applied expected changes.
 Just to give you an idea:
 ```
-migrate -database YOUR_DATBASE_URL -path PATH_TO_YOUR_MIGRATIONS up
+migrate -database YOUR_DATABASE_URL -path PATH_TO_YOUR_MIGRATIONS up
 ```
 
 Just add the code to your app and you're ready to go!
@@ -33,6 +33,16 @@ Before commiting your migrations you should run your migrations up, down, and th
 It's also worth checking your migrations in a separate, containerized environment. You can find some tools in the end of this document.
 
 **IMPORTANT:** If you would like to run multiple instances of your app on different machines be sure to use a database that supports locking when running migrations. Otherwise you may encounter issues.
+
+## Forcing your database version
+In case you run a migration that contained an error, migrate will not let you run other migrations on the same database. You will see an error like `Dirty database version 1. Fix and force version`, even when you fix the erred migration. This means your database was marked as 'dirty'.
+You need to investigate the migration error - was your migration applied partially, or was it not applied at all? Once you know, you should force your database to a version reflecting it's real state. You can do so with `force` command:
+```
+migrate -path PATH_TO_YOUR_MIGRATIONS -database YOUR_DATABASE_URL force VERSION
+```
+Once you force the version and your migration was fixed, your database is 'clean' again and you can proceed with your migrations.
+
+For details and example of usage see [this comment](https://github.com/golang-migrate/migrate/issues/282#issuecomment-530743258).
 
 ## Further reading:
 - [PostgreSQL tutorial](database/postgres/TUTORIAL.md)

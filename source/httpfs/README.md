@@ -36,7 +36,7 @@ with `http.FileSystem` provided by the user of this package. It is created with
 Example of using `http.Dir()` to read migrations from `sql` directory:
 
 ```go
-	src, err := httpfs.New(http.Dir("sql")
+	src, err := httpfs.New(http.Dir("sql"))
 	if err != nil {
 		// do something
 	}

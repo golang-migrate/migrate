@@ -1,29 +1,56 @@
 # oracle
-The golang oracle driver [godror](https://github.com/godror/godror) does not natively support executing multiple statements in a single query. 
-Here are the strategies for splitting the migration text into separately-executed statements if multi statements detecting isn't been disable explicitly via `x-disable-multi-statements`:
-1. If there is no PL/SQL statement in a migration file, the `semicolons` will be the separator
-1. If there is any PL/SQL statement in a migration file, the separator will be `---` in a single line or specified by `x-plsql-line-separator`, 
-   And in this case the multiple statements cannot be used when a statement in the migration contains a string with the given `line separator`.
 
-`oracle://user:password@host:port/sid?query`
+The supported oracle specific options can be configured in the query section of the oracle URL `oracle://user:password@host:port/sid?query`
 
-| URL Query  | WithInstance Config | Description |
-|------------|---------------------|-------------|
-| `x-migrations-table` | `MigrationsTable` | Name of the migrations table in UPPER case |
-| `x-disable-multi-statements` | `DisableMultiStatements` | Indicate if disable multi statements detection automatically |
-| `x-plsql-line-separator` | `PLSQLStatementSeparator` | a single line which use as the token to spilt multiple statements in single migration file (See note above), default `---` |
+| URL Query                | WithInstance Config  | Description                                                                                                             |
+|--------------------------|----------------------|-------------------------------------------------------------------------------------------------------------------------|
+| `x-migrations-table`     | `MigrationsTable`    | Name of the migrations table in UPPER case                                                                              |
+| `x-multi-stmt-enabled`   | `MultiStmtEnabled`   | If the migration files are in multi-statements style                                                                    |
+| `x-multi-stmt-separator` | `MultiStmtSeparator` | a single line which use as the token to spilt multiple statements in single migration file, triple-dash separator `---` |
 
-## Runtime dependency
+## Run-time Requirements
+- Oracle Client libraries - see [ODPI-C](https://oracle.github.io/odpi/doc/installation.html)
 
-Although an Oracle client is NOT required for compiling, it is at run time. One can download it from https://www.oracle.com/database/technologies/instant-client/downloads.html
+Although Oracle Client libraries are NOT required for compiling, they *are*
+needed at run time.  Download the free Basic or Basic Light package from
+<https://www.oracle.com/database/technologies/instant-client/downloads.html>.
+
+```shell
+sudo apt-get install -y libaio1 wget unzip
+wget -O /tmp/instantclient-basic-linux-x64.zip https://download.oracle.com/otn_software/linux/instantclient/193000/instantclient-basic-linux.x64-19.3.0.0.0dbru.zip
+mkdir -p /usr/lib/oracle && unzip /tmp/instantclient-basic-linux-x64.zip -d /usr/lib/oracle
+ldconfig -v /usr/lib/oracle/instantclient_19_3
+ldd /usr/lib/oracle/instantclient_19_3/libclntsh.so
+```
+
+## Write migration files
+
+There are two ways to write the migration files,
+
+1. Single statement file in which it contains only one SQL statement or one PL/SQL statement(Default)
+2. Multi statements file in which it can have multi statements(can be SQL or PL/SQL or mixed)
+
+### Single statement file
+
+Oracle godor driver support process one statement at a time, so it is natural to support single statement per file as the default.
+Check the [single statement migration files](examples/migrations) as an example.
+
+### Multi statements file
+
+Although the golang oracle driver [godror](https://github.com/godror/godror) does not natively support executing multiple
+statements in a single query, it's more friendly and handy to support multi statements in a single migration file in some case,
+so the multi statements can be separated with a line separator(default to triple-dash separator ---), for example:
+
+```
+statement 1
+---
+statement 2
+```
+Check the [multi statements' migration files](examples/migrations-multistmt) as an example.
 
 ## Supported & tested version
-- 12c-ee
-- 18c-xe
 
-## How to use
-
-In order to compile & run the migration against Oracle database, basically it will require:
+- 18-xe
 
 ## Build cli
 
@@ -32,56 +59,27 @@ $ cd /path/to/repo/dir
 $ go build  -tags 'oracle' -o bin/migrate github.com/golang-migrate/migrate/v4/cli
 ```
 
-## Configure Oracle database
-1. Example Oracle version: `Oracle Database Express Edition`, check [here](https://docs.oracle.com/cd/B28359_01/license.111/b28287/editions.htm#DBLIC119) from version details and download xe [here](https://www.oracle.com/database/technologies/xe-downloads.html)
-1. Start a oracle docker container based on customized community oracle-xe image(include a PDB database & default user `oracle` in it): `docker run --name oracle -d -p 1521:1521 -p 5500:5500 --volume ~/data/oracle-xe:/opt/oracle/oradata maxnilz/oracle-xe:18c`
-1. Wait a moment, first time will take a while to run for as the oracle-xe configure script needs to complete
+## Run test code
 
-## Download runtime dependency
+Start the `Oracle Database Instance` via docker first
+```
+$ cat docker-compose.yaml
+---
+version: '2'
+services:
+  orclxe:
+    image: container-registry.oracle.com/database/express:18.4.0-xe
+    ports:
+      - 1521:1521
+    container_name: orclxe
+    environment:
+      ORACLE_PWD: oracle
+    volumes:
+      - ${HOME}/data/orclxe:/opt/oracle/oradata  # permission chown -R 54321:54321 ${HOME}/data/orclxe
 
-Download [oracle client dynamic library](https://www.oracle.com/technetwork/database/database-technologies/instant-client/downloads/index.html) from their official site manually, because it requires to logon and honor a check box on download page manually.
-
-## Play
-
-### Run test code 
+```
 
 ```bash
 $ cd /path/to/repo/database/oracle/dir
-$ ORACLE_DSN=oracle://oracle:oracle@localhost:1521/XEPDB1 LD_LIBRARY_PATH=/path/to/oracle/lib/dir go test -tags "oracle" -race -v -covermode atomic ./... -coverprofile .coverage
+$ ORACLE_DSN=oracle://sys:oracle@localhost:1521/XEPDB1 go test -tags "oracle" -race -v -covermode atomic ./... -coverprofile .coverage
 ```
-
-### Write migration files
-
-Check [example migration files](examples)
-
-## FAQs
-
-Maybe not "frequently asked", but hopefully these answers will be useful.
-
-### Why the test code for oracle in CI are disabled
-
-Setup test case via oracle container in CI is very expensive for these reasons:
-1. There is no public official docker images available
-1. The oracle image size in community is 8GB, which is huge
-1. The volume size of one single oracle container is about 5GB, which is huge too
-1. And more importantly, It will take a long time to start just a single oracle container & configure it(almost 30min on my 16GB memory, 8 cores machine). The test case will run in parallel and each case will require it's own container, which will increase the resource & time costs many times.
-1. Although an Oracle client is NOT required for compiling, it is at run time. and it's tricky to download the dynamic lib directly/automatically because of the oracle download policies. 
-
-### Why there is a dockerfile for oracle only?
-
-The dependent dynamic libs are missing in alpine system, the dockerfile for oracle is based on debian system.
-
-### Why there is an assets dir for the oracle libs
-
-1. It requires to login to the oracle official site & config the license manually for downloading these oracle lib, we can't use wget & curl to download directly.
-1. In order to make `Dockerfile.oracle` works, I download them manually and put them in the `assets` dir.
-
-### Why we need the dynamic library?
-
-There is no static lib for the application to compile & link. check [here](https://community.oracle.com/thread/4177571) for more details.
-
-### Are there public docker images available
-
-1. There is no official pubic docker images available
-1. Based on [this official open-source repo](https://github.com/oracle/docker-images), I published [maxnilz/oracle-ee:12.2.0.1](https://hub.docker.com/repository/docker/maxnilz/oracle-ee) and [maxnilz/oracle-xe:18c](https://hub.docker.com/repository/docker/maxnilz/oracle-xe) in docker hub 
-1. JUST FOR LEARN PURPOSE!!!

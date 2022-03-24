@@ -3,184 +3,223 @@ package cli
 import (
 	"errors"
 	"fmt"
-	"github.com/golang-migrate/migrate/v4"
-	_ "github.com/golang-migrate/migrate/v4/database/stub" // TODO remove again
-	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/stub" // TODO remove again
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
-func nextSeq(matches []string, dir string, seqDigits int) (string, error) {
+var (
+	errInvalidSequenceWidth     = errors.New("Digits must be positive")
+	errIncompatibleSeqAndFormat = errors.New("The seq and format options are mutually exclusive")
+	errInvalidTimeFormat        = errors.New("Time format may not be empty")
+)
+
+func nextSeqVersion(matches []string, seqDigits int) (string, error) {
 	if seqDigits <= 0 {
-		return "", errors.New("Digits must be positive")
+		return "", errInvalidSequenceWidth
 	}
 
-	nextSeq := 1
+	nextSeq := uint64(1)
+
 	if len(matches) > 0 {
 		filename := matches[len(matches)-1]
-		matchSeqStr := strings.TrimPrefix(filename, dir)
+		matchSeqStr := filepath.Base(filename)
 		idx := strings.Index(matchSeqStr, "_")
+
 		if idx < 1 { // Using 1 instead of 0 since there should be at least 1 digit
-			return "", errors.New("Malformed migration filename: " + filename)
+			return "", fmt.Errorf("Malformed migration filename: %s", filename)
 		}
-		matchSeqStr = matchSeqStr[0:idx]
+
 		var err error
-		nextSeq, err = strconv.Atoi(matchSeqStr)
+		matchSeqStr = matchSeqStr[0:idx]
+		nextSeq, err = strconv.ParseUint(matchSeqStr, 10, 64)
+
 		if err != nil {
 			return "", err
 		}
+
 		nextSeq++
 	}
-	if nextSeq <= 0 {
-		return "", errors.New("Next sequence number must be positive")
+
+	version := fmt.Sprintf("%0[2]*[1]d", nextSeq, seqDigits)
+
+	if len(version) > seqDigits {
+		return "", fmt.Errorf("Next sequence number %s too large. At most %d digits are allowed", version, seqDigits)
 	}
 
-	nextSeqStr := strconv.Itoa(nextSeq)
-	if len(nextSeqStr) > seqDigits {
-		return "", fmt.Errorf("Next sequence number %s too large. At most %d digits are allowed", nextSeqStr, seqDigits)
-	}
-	padding := seqDigits - len(nextSeqStr)
-	if padding > 0 {
-		nextSeqStr = strings.Repeat("0", padding) + nextSeqStr
-	}
-	return nextSeqStr, nil
+	return version, nil
 }
 
-// cleanDir normalizes the provided directory
-func cleanDir(dir string) string {
-	dir = filepath.Clean(dir)
-	switch dir {
-	case ".":
-		return ""
-	case "/":
-		return dir
+func timeVersion(startTime time.Time, format string) (version string, err error) {
+	switch format {
+	case "":
+		err = errInvalidTimeFormat
+	case "unix":
+		version = strconv.FormatInt(startTime.Unix(), 10)
+	case "unixNano":
+		version = strconv.FormatInt(startTime.UnixNano(), 10)
 	default:
-		return dir + "/"
+		version = startTime.Format(format)
 	}
+
+	return
 }
 
 // createCmd (meant to be called via a CLI command) creates a new migration
-func createCmd(dir string, startTime time.Time, format string, name string, ext string, seq bool, seqDigits int) {
-	dir = cleanDir(dir)
-	var base string
+func createCmd(dir string, startTime time.Time, format string, name string, ext string, seq bool, seqDigits int, print bool) error {
 	if seq && format != defaultTimeFormat {
-		log.fatalErr(errors.New("The seq and format options are mutually exclusive"))
+		return errIncompatibleSeqAndFormat
 	}
+
+	var version string
+	var err error
+
+	dir = filepath.Clean(dir)
+	ext = "." + strings.TrimPrefix(ext, ".")
+
 	if seq {
-		if seqDigits <= 0 {
-			log.fatalErr(errors.New("Digits must be positive"))
-		}
-		matches, err := filepath.Glob(dir + "*" + ext)
+		matches, err := filepath.Glob(filepath.Join(dir, "*"+ext))
+
 		if err != nil {
-			log.fatalErr(err)
+			return err
 		}
-		nextSeqStr, err := nextSeq(matches, dir, seqDigits)
+
+		version, err = nextSeqVersion(matches, seqDigits)
+
 		if err != nil {
-			log.fatalErr(err)
+			return err
 		}
-		base = fmt.Sprintf("%v%v_%v.", dir, nextSeqStr, name)
 	} else {
-		switch format {
-		case "":
-			log.fatal("Time format may not be empty")
-		case "unix":
-			base = fmt.Sprintf("%v%v_%v.", dir, startTime.Unix(), name)
-		case "unixNano":
-			base = fmt.Sprintf("%v%v_%v.", dir, startTime.UnixNano(), name)
-		default:
-			base = fmt.Sprintf("%v%v_%v.", dir, startTime.Format(format), name)
+		version, err = timeVersion(startTime, format)
+
+		if err != nil {
+			return err
 		}
 	}
 
-	if err := os.MkdirAll(dir, os.ModePerm); err != nil {
-		log.fatalErr(err)
+	versionGlob := filepath.Join(dir, version+"_*"+ext)
+	matches, err := filepath.Glob(versionGlob)
+
+	if err != nil {
+		return err
 	}
 
-	createFile(base + "up" + ext)
-	createFile(base + "down" + ext)
-}
-
-func createFile(fname string) {
-	if _, err := os.Create(fname); err != nil {
-		log.fatalErr(err)
+	if len(matches) > 0 {
+		return fmt.Errorf("duplicate migration version: %s", version)
 	}
+
+	if err = os.MkdirAll(dir, os.ModePerm); err != nil {
+		return err
+	}
+
+	for _, direction := range []string{"up", "down"} {
+		basename := fmt.Sprintf("%s_%s.%s%s", version, name, direction, ext)
+		filename := filepath.Join(dir, basename)
+
+		if err = createFile(filename); err != nil {
+			return err
+		}
+
+		if print {
+			absPath, _ := filepath.Abs(filename)
+			log.Println(absPath)
+		}
+	}
+
+	return nil
 }
 
-func gotoCmd(m *migrate.Migrate, v uint) {
+func createFile(filename string) error {
+	// create exclusive (fails if file already exists)
+	// os.Create() specifies 0666 as the FileMode, so we're doing the same
+	f, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0666)
+
+	if err != nil {
+		return err
+	}
+
+	return f.Close()
+}
+
+func gotoCmd(m *migrate.Migrate, v uint) error {
 	if err := m.Migrate(v); err != nil {
 		if err != migrate.ErrNoChange {
-			log.fatalErr(err)
-		} else {
-			log.Println(err)
+			return err
 		}
+		log.Println(err)
 	}
+	return nil
 }
 
-func upCmd(m *migrate.Migrate, limit int) {
+func upCmd(m *migrate.Migrate, limit int) error {
 	if limit >= 0 {
 		if err := m.Steps(limit); err != nil {
 			if err != migrate.ErrNoChange {
-				log.fatalErr(err)
-			} else {
-				log.Println(err)
+				return err
 			}
+			log.Println(err)
 		}
 	} else {
 		if err := m.Up(); err != nil {
 			if err != migrate.ErrNoChange {
-				log.fatalErr(err)
-			} else {
-				log.Println(err)
+				return err
 			}
+			log.Println(err)
 		}
 	}
+	return nil
 }
 
-func downCmd(m *migrate.Migrate, limit int) {
+func downCmd(m *migrate.Migrate, limit int) error {
 	if limit >= 0 {
 		if err := m.Steps(-limit); err != nil {
 			if err != migrate.ErrNoChange {
-				log.fatalErr(err)
-			} else {
-				log.Println(err)
+				return err
 			}
+			log.Println(err)
 		}
 	} else {
 		if err := m.Down(); err != nil {
 			if err != migrate.ErrNoChange {
-				log.fatalErr(err)
-			} else {
-				log.Println(err)
+				return err
 			}
+			log.Println(err)
 		}
 	}
+	return nil
 }
 
-func dropCmd(m *migrate.Migrate) {
+func dropCmd(m *migrate.Migrate) error {
 	if err := m.Drop(); err != nil {
-		log.fatalErr(err)
+		return err
 	}
+	return nil
 }
 
-func forceCmd(m *migrate.Migrate, v int) {
+func forceCmd(m *migrate.Migrate, v int) error {
 	if err := m.Force(v); err != nil {
-		log.fatalErr(err)
+		return err
 	}
+	return nil
 }
 
-func versionCmd(m *migrate.Migrate) {
+func versionCmd(m *migrate.Migrate) error {
 	v, dirty, err := m.Version()
 	if err != nil {
-		log.fatalErr(err)
+		return err
 	}
 	if dirty {
 		log.Printf("%v (dirty)\n", v)
 	} else {
 		log.Println(v)
 	}
+	return nil
 }
 
 // numDownMigrationsFromArgs returns an int for number of migrations to apply

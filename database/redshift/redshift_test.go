@@ -22,6 +22,7 @@ import (
 )
 
 import (
+	"github.com/golang-migrate/migrate/v4/database"
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
 	"github.com/golang-migrate/migrate/v4/dktesting"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
@@ -247,7 +248,7 @@ func TestWithSchema(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if version != -1 {
+		if version != database.NilVersion {
 			t.Fatal("expected NilVersion")
 		}
 

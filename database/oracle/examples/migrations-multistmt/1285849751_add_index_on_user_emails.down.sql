@@ -1,0 +1,12 @@
+DECLARE
+   COUNT_INDEXES   INTEGER;
+BEGIN
+   SELECT COUNT ( * )
+     INTO COUNT_INDEXES_MS
+     FROM USERS_MS_INDEXES
+    WHERE INDEX_NAME = 'users_ms_email_index';
+   IF COUNT_INDEXES > 0
+   THEN
+      EXECUTE IMMEDIATE 'DROP INDEX users_ms_email_index';
+   END IF;
+END;

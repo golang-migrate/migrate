@@ -1,280 +1,173 @@
 package oracle
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
+	"github.com/docker/go-connections/nat"
+	"github.com/golang-migrate/migrate/v4"
+	dt "github.com/golang-migrate/migrate/v4/database/testing"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/stretchr/testify/suite"
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/wait"
 	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/dhui/dktest"
-	"github.com/godror/godror"
-	"github.com/golang-migrate/migrate/v4"
-	dt "github.com/golang-migrate/migrate/v4/database/testing"
-	"github.com/golang-migrate/migrate/v4/dktesting"
-	_ "github.com/golang-migrate/migrate/v4/source/file"
-	"github.com/stretchr/testify/require"
 )
 
-var (
-	opts  = dktest.Options{PortRequired: true, ReadyFunc: isReady, Timeout: time.Minute * 40, ReadyTimeout: time.Minute * 3, PullTimeout: time.Minute * 30}
-	specs = []dktesting.ContainerSpec{
-		{ImageName: "maxnilz/oracle-xe:18c", Options: opts},
-	}
-)
-
-type dsnFunc func(t *testing.T, args ...interface{}) string
-
-func oracleEnvDsn(t *testing.T, _ ...interface{}) string {
-	//E.g: oci8://user/password@localhost:1521/ORCLPDB1
-	dsn := os.Getenv("MIGRATE_TEST_ORACLE_DSN")
-	if dsn == "" {
-		t.Skip("MIGRATE_TEST_ORACLE_DSN not found, skip the test case")
-	}
-	return dsn
+type oracleSuite struct {
+	suite.Suite
+	dsn       string
+	container testcontainers.Container
 }
 
-func isDKHonored(t *testing.T) {
-	s := os.Getenv("MIGRATE_TEST_ENABLE_ORACLE_CONTAINER")
-	if s != "true" {
-		t.Skip("MIGRATE_TEST_ENABLE_ORACLE_CONTAINER not found, skip the dk test case")
+func (s *oracleSuite) SetupSuite() {
+	dsn := os.Getenv("ORACLE_DSN")
+	if dsn != "" {
+		s.dsn = dsn
+		return
 	}
-}
 
-func oracleDKDsn(t *testing.T, args ...interface{}) string {
-	c := args[0].(dktest.ContainerInfo)
-	ip, port, err := c.Port(1521)
+	username := "orcl"
+	password := "orcl"
+	host := "localhost"
+	db := "XEPDB1"
+	nPort, err := nat.NewPort("tcp", "1521")
 	if err != nil {
-		t.Fatal(err)
+		return
 	}
-	return oracleConnectionString(ip, port)
-}
-
-func oracleConnectionString(host, port string) string {
-	return fmt.Sprintf("oracle://oracle:oracle@%s:%s/XEPDB1", host, port)
-}
-
-func TestParseStatements(t *testing.T) {
-	cases := []struct {
-		migration       string
-		expectedQueries []string
-	}{
-		{migration: `
-CREATE TABLE USERS (
-  USER_ID integer unique,
-  NAME    varchar(40),
-  EMAIL   varchar(40)
-);
-
----
---
-BEGIN
-EXECUTE IMMEDIATE 'DROP TABLE USERS';
-EXCEPTION
-    WHEN OTHERS THEN
-        IF SQLCODE != -942 THEN
-            RAISE;
-        END IF;
-END;
-
----
--- comment
---
-CREATE TABLE USERS (
-   USER_ID integer unique,
-   NAME    varchar(40),
-   EMAIL   varchar(40)
-);
----
---`,
-			expectedQueries: []string{
-				`CREATE TABLE USERS (
-  USER_ID integer unique,
-  NAME    varchar(40),
-  EMAIL   varchar(40)
-)`,
-				`BEGIN
-EXECUTE IMMEDIATE 'DROP TABLE USERS';
-EXCEPTION
-    WHEN OTHERS THEN
-        IF SQLCODE != -942 THEN
-            RAISE;
-        END IF;
-END;`,
-				`CREATE TABLE USERS (
-   USER_ID integer unique,
-   NAME    varchar(40),
-   EMAIL   varchar(40)
-)`,
-			}},
-		{migration: `
--- comment
-CREATE TABLE USERS (
-  USER_ID integer unique,
-  NAME    varchar(40),
-  EMAIL   varchar(40)
-);
--- this is comment
-ALTER TABLE USERS ADD CITY varchar(100);
-`,
-			expectedQueries: []string{
-				`CREATE TABLE USERS (
-  USER_ID integer unique,
-  NAME    varchar(40),
-  EMAIL   varchar(40)
-)`,
-				`ALTER TABLE USERS ADD CITY varchar(100)`,
-			}},
+	cwd, _ := os.Getwd()
+	req := testcontainers.ContainerRequest{
+		Image:        "container-registry.oracle.com/database/express:18.4.0-xe",
+		ExposedPorts: []string{nPort.Port()},
+		Env: map[string]string{
+			// password for SYS and SYSTEM users
+			"ORACLE_PWD": password,
+		},
+		BindMounts: map[string]string{
+			// container path : host path
+			"/opt/oracle/scripts/setup/user.sql": filepath.Join(cwd, "testdata/user.sql"),
+		},
+		WaitingFor: wait.NewHealthStrategy().WithStartupTimeout(time.Minute * 15),
+		AutoRemove: true,
 	}
-	for _, c := range cases {
-		queries, err := parseStatements(bytes.NewBufferString(c.migration), &Config{PLSQLStatementSeparator: plsqlDefaultStatementSeparator})
-		require.Nil(t, err)
-		require.Equal(t, c.expectedQueries, queries)
-	}
-}
-
-func TestOpen(t *testing.T) {
-	testOpen(t, oracleEnvDsn)
-}
-
-func TestMigrate(t *testing.T) {
-	testMigrate(t, oracleEnvDsn)
-}
-
-func TestLockWorks(t *testing.T) {
-	testLockWorks(t, oracleEnvDsn)
-}
-
-func TestWithInstanceConcurrent(t *testing.T) {
-	testWithInstanceConcurrent(t, oracleEnvDsn)
-}
-
-func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
-	ip, port, err := c.Port(1521)
-	if err != nil {
-		return false
-	}
-	db, err := sql.Open("godror", oracleConnectionString(ip, port))
-	if err != nil {
-		return false
-	}
-	defer func() {
-		if err := db.Close(); err != nil {
-			log.Println("close error:", err)
-		}
-	}()
-	if err = db.PingContext(ctx); err != nil {
-		oraErr, ok := godror.AsOraErr(err)
-		if ok {
-			if oraErr.Code() == 12514 || oraErr.Code() == 12547 {
-				// log the not ready very 60s
-				if time.Now().Unix()%60 == 0 {
-					log.Println(oracleConnectionString(ip, port), "not ready, ora code:", oraErr.Code())
-				}
-			} else {
-				log.Printf("%s got ora error code: %v\n", oracleConnectionString(ip, port), oraErr.Code())
-			}
-		} else {
-			log.Printf("%s got unexpected err: %v", oracleConnectionString(ip, port), err)
-		}
-		return false
-	}
-
-	return true
-}
-
-// Since start a oracle container is very time expensive, just try to start one and reuse it for different test case.
-func TestAllInOneWithDK(t *testing.T) {
-	isDKHonored(t)
-	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
-		testOpen(t, oracleDKDsn, c)
-		testMigrate(t, oracleDKDsn, c)
-		testLockWorks(t, oracleDKDsn, c)
-		testWithInstanceConcurrent(t, oracleDKDsn, c)
+	ctx := context.Background()
+	orcl, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+		ContainerRequest: req,
+		Started:          true,
 	})
+	s.Require().NoError(err)
+	host, err = orcl.Host(ctx)
+	s.Require().NoError(err)
+	mappedPort, err := orcl.MappedPort(ctx, nPort)
+	s.Require().NoError(err)
+	port := mappedPort.Port()
+
+	s.dsn = fmt.Sprintf("oracle://%s:%s@%s:%s/%s", username, password, host, port, db)
+	s.container = orcl
 }
 
-func testOpen(t *testing.T, oracleDsnFunc dsnFunc, args ...interface{}) {
+func (s *oracleSuite) TearDownSuite() {
+	if s.container != nil {
+		s.container.Terminate(context.Background())
+	}
+}
+
+// In order for 'go test' to run this suite, we need to create
+// a normal test function and pass our suite to suite.Run
+func TestOracleTestSuite(t *testing.T) {
+	suite.Run(t, new(oracleSuite))
+}
+
+func (s *oracleSuite) TestOpen() {
 	ora := &Oracle{}
-	d, err := ora.Open(oracleDsnFunc(t, args...))
-	require.Nil(t, err)
-	require.NotNil(t, d)
+	d, err := ora.Open(s.dsn)
+	s.Require().Nil(err)
+	s.Require().NotNil(err)
 	defer func() {
 		if err := d.Close(); err != nil {
-			t.Error(err)
+			s.Error(err)
 		}
 	}()
 	ora = d.(*Oracle)
-	require.Equal(t, defaultMigrationsTable, ora.config.MigrationsTable)
+	s.Require().Equal(defaultMigrationsTable, ora.config.MigrationsTable)
 
 	tbName := ""
 	err = ora.conn.QueryRowContext(context.Background(), `SELECT tname FROM tab WHERE tname = :1`, ora.config.MigrationsTable).Scan(&tbName)
-	require.Nil(t, err)
-	require.Equal(t, ora.config.MigrationsTable, tbName)
+	s.Require().Nil(err)
+	s.Require().Equal(ora.config.MigrationsTable, tbName)
 
-	dt.Test(t, d, []byte(`BEGIN DBMS_OUTPUT.PUT_LINE('hello'); END;`))
+	dt.Test(s.T(), d, []byte(`BEGIN DBMS_OUTPUT.PUT_LINE('hello'); END;`))
+
 }
 
-func testMigrate(t *testing.T, oracleDsnFunc dsnFunc, args ...interface{}) {
-	p := &Oracle{}
-	d, err := p.Open(oracleDsnFunc(t, args...))
-	if err != nil {
-		t.Fatal(err)
-	}
+func (s oracleSuite) TestMigrate() {
+	ora := &Oracle{}
+	d, err := ora.Open(s.dsn)
+	s.Require().Nil(err)
+	s.Require().NotNil(err)
 	defer func() {
 		if err := d.Close(); err != nil {
-			t.Error(err)
+			s.Error(err)
 		}
 	}()
 	m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "", d)
-	if err != nil {
-		t.Fatal(err)
-	}
-	dt.TestMigrate(t, m)
+	s.Require().Nil(err)
+	dt.TestMigrate(s.T(), m)
 }
 
-func testLockWorks(t *testing.T, oracleDsnFunc dsnFunc, args ...interface{}) {
-	p := &Oracle{}
-	d, err := p.Open(oracleDsnFunc(t, args...))
-	if err != nil {
-		t.Fatal(err)
+func (s *oracleSuite) TestMultiStmtMigrate() {
+	ora := &Oracle{
+		config: &Config{
+			MigrationsTable:    "SCHEMA_MIGRATIONS_MULTI_STMT",
+			MultiStmtEnabled:   true,
+			MultiStmtSeparator: defaultMultiStmtSeparator,
+			databaseName:       "",
+		},
 	}
+	d, err := ora.Open(s.dsn)
+	s.Require().Nil(err)
+	s.Require().NotNil(d)
 	defer func() {
 		if err := d.Close(); err != nil {
-			t.Error(err)
+			s.Error(err)
+		}
+	}()
+	m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations-multistmt", "", d)
+	s.Require().Nil(err)
+	dt.TestMigrate(s.T(), m)
+}
+
+func (s *oracleSuite) TestLockWorks() {
+	ora := &Oracle{}
+	d, err := ora.Open(s.dsn)
+	s.Require().Nil(err)
+	s.Require().NotNil(err)
+	defer func() {
+		if err := d.Close(); err != nil {
+			s.Error(err)
 		}
 	}()
 
-	dt.Test(t, d, []byte(`BEGIN DBMS_OUTPUT.PUT_LINE('hello'); END;`))
-
-	ora := d.(*Oracle)
+	dt.Test(s.T(), d, []byte(`BEGIN DBMS_OUTPUT.PUT_LINE('hello'); END;`))
 
 	err = ora.Lock()
-	if err != nil {
-		t.Fatal(err)
-	}
+	s.Require().Nil(err)
 
 	err = ora.Unlock()
-	if err != nil {
-		t.Fatal(err)
-	}
+	s.Require().Nil(err)
 
 	err = ora.Lock()
-	if err != nil {
-		t.Fatal(err)
-	}
+	s.Require().Nil(err)
 
 	err = ora.Unlock()
-	if err != nil {
-		t.Fatal(err)
-	}
+	s.Require().Nil(err)
 }
 
-func testWithInstanceConcurrent(t *testing.T, oracleDsnFunc dsnFunc, args ...interface{}) {
+func (s *oracleSuite) TestWithInstanceConcurrent() {
 	// The number of concurrent processes running WithInstance
 	const concurrency = 30
 
@@ -282,13 +175,11 @@ func testWithInstanceConcurrent(t *testing.T, oracleDsnFunc dsnFunc, args ...int
 	// actually a connection pool, and so, each of the below go
 	// routines will have a high probability of using a separate
 	// connection, which is something we want to exercise.
-	db, err := sql.Open("godror", oracleDsnFunc(t, args...))
-	if err != nil {
-		t.Fatal(err)
-	}
+	db, err := sql.Open("godror", s.dsn)
+	s.Require().Nil(err)
 	defer func() {
 		if err := db.Close(); err != nil {
-			t.Error(err)
+			s.Error(err)
 		}
 	}()
 
@@ -304,7 +195,7 @@ func testWithInstanceConcurrent(t *testing.T, oracleDsnFunc dsnFunc, args ...int
 			defer wg.Done()
 			_, err := WithInstance(db, &Config{})
 			if err != nil {
-				t.Errorf("process %d error: %s", i, err)
+				s.T().Errorf("process %d error: %s", i, err)
 			}
 		}(i)
 	}

@@ -16,6 +16,7 @@
 | `dial+timeout` | | in seconds (default is 15), set to 0 for no timeout. |
 | `encrypt` | | `disable` - Data send between client and server is not encrypted. `false` - Data sent between client and server is not encrypted beyond the login packet (Default). `true` - Data sent between client and server is encrypted. |
 | `app+name` || The application name (default is go-mssqldb). |
+| `useMsi` | | `true` - Use Azure MSI Authentication for connecting to Sql Server. Must be running from an Azure VM/an instance with MSI enabled. `false` - Use password authentication (Default). See [here for Azure MSI Auth details](https://docs.microsoft.com/en-us/azure/app-service/app-service-web-tutorial-connect-msi). NOTE: Since this cannot be tested locally, this is not officially supported.
 
 See https://github.com/denisenkom/go-mssqldb for full parameter list.
 
