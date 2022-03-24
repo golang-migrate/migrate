@@ -24,7 +24,7 @@ require (
 	github.com/envoyproxy/protoc-gen-validate v0.6.2 // indirect
 	github.com/fsouza/fake-gcs-server v1.17.0
 	github.com/gabriel-vasile/mimetype v1.4.0 // indirect
-	github.com/go-sql-driver/mysql v1.6.0
+	github.com/go-sql-driver/mysql v1.5.0
 	github.com/gobuffalo/here v0.6.0
 	github.com/gocql/gocql v0.0.0-20210515062232-b7ef815b4556
 	github.com/godror/godror v0.32.0
