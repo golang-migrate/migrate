@@ -1,21 +1,24 @@
 package oracle
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/docker/go-connections/nat"
-	"github.com/golang-migrate/migrate/v4"
-	dt "github.com/golang-migrate/migrate/v4/database/testing"
-	_ "github.com/golang-migrate/migrate/v4/source/file"
-	"github.com/stretchr/testify/suite"
-	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/wait"
 	"os"
 	"path/filepath"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/docker/go-connections/nat"
+	"github.com/golang-migrate/migrate/v4"
+	dt "github.com/golang-migrate/migrate/v4/database/testing"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/wait"
 )
 
 type oracleSuite struct {
@@ -86,14 +89,14 @@ func (s *oracleSuite) TestOpen() {
 	ora := &Oracle{}
 	d, err := ora.Open(s.dsn)
 	s.Require().Nil(err)
-	s.Require().NotNil(err)
+	s.Require().NotNil(d)
 	defer func() {
 		if err := d.Close(); err != nil {
 			s.Error(err)
 		}
 	}()
 	ora = d.(*Oracle)
-	s.Require().Equal(defaultMigrationsTable, ora.config.MigrationsTable)
+	s.Require().Equal(DefaultMigrationsTable, ora.config.MigrationsTable)
 
 	tbName := ""
 	err = ora.conn.QueryRowContext(context.Background(), `SELECT tname FROM tab WHERE tname = :1`, ora.config.MigrationsTable).Scan(&tbName)
@@ -108,7 +111,7 @@ func (s oracleSuite) TestMigrate() {
 	ora := &Oracle{}
 	d, err := ora.Open(s.dsn)
 	s.Require().Nil(err)
-	s.Require().NotNil(err)
+	s.Require().NotNil(d)
 	defer func() {
 		if err := d.Close(); err != nil {
 			s.Error(err)
@@ -120,15 +123,9 @@ func (s oracleSuite) TestMigrate() {
 }
 
 func (s *oracleSuite) TestMultiStmtMigrate() {
-	ora := &Oracle{
-		config: &Config{
-			MigrationsTable:    "SCHEMA_MIGRATIONS_MULTI_STMT",
-			MultiStmtEnabled:   true,
-			MultiStmtSeparator: defaultMultiStmtSeparator,
-			databaseName:       "",
-		},
-	}
-	d, err := ora.Open(s.dsn)
+	ora := &Oracle{}
+	dsn := fmt.Sprintf("%s?%s=%s&&%s=%s", s.dsn, multiStmtEnableQueryKey, "true", multiStmtSeparatorQueryKey, "---")
+	d, err := ora.Open(dsn)
 	s.Require().Nil(err)
 	s.Require().NotNil(d)
 	defer func() {
@@ -145,7 +142,7 @@ func (s *oracleSuite) TestLockWorks() {
 	ora := &Oracle{}
 	d, err := ora.Open(s.dsn)
 	s.Require().Nil(err)
-	s.Require().NotNil(err)
+	s.Require().NotNil(d)
 	defer func() {
 		if err := d.Close(); err != nil {
 			s.Error(err)
@@ -154,6 +151,7 @@ func (s *oracleSuite) TestLockWorks() {
 
 	dt.Test(s.T(), d, []byte(`BEGIN DBMS_OUTPUT.PUT_LINE('hello'); END;`))
 
+	ora = d.(*Oracle)
 	err = ora.Lock()
 	s.Require().Nil(err)
 
@@ -198,5 +196,85 @@ func (s *oracleSuite) TestWithInstanceConcurrent() {
 				s.T().Errorf("process %d error: %s", i, err)
 			}
 		}(i)
+	}
+}
+
+func TestParseStatements(t *testing.T) {
+	cases := []struct {
+		migration       string
+		expectedQueries []string
+	}{
+		{migration: `
+CREATE TABLE USERS (
+  USER_ID integer unique,
+  NAME    varchar(40),
+  EMAIL   varchar(40)
+);
+
+---
+--
+BEGIN
+EXECUTE IMMEDIATE 'DROP TABLE USERS';
+EXCEPTION
+    WHEN OTHERS THEN
+        IF SQLCODE != -942 THEN
+            RAISE;
+        END IF;
+END;
+
+---
+-- comment
+--
+CREATE TABLE USERS (
+   USER_ID integer unique,
+   NAME    varchar(40),
+   EMAIL   varchar(40)
+);
+---
+--`,
+			expectedQueries: []string{
+				`CREATE TABLE USERS (
+  USER_ID integer unique,
+  NAME    varchar(40),
+  EMAIL   varchar(40)
+)`,
+				`BEGIN
+EXECUTE IMMEDIATE 'DROP TABLE USERS';
+EXCEPTION
+    WHEN OTHERS THEN
+        IF SQLCODE != -942 THEN
+            RAISE;
+        END IF;
+END;`,
+				`CREATE TABLE USERS (
+   USER_ID integer unique,
+   NAME    varchar(40),
+   EMAIL   varchar(40)
+)`,
+			}},
+		{migration: `
+-- comment
+CREATE TABLE USERS (
+  USER_ID integer unique,
+  NAME    varchar(40),
+  EMAIL   varchar(40)
+);
+-- this is comment
+---
+ALTER TABLE USERS ADD CITY varchar(100);
+`,
+			expectedQueries: []string{
+				`CREATE TABLE USERS (
+  USER_ID integer unique,
+  NAME    varchar(40),
+  EMAIL   varchar(40)
+)`,
+				`ALTER TABLE USERS ADD CITY varchar(100)`,
+			}},
+	}
+	for _, c := range cases {
+		queries, err := parseMultiStatements(bytes.NewBufferString(c.migration), DefaultMultiStmtSeparator)
+		require.Nil(t, err)
+		require.Equal(t, c.expectedQueries, queries)
 	}
 }

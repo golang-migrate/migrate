@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	nurl "net/url"
+	"strconv"
 	"strings"
 
 	"github.com/godror/godror"
@@ -25,8 +26,12 @@ const (
 	migrationsTableQueryKey    = "x-migrations-table"
 	multiStmtEnableQueryKey    = "x-multi-stmt-enabled"
 	multiStmtSeparatorQueryKey = "x-multi-stmt-separator"
-	defaultMigrationsTable     = "SCHEMA_MIGRATIONS"
-	defaultMultiStmtSeparator  = "---"
+)
+
+var (
+	DefaultMigrationsTable    = "SCHEMA_MIGRATIONS"
+	DefaultMultiStmtEnabled   = false
+	DefaultMultiStmtSeparator = "---"
 )
 
 var (
@@ -74,11 +79,11 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	config.databaseName = dbName
 
 	if config.MigrationsTable == "" {
-		config.MigrationsTable = defaultMigrationsTable
+		config.MigrationsTable = DefaultMigrationsTable
 	}
 
 	if config.MultiStmtSeparator == "" {
-		config.MultiStmtSeparator = defaultMultiStmtSeparator
+		config.MultiStmtSeparator = DefaultMultiStmtSeparator
 	}
 
 	conn, err := instance.Conn(context.Background())
@@ -110,12 +115,21 @@ func (ora *Oracle) Open(url string) (database.Driver, error) {
 		return nil, err
 	}
 
-	migrationsTable := strings.ToUpper(purl.Query().Get(migrationsTableQueryKey))
-	multiStmtEnabled := false
-	if purl.Query().Get(multiStmtEnableQueryKey) == "true" {
-		multiStmtEnabled = true
+	migrationsTable := DefaultMigrationsTable
+	if s := purl.Query().Get(migrationsTableQueryKey); len(s) > 0 {
+		migrationsTable = strings.ToUpper(s)
 	}
-	multiStmtSeparator := purl.Query().Get(multiStmtSeparatorQueryKey)
+	multiStmtEnabled := DefaultMultiStmtEnabled
+	if s := purl.Query().Get(multiStmtEnableQueryKey); len(s) > 0 {
+		multiStmtEnabled, err = strconv.ParseBool(s)
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse option %s: %w", multiStmtEnableQueryKey, err)
+		}
+	}
+	multiStmtSeparator := DefaultMultiStmtSeparator
+	if s := purl.Query().Get(multiStmtSeparatorQueryKey); len(s) > 0 {
+		multiStmtSeparator = s
+	}
 
 	oraInst, err := WithInstance(db, &Config{
 		databaseName:       purl.Path,
@@ -447,7 +461,7 @@ func parseMultiStatements(rd io.Reader, plsqlStmtSeparator string) ([]string, er
 			result = strings.TrimSuffix(result, ";")
 		}
 		if result == "" {
-			continue // if
+			continue // skip empty query
 		}
 		queries = append(queries, result)
 	}
@@ -455,6 +469,11 @@ func parseMultiStatements(rd io.Reader, plsqlStmtSeparator string) ([]string, er
 }
 
 func isPLSQLTail(s string) bool {
-	s = strings.ReplaceAll(s, " ", "")
-	return strings.EqualFold(s, "end;")
+	plsqlTail := "end;"
+	if len(s) < len(plsqlTail) {
+		return false
+	}
+	pos := len(s) - len(plsqlTail)
+	tail := s[pos:]
+	return strings.EqualFold(tail, plsqlTail)
 }
