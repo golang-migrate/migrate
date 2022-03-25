@@ -314,7 +314,7 @@ func (ora *Oracle) Version() (version int, dirty bool, err error) {
 
 func (ora *Oracle) Drop() (err error) {
 	// select all tables in current schema
-	query := fmt.Sprintf(`SELECT TABLE_NAME FROM USER_TABLES`)
+	query := `SELECT TABLE_NAME FROM USER_TABLES`
 	tables, err := ora.conn.QueryContext(context.Background(), query)
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}

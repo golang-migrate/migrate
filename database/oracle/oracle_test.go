@@ -36,7 +36,6 @@ func (s *oracleSuite) SetupSuite() {
 
 	username := "orcl"
 	password := "orcl"
-	host := "localhost"
 	db := "XEPDB1"
 	nPort, err := nat.NewPort("tcp", "1521")
 	if err != nil {
@@ -63,7 +62,7 @@ func (s *oracleSuite) SetupSuite() {
 		Started:          true,
 	})
 	s.Require().NoError(err)
-	host, err = orcl.Host(ctx)
+	host, err := orcl.Host(ctx)
 	s.Require().NoError(err)
 	mappedPort, err := orcl.MappedPort(ctx, nPort)
 	s.Require().NoError(err)
@@ -75,7 +74,7 @@ func (s *oracleSuite) SetupSuite() {
 
 func (s *oracleSuite) TearDownSuite() {
 	if s.container != nil {
-		s.container.Terminate(context.Background())
+		_ = s.container.Terminate(context.Background())
 	}
 }
 
