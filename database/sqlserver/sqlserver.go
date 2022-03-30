@@ -55,7 +55,7 @@ type SQLServer struct {
 	db       *sql.DB
 	isLocked atomic.Bool
 
-	// Open and WithInstance need to garantuee that config is never nil
+	// Open and WithInstance need to guarantee that config is never nil
 	config *Config
 }
 
