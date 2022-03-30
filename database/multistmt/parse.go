@@ -34,9 +34,9 @@ func splitWithDelimiter(delimiter []byte) func(d []byte, atEOF bool) (int, []byt
 // Parse parses the given multi-statement migration
 func Parse(reader io.Reader, delimiter []byte, maxMigrationSize int, h Handler) error {
 	// notes:
-	// 1. comment chars will be detected anywhere, a '--' in the middle of a 
+	// 1. comment chars will be detected anywhere, a '--' in the middle of a
 	//    line will start comment mode(good and bad)
-	// 2. input can be arbitrarily large, but the internal buffers will be 
+	// 2. input can be arbitrarily large, but the internal buffers will be
 	//    problems(like statements)
 	// 3. could be converted to work with logger, for now fmt is still used
 	// 4. doesn't support /* */ c-style comments (future)
@@ -56,9 +56,15 @@ func Parse(reader io.Reader, delimiter []byte, maxMigrationSize int, h Handler) 
 		if n > 0 {
 			for i := range buf[:n] {
 				// when first two chars are comment indicators.
-				if len(buf) > 1 &&  buf[i] == '-' && buf[i+1] == '-' {
+				switch {
+				// ignore all lines that start with --
+				case len(buf) > 1 && i+1 < len(buf) && buf[i] == '-' && buf[i+1] == '-':
+					discard = true
+				// ignore any lines that start with // (this also covers ///)
+				case len(buf) > 1 && i+1 < len(buf) && buf[i] == '/' && buf[i+1] == '/':
 					discard = true
 				}
+				// output the content, for logging
 				fmt.Printf("%c", buf[i])
 				switch ch := buf[i]; ch {
 				case ';':
