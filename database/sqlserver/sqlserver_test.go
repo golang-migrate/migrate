@@ -49,8 +49,9 @@ var (
 	}
 )
 
-func msConnectionString(host, port string) string {
-	return fmt.Sprintf("sqlserver://sa:%v@%v:%v?database=master", saPassword, host, port)
+func msConnectionString(host, port string, options ...string) string {
+	options = append(options, "database=master")
+	return fmt.Sprintf("sqlserver://sa:%v@%v:%v?%s", saPassword, host, port, strings.Join(options, "&"))
 }
 
 func msConnectionStringMsiWithPassword(host, port string, useMsi bool) string {
@@ -190,7 +191,7 @@ func TestBatchedStatement(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		addr := msConnectionString(ip, port)
+		addr := msConnectionString(ip, port, "x-batch=true")
 		ms := &SQLServer{}
 		d, err := ms.Open(addr)
 		if err != nil {
