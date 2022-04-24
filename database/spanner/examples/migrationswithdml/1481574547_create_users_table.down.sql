@@ -1,0 +1,2 @@
+DROP TABLE Users;
+DROP TABLE Users2;
