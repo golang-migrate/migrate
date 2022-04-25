@@ -33,6 +33,13 @@ $ apt-get update
 $ apt-get install -y migrate
 ```
 
+### Dockerfile
+
+```dockerfile
+# https://hub.docker.com/r/migrate/migrate/tags
+COPY --from=migrate/migrate:$version /usr/local/bin/migrate /usr/local/bin/migrate
+```
+
 ### With Go toolchain
 
 #### Versioned
