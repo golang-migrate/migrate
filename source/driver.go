@@ -33,7 +33,7 @@ var drivers = make(map[string]Driver)
 //   * Drivers are supposed to be read only.
 //   * Ideally don't load any contents (into memory) in Open or WithInstance.
 type Driver interface {
-	// Open returns a a new driver instance configured with parameters
+	// Open returns a new driver instance configured with parameters
 	// coming from the URL string. Migrate will call this function
 	// only once per instance.
 	Open(url string) (Driver, error)

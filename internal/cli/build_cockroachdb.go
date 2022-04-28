@@ -1,3 +1,4 @@
+//go:build cockroachdb
 // +build cockroachdb
 
 package cli

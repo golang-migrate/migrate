@@ -68,7 +68,9 @@ $
 Source drivers read migrations from local or remote sources. [Add a new source?](source/driver.go)
 
 * [Filesystem](source/file) - read from filesystem
+* [io/fs](source/iofs) - read from a Go [io/fs](https://pkg.go.dev/io/fs#FS)
 * [Go-Bindata](source/go_bindata) - read from embedded binary data ([jteeuwen/go-bindata](https://github.com/jteeuwen/go-bindata))
+* [pkger](source/pkger) - read from embedded binary data ([markbates/pkger](https://github.com/markbates/pkger))
 * [GitHub](source/github) - read from remote GitHub repositories
 * [GitHub Enterprise](source/github_ee) - read from remote GitHub Enterprise repositories
 * [Bitbucket](source/bitbucket) - read from remote Bitbucket repositories
@@ -140,7 +142,7 @@ func main() {
     m, err := migrate.NewWithDatabaseInstance(
         "file:///migrations",
         "postgres", driver)
-    m.Steps(2)
+    m.Up() // or m.Step(2) if you want to explicitly set the number of migrations to run
 }
 ```
 
