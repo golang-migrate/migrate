@@ -12,12 +12,13 @@ require (
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.5.4 // indirect
 	github.com/cenkalti/backoff/v4 v4.1.2
 	github.com/census-instrumentation/opencensus-proto v0.3.0 // indirect
+	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/cncf/xds/go v0.0.0-20211130200136-a8f946100490 // indirect
 	github.com/cockroachdb/cockroach-go/v2 v2.1.1
 	github.com/cznic/mathutil v0.0.0-20180504122225-ca4c9f2c1369 // indirect
 	github.com/denisenkom/go-mssqldb v0.10.0
-	github.com/dhui/dktest v0.3.10
-	github.com/docker/docker v20.10.13+incompatible
+	github.com/dhui/dktest v0.3.11
+	github.com/docker/docker v20.10.15+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/edsrzf/mmap-go v0.0.0-20170320065105-0bce6a688712 // indirect
 	github.com/envoyproxy/go-control-plane v0.10.1 // indirect
@@ -29,8 +30,10 @@ require (
 	github.com/gocql/gocql v0.0.0-20210515062232-b7ef815b4556
 	github.com/gofrs/uuid v4.0.0+incompatible // indirect
 	github.com/golang-jwt/jwt/v4 v4.1.0 // indirect
+	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/google/go-github/v39 v39.2.0
 	github.com/gorilla/mux v1.7.4 // indirect
+	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/jackc/pgconn v1.8.0
 	github.com/jackc/pgerrcode v0.0.0-20201024163028-a0d42d470451
@@ -42,9 +45,11 @@ require (
 	github.com/lib/pq v1.10.0
 	github.com/markbates/pkger v0.15.1
 	github.com/mattn/go-sqlite3 v1.14.10
+	github.com/mitchellh/mapstructure v1.1.2 // indirect
 	github.com/mutecomm/go-sqlcipher/v4 v4.4.0
 	github.com/nakagami/firebirdsql v0.0.0-20190310045651-3c02a58cfed8
 	github.com/neo4j/neo4j-go-driver v1.8.1-0.20200803113522-b626aa943eba
+	github.com/onsi/gomega v1.15.0 // indirect
 	github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8 // indirect
 	github.com/snowflakedb/gosnowflake v1.6.3
 	github.com/stretchr/testify v1.7.0
@@ -53,9 +58,9 @@ require (
 	go.mongodb.org/mongo-driver v1.7.0
 	go.uber.org/atomic v1.7.0
 	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519 // indirect
-	golang.org/x/net v0.0.0-20220225172249-27dd8689420f // indirect
+	golang.org/x/net v0.0.0-20220425223048-2871e0cb64e4 // indirect
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
-	golang.org/x/sys v0.0.0-20220317061510-51cd9980dadf // indirect
+	golang.org/x/sys v0.0.0-20220503163025-988cb79eb6c6 // indirect
 	golang.org/x/tools v0.1.5
 	google.golang.org/api v0.62.0
 	google.golang.org/genproto v0.0.0-20220314164441-57ef72a4c106
