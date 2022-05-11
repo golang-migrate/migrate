@@ -12,6 +12,18 @@ import (
 const maxMigrationSize = 1024
 
 func TestParse(t *testing.T) {
+
+	plpgsqlBody := `CREATE OR REPLACE function fn1() returns TRIGGER as $$
+	-- this is a function body
+	DECLARE
+	BEGIN
+	SELECT parent_path || flagship_role_id::text FROM roles WHERE id = NEW.parent_id INTO path;
+	IF path IS NULL THEN
+		RAISE EXCEPTION 'Invalid role parent %', NEW.parent_id;
+	END IF;
+	END;
+	$$ LANGUAGE plpgsql;`
+
 	testCases := []struct {
 		name        string
 		multiStmt   string
@@ -27,6 +39,8 @@ func TestParse(t *testing.T) {
 			expected: []string{"statement one;", " statement two"}, expectedErr: nil},
 		{name: "two statements, with trailing delimiter", multiStmt: "statement one; statement two;", delimiter: ";",
 			expected: []string{"statement one;", " statement two;"}, expectedErr: nil},
+		{name: "multi line plpgsql body", multiStmt: plpgsqlBody, delimiter: "$$.*;",
+			expected: []string{plpgsqlBody}, expectedErr: nil},
 	}
 
 	for _, tc := range testCases {

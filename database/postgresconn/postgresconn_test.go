@@ -673,10 +673,16 @@ func TestWithInstance_Concurrent(t *testing.T) {
 		defer wg.Wait()
 
 		wg.Add(concurrency)
+		ctx := context.Background()
 		for i := 0; i < concurrency; i++ {
 			go func(i int) {
 				defer wg.Done()
-				_, err := WithInstance(db, &Config{})
+				conn, err := db.Conn(ctx)
+				if err != nil {
+					t.Errorf("TestWithInstance_Concurrent(conn) %d error: %s", i, err)
+				}
+				defer conn.Close()
+				_, err = WithConn(ctx, conn, &Config{})
 				if err != nil {
 					t.Errorf("process %d error: %s", i, err)
 				}
