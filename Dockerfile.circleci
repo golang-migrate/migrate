@@ -3,7 +3,7 @@ FROM $DOCKER_IMAGE
 
 RUN apk add --no-cache git gcc musl-dev make
 
-WORKDIR /go/src/github.com/golang-migrate/migrate
+WORKDIR /go/src/github.com/HqOapp/migrate
 
 ENV GO111MODULE=on
 ENV COVERAGE_DIR=/tmp/coverage
