@@ -31,12 +31,14 @@ func TestParse(t *testing.T) {
 		expected    []string
 		expectedErr error
 	}{
+		//// these tests are changed from their original, why would we expect to add a missing delimiter?
 		{name: "single statement, no delimiter", multiStmt: "single statement, no delimiter", delimiter: ";",
-			expected: []string{"single statement, no delimiter"}, expectedErr: nil},
+			expected: []string{}, expectedErr: nil},
 		{name: "single statement, one delimiter", multiStmt: "single statement, one delimiter;", delimiter: ";",
 			expected: []string{"single statement, one delimiter;"}, expectedErr: nil},
+		
 		{name: "two statements, no trailing delimiter", multiStmt: "statement one; statement two", delimiter: ";",
-			expected: []string{"statement one;", " statement two"}, expectedErr: nil},
+			expected: []string{"statement one;"}, expectedErr: nil},
 		{name: "two statements, with trailing delimiter", multiStmt: "statement one; statement two;", delimiter: ";",
 			expected: []string{"statement one;", " statement two;"}, expectedErr: nil},
 		{name: "multi line plpgsql body", multiStmt: plpgsqlBody, delimiter: "$$.*;",

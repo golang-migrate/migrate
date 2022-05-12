@@ -4,11 +4,15 @@
 package iofs_test
 
 import (
+	"embed"
 	"testing"
 
 	"github.com/getoutreach/migrate/v4/source/iofs"
 	st "github.com/getoutreach/migrate/v4/source/testing"
 )
+
+//go:embed testdata/migrations/*.sql
+var fs embed.FS
 
 func Test(t *testing.T) {
 	// reuse the embed.FS set in example_test.go
