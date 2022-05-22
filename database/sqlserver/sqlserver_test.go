@@ -91,7 +91,7 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 
 func SkipIfUnsupportedArch(t *testing.T, c dktest.ContainerInfo) {
 	if strings.Contains(c.ImageName, "mssql") && !strings.HasPrefix(runtime.GOARCH, "amd") {
-		t.Skip(fmt.Sprintf("Image %s is not supported on arch %s", c.ImageName, runtime.GOARCH))
+		t.Skipf("Image %s is not supported on arch %s", c.ImageName, runtime.GOARCH)
 	}
 }
 
