@@ -395,6 +395,50 @@ func (m *Migrate) Version() (version uint, dirty bool, err error) {
 	return suint(v), d, nil
 }
 
+// Check if exists a pending migration
+func (m *Migrate) Check() error {
+	if err := m.lock(); err != nil {
+		return err
+	}
+
+	curVersion, dirty, err := m.databaseDrv.Version()
+	if err != nil {
+		return m.unlockErr(err)
+	}
+
+	if dirty {
+		return m.unlockErr(ErrDirty{curVersion})
+	}
+
+	ret := make(chan interface{}, m.PrefetchMigrations)
+
+	go m.readUp(curVersion, 1, ret)
+	return m.unlockErr(m.hasPendingMigration(ret))
+}
+
+// hasPendingMigration read a channel of migrations
+// If a migration exists, return an error
+func (m *Migrate) hasPendingMigration(ret <-chan interface{}) error {
+	for r := range ret {
+
+		if m.stop() {
+			return nil
+		}
+
+		switch r := r.(type) {
+		case error:
+			return r
+
+		case *Migration:
+			return fmt.Errorf("has pending migration %v", r.Version)
+
+		default:
+			return fmt.Errorf("unknown type: %T with value: %+v", r, r)
+		}
+	}
+	return nil
+}
+
 // read reads either up or down migrations from source `from` to `to`.
 // Each migration is then written to the ret channel.
 // If an error occurs during reading, that error is written to the ret channel, too.
