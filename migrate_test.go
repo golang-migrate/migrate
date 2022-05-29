@@ -1320,6 +1320,48 @@ func TestLock(t *testing.T) {
 	}
 }
 
+func TestCheck(t *testing.T) {
+	m, _ := New("stub://", "stub://")
+	m.sourceDrv.(*sStub.Stub).Migrations = sourceStubMigrations
+
+	err := m.Check()
+	if err != nil && !errors.Is(err, ErrPendingMigration) {
+		t.Errorf("expected has pending migration, but got %v", err)
+	}
+}
+
+func TestHasPendingMigration(t *testing.T) {
+
+	m, _ := New("stub://", "stub://")
+	m.sourceDrv.(*sStub.Stub).Migrations = sourceStubMigrations
+
+	tt := []struct {
+		from      int
+		expectErr error
+	}{
+		{from: -1, expectErr: ErrPendingMigration},
+		{from: 0, expectErr: os.ErrNotExist},
+		{from: 1, expectErr: ErrPendingMigration},
+		{from: 2, expectErr: os.ErrNotExist},
+		{from: 3, expectErr: ErrPendingMigration},
+		{from: 4, expectErr: ErrPendingMigration},
+		{from: 5, expectErr: ErrPendingMigration},
+		{from: 6, expectErr: os.ErrNotExist},
+		{from: 7, expectErr: os.ErrNotExist},
+		{from: 8, expectErr: os.ErrNotExist},
+	}
+
+	for i, v := range tt {
+		ret := make(chan interface{})
+		go m.readUp(v.from, 1, ret)
+		err := m.hasPendingMigration(ret)
+
+		if err != nil && !errors.Is(err, v.expectErr) {
+			t.Errorf("fail: %v, in %d", err, i)
+		}
+	}
+}
+
 func migrationsFromChannel(ret chan interface{}) ([]*Migration, error) {
 	slice := make([]*Migration, 0)
 	for r := range ret {

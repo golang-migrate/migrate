@@ -29,11 +29,12 @@ var DefaultPrefetchMigrations = uint(10)
 var DefaultLockTimeout = 15 * time.Second
 
 var (
-	ErrNoChange       = errors.New("no change")
-	ErrNilVersion     = errors.New("no migration")
-	ErrInvalidVersion = errors.New("version must be >= -1")
-	ErrLocked         = errors.New("database locked")
-	ErrLockTimeout    = errors.New("timeout: can't acquire database lock")
+	ErrNoChange         = errors.New("no change")
+	ErrNilVersion       = errors.New("no migration")
+	ErrInvalidVersion   = errors.New("version must be >= -1")
+	ErrLocked           = errors.New("database locked")
+	ErrLockTimeout      = errors.New("timeout: can't acquire database lock")
+	ErrPendingMigration = errors.New("has pending migration")
 )
 
 // ErrShortLimit is an error returned when not enough migrations
@@ -430,7 +431,7 @@ func (m *Migrate) hasPendingMigration(ret <-chan interface{}) error {
 			return r
 
 		case *Migration:
-			return fmt.Errorf("has pending migration %v", r.Version)
+			return ErrPendingMigration
 
 		default:
 			return fmt.Errorf("unknown type: %T with value: %+v", r, r)
