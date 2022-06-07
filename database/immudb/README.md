@@ -12,3 +12,7 @@
 | `host` | | The host to connect to. Values that start with / are for unix domain sockets. (default is localhost) |
 | `port` | | The port to bind to. (default is 5432) |
 
+## Notes
+
+* The immudb supports executing multiple statements in a single file natively.
+* Immudb does not support transactions, meaning migrations will not be executed in transactions.
