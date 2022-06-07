@@ -246,8 +246,9 @@ func (i *Immudb) Version() (version int, dirty bool, err error) {
 	for _, row := range result.Rows {
 		if len(row.Values) != 2 {
 			return database.NilVersion, false, database.Error{Err: "unexpected version row"}
+		} else {
+			return int(row.Values[0].GetN()), row.Values[1].GetB(), nil
 		}
-		return int(row.Values[0].GetN()), row.Values[1].GetB(), nil
 	}
 	return database.NilVersion, false, nil
 }
