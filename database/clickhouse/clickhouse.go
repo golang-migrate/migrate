@@ -196,7 +196,9 @@ func (ch *ClickHouse) SetVersion(version int, dirty bool) error {
 	query := "INSERT INTO " + ch.config.MigrationsTable + " (version, dirty, sequence) VALUES (?, ?, ?)"
 	stmt, err := tx.Prepare(query)
 	if err != nil {
-		tx.Rollback()
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			return fmt.Errorf("error during prepare statement %w and rollback %s", err, rollbackErr)
+		}
 
 		return err
 	}
