@@ -14,5 +14,5 @@
 
 ## Notes
 
-* The immudb supports executing multiple statements in a single file natively.
-* Immudb does not support transactions, meaning migrations will not be executed in transactions.
+* Immudb supports executing multiple statements in a single file natively.
+* Immudb supports transactions, but this package does not implement them.
