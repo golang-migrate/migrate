@@ -3,7 +3,6 @@ package bitbucket
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	nurl "net/url"
 	"os"
 	"path"
@@ -177,7 +176,7 @@ func (b *Bitbucket) ReadUp(version uint) (r io.ReadCloser, identifier string, er
 		}
 		if file != nil {
 			r := file.Content
-			return ioutil.NopCloser(strings.NewReader(string(r))), m.Identifier, nil
+			return io.NopCloser(strings.NewReader(string(r))), m.Identifier, nil
 		}
 	}
 	return nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: b.config.Path, Err: os.ErrNotExist}
@@ -201,7 +200,7 @@ func (b *Bitbucket) ReadDown(version uint) (r io.ReadCloser, identifier string, 
 		if file != nil {
 			r := file.Content
 
-			return ioutil.NopCloser(strings.NewReader(string(r))), m.Identifier, nil
+			return io.NopCloser(strings.NewReader(string(r))), m.Identifier, nil
 		}
 	}
 	return nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: b.config.Path, Err: os.ErrNotExist}

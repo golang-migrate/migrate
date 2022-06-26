@@ -2,7 +2,6 @@ package cli
 
 import (
 	"errors"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -22,7 +21,7 @@ func TestCreateCmdSuite(t *testing.T) {
 }
 
 func (s *CreateCmdSuite) mustCreateTempDir() string {
-	tmpDir, err := ioutil.TempDir("", "migrate_")
+	tmpDir, err := os.MkdirTemp("", "migrate_")
 
 	if err != nil {
 		s.FailNow(err.Error())
@@ -44,7 +43,7 @@ func (s *CreateCmdSuite) mustRemoveDir(dir string) {
 }
 
 func (s *CreateCmdSuite) mustWriteFile(dir, file, body string) {
-	if err := ioutil.WriteFile(filepath.Join(dir, file), []byte(body), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, file), []byte(body), 0644); err != nil {
 		s.FailNow(err.Error())
 	}
 }
@@ -66,7 +65,7 @@ func (s *CreateCmdSuite) mustChdir(dir string) {
 }
 
 func (s *CreateCmdSuite) assertEmptyDir(dir string) bool {
-	fis, err := ioutil.ReadDir(dir)
+	fis, err := os.ReadDir(dir)
 
 	if err != nil {
 		return s.Fail(err.Error())

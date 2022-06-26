@@ -9,12 +9,13 @@ import (
 	"crypto/x509"
 	"database/sql"
 	"fmt"
-	"go.uber.org/atomic"
 	"io"
-	"io/ioutil"
 	nurl "net/url"
+	"os"
 	"strconv"
 	"strings"
+
+	"go.uber.org/atomic"
 
 	"github.com/go-sql-driver/mysql"
 	"github.com/golang-migrate/migrate/v4/database"
@@ -154,7 +155,7 @@ func urlToMySQLConfig(url string) (*mysql.Config, error) {
 		if len(ctls) > 0 {
 			if _, isBool := readBool(ctls); !isBool && strings.ToLower(ctls) != "skip-verify" {
 				rootCertPool := x509.NewCertPool()
-				pem, err := ioutil.ReadFile(parsedParams.Get("x-tls-ca"))
+				pem, err := os.ReadFile(parsedParams.Get("x-tls-ca"))
 				if err != nil {
 					return nil, err
 				}
@@ -322,7 +323,7 @@ func (m *Mysql) Unlock() error {
 }
 
 func (m *Mysql) Run(migration io.Reader) error {
-	migr, err := ioutil.ReadAll(migration)
+	migr, err := io.ReadAll(migration)
 	if err != nil {
 		return err
 	}
