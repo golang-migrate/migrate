@@ -49,8 +49,8 @@ var (
 	}
 )
 
-func msConnectionString(host, port string) string {
-	return fmt.Sprintf("sqlserver://sa:%v@%v:%v?database=master", saPassword, host, port)
+func msConnectionString(host, port string, options ...string) string {
+	return fmt.Sprintf("sqlserver://sa:%v@%v:%v?database=master?%s", saPassword, host, port, strings.Join(options, "&"))
 }
 
 func msConnectionStringMsiWithPassword(host, port string, useMsi bool) string {
@@ -169,6 +169,39 @@ func TestMultiStatement(t *testing.T) {
 			}
 		}()
 		if err := d.Run(strings.NewReader("CREATE TABLE foo (foo text); CREATE TABLE bar (bar text);")); err != nil {
+			t.Fatalf("expected err to be nil, got %v", err)
+		}
+
+		// make sure second table exists
+		var exists int
+		if err := d.(*SQLServer).conn.QueryRowContext(context.Background(), "SELECT COUNT(1) FROM information_schema.tables WHERE table_name = 'bar' AND table_schema = (SELECT schema_name()) AND table_catalog = (SELECT db_name())").Scan(&exists); err != nil {
+			t.Fatal(err)
+		}
+		if exists != 1 {
+			t.Fatalf("expected table bar to exist")
+		}
+	})
+}
+func TestMultiStatementWithGO(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		SkipIfUnsupportedArch(t, c)
+		ip, port, err := c.Port(defaultPort)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := msConnectionString(ip, port, "x-multi-statement=true")
+		ms := &SQLServer{}
+		d, err := ms.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
+		if err := d.Run(strings.NewReader("CREATE TABLE foo (foo text); GO CREATE TABLE bar (bar text);")); err != nil {
 			t.Fatalf("expected err to be nil, got %v", err)
 		}
 

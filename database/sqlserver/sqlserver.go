@@ -16,6 +16,7 @@ import (
 	mssql "github.com/denisenkom/go-mssqldb" // mssql support
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
+	"github.com/golang-migrate/migrate/v4/database/multistmt"
 	"github.com/hashicorp/go-multierror"
 )
 
@@ -25,6 +26,8 @@ func init() {
 
 // DefaultMigrationsTable is the name of the migrations table in the database
 var DefaultMigrationsTable = "schema_migrations"
+var DefaultMultiStatementMaxSize = 10 * 1 << 20 // 10 MB
+var multiStmtDelimiter = []byte("GO")
 
 var (
 	ErrNilConfig                 = fmt.Errorf("no config")
@@ -43,9 +46,11 @@ var lockErrorMap = map[mssql.ReturnStatus]string{
 
 // Config for database
 type Config struct {
-	MigrationsTable string
-	DatabaseName    string
-	SchemaName      string
+	MigrationsTable       string
+	DatabaseName          string
+	SchemaName            string
+	MultiStatementEnabled bool
+	MultiStatementMaxSize int
 }
 
 // SQL Server connection
@@ -169,9 +174,30 @@ func (ss *SQLServer) Open(url string) (database.Driver, error) {
 
 	migrationsTable := purl.Query().Get("x-migrations-table")
 
+	multiStatementMaxSize := DefaultMultiStatementMaxSize
+	if s := purl.Query().Get("x-multi-statement-max-size"); len(s) > 0 {
+		multiStatementMaxSize, err = strconv.Atoi(s)
+		if err != nil {
+			return nil, err
+		}
+		if multiStatementMaxSize <= 0 {
+			multiStatementMaxSize = DefaultMultiStatementMaxSize
+		}
+	}
+
+	multiStatementEnabled := false
+	if s := purl.Query().Get("x-multi-statement"); len(s) > 0 {
+		multiStatementEnabled, err = strconv.ParseBool(s)
+		if err != nil {
+			return nil, fmt.Errorf("Unable to parse option x-multi-statement: %w", err)
+		}
+	}
+
 	px, err := WithInstance(db, &Config{
-		DatabaseName:    purl.Path,
-		MigrationsTable: migrationsTable,
+		DatabaseName:          purl.Path,
+		MigrationsTable:       migrationsTable,
+		MultiStatementEnabled: multiStatementEnabled,
+		MultiStatementMaxSize: multiStatementMaxSize,
 	})
 
 	if err != nil {
@@ -235,22 +261,38 @@ func (ss *SQLServer) Unlock() error {
 
 // Run the migrations for the database
 func (ss *SQLServer) Run(migration io.Reader) error {
+	if ss.config.MultiStatementEnabled {
+		var err error
+		if e := multistmt.ParseRemovingDelim(migration, multiStmtDelimiter, ss.config.MultiStatementMaxSize, func(m []byte) bool {
+			if err = ss.runStatement(m); err != nil {
+				return false
+			}
+			return true
+		}); e != nil {
+			return e
+		}
+		return err
+	}
+
 	migr, err := ioutil.ReadAll(migration)
 	if err != nil {
 		return err
 	}
 
-	// run migration
-	query := string(migr[:])
+	return ss.runStatement(migr)
+}
+
+func (ss *SQLServer) runStatement(statement []byte) error {
+	query := string(statement)
 	if _, err := ss.conn.ExecContext(context.Background(), query); err != nil {
 		if msErr, ok := err.(mssql.Error); ok {
 			message := fmt.Sprintf("migration failed: %s", msErr.Message)
 			if msErr.ProcName != "" {
 				message = fmt.Sprintf("%s (proc name %s)", msErr.Message, msErr.ProcName)
 			}
-			return database.Error{OrigErr: err, Err: message, Query: migr, Line: uint(msErr.LineNo)}
+			return database.Error{OrigErr: err, Err: message, Query: statement, Line: uint(msErr.LineNo)}
 		}
-		return database.Error{OrigErr: err, Err: "migration failed", Query: migr}
+		return database.Error{OrigErr: err, Err: "migration failed", Query: statement}
 	}
 
 	return nil

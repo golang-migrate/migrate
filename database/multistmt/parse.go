@@ -15,7 +15,7 @@ var StartBufSize = 4096
 // from the multi-statement migration should be parsed and handled.
 type Handler func(migration []byte) bool
 
-func splitWithDelimiter(delimiter []byte) func(d []byte, atEOF bool) (int, []byte, error) {
+func splitWithDelimiter(delimiter []byte, keepDelim bool) func(d []byte, atEOF bool) (int, []byte, error) {
 	return func(d []byte, atEOF bool) (int, []byte, error) {
 		// SplitFunc inspired by bufio.ScanLines() implementation
 		if atEOF {
@@ -25,7 +25,11 @@ func splitWithDelimiter(delimiter []byte) func(d []byte, atEOF bool) (int, []byt
 			return len(d), d, nil
 		}
 		if i := bytes.Index(d, delimiter); i >= 0 {
-			return i + len(delimiter), d[:i+len(delimiter)], nil
+			if keepDelim {
+				return i + len(delimiter), d[:i+len(delimiter)], nil
+			} else {
+				return i + len(delimiter), d[:i], nil
+			}
 		}
 		return 0, nil, nil
 	}
@@ -35,7 +39,20 @@ func splitWithDelimiter(delimiter []byte) func(d []byte, atEOF bool) (int, []byt
 func Parse(reader io.Reader, delimiter []byte, maxMigrationSize int, h Handler) error {
 	scanner := bufio.NewScanner(reader)
 	scanner.Buffer(make([]byte, 0, StartBufSize), maxMigrationSize)
-	scanner.Split(splitWithDelimiter(delimiter))
+	scanner.Split(splitWithDelimiter(delimiter, true))
+	for scanner.Scan() {
+		cont := h(scanner.Bytes())
+		if !cont {
+			break
+		}
+	}
+	return scanner.Err()
+}
+
+func ParseRemovingDelim(reader io.Reader, delimiter []byte, maxMigrationSize int, h Handler) error {
+	scanner := bufio.NewScanner(reader)
+	scanner.Buffer(make([]byte, 0, StartBufSize), maxMigrationSize)
+	scanner.Split(splitWithDelimiter(delimiter, false))
 	for scanner.Scan() {
 		cont := h(scanner.Bytes())
 		if !cont {
