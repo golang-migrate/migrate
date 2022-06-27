@@ -41,6 +41,7 @@ Database drivers run migrations. [Add a new database?](database/driver.go)
 * [ClickHouse](database/clickhouse)
 * [Firebird](database/firebird)
 * [MS SQL Server](database/sqlserver)
+* [Immudb](database/immudb)
 
 ### Database URLs
 
