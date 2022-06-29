@@ -16,7 +16,6 @@ require (
 	github.com/cncf/xds/go v0.0.0-20211130200136-a8f946100490 // indirect
 	github.com/cockroachdb/cockroach-go/v2 v2.1.1
 	github.com/cznic/mathutil v0.0.0-20180504122225-ca4c9f2c1369 // indirect
-	github.com/denisenkom/go-mssqldb v0.10.0
 	github.com/dhui/dktest v0.3.11
 	github.com/docker/docker v20.10.15+incompatible
 	github.com/docker/go-connections v0.4.0
@@ -29,7 +28,7 @@ require (
 	github.com/gobuffalo/here v0.6.0
 	github.com/gocql/gocql v0.0.0-20210515062232-b7ef815b4556
 	github.com/gofrs/uuid v4.0.0+incompatible // indirect
-	github.com/golang-jwt/jwt/v4 v4.1.0 // indirect
+	github.com/golang-jwt/jwt/v4 v4.2.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/google/go-github/v39 v39.2.0
 	github.com/gorilla/mux v1.7.4 // indirect
@@ -57,7 +56,7 @@ require (
 	gitlab.com/nyarla/go-crypt v0.0.0-20160106005555-d9a5dc2b789b // indirect
 	go.mongodb.org/mongo-driver v1.7.0
 	go.uber.org/atomic v1.7.0
-	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519 // indirect
+	golang.org/x/crypto v0.0.0-20220214200702-86341886e292 // indirect
 	golang.org/x/net v0.0.0-20220425223048-2871e0cb64e4 // indirect
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
 	golang.org/x/sys v0.0.0-20220503163025-988cb79eb6c6 // indirect
