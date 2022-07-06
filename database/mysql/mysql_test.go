@@ -17,18 +17,15 @@ import (
 	"os"
 	"strconv"
 	"testing"
-)
 
-import (
 	"github.com/dhui/dktest"
 	"github.com/go-sql-driver/mysql"
-	"github.com/stretchr/testify/assert"
-)
-
-import (
 	"github.com/golang-migrate/migrate/v4"
+	"github.com/stretchr/testify/assert"
+
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
 	"github.com/golang-migrate/migrate/v4/dktesting"
+
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
@@ -90,6 +87,7 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 func Test(t *testing.T) {
 	// mysql.SetLogger(mysql.Logger(log.New(ioutil.Discard, "", log.Ltime)))
 
+	ctx := context.Background()
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.Port(defaultPort)
 		if err != nil {
@@ -98,7 +96,7 @@ func Test(t *testing.T) {
 
 		addr := fmt.Sprintf("mysql://root:root@tcp(%v:%v)/public", ip, port)
 		p := &Mysql{}
-		d, err := p.Open(addr)
+		d, err := p.Open(ctx, addr)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -123,6 +121,7 @@ func Test(t *testing.T) {
 func TestMigrate(t *testing.T) {
 	// mysql.SetLogger(mysql.Logger(log.New(ioutil.Discard, "", log.Ltime)))
 
+	ctx := context.Background()
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.Port(defaultPort)
 		if err != nil {
@@ -131,7 +130,7 @@ func TestMigrate(t *testing.T) {
 
 		addr := fmt.Sprintf("mysql://root:root@tcp(%v:%v)/public", ip, port)
 		p := &Mysql{}
-		d, err := p.Open(addr)
+		d, err := p.Open(ctx, addr)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -148,11 +147,11 @@ func TestMigrate(t *testing.T) {
 		dt.TestMigrate(t, m)
 
 		// check ensureVersionTable
-		if err := d.(*Mysql).ensureVersionTable(); err != nil {
+		if err := d.(*Mysql).ensureVersionTable(ctx); err != nil {
 			t.Fatal(err)
 		}
 		// check again
-		if err := d.(*Mysql).ensureVersionTable(); err != nil {
+		if err := d.(*Mysql).ensureVersionTable(ctx); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -161,6 +160,7 @@ func TestMigrate(t *testing.T) {
 func TestMigrateAnsiQuotes(t *testing.T) {
 	// mysql.SetLogger(mysql.Logger(log.New(ioutil.Discard, "", log.Ltime)))
 
+	ctx := context.Background()
 	dktesting.ParallelTest(t, specsAnsiQuotes, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.Port(defaultPort)
 		if err != nil {
@@ -169,7 +169,7 @@ func TestMigrateAnsiQuotes(t *testing.T) {
 
 		addr := fmt.Sprintf("mysql://root:root@tcp(%v:%v)/public", ip, port)
 		p := &Mysql{}
-		d, err := p.Open(addr)
+		d, err := p.Open(ctx, addr)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -186,17 +186,18 @@ func TestMigrateAnsiQuotes(t *testing.T) {
 		dt.TestMigrate(t, m)
 
 		// check ensureVersionTable
-		if err := d.(*Mysql).ensureVersionTable(); err != nil {
+		if err := d.(*Mysql).ensureVersionTable(ctx); err != nil {
 			t.Fatal(err)
 		}
 		// check again
-		if err := d.(*Mysql).ensureVersionTable(); err != nil {
+		if err := d.(*Mysql).ensureVersionTable(ctx); err != nil {
 			t.Fatal(err)
 		}
 	})
 }
 
 func TestLockWorks(t *testing.T) {
+	ctx := context.Background()
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.Port(defaultPort)
 		if err != nil {
@@ -205,7 +206,7 @@ func TestLockWorks(t *testing.T) {
 
 		addr := fmt.Sprintf("mysql://root:root@tcp(%v:%v)/public", ip, port)
 		p := &Mysql{}
-		d, err := p.Open(addr)
+		d, err := p.Open(ctx, addr)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -213,21 +214,21 @@ func TestLockWorks(t *testing.T) {
 
 		ms := d.(*Mysql)
 
-		err = ms.Lock()
+		err = ms.Lock(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = ms.Unlock()
+		err = ms.Unlock(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		// make sure the 2nd lock works (RELEASE_LOCK is very finicky)
-		err = ms.Lock()
+		err = ms.Lock(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = ms.Unlock()
+		err = ms.Unlock(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -246,6 +247,7 @@ func TestNoLockParamValidation(t *testing.T) {
 }
 
 func TestNoLockWorks(t *testing.T) {
+	ctx := context.Background()
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.Port(defaultPort)
 		if err != nil {
@@ -254,7 +256,7 @@ func TestNoLockWorks(t *testing.T) {
 
 		addr := fmt.Sprintf("mysql://root:root@tcp(%v:%v)/public", ip, port)
 		p := &Mysql{}
-		d, err := p.Open(addr)
+		d, err := p.Open(ctx, addr)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -270,16 +272,16 @@ func TestNoLockWorks(t *testing.T) {
 		noLock := d.(*Mysql)
 
 		// Should be possible to take real lock and no-lock at the same time
-		if err = lock.Lock(); err != nil {
+		if err = lock.Lock(ctx); err != nil {
 			t.Fatal(err)
 		}
-		if err = noLock.Lock(); err != nil {
+		if err = noLock.Lock(ctx); err != nil {
 			t.Fatal(err)
 		}
-		if err = lock.Unlock(); err != nil {
+		if err = lock.Unlock(ctx); err != nil {
 			t.Fatal(err)
 		}
-		if err = noLock.Unlock(); err != nil {
+		if err = noLock.Unlock(ctx); err != nil {
 			t.Fatal(err)
 		}
 	})
