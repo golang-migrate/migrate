@@ -336,12 +336,12 @@ func (m *Mysql) Run(migration io.Reader) error {
 }
 
 func (m *Mysql) SetVersion(version int, dirty bool) error {
-	tx, err := m.conn.BeginTx(context.Background(), &sql.TxOptions{})
+	tx, err := m.conn.BeginTx(context.Background(), &sql.TxOptions{Isolation: sql.LevelSerializable})
 	if err != nil {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
 	}
 
-	query := "TRUNCATE `" + m.config.MigrationsTable + "`"
+	query := "DELETE FROM `" + m.config.MigrationsTable + "`"
 	if _, err := tx.ExecContext(context.Background(), query); err != nil {
 		if errRollback := tx.Rollback(); errRollback != nil {
 			err = multierror.Append(err, errRollback)
