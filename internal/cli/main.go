@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"database/sql"
 	"fmt"
 	"net/url"
 	"os"
@@ -10,11 +11,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/infobloxopen/hotload"
+	"github.com/lib/pq"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
+	"github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/golang-migrate/migrate/v4/source"
 )
 
@@ -35,6 +39,10 @@ const (
 	Use -f to bypass confirmation`
 	forceUsage = `force V      Set version V but don't run migration (ignores dirty state)`
 )
+
+func init() {
+	hotload.RegisterSQLDriver("postgres", pq.Driver{})
+}
 
 func handleSubCmdHelp(help bool, usage string, flagSet *flag.FlagSet) {
 	if help {
@@ -148,7 +156,34 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 	// initialize migrate
 	// don't catch migraterErr here and let each command decide
 	// how it wants to handle the error
-	migrater, migraterErr := migrate.New(sourcePtr, databasePtr)
+	var migrater *migrate.Migrate
+	var migraterErr error
+
+	if driver := viper.GetString("database.driver"); driver == "hotload" {
+		u, err := url.Parse(databasePtr)
+		if err != nil {
+			log.fatalErr(fmt.Errorf("could not parse hotload dsn %v: %s", databasePtr, err))
+		}
+		if hostname := u.Hostname(); hostname != "postgres" {
+			log.fatalErr(fmt.Errorf("unsupported hotload base driver: %s", hostname))
+		}
+		db, err := sql.Open(driver, databasePtr)
+		if err != nil {
+			log.fatalErr(fmt.Errorf("could not open hotload dsn %s: %s", databasePtr, err))
+		}
+		var dbname, user string
+		if err := db.QueryRow("SELECT current_database(), user").Scan(&dbname, &user); err != nil {
+			log.fatalErr(fmt.Errorf("could not get current_database: %s", err.Error()))
+		}
+		// dbname is not needed since it gets filled in by the driver but we want to be complete
+		migrateDriver, err := postgres.WithInstance(db, &postgres.Config{DatabaseName: dbname})
+		if err != nil {
+			log.fatalErr(fmt.Errorf("could not create migrate driver: %s", err))
+		}
+		migrater, migraterErr = migrate.NewWithDatabaseInstance(sourcePtr, dbname, migrateDriver)
+	} else {
+		migrater, migraterErr = migrate.New(sourcePtr, databasePtr)
+	}
 	defer func() {
 		if migraterErr == nil {
 			if _, err := migrater.Close(); err != nil {

@@ -35,6 +35,7 @@ require (
 	github.com/gorilla/mux v1.7.4 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1
+	github.com/infobloxopen/hotload v0.0.0-20210618153036-1535a93a8521 // indirect
 	github.com/jackc/pgconn v1.8.0
 	github.com/jackc/pgerrcode v0.0.0-20201024163028-a0d42d470451
 	github.com/jackc/pgproto3/v2 v2.0.7 // indirect
