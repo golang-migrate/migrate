@@ -7,7 +7,7 @@ pipeline {
     label 'ubuntu_docker_label'
   }
   tools {
-    go "Go 1.14.4"
+    go "Go 1.17"
   }
   options {
     checkoutToSubdirectory('src/github.com/infobloxopen/migrate')
@@ -33,7 +33,7 @@ pipeline {
     }
     stage("Build Image") {
       // only build images on trunk builds. An alternate approach
-      // when { branch 'main' } or when { anyOf { branch "main", branch "develop" } }
+      // when { branch 'main' } or when { anyOf { branch "main", branch "develop", "ib" } }
       when {
         expression { ! isPrBuild() }
       }
