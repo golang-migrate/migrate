@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/infobloxopen/hotload"
+	_ "github.com/infobloxopen/hotload/fsnotify"
 	"github.com/lib/pq"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
