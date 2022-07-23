@@ -1,4 +1,4 @@
-// Package database provides the Database interface.
+// Package database provides the Driver interface.
 // All database drivers must implement this interface, register themselves,
 // optionally provide a `WithInstance` function and pass the tests
 // in package database/testing.
