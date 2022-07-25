@@ -9,13 +9,14 @@ import (
 	"crypto/x509"
 	"database/sql"
 	"fmt"
-	"go.uber.org/atomic"
 	"io"
 	"io/ioutil"
 	nurl "net/url"
 	"strconv"
 	"strings"
 	"time"
+
+	"go.uber.org/atomic"
 
 	"github.com/go-sql-driver/mysql"
 	"github.com/golang-migrate/migrate/v4/database"
@@ -246,7 +247,7 @@ func (m *Mysql) Open(url string) (database.Driver, error) {
 	statementTimeoutParam := customParams["x-statement-timeout"]
 	statementTimeout := 0
 	if statementTimeoutParam != "" {
-		statementTimeout, err := strconv.ParseFloat(statementTimeoutParam, 64)
+		statementTimeout, err = strconv.Atoi(statementTimeoutParam)
 		if err != nil {
 			return nil, fmt.Errorf("could not parse x-statement-timeout as float: %w", err)
 		}
