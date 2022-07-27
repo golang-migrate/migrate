@@ -2,7 +2,7 @@ package bitbucket
 
 import (
 	"bytes"
-	"io/ioutil"
+	"os"
 	"testing"
 
 	st "github.com/golang-migrate/migrate/v4/source/testing"
@@ -11,7 +11,7 @@ import (
 var BitbucketTestSecret = "" // username:password
 
 func init() {
-	secrets, err := ioutil.ReadFile(".bitbucket_test_secrets")
+	secrets, err := os.ReadFile(".bitbucket_test_secrets")
 	if err == nil {
 		BitbucketTestSecret = string(bytes.TrimSpace(secrets)[:])
 	}

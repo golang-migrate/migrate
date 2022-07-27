@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	neturl "net/url"
 	"strconv"
 	"sync/atomic"
@@ -173,7 +172,7 @@ func (n *Neo4j) Run(migration io.Reader) (err error) {
 		return err
 	}
 
-	body, err := ioutil.ReadAll(migration)
+	body, err := io.ReadAll(migration)
 	if err != nil {
 		return err
 	}

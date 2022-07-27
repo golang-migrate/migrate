@@ -3,6 +3,12 @@ package mongodb
 import (
 	"context"
 	"fmt"
+	"io"
+	"net/url"
+	"os"
+	"strconv"
+	"time"
+
 	"github.com/cenkalti/backoff/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/hashicorp/go-multierror"
@@ -11,12 +17,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/x/mongo/driver/connstring"
 	"go.uber.org/atomic"
-	"io"
-	"io/ioutil"
-	"net/url"
-	os "os"
-	"strconv"
-	"time"
 )
 
 func init() {
@@ -114,7 +114,7 @@ func WithInstance(instance *mongo.Client, config *Config) (database.Driver, erro
 }
 
 func (m *Mongo) Open(dsn string) (database.Driver, error) {
-	//connstring is experimental package, but it used for parse connection string in mongo.Connect function
+	// connstring is experimental package, but it used for parse connection string in mongo.Connect function
 	uri, err := connstring.Parse(dsn)
 	if err != nil {
 		return nil, err
@@ -182,7 +182,7 @@ func (m *Mongo) Open(dsn string) (database.Driver, error) {
 	return mc, nil
 }
 
-//Parse the url param, convert it to boolean
+// Parse the url param, convert it to boolean
 // returns error if param invalid. returns defaultValue if param not present
 func parseBoolean(urlParam string, defaultValue bool) (bool, error) {
 
@@ -199,7 +199,7 @@ func parseBoolean(urlParam string, defaultValue bool) (bool, error) {
 	return defaultValue, nil
 }
 
-//Parse the url param, convert it to int
+// Parse the url param, convert it to int
 // returns error if param invalid. returns defaultValue if param not present
 func parseInt(urlParam string, defaultValue int) (int, error) {
 
@@ -241,7 +241,7 @@ func (m *Mongo) Version() (version int, dirty bool, err error) {
 }
 
 func (m *Mongo) Run(migration io.Reader) error {
-	migr, err := ioutil.ReadAll(migration)
+	migr, err := io.ReadAll(migration)
 	if err != nil {
 		return err
 	}
@@ -268,8 +268,8 @@ func (m *Mongo) executeCommandsWithTransaction(ctx context.Context, cmds []bson.
 			return &database.Error{OrigErr: err, Err: "failed to start transaction"}
 		}
 		if err := m.executeCommands(sessionContext, cmds); err != nil {
-			//When command execution is failed, it's aborting transaction
-			//If you tried to call abortTransaction, it`s return error that transaction already aborted
+			// When command execution is failed, it's aborting transaction
+			// If you tried to call abortTransaction, it`s return error that transaction already aborted
 			return err
 		}
 		if err := sessionContext.CommitTransaction(sessionContext); err != nil {

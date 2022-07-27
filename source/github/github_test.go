@@ -3,7 +3,7 @@ package github
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"testing"
 
 	st "github.com/golang-migrate/migrate/v4/source/testing"
@@ -13,7 +13,7 @@ import (
 var GithubTestSecret = "" // username:token
 
 func init() {
-	secrets, err := ioutil.ReadFile(".github_test_secrets")
+	secrets, err := os.ReadFile(".github_test_secrets")
 	if err == nil {
 		GithubTestSecret = string(bytes.TrimSpace(secrets)[:])
 	}
