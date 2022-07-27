@@ -3,13 +3,12 @@ package ql
 import (
 	"database/sql"
 	"fmt"
-	"github.com/hashicorp/go-multierror"
-	"go.uber.org/atomic"
 	"io"
-	"io/ioutil"
+	nurl "net/url"
 	"strings"
 
-	nurl "net/url"
+	"github.com/hashicorp/go-multierror"
+	"go.uber.org/atomic"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
@@ -179,7 +178,7 @@ func (m *Ql) Unlock() error {
 	return nil
 }
 func (m *Ql) Run(migration io.Reader) error {
-	migr, err := ioutil.ReadAll(migration)
+	migr, err := io.ReadAll(migration)
 	if err != nil {
 		return err
 	}

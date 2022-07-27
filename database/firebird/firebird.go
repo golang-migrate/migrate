@@ -7,14 +7,14 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"io"
+	nurl "net/url"
+
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/hashicorp/go-multierror"
 	_ "github.com/nakagami/firebirdsql"
 	"go.uber.org/atomic"
-	"io"
-	"io/ioutil"
-	nurl "net/url"
 )
 
 func init() {
@@ -122,7 +122,7 @@ func (f *Firebird) Unlock() error {
 }
 
 func (f *Firebird) Run(migration io.Reader) error {
-	migr, err := ioutil.ReadAll(migration)
+	migr, err := io.ReadAll(migration)
 	if err != nil {
 		return err
 	}

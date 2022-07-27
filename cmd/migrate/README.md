@@ -127,7 +127,7 @@ $ migrate -database "$MY_MIGRATE_DATABASE"
 Check out https://stedolan.github.io/jq/
 
 ```bash
-$ migrate -database "$(cat config.json | jq '.database')"
+$ migrate -database "$(cat config.json | jq -r '.database')"
 ```
 
 ### YAML files

@@ -10,11 +10,13 @@ import (
 	"database/sql"
 	"fmt"
 	"io"
-	"io/ioutil"
 	nurl "net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	"go.uber.org/atomic"
 
 	"go.uber.org/atomic"
 
@@ -157,7 +159,7 @@ func urlToMySQLConfig(url string) (*mysql.Config, error) {
 		if len(ctls) > 0 {
 			if _, isBool := readBool(ctls); !isBool && strings.ToLower(ctls) != "skip-verify" {
 				rootCertPool := x509.NewCertPool()
-				pem, err := ioutil.ReadFile(parsedParams.Get("x-tls-ca"))
+				pem, err := os.ReadFile(parsedParams.Get("x-tls-ca"))
 				if err != nil {
 					return nil, err
 				}
@@ -335,7 +337,7 @@ func (m *Mysql) Unlock() error {
 }
 
 func (m *Mysql) Run(migration io.Reader) error {
-	migr, err := ioutil.ReadAll(migration)
+	migr, err := io.ReadAll(migration)
 	if err != nil {
 		return err
 	}
