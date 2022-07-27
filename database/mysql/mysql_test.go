@@ -9,7 +9,6 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"math/big"
 	"math/rand"
@@ -17,19 +16,14 @@ import (
 	"os"
 	"strconv"
 	"testing"
-)
 
-import (
 	"github.com/dhui/dktest"
 	"github.com/go-sql-driver/mysql"
-	"github.com/stretchr/testify/assert"
-)
-
-import (
 	"github.com/golang-migrate/migrate/v4"
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
 	"github.com/golang-migrate/migrate/v4/dktesting"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/stretchr/testify/assert"
 )
 
 const defaultPort = 3306
@@ -88,7 +82,7 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 }
 
 func Test(t *testing.T) {
-	// mysql.SetLogger(mysql.Logger(log.New(ioutil.Discard, "", log.Ltime)))
+	// mysql.SetLogger(mysql.Logger(log.New(io.Discard, "", log.Ltime)))
 
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.Port(defaultPort)
@@ -121,7 +115,7 @@ func Test(t *testing.T) {
 }
 
 func TestMigrate(t *testing.T) {
-	// mysql.SetLogger(mysql.Logger(log.New(ioutil.Discard, "", log.Ltime)))
+	// mysql.SetLogger(mysql.Logger(log.New(io.Discard, "", log.Ltime)))
 
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.Port(defaultPort)
@@ -159,7 +153,7 @@ func TestMigrate(t *testing.T) {
 }
 
 func TestMigrateAnsiQuotes(t *testing.T) {
-	// mysql.SetLogger(mysql.Logger(log.New(ioutil.Discard, "", log.Ltime)))
+	// mysql.SetLogger(mysql.Logger(log.New(io.Discard, "", log.Ltime)))
 
 	dktesting.ParallelTest(t, specsAnsiQuotes, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.Port(defaultPort)
@@ -342,7 +336,7 @@ func TestExtractCustomQueryParams(t *testing.T) {
 }
 
 func createTmpCert(t *testing.T) string {
-	tmpCertFile, err := ioutil.TempFile("", "migrate_test_cert")
+	tmpCertFile, err := os.CreateTemp("", "migrate_test_cert")
 	if err != nil {
 		t.Fatal("Failed to create temp cert file:", err)
 	}

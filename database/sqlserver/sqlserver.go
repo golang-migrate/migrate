@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"io"
-	"io/ioutil"
 	nurl "net/url"
 	"strconv"
 	"strings"
@@ -235,7 +234,7 @@ func (ss *SQLServer) Unlock() error {
 
 // Run the migrations for the database
 func (ss *SQLServer) Run(migration io.Reader) error {
-	migr, err := ioutil.ReadAll(migration)
+	migr, err := io.ReadAll(migration)
 	if err != nil {
 		return err
 	}

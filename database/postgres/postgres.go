@@ -8,7 +8,6 @@ import (
 	"database/sql"
 	"fmt"
 	"io"
-	"io/ioutil"
 	nurl "net/url"
 	"regexp"
 	"strconv"
@@ -278,7 +277,7 @@ func (p *Postgres) Run(migration io.Reader) error {
 		}
 		return err
 	}
-	migr, err := ioutil.ReadAll(migration)
+	migr, err := io.ReadAll(migration)
 	if err != nil {
 		return err
 	}
