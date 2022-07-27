@@ -3,14 +3,14 @@ package github
 import (
 	"context"
 	"fmt"
-	"golang.org/x/oauth2"
 	"io"
-	"io/ioutil"
 	"net/http"
 	nurl "net/url"
 	"os"
 	"path"
 	"strings"
+
+	"golang.org/x/oauth2"
 
 	"github.com/golang-migrate/migrate/v4/source"
 	"github.com/google/go-github/v39/github"
@@ -194,7 +194,7 @@ func (g *Github) ReadUp(version uint) (r io.ReadCloser, identifier string, err e
 			if err != nil {
 				return nil, "", err
 			}
-			return ioutil.NopCloser(strings.NewReader(r)), m.Identifier, nil
+			return io.NopCloser(strings.NewReader(r)), m.Identifier, nil
 		}
 	}
 	return nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: g.config.Path, Err: os.ErrNotExist}
@@ -220,7 +220,7 @@ func (g *Github) ReadDown(version uint) (r io.ReadCloser, identifier string, err
 			if err != nil {
 				return nil, "", err
 			}
-			return ioutil.NopCloser(strings.NewReader(r)), m.Identifier, nil
+			return io.NopCloser(strings.NewReader(r)), m.Identifier, nil
 		}
 	}
 	return nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: g.config.Path, Err: os.ErrNotExist}
