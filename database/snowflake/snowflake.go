@@ -4,12 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"go.uber.org/atomic"
 	"io"
-	"io/ioutil"
 	nurl "net/url"
 	"strconv"
 	"strings"
+
+	"go.uber.org/atomic"
 
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/hashicorp/go-multierror"
@@ -173,7 +173,7 @@ func (p *Snowflake) Unlock() error {
 }
 
 func (p *Snowflake) Run(migration io.Reader) error {
-	migr, err := ioutil.ReadAll(migration)
+	migr, err := io.ReadAll(migration)
 	if err != nil {
 		return err
 	}

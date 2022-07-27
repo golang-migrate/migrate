@@ -1,17 +1,15 @@
 package spanner
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	nurl "net/url"
 	"regexp"
 	"strconv"
 	"strings"
-
-	"context"
 
 	"cloud.google.com/go/spanner"
 	sdb "cloud.google.com/go/spanner/admin/database/apiv1"
@@ -171,7 +169,7 @@ func (s *Spanner) Unlock() error {
 
 // Run implements database.Driver
 func (s *Spanner) Run(migration io.Reader) error {
-	migr, err := ioutil.ReadAll(migration)
+	migr, err := io.ReadAll(migration)
 	if err != nil {
 		return err
 	}

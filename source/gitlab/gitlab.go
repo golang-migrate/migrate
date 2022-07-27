@@ -4,15 +4,12 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	nurl "net/url"
 	"os"
 	"strconv"
 	"strings"
-)
 
-import (
 	"github.com/golang-migrate/migrate/v4/source"
 	"github.com/xanzy/go-gitlab"
 )
@@ -211,7 +208,7 @@ func (g *Gitlab) ReadUp(version uint) (r io.ReadCloser, identifier string, err e
 			return nil, "", err
 		}
 
-		return ioutil.NopCloser(strings.NewReader(string(content))), m.Identifier, nil
+		return io.NopCloser(strings.NewReader(string(content))), m.Identifier, nil
 	}
 
 	return nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: g.path, Err: os.ErrNotExist}
@@ -233,7 +230,7 @@ func (g *Gitlab) ReadDown(version uint) (r io.ReadCloser, identifier string, err
 			return nil, "", err
 		}
 
-		return ioutil.NopCloser(strings.NewReader(string(content))), m.Identifier, nil
+		return io.NopCloser(strings.NewReader(string(content))), m.Identifier, nil
 	}
 
 	return nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: g.path, Err: os.ErrNotExist}
