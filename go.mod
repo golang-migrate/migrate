@@ -16,7 +16,6 @@ require (
 	github.com/cncf/xds/go v0.0.0-20220520190051-1e77728a1eaa // indirect
 	github.com/cockroachdb/cockroach-go/v2 v2.1.1
 	github.com/cznic/mathutil v0.0.0-20180504122225-ca4c9f2c1369 // indirect
-	github.com/denisenkom/go-mssqldb v0.10.0
 	github.com/dhui/dktest v0.3.11
 	github.com/docker/docker v20.10.15+incompatible
 	github.com/docker/go-connections v0.4.0
@@ -28,7 +27,6 @@ require (
 	github.com/gobuffalo/here v0.6.0
 	github.com/gocql/gocql v0.0.0-20210515062232-b7ef815b4556
 	github.com/gofrs/uuid v4.0.0+incompatible // indirect
-	github.com/golang-jwt/jwt/v4 v4.1.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/google/go-github/v39 v39.2.0
 	github.com/gorilla/mux v1.7.4 // indirect
@@ -44,19 +42,18 @@ require (
 	github.com/lib/pq v1.10.0
 	github.com/markbates/pkger v0.15.1
 	github.com/mattn/go-sqlite3 v1.14.14
+	github.com/microsoft/go-mssqldb v0.15.0
 	github.com/mitchellh/mapstructure v1.1.2 // indirect
 	github.com/mutecomm/go-sqlcipher/v4 v4.4.0
 	github.com/nakagami/firebirdsql v0.0.0-20190310045651-3c02a58cfed8
 	github.com/neo4j/neo4j-go-driver v1.8.1-0.20200803113522-b626aa943eba
 	github.com/onsi/gomega v1.15.0 // indirect
-	github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8 // indirect
 	github.com/snowflakedb/gosnowflake v1.6.3
 	github.com/stretchr/testify v1.7.1
 	github.com/xanzy/go-gitlab v0.15.0
 	gitlab.com/nyarla/go-crypt v0.0.0-20160106005555-d9a5dc2b789b // indirect
 	go.mongodb.org/mongo-driver v1.7.0
 	go.uber.org/atomic v1.7.0
-	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519 // indirect
 	golang.org/x/net v0.0.0-20220708220712-1185a9018129 // indirect
 	golang.org/x/oauth2 v0.0.0-20220630143837-2104d58473e0
 	golang.org/x/sys v0.0.0-20220712014510-0a85c31ab51e // indirect
