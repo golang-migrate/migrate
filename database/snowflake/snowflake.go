@@ -9,12 +9,10 @@ import (
 	"strconv"
 	"strings"
 
-	"go.uber.org/atomic"
-
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/hashicorp/go-multierror"
-	"github.com/lib/pq"
 	sf "github.com/snowflakedb/gosnowflake"
+	"go.uber.org/atomic"
 )
 
 func init() {
@@ -219,63 +217,11 @@ func (p *Snowflake) Run(migration io.Reader) error {
 	// run migration
 	query := string(migr[:])
 	if _, err := p.conn.ExecContext(ctx, query); err != nil {
-		if pgErr, ok := err.(*pq.Error); ok {
-			var line uint
-			var col uint
-			var lineColOK bool
-			if pgErr.Position != "" {
-				if pos, err := strconv.ParseUint(pgErr.Position, 10, 64); err == nil {
-					line, col, lineColOK = computeLineFromPos(query, int(pos))
-				}
-			}
-			message := fmt.Sprintf("migration failed: %s", pgErr.Message)
-			if lineColOK {
-				message = fmt.Sprintf("%s (column %d)", message, col)
-			}
-			if pgErr.Detail != "" {
-				message = fmt.Sprintf("%s, %s", message, pgErr.Detail)
-			}
-			return database.Error{OrigErr: err, Err: message, Query: migr, Line: line}
-		}
+		// gosnowflake.SnowflakeError does not return a line number, so there's no need to parse it
 		return database.Error{OrigErr: err, Err: "migration failed", Query: migr}
 	}
 
 	return nil
-}
-
-func computeLineFromPos(s string, pos int) (line uint, col uint, ok bool) {
-	// replace crlf with lf
-	s = strings.Replace(s, "\r\n", "\n", -1)
-	// pg docs: pos uses index 1 for the first character, and positions are measured in characters not bytes
-	runes := []rune(s)
-	if pos > len(runes) {
-		return 0, 0, false
-	}
-	sel := runes[:pos]
-	line = uint(runesCount(sel, newLine) + 1)
-	col = uint(pos - 1 - runesLastIndex(sel, newLine))
-	return line, col, true
-}
-
-const newLine = '\n'
-
-func runesCount(input []rune, target rune) int {
-	var count int
-	for _, r := range input {
-		if r == target {
-			count++
-		}
-	}
-	return count
-}
-
-func runesLastIndex(input []rune, target rune) int {
-	for i := len(input) - 1; i >= 0; i-- {
-		if input[i] == target {
-			return i
-		}
-	}
-	return -1
 }
 
 func (p *Snowflake) SetVersion(version int, dirty bool) error {
@@ -322,8 +268,8 @@ func (p *Snowflake) Version() (version int, dirty bool, err error) {
 		return database.NilVersion, false, nil
 
 	case err != nil:
-		if e, ok := err.(*pq.Error); ok {
-			if e.Code.Name() == "undefined_table" {
+		if e, ok := err.(*sf.SnowflakeError); ok {
+			if e.Number == sf.ErrObjectNotExistOrAuthorized {
 				return database.NilVersion, false, nil
 			}
 		}

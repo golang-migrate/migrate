@@ -10,6 +10,7 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/golang-migrate/migrate/v4/database"
+	sf "github.com/snowflakedb/gosnowflake"
 )
 
 const (
@@ -313,6 +314,16 @@ func TestVersion(t *testing.T) {
 					WillReturnError(errors.New("foo"))
 			},
 			wantError: "foo",
+		},
+		{
+			name: "it should return a nil version if snowflake reports the object doesn't exist",
+			setExpectations: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(`SELECT version, dirty FROM "WANT_MIGRATION_TABLE" LIMIT 1`).
+					WillReturnError(&sf.SnowflakeError{Number: sf.ErrObjectNotExistOrAuthorized})
+			},
+			wantVersion: database.NilVersion,
+			wantDirty:   false,
+			wantError:   nil,
 		},
 	}
 	for _, test := range tests {
