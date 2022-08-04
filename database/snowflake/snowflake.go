@@ -35,6 +35,7 @@ var (
 type Config struct {
 	MigrationsTable string
 	DatabaseName    string
+	dsn             string
 }
 
 type Snowflake struct {
@@ -92,7 +93,7 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	return px, nil
 }
 
-func (p *Snowflake) Open(url string) (database.Driver, error) {
+func configForURL(url string) (*Config, error) {
 	purl, err := nurl.Parse(url)
 	if err != nil {
 		return nil, err
@@ -131,17 +132,27 @@ func (p *Snowflake) Open(url string) (database.Driver, error) {
 		return nil, err
 	}
 
-	db, err := sql.Open("snowflake", dsn)
+	migrationsTable := purl.Query().Get("x-migrations-table")
+
+	return &Config{
+		DatabaseName:    database,
+		MigrationsTable: migrationsTable,
+		dsn:             dsn,
+	}, nil
+}
+
+func (p *Snowflake) Open(url string) (database.Driver, error) {
+	cfg, err := configForURL(url)
 	if err != nil {
 		return nil, err
 	}
 
-	migrationsTable := purl.Query().Get("x-migrations-table")
+	db, err := sql.Open("snowflake", cfg.dsn)
+	if err != nil {
+		return nil, err
+	}
 
-	px, err := WithInstance(db, &Config{
-		DatabaseName:    database,
-		MigrationsTable: migrationsTable,
-	})
+	px, err := WithInstance(db, cfg)
 	if err != nil {
 		return nil, err
 	}
