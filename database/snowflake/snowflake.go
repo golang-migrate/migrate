@@ -25,17 +25,19 @@ func init() {
 var DefaultMigrationsTable = "schema_migrations"
 
 var (
-	ErrNilConfig          = fmt.Errorf("no config")
-	ErrNoDatabaseName     = fmt.Errorf("no database name")
-	ErrNoPassword         = fmt.Errorf("no password")
-	ErrNoSchema           = fmt.Errorf("no schema")
-	ErrNoSchemaOrDatabase = fmt.Errorf("no schema/database name")
+	ErrNilConfig              = fmt.Errorf("no config")
+	ErrNoDatabaseName         = fmt.Errorf("no database name")
+	ErrNoPassword             = fmt.Errorf("no password")
+	ErrNoSchema               = fmt.Errorf("no schema")
+	ErrNoSchemaOrDatabase     = fmt.Errorf("no schema/database name")
+	ErrInvalidParameterFormat = fmt.Errorf("invalid parameter format")
 )
 
 type Config struct {
-	MigrationsTable string
-	DatabaseName    string
-	dsn             string
+	MigrationsTable       string
+	DatabaseName          string
+	MultiStatementEnabled bool
+	dsn                   string
 }
 
 type Snowflake struct {
@@ -141,10 +143,19 @@ func configForURL(url string) (*Config, error) {
 
 	migrationsTable := purl.Query().Get("x-migrations-table")
 
+	multiStatement := false
+	if multi := purl.Query().Get("x-multi-statement"); len(multi) > 0 {
+		multiStatement, err = strconv.ParseBool(multi)
+		if err != nil {
+			return nil, ErrInvalidParameterFormat
+		}
+	}
+
 	return &Config{
-		DatabaseName:    database,
-		MigrationsTable: migrationsTable,
-		dsn:             dsn,
+		DatabaseName:          database,
+		MigrationsTable:       migrationsTable,
+		MultiStatementEnabled: multiStatement,
+		dsn:                   dsn,
 	}, nil
 }
 
@@ -196,9 +207,18 @@ func (p *Snowflake) Run(migration io.Reader) error {
 		return err
 	}
 
+	ctx := context.Background()
+	if p.config.MultiStatementEnabled {
+		// allow variable number of statements in the request by setting MULTI_STATEMENT_COUNT to 0
+		// https://docs.snowflake.com/en/developer-guide/sql-api/submitting-multiple-statements.html#specifying-multiple-sql-statements-in-the-request
+		if ctx, err = sf.WithMultiStatement(ctx, 0); err != nil {
+			return err
+		}
+	}
+
 	// run migration
 	query := string(migr[:])
-	if _, err := p.conn.ExecContext(context.Background(), query); err != nil {
+	if _, err := p.conn.ExecContext(ctx, query); err != nil {
 		if pgErr, ok := err.(*pq.Error); ok {
 			var line uint
 			var col uint

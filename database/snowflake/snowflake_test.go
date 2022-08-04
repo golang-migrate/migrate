@@ -99,6 +99,22 @@ func TestConfigForURL(t *testing.T) {
 			wantError: nil,
 		},
 		{
+			name:     "it should enable multi-statement from query parameters",
+			inputURL: "snowflake://user:password@accountname/schema/dbname?x-multi-statement=true",
+			wantConfig: &Config{
+				MigrationsTable:       "",
+				DatabaseName:          "dbname",
+				MultiStatementEnabled: true,
+				dsn:                   "user:password@accountname.snowflakecomputing.com:443?database=dbname&ocspFailOpen=true&schema=schema&validateDefaultParameters=true",
+			},
+			wantError: nil,
+		},
+		{
+			name:      "it should error if x-multi-statement is not a boolean",
+			inputURL:  "snowflake://user:password@accountname/schema/dbname?x-multi-statement=foo",
+			wantError: ErrInvalidParameterFormat,
+		},
+		{
 			name:      "it should error if unable to parse the url",
 			inputURL:  "fo?>??ASD:::\033obar",
 			wantError: "invalid control character",
