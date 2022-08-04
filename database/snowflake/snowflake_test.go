@@ -79,6 +79,26 @@ func TestConfigForURL(t *testing.T) {
 			wantError: nil,
 		},
 		{
+			name:     "it should configure the migrations table from query parameters",
+			inputURL: "snowflake://user:password@accountname/schema/dbname?x-migrations-table=migrations",
+			wantConfig: &Config{
+				MigrationsTable: "migrations",
+				DatabaseName:    "dbname",
+				dsn:             "user:password@accountname.snowflakecomputing.com:443?database=dbname&ocspFailOpen=true&schema=schema&validateDefaultParameters=true",
+			},
+			wantError: nil,
+		},
+		{
+			name:     "it should configure warehouse and role from query parameters",
+			inputURL: "snowflake://user:password@accountname/schema/dbname?x-warehouse=wh&x-role=role",
+			wantConfig: &Config{
+				MigrationsTable: "",
+				DatabaseName:    "dbname",
+				dsn:             "user:password@accountname.snowflakecomputing.com:443?database=dbname&ocspFailOpen=true&role=role&schema=schema&validateDefaultParameters=true&warehouse=wh",
+			},
+			wantError: nil,
+		},
+		{
 			name:      "it should error if unable to parse the url",
 			inputURL:  "fo?>??ASD:::\033obar",
 			wantError: "invalid control character",

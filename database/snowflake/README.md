@@ -4,6 +4,8 @@
 
 | URL Query  | WithInstance Config | Description |
 |------------|---------------------|-------------|
+| `x-warehouse`| n/a | Name of the warehouse to use when connecting |
+| `x-role`     | n/a | Name of the role to use when connecting |
 | `x-migrations-table` | `MigrationsTable` | Name of the migrations table |
 
 Snowflake is PostgreSQL compatible but has some specific features (or lack thereof) that require slightly different behavior.

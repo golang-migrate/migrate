@@ -127,6 +127,13 @@ func configForURL(url string) (*Config, error) {
 		Schema:   schema,
 	}
 
+	if warehouse := purl.Query().Get("x-warehouse"); len(warehouse) > 0 {
+		cfg.Warehouse = warehouse
+	}
+	if role := purl.Query().Get("x-role"); len(role) > 0 {
+		cfg.Role = role
+	}
+
 	dsn, err := sf.DSN(cfg)
 	if err != nil {
 		return nil, err
