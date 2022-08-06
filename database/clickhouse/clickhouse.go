@@ -72,13 +72,8 @@ func (ch *ClickHouse) Open(dsn string) (database.Driver, error) {
 	if err != nil {
 		return nil, err
 	}
-	q := migrate.FilterCustomQuery(purl)
-	q.Scheme = "tcp"
-	conn, err := sql.Open("clickhouse", q.String())
-	if err != nil {
-		return nil, err
-	}
 
+	// "Our" setting (not a ClickHouse setting), resolved from query params.
 	multiStatementMaxSize := DefaultMultiStatementMaxSize
 	if s := purl.Query().Get("x-multi-statement-max-size"); len(s) > 0 {
 		multiStatementMaxSize, err = strconv.Atoi(s)
@@ -87,9 +82,43 @@ func (ch *ClickHouse) Open(dsn string) (database.Driver, error) {
 		}
 	}
 
+	// Another extended setting for our config purposes.
 	migrationsTableEngine := DefaultMigrationsTableEngine
 	if s := purl.Query().Get("x-migrations-table-engine"); len(s) > 0 {
 		migrationsTableEngine = s
+	}
+
+	// If the DSN specifies the DB using both the path
+	// and the query parameter, they must match.
+	// Otherwise, we honor whatever is explicitly set.
+	var targetDatabase string
+	urlParamDB := purl.Query().Get("database")
+	urlPathDB := strings.TrimPrefix(purl.Path, "/")
+	if len(urlPathDB) != 0 && len(urlParamDB) != 0 && urlPathDB != urlParamDB {
+		return nil, fmt.Errorf("DSN path-specified DB '%s' does not match and query parameter DB '%s'",
+			urlPathDB, urlParamDB)
+	} else if len(urlPathDB) != 0 {
+		targetDatabase = urlPathDB
+	} else {
+		targetDatabase = urlParamDB
+	}
+
+	// Remove extended options from what we'll send to ClickHouse.
+	// ClickHouse will reject unsupported settings rather
+	// than silently fail. We also set the target DB in both the
+	// path and the query parameter to ensure that both the legacy
+	// v1 driver and the v2 driver target the correct database
+	// and never split the schema migrations table and migrations
+	// themselves across two databases due to misconfiguration.
+	q := migrate.FilterCustomQuery(purl)
+	q.Scheme = "tcp"
+	q.Path = targetDatabase
+	queryWithDatabase := q.Query()
+	queryWithDatabase.Set("database", targetDatabase)
+	q.RawQuery = queryWithDatabase.Encode()
+	conn, err := sql.Open("clickhouse", q.String())
+	if err != nil {
+		return nil, err
 	}
 
 	ch = &ClickHouse{
@@ -97,7 +126,7 @@ func (ch *ClickHouse) Open(dsn string) (database.Driver, error) {
 		config: &Config{
 			MigrationsTable:       purl.Query().Get("x-migrations-table"),
 			MigrationsTableEngine: migrationsTableEngine,
-			DatabaseName:          purl.Query().Get("database"),
+			DatabaseName:          targetDatabase,
 			ClusterName:           purl.Query().Get("x-cluster-name"),
 			MultiStatementEnabled: purl.Query().Get("x-multi-statement") == "true",
 			MultiStatementMaxSize: multiStatementMaxSize,
@@ -112,10 +141,25 @@ func (ch *ClickHouse) Open(dsn string) (database.Driver, error) {
 }
 
 func (ch *ClickHouse) init() error {
+	var connectionDatabase string
+	if err := ch.conn.QueryRow("SELECT currentDatabase()").Scan(&connectionDatabase); err != nil {
+		return err
+	}
 	if len(ch.config.DatabaseName) == 0 {
-		if err := ch.conn.QueryRow("SELECT currentDatabase()").Scan(&ch.config.DatabaseName); err != nil {
-			return err
-		}
+		ch.config.DatabaseName = connectionDatabase
+	} else if connectionDatabase != ch.config.DatabaseName {
+		// If a library user initializes us with WithInstance instead of Open,
+		// it is possible for the connection to be created targeting any database,
+		// including the default database. In such a case, migration-running code
+		// below would apply migrations to the connection's associated database
+		// even if the operations related to the schema migration table were
+		// correctly scoped to the configured database. Fail hard here to prevent
+		// this from happening.
+		return fmt.Errorf(
+			"provided connection using DB '%s' but config targets '%s'",
+			connectionDatabase,
+			ch.config.DatabaseName,
+		)
 	}
 
 	if len(ch.config.MigrationsTable) == 0 {
@@ -167,7 +211,7 @@ func (ch *ClickHouse) Version() (int, bool, error) {
 	var (
 		version int
 		dirty   uint8
-		query   = "SELECT version, dirty FROM `" + ch.config.MigrationsTable + "` ORDER BY sequence DESC LIMIT 1"
+		query   = fmt.Sprintf("SELECT version, dirty FROM %s ORDER BY sequence DESC LIMIT 1", ch.migrationTableReference())
 	)
 	if err := ch.conn.QueryRow(query).Scan(&version, &dirty); err != nil {
 		if err == sql.ErrNoRows {
@@ -192,8 +236,20 @@ func (ch *ClickHouse) SetVersion(version int, dirty bool) error {
 		return err
 	}
 
-	query := "INSERT INTO " + ch.config.MigrationsTable + " (version, dirty, sequence) VALUES (?, ?, ?)"
-	if _, err := tx.Exec(query, version, bool(dirty), time.Now().UnixNano()); err != nil {
+	query := fmt.Sprintf(
+		"INSERT INTO %s (version, dirty, sequence) VALUES (?, ?, ?)",
+		ch.migrationTableReference(),
+	)
+	stmt, err := tx.Prepare(query)
+	if err != nil {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			return fmt.Errorf("error during prepare statement %w and rollback %s", err, rollbackErr)
+		}
+
+		return err
+	}
+
+	if _, err := stmt.Exec(int64(version), bool(dirty), uint64(time.Now().UnixNano())); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 
@@ -219,13 +275,18 @@ func (ch *ClickHouse) ensureVersionTable() (err error) {
 	}()
 
 	var (
-		table string
-		query = "SHOW TABLES FROM " + ch.config.DatabaseName + " LIKE '" + ch.config.MigrationsTable + "'"
+		table               string
+		tableExistenceQuery = fmt.Sprintf(
+			"SHOW TABLES FROM %s LIKE '%s'",
+			ch.dbReference(),
+			ch.config.MigrationsTable, // Escaping this is syntactically incorrect (LIKE expects a quoted string)
+		)
 	)
+
 	// check if migration table exists
-	if err := ch.conn.QueryRow(query).Scan(&table); err != nil {
+	if err = ch.conn.QueryRow(tableExistenceQuery).Scan(&table); err != nil {
 		if err != sql.ErrNoRows {
-			return &database.Error{OrigErr: err, Query: []byte(query)}
+			return &database.Error{OrigErr: err, Query: []byte(tableExistenceQuery)}
 		}
 	} else {
 		return nil
@@ -233,33 +294,33 @@ func (ch *ClickHouse) ensureVersionTable() (err error) {
 
 	// if not, create the empty migration table
 	if len(ch.config.ClusterName) > 0 {
-		query = fmt.Sprintf(`
+		tableExistenceQuery = fmt.Sprintf(`
 			CREATE TABLE %s ON CLUSTER %s (
 				version    Int64,
 				dirty      UInt8,
 				sequence   UInt64
-			) Engine=%s`, ch.config.MigrationsTable, ch.config.ClusterName, ch.config.MigrationsTableEngine)
+			) Engine=%s`, ch.migrationTableReference(), ch.config.ClusterName, ch.config.MigrationsTableEngine)
 	} else {
-		query = fmt.Sprintf(`
+		tableExistenceQuery = fmt.Sprintf(`
 			CREATE TABLE %s (
 				version    Int64,
 				dirty      UInt8,
 				sequence   UInt64
-			) Engine=%s`, ch.config.MigrationsTable, ch.config.MigrationsTableEngine)
+			) Engine=%s`, ch.migrationTableReference(), ch.config.MigrationsTableEngine)
 	}
 
 	if strings.HasSuffix(ch.config.MigrationsTableEngine, "Tree") {
-		query = fmt.Sprintf(`%s ORDER BY sequence`, query)
+		tableExistenceQuery = fmt.Sprintf(`%s ORDER BY sequence`, tableExistenceQuery)
 	}
 
-	if _, err := ch.conn.Exec(query); err != nil {
-		return &database.Error{OrigErr: err, Query: []byte(query)}
+	if _, err := ch.conn.Exec(tableExistenceQuery); err != nil {
+		return &database.Error{OrigErr: err, Query: []byte(tableExistenceQuery)}
 	}
 	return nil
 }
 
 func (ch *ClickHouse) Drop() (err error) {
-	query := "SHOW TABLES FROM " + ch.config.DatabaseName
+	query := fmt.Sprintf("SHOW TABLES FROM %s", ch.dbReference())
 	tables, err := ch.conn.Query(query)
 
 	if err != nil {
@@ -277,7 +338,7 @@ func (ch *ClickHouse) Drop() (err error) {
 			return err
 		}
 
-		query = "DROP TABLE IF EXISTS " + ch.config.DatabaseName + "." + table
+		query = fmt.Sprintf("DROP TABLE IF EXISTS %s", ch.migrationTableReference())
 
 		if _, err := ch.conn.Exec(query); err != nil {
 			return &database.Error{OrigErr: err, Query: []byte(query)}
@@ -305,3 +366,23 @@ func (ch *ClickHouse) Unlock() error {
 	return nil
 }
 func (ch *ClickHouse) Close() error { return ch.conn.Close() }
+
+// dbReference returns the escaped DB name
+func (ch *ClickHouse) dbReference() string {
+	return backtickEscape(ch.config.DatabaseName)
+}
+
+// dbAndTableName returns the fully qualified table name
+// which includes the escaped DB name and escaped table name
+func (ch *ClickHouse) migrationTableReference() string {
+	return fmt.Sprintf(
+		"%s.%s",
+		ch.dbReference(),
+		backtickEscape(ch.config.MigrationsTable),
+	)
+}
+
+// backtickEscape returns the given string wrapped in backticks (`)
+func backtickEscape(dbOrTableName string) string {
+	return fmt.Sprintf("`%s`", dbOrTableName)
+}
