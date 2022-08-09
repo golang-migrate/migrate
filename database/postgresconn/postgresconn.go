@@ -215,6 +215,7 @@ func (p *Postgres) runStatement(statement []byte) error {
 	if strings.TrimSpace(query) == "" {
 		return nil
 	}
+	query = strings.ReplaceAll(query, "<SCHEMA_NAME>", p.config.SchemaName)
 	
 	if _, err := p.conn.ExecContext(ctx, query); err != nil {
 		if pgErr, ok := err.(*pq.Error); ok {
