@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/golang-migrate/migrate/v4/database"
@@ -75,7 +76,8 @@ func TestConfigForURL(t *testing.T) {
 			wantConfig: &Config{
 				MigrationsTable: "",
 				DatabaseName:    "dbname",
-				dsn:             "user:password@accountname.snowflakecomputing.com:443?database=dbname&ocspFailOpen=true&schema=schema&validateDefaultParameters=true",
+				ConnectTimeout:  DefaultConnectTimeout,
+				dsn:             "user:password@accountname.snowflakecomputing.com:443?database=dbname&ocspFailOpen=true&requestTimeout=300&schema=schema&validateDefaultParameters=true",
 			},
 			wantError: nil,
 		},
@@ -85,7 +87,30 @@ func TestConfigForURL(t *testing.T) {
 			wantConfig: &Config{
 				MigrationsTable: "migrations",
 				DatabaseName:    "dbname",
-				dsn:             "user:password@accountname.snowflakecomputing.com:443?database=dbname&ocspFailOpen=true&schema=schema&validateDefaultParameters=true",
+				ConnectTimeout:  DefaultConnectTimeout,
+				dsn:             "user:password@accountname.snowflakecomputing.com:443?database=dbname&ocspFailOpen=true&requestTimeout=300&schema=schema&validateDefaultParameters=true",
+			},
+			wantError: nil,
+		},
+		{
+			name:     "it should configure the connect timeout from query parameters",
+			inputURL: "snowflake://user:password@accountname/schema/dbname?x-connect-timeout=72",
+			wantConfig: &Config{
+				MigrationsTable: "",
+				DatabaseName:    "dbname",
+				ConnectTimeout:  72 * time.Second,
+				dsn:             "user:password@accountname.snowflakecomputing.com:443?database=dbname&ocspFailOpen=true&requestTimeout=300&schema=schema&validateDefaultParameters=true",
+			},
+			wantError: nil,
+		},
+		{
+			name:     "it should configure the request timeout from query parameters",
+			inputURL: "snowflake://user:password@accountname/schema/dbname?x-timeout=72",
+			wantConfig: &Config{
+				MigrationsTable: "",
+				DatabaseName:    "dbname",
+				ConnectTimeout:  DefaultConnectTimeout,
+				dsn:             "user:password@accountname.snowflakecomputing.com:443?database=dbname&ocspFailOpen=true&requestTimeout=72&schema=schema&validateDefaultParameters=true",
 			},
 			wantError: nil,
 		},
@@ -95,7 +120,8 @@ func TestConfigForURL(t *testing.T) {
 			wantConfig: &Config{
 				MigrationsTable: "",
 				DatabaseName:    "dbname",
-				dsn:             "user:password@accountname.snowflakecomputing.com:443?database=dbname&ocspFailOpen=true&role=role&schema=schema&validateDefaultParameters=true&warehouse=wh",
+				ConnectTimeout:  DefaultConnectTimeout,
+				dsn:             "user:password@accountname.snowflakecomputing.com:443?database=dbname&ocspFailOpen=true&requestTimeout=300&role=role&schema=schema&validateDefaultParameters=true&warehouse=wh",
 			},
 			wantError: nil,
 		},
@@ -106,7 +132,8 @@ func TestConfigForURL(t *testing.T) {
 				MigrationsTable:       "",
 				DatabaseName:          "dbname",
 				MultiStatementEnabled: true,
-				dsn:                   "user:password@accountname.snowflakecomputing.com:443?database=dbname&ocspFailOpen=true&schema=schema&validateDefaultParameters=true",
+				ConnectTimeout:        DefaultConnectTimeout,
+				dsn:                   "user:password@accountname.snowflakecomputing.com:443?database=dbname&ocspFailOpen=true&requestTimeout=300&schema=schema&validateDefaultParameters=true",
 			},
 			wantError: nil,
 		},
@@ -494,16 +521,20 @@ func TestWithInstance(t *testing.T) {
 			wantError:       ErrNilConfig,
 		},
 		{
-			name:        "it should error if unable to ping the database",
-			inputConfig: &Config{},
+			name: "it should error if unable to ping the database",
+			inputConfig: &Config{
+				ConnectTimeout: DefaultConnectTimeout,
+			},
 			setExpectations: func(mock sqlmock.Sqlmock) {
 				mock.ExpectPing().WillReturnError(errors.New("foo"))
 			},
 			wantError: "foo",
 		},
 		{
-			name:        "it should determine default migration table and database",
-			inputConfig: &Config{},
+			name: "it should determine default migration table and database",
+			inputConfig: &Config{
+				ConnectTimeout: DefaultConnectTimeout,
+			},
 			setExpectations: func(mock sqlmock.Sqlmock) {
 				mock.ExpectPing()
 				mock.ExpectQuery(`SELECT CURRENT_DATABASE()`).
@@ -518,12 +549,15 @@ func TestWithInstance(t *testing.T) {
 			wantConfig: &Config{
 				DatabaseName:    "FOO",
 				MigrationsTable: DefaultMigrationsTable,
+				ConnectTimeout:  DefaultConnectTimeout,
 			},
 			wantError: nil,
 		},
 		{
-			name:        "it should error if unable to determine the current database",
-			inputConfig: &Config{},
+			name: "it should error if unable to determine the current database",
+			inputConfig: &Config{
+				ConnectTimeout: DefaultConnectTimeout,
+			},
 			setExpectations: func(mock sqlmock.Sqlmock) {
 				mock.ExpectPing()
 				mock.ExpectQuery(`SELECT CURRENT_DATABASE()`).
@@ -533,8 +567,10 @@ func TestWithInstance(t *testing.T) {
 			wantError: ErrNoDatabaseName,
 		},
 		{
-			name:        "it should error if the query to determine the current database fails",
-			inputConfig: &Config{},
+			name: "it should error if the query to determine the current database fails",
+			inputConfig: &Config{
+				ConnectTimeout: DefaultConnectTimeout,
+			},
 			setExpectations: func(mock sqlmock.Sqlmock) {
 				mock.ExpectPing()
 				mock.ExpectQuery(`SELECT CURRENT_DATABASE()`).WillReturnError(errors.New("foo"))
@@ -546,6 +582,7 @@ func TestWithInstance(t *testing.T) {
 			inputConfig: &Config{
 				DatabaseName:    "FOO",
 				MigrationsTable: "BAR",
+				ConnectTimeout:  DefaultConnectTimeout,
 			},
 			setExpectations: func(mock sqlmock.Sqlmock) {
 				mock.ExpectPing()
@@ -561,6 +598,7 @@ func TestWithInstance(t *testing.T) {
 			inputConfig: &Config{
 				DatabaseName:    "FOO",
 				MigrationsTable: "BAR",
+				ConnectTimeout:  DefaultConnectTimeout,
 			},
 			setExpectations: func(mock sqlmock.Sqlmock) {
 				mock.ExpectPing()
@@ -580,6 +618,7 @@ func TestWithInstance(t *testing.T) {
 			inputConfig: &Config{
 				DatabaseName:    "FOO",
 				MigrationsTable: "BAR",
+				ConnectTimeout:  DefaultConnectTimeout,
 			},
 			setExpectations: func(mock sqlmock.Sqlmock) {
 				mock.ExpectPing()
@@ -594,6 +633,7 @@ func TestWithInstance(t *testing.T) {
 			inputConfig: &Config{
 				DatabaseName:    "FOO",
 				MigrationsTable: "BAR",
+				ConnectTimeout:  DefaultConnectTimeout,
 			},
 			setExpectations: func(mock sqlmock.Sqlmock) {
 				mock.ExpectPing()

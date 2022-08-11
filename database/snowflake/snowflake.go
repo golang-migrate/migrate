@@ -8,6 +8,7 @@ import (
 	nurl "net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/hashicorp/go-multierror"
@@ -20,7 +21,11 @@ func init() {
 	database.Register("snowflake", &db)
 }
 
-var DefaultMigrationsTable = "schema_migrations"
+const (
+	DefaultMigrationsTable = "schema_migrations"
+	DefaultRequestTimeout  = 5 * time.Minute
+	DefaultConnectTimeout  = 30 * time.Second
+)
 
 var (
 	ErrNilConfig              = fmt.Errorf("no config")
@@ -35,6 +40,7 @@ type Config struct {
 	MigrationsTable       string
 	DatabaseName          string
 	MultiStatementEnabled bool
+	ConnectTimeout        time.Duration
 	dsn                   string
 }
 
@@ -51,8 +57,10 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	if config == nil {
 		return nil, ErrNilConfig
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), config.ConnectTimeout)
+	defer cancel()
 
-	if err := instance.Ping(); err != nil {
+	if err := instance.PingContext(ctx); err != nil {
 		return nil, err
 	}
 
@@ -74,7 +82,7 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		config.MigrationsTable = DefaultMigrationsTable
 	}
 
-	conn, err := instance.Conn(context.Background())
+	conn, err := instance.Conn(ctx)
 
 	if err != nil {
 		return nil, err
@@ -120,11 +128,12 @@ func configForURL(url string) (*Config, error) {
 	}
 
 	cfg := &sf.Config{
-		Account:  purl.Host,
-		User:     purl.User.Username(),
-		Password: password,
-		Database: database,
-		Schema:   schema,
+		Account:        purl.Host,
+		User:           purl.User.Username(),
+		Password:       password,
+		Database:       database,
+		Schema:         schema,
+		RequestTimeout: DefaultRequestTimeout,
 	}
 
 	if warehouse := purl.Query().Get("x-warehouse"); len(warehouse) > 0 {
@@ -132,6 +141,13 @@ func configForURL(url string) (*Config, error) {
 	}
 	if role := purl.Query().Get("x-role"); len(role) > 0 {
 		cfg.Role = role
+	}
+	if timeout := purl.Query().Get("x-timeout"); len(timeout) > 0 {
+		timeoutSeconds, err := strconv.ParseInt(timeout, 10, 64)
+		if err != nil {
+			return nil, ErrInvalidParameterFormat
+		}
+		cfg.RequestTimeout = time.Duration(timeoutSeconds) * time.Second
 	}
 
 	dsn, err := sf.DSN(cfg)
@@ -149,12 +165,23 @@ func configForURL(url string) (*Config, error) {
 		}
 	}
 
-	return &Config{
+	config := &Config{
 		DatabaseName:          database,
 		MigrationsTable:       migrationsTable,
 		MultiStatementEnabled: multiStatement,
+		ConnectTimeout:        DefaultConnectTimeout,
 		dsn:                   dsn,
-	}, nil
+	}
+
+	if connectTimeout := purl.Query().Get("x-connect-timeout"); len(connectTimeout) > 0 {
+		connectTimeoutSeconds, err := strconv.ParseInt(connectTimeout, 10, 64)
+		if err != nil {
+			return nil, ErrInvalidParameterFormat
+		}
+		config.ConnectTimeout = time.Duration(connectTimeoutSeconds) * time.Second
+	}
+
+	return config, nil
 }
 
 func (p *Snowflake) Open(url string) (database.Driver, error) {
