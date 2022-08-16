@@ -189,7 +189,7 @@ func (p *Postgres) Run(migration io.Reader) error {
 		}
 		fmt.Printf("current schema %v\n", currentSchema)
 		
-		err := multistmt.Parse(migration, multiStmtDelimiter, p.config.MultiStatementMaxSize, func(m []byte) error {
+		err := multistmt.Parse(migration, multiStmtDelimiter, p.config.MultiStatementMaxSize, p.config.SchemaName, func(m []byte) error {
 			if err := p.runStatement(m); err != nil {
 				return errors.Wrap(err, string(m))
 			}
@@ -215,7 +215,6 @@ func (p *Postgres) runStatement(statement []byte) error {
 	if strings.TrimSpace(query) == "" {
 		return nil
 	}
-	query = strings.ReplaceAll(query, "<SCHEMA_NAME>", p.config.SchemaName)
 	
 	if _, err := p.conn.ExecContext(ctx, query); err != nil {
 		if pgErr, ok := err.(*pq.Error); ok {

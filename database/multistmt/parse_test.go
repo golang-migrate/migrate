@@ -48,7 +48,7 @@ func TestParse(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			stmts := make([]string, 0, len(tc.expected))
-			err := multistmt.Parse(strings.NewReader(tc.multiStmt), []byte(tc.delimiter), maxMigrationSize, func(b []byte) bool {
+			err := multistmt.Parse(strings.NewReader(tc.multiStmt), []byte(tc.delimiter), maxMigrationSize, "", func(b []byte) bool {
 				stmts = append(stmts, string(b))
 				return true
 			})
@@ -64,7 +64,7 @@ func TestParseDiscontinue(t *testing.T) {
 	expected := []string{"statement one;"}
 
 	stmts := make([]string, 0, len(expected))
-	err := multistmt.Parse(strings.NewReader(multiStmt), []byte(delimiter), maxMigrationSize, func(b []byte) bool {
+	err := multistmt.Parse(strings.NewReader(multiStmt), []byte(delimiter), maxMigrationSize, "", func(b []byte) bool {
 		stmts = append(stmts, string(b))
 		return false
 	})

@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/pkg/errors"
 )
@@ -34,7 +35,7 @@ func splitWithDelimiter(delimiter []byte) func(d []byte, atEOF bool) (int, []byt
 }
 
 // Parse parses the given multi-statement migration
-func Parse(reader io.Reader, delimiter []byte, maxMigrationSize int, h Handler) error {
+func Parse(reader io.Reader, delimiter []byte, maxMigrationSize int, replacementStatement string, h Handler) error {
 	// notes:
 	// 1. comment chars will be detected anywhere, a '--' in the middle of a
 	//    line will start comment mode(good and bad)
@@ -95,6 +96,10 @@ func Parse(reader io.Reader, delimiter []byte, maxMigrationSize int, h Handler) 
 						accum = append(accum, ch)
 						c1 := make([]byte, len(accum))
 						copy(c1, accum)
+						if replacementStatement != "" {
+							s1 := strings.ReplaceAll(string(c1), "<SCHEMA_NAME>", replacementStatement)
+							c1 = []byte(s1)
+						}
 						stmts = append(stmts, c1)
 						// reset accum, maintain allocated memory
 						accum = accum[:0]
