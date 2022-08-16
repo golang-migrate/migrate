@@ -120,6 +120,53 @@ func Test(t *testing.T) {
 	})
 }
 
+func TestWithConnection(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ctx := context.Background()
+
+		ip, port, err := c.Port(defaultPort)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		db, err := sql.Open("sqlserver", msConnectionString(ip, port))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := db.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
+
+		conn, err := db.Conn(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		p, err := WithConnection(ctx, conn, &Config{})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		defer func() {
+			if err := p.Close(); err != nil {
+				t.Error(err)
+			}
+			// Ensure connection is closed after database provider close
+			_, err := conn.QueryContext(ctx, "SELECT 1")
+			if err != sql.ErrConnDone {
+				t.Error("connection not closed")
+			}
+			_, err = db.QueryContext(ctx, "SELECT 1")
+			if err != nil {
+				t.Error("database handle should not be closed")
+			}
+		}()
+		dt.Test(t, p, []byte("SELECT 1"))
+	})
+}
+
 func TestMigrate(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		SkipIfUnsupportedArch(t, c)
