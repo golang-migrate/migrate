@@ -1,6 +1,6 @@
 # ClickHouse
 
-`clickhouse://username:password@host:port/database=clicks?x-multi-statement=true`
+`clickhouse://host:port?username=user&password=password&database=clicks&x-multi-statement=true`
 
 | URL Query  | Description |
 |------------|-------------|
