@@ -4,23 +4,17 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"go.uber.org/atomic"
 	"io"
-	"io/ioutil"
 	nurl "net/url"
 	"regexp"
 	"strconv"
-)
 
-import (
 	"github.com/cockroachdb/cockroach-go/v2/crdb"
-	"github.com/hashicorp/go-multierror"
-	"github.com/lib/pq"
-)
-
-import (
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
+	"github.com/hashicorp/go-multierror"
+	"github.com/lib/pq"
+	"go.uber.org/atomic"
 )
 
 func init() {
@@ -217,7 +211,7 @@ func (c *CockroachDb) Unlock() error {
 }
 
 func (c *CockroachDb) Run(migration io.Reader) error {
-	migr, err := ioutil.ReadAll(migration)
+	migr, err := io.ReadAll(migration)
 	if err != nil {
 		return err
 	}

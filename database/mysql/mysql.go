@@ -9,12 +9,14 @@ import (
 	"crypto/x509"
 	"database/sql"
 	"fmt"
-	"go.uber.org/atomic"
 	"io"
-	"io/ioutil"
 	nurl "net/url"
+	"os"
 	"strconv"
 	"strings"
+	"time"
+
+	"go.uber.org/atomic"
 
 	"github.com/go-sql-driver/mysql"
 	"github.com/golang-migrate/migrate/v4/database"
@@ -38,9 +40,10 @@ var (
 )
 
 type Config struct {
-	MigrationsTable string
-	DatabaseName    string
-	NoLock          bool
+	MigrationsTable  string
+	DatabaseName     string
+	NoLock           bool
+	StatementTimeout time.Duration
 }
 
 type Mysql struct {
@@ -154,7 +157,7 @@ func urlToMySQLConfig(url string) (*mysql.Config, error) {
 		if len(ctls) > 0 {
 			if _, isBool := readBool(ctls); !isBool && strings.ToLower(ctls) != "skip-verify" {
 				rootCertPool := x509.NewCertPool()
-				pem, err := ioutil.ReadFile(parsedParams.Get("x-tls-ca"))
+				pem, err := os.ReadFile(parsedParams.Get("x-tls-ca"))
 				if err != nil {
 					return nil, err
 				}
@@ -241,15 +244,25 @@ func (m *Mysql) Open(url string) (database.Driver, error) {
 		}
 	}
 
+	statementTimeoutParam := customParams["x-statement-timeout"]
+	statementTimeout := 0
+	if statementTimeoutParam != "" {
+		statementTimeout, err = strconv.Atoi(statementTimeoutParam)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse x-statement-timeout as float: %w", err)
+		}
+	}
+
 	db, err := sql.Open("mysql", config.FormatDSN())
 	if err != nil {
 		return nil, err
 	}
 
 	mx, err := WithInstance(db, &Config{
-		DatabaseName:    config.DBName,
-		MigrationsTable: customParams["x-migrations-table"],
-		NoLock:          noLock,
+		DatabaseName:     config.DBName,
+		MigrationsTable:  customParams["x-migrations-table"],
+		NoLock:           noLock,
+		StatementTimeout: time.Duration(statementTimeout) * time.Millisecond,
 	})
 	if err != nil {
 		return nil, err
@@ -322,13 +335,20 @@ func (m *Mysql) Unlock() error {
 }
 
 func (m *Mysql) Run(migration io.Reader) error {
-	migr, err := ioutil.ReadAll(migration)
+	migr, err := io.ReadAll(migration)
 	if err != nil {
 		return err
 	}
 
+	ctx := context.Background()
+	if m.config.StatementTimeout != 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, m.config.StatementTimeout)
+		defer cancel()
+	}
+
 	query := string(migr[:])
-	if _, err := m.conn.ExecContext(context.Background(), query); err != nil {
+	if _, err := m.conn.ExecContext(ctx, query); err != nil {
 		return database.Error{OrigErr: err, Err: "migration failed", Query: migr}
 	}
 

@@ -17,7 +17,6 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -288,13 +287,13 @@ func AssetNames() []string {
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
 	"1_test.down.sql": _1_testDownSql,
-	"1_test.up.sql": _1_testUpSql,
-	"3_test.up.sql": _3_testUpSql,
+	"1_test.up.sql":   _1_testUpSql,
+	"3_test.up.sql":   _3_testUpSql,
 	"4_test.down.sql": _4_testDownSql,
-	"4_test.up.sql": _4_testUpSql,
+	"4_test.up.sql":   _4_testUpSql,
 	"5_test.down.sql": _5_testDownSql,
 	"7_test.down.sql": _7_testDownSql,
-	"7_test.up.sql": _7_testUpSql,
+	"7_test.up.sql":   _7_testUpSql,
 }
 
 // AssetDir returns the file names below a certain
@@ -336,15 +335,16 @@ type bintree struct {
 	Func     func() (*asset, error)
 	Children map[string]*bintree
 }
+
 var _bintree = &bintree{nil, map[string]*bintree{
 	"1_test.down.sql": &bintree{_1_testDownSql, map[string]*bintree{}},
-	"1_test.up.sql": &bintree{_1_testUpSql, map[string]*bintree{}},
-	"3_test.up.sql": &bintree{_3_testUpSql, map[string]*bintree{}},
+	"1_test.up.sql":   &bintree{_1_testUpSql, map[string]*bintree{}},
+	"3_test.up.sql":   &bintree{_3_testUpSql, map[string]*bintree{}},
 	"4_test.down.sql": &bintree{_4_testDownSql, map[string]*bintree{}},
-	"4_test.up.sql": &bintree{_4_testUpSql, map[string]*bintree{}},
+	"4_test.up.sql":   &bintree{_4_testUpSql, map[string]*bintree{}},
 	"5_test.down.sql": &bintree{_5_testDownSql, map[string]*bintree{}},
 	"7_test.down.sql": &bintree{_7_testDownSql, map[string]*bintree{}},
-	"7_test.up.sql": &bintree{_7_testUpSql, map[string]*bintree{}},
+	"7_test.up.sql":   &bintree{_7_testUpSql, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory
@@ -361,7 +361,7 @@ func RestoreAsset(dir, name string) error {
 	if err != nil {
 		return err
 	}
-	err = ioutil.WriteFile(_filePath(dir, name), data, info.Mode())
+	err = os.WriteFile(_filePath(dir, name), data, info.Mode())
 	if err != nil {
 		return err
 	}
@@ -393,4 +393,3 @@ func _filePath(dir, name string) string {
 	cannonicalName := strings.Replace(name, "\\", "/", -1)
 	return filepath.Join(append([]string{dir}, strings.Split(cannonicalName, "/")...)...)
 }
-
