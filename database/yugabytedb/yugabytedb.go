@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"io"
-	"io/ioutil"
 	"net/url"
 	"regexp"
 	"strconv"
@@ -255,7 +254,7 @@ func (c *YugabyteDB) Unlock() error {
 }
 
 func (c *YugabyteDB) Run(migration io.Reader) error {
-	migr, err := ioutil.ReadAll(migration)
+	migr, err := io.ReadAll(migration)
 	if err != nil {
 		return err
 	}
@@ -418,6 +417,8 @@ func (c *YugabyteDB) doTxWithRetry(
 			return backoff.Permanent(err)
 		}
 
+		// If we've tried to commit the transaction Rollback just returns sql.ErrTxDone.
+		//nolint:errcheck
 		defer tx.Rollback()
 
 		if err := fn(tx); err != nil && !errIsRetryable(err) {
