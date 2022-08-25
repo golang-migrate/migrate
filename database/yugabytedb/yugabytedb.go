@@ -421,16 +421,20 @@ func (c *YugabyteDB) doTxWithRetry(
 		//nolint:errcheck
 		defer tx.Rollback()
 
-		if err := fn(tx); err != nil && !errIsRetryable(err) {
+		if err := fn(tx); err != nil {
+			if errIsRetryable(err) {
+				return err
+			}
+
 			return backoff.Permanent(err)
-		} else if err != nil {
-			return err
 		}
 
-		if err := tx.Commit(); err != nil && !errIsRetryable(err) {
+		if err := tx.Commit(); err != nil {
+			if errIsRetryable(err) {
+				return err
+			}
+
 			return backoff.Permanent(err)
-		} else if err != nil {
-			return err
 		}
 
 		return nil
