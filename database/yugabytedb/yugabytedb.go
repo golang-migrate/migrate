@@ -19,9 +19,9 @@ import (
 )
 
 const (
-	DefaultRetryMaxInterval    = time.Second * 15
-	DefaultRetryMaxElapsedTime = time.Second * 30
-	DefaultRetryMaxRetries     = 10
+	DefaultMaxRetryInterval    = time.Second * 15
+	DefaultMaxRetryElapsedTime = time.Second * 30
+	DefaultMaxRetries          = 10
 	DefaultMigrationsTable     = "migrations"
 	DefaultLockTable           = "migrations_locks"
 )
@@ -44,9 +44,9 @@ type Config struct {
 	LockTable           string
 	ForceLock           bool
 	DatabaseName        string
-	RetryMaxInterval    time.Duration
-	RetryMaxElapsedTime time.Duration
-	RetryMaxRetries     int
+	MaxRetryInterval    time.Duration
+	MaxRetryElapsedTime time.Duration
+	MaxRetries          int
 }
 
 type YugabyteDB struct {
@@ -88,16 +88,16 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		config.LockTable = DefaultLockTable
 	}
 
-	if config.RetryMaxInterval == 0 {
-		config.RetryMaxInterval = DefaultRetryMaxInterval
+	if config.MaxRetryInterval == 0 {
+		config.MaxRetryInterval = DefaultMaxRetryInterval
 	}
 
-	if config.RetryMaxElapsedTime == 0 {
-		config.RetryMaxElapsedTime = DefaultRetryMaxElapsedTime
+	if config.MaxRetryElapsedTime == 0 {
+		config.MaxRetryElapsedTime = DefaultMaxRetryElapsedTime
 	}
 
-	if config.RetryMaxRetries == 0 {
-		config.RetryMaxRetries = DefaultRetryMaxRetries
+	if config.MaxRetries == 0 {
+		config.MaxRetries = DefaultMaxRetries
 	}
 
 	px := &YugabyteDB{
@@ -149,22 +149,22 @@ func (c *YugabyteDB) Open(dbURL string) (database.Driver, error) {
 		forceLock = false
 	}
 
-	maxIntervalStr := purl.Query().Get("x-retry-max-interval")
+	maxIntervalStr := purl.Query().Get("x-max-retry-interval")
 	maxInterval, err := time.ParseDuration(maxIntervalStr)
 	if err != nil {
-		maxInterval = DefaultRetryMaxInterval
+		maxInterval = DefaultMaxRetryInterval
 	}
 
-	maxElapsedTimeStr := purl.Query().Get("x-retry-max-elapsed-time")
+	maxElapsedTimeStr := purl.Query().Get("x-max-retry-elapsed-time")
 	maxElapsedTime, err := time.ParseDuration(maxElapsedTimeStr)
 	if err != nil {
-		maxElapsedTime = DefaultRetryMaxElapsedTime
+		maxElapsedTime = DefaultMaxRetryElapsedTime
 	}
 
-	maxRetriesStr := purl.Query().Get("x-retry-max-retries")
+	maxRetriesStr := purl.Query().Get("x-max-retries")
 	maxRetries, err := strconv.Atoi(maxRetriesStr)
 	if err != nil {
-		maxRetries = DefaultRetryMaxRetries
+		maxRetries = DefaultMaxRetries
 	}
 
 	px, err := WithInstance(db, &Config{
@@ -172,9 +172,9 @@ func (c *YugabyteDB) Open(dbURL string) (database.Driver, error) {
 		MigrationsTable:     migrationsTable,
 		LockTable:           lockTable,
 		ForceLock:           forceLock,
-		RetryMaxInterval:    maxInterval,
-		RetryMaxElapsedTime: maxElapsedTime,
-		RetryMaxRetries:     maxRetries,
+		MaxRetryInterval:    maxInterval,
+		MaxRetryElapsedTime: maxElapsedTime,
+		MaxRetries:          maxRetries,
 	})
 	if err != nil {
 		return nil, err
@@ -450,11 +450,11 @@ func (c *YugabyteDB) newBackoff(ctx context.Context) backoff.BackOff {
 		InitialInterval:     backoff.DefaultInitialInterval,
 		RandomizationFactor: backoff.DefaultRandomizationFactor,
 		Multiplier:          backoff.DefaultMultiplier,
-		MaxInterval:         c.config.RetryMaxInterval,
-		MaxElapsedTime:      c.config.RetryMaxElapsedTime,
+		MaxInterval:         c.config.MaxRetryInterval,
+		MaxElapsedTime:      c.config.MaxRetryElapsedTime,
 		Stop:                backoff.Stop,
 		Clock:               backoff.SystemClock,
-	}, ctx), uint64(c.config.RetryMaxRetries))
+	}, ctx), uint64(c.config.MaxRetries))
 
 	retrier.Reset()
 
