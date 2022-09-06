@@ -905,6 +905,32 @@ func TestDownDirty(t *testing.T) {
 	}
 }
 
+func TestUpOutdatedSource(t *testing.T) {
+	m, _ := New("stub://", "stub://")
+	dbDrv := m.databaseDrv.(*dStub.Stub)
+	if err := dbDrv.SetVersion(10, false); err != nil {
+		t.Fatal(err)
+	}
+
+	err := m.Up()
+	if _, ok := err.(ErrVersionNotFound); !ok {
+		t.Fatalf("expected ErrVersionNotFound, got %v", err)
+	}
+}
+
+func TestDownOutdatedSource(t *testing.T) {
+	m, _ := New("stub://", "stub://")
+	dbDrv := m.databaseDrv.(*dStub.Stub)
+	if err := dbDrv.SetVersion(10, false); err != nil {
+		t.Fatal(err)
+	}
+
+	err := m.Down()
+	if _, ok := err.(ErrVersionNotFound); !ok {
+		t.Fatalf("expected ErrVersionNotFound, got %v", err)
+	}
+}
+
 func TestDrop(t *testing.T) {
 	m, _ := New("stub://", "stub://")
 	m.sourceDrv.(*sStub.Stub).Migrations = sourceStubMigrations

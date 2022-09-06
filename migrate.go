@@ -55,6 +55,15 @@ func (e ErrDirty) Error() string {
 	return fmt.Sprintf("Dirty database version %v. Fix and force version.", e.Version)
 }
 
+type ErrVersionNotFound struct {
+	Version uint
+	err     error
+}
+
+func (e ErrVersionNotFound) Error() string {
+	return fmt.Sprintf("no migration found for version %v: %v", e.Version, e.err)
+}
+
 type Migrate struct {
 	sourceName   string
 	sourceDrv    source.Driver
@@ -806,7 +815,7 @@ func (m *Migrate) versionExists(version uint) (result error) {
 		return err
 	}
 
-	err = fmt.Errorf("no migration found for version %d: %w", version, err)
+	err = ErrVersionNotFound{version, err}
 	m.logErr(err)
 	return err
 }
