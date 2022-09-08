@@ -73,8 +73,6 @@ func Parse(reader io.Reader, delimiter []byte, maxMigrationSize int, replacement
 						discard = true
 					}
 				}
-				// output the content, for logging
-				fmt.Printf("%c", buf[i])
 				switch ch := buf[i]; ch {
 				case '$':
 					// look around is there another $?
