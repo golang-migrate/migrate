@@ -2,7 +2,7 @@ module github.com/golang-migrate/migrate/v4
 
 require (
 	cloud.google.com/go v0.103.0 // indirect
-	cloud.google.com/go/spanner v1.34.1
+	cloud.google.com/go/spanner v1.38.0
 	cloud.google.com/go/storage v1.23.0
 	github.com/Azure/go-autorest/autorest/adal v0.9.16
 	github.com/ClickHouse/clickhouse-go v1.4.3
@@ -55,11 +55,11 @@ require (
 	go.mongodb.org/mongo-driver v1.7.0
 	go.uber.org/atomic v1.7.0
 	golang.org/x/net v0.0.0-20220708220712-1185a9018129 // indirect
-	golang.org/x/oauth2 v0.0.0-20220630143837-2104d58473e0
+	golang.org/x/oauth2 v0.0.0-20220822191816-0ebed06d0094
 	golang.org/x/sys v0.0.0-20220712014510-0a85c31ab51e // indirect
 	golang.org/x/tools v0.1.5
-	google.golang.org/api v0.87.0
-	google.golang.org/genproto v0.0.0-20220714211235-042d03aeabc9
+	google.golang.org/api v0.94.0
+	google.golang.org/genproto v0.0.0-20220829175752-36a9c930ecbf
 	google.golang.org/grpc v1.48.0 // indirect
 	modernc.org/b v1.0.0 // indirect
 	modernc.org/db v1.0.0 // indirect
