@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"io"
-	"io/ioutil"
 	nurl "net/url"
 	"strconv"
 	"strings"
@@ -13,10 +12,10 @@ import (
 	"go.uber.org/atomic"
 
 	"github.com/Azure/go-autorest/autorest/adal"
-	mssql "github.com/denisenkom/go-mssqldb" // mssql support
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/hashicorp/go-multierror"
+	mssql "github.com/microsoft/go-mssqldb" // mssql support
 )
 
 func init() {
@@ -235,7 +234,7 @@ func (ss *SQLServer) Unlock() error {
 
 // Run the migrations for the database
 func (ss *SQLServer) Run(migration io.Reader) error {
-	migr, err := ioutil.ReadAll(migration)
+	migr, err := io.ReadAll(migration)
 	if err != nil {
 		return err
 	}

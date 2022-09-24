@@ -1,15 +1,16 @@
-package cockroachdb
+package yugabytedb
 
 import (
 	"context"
 	"database/sql"
-	"fmt"
+	"errors"
 	"io"
-	nurl "net/url"
+	"net/url"
 	"regexp"
 	"strconv"
+	"time"
 
-	"github.com/cockroachdb/cockroach-go/v2/crdb"
+	"github.com/cenkalti/backoff/v4"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/hashicorp/go-multierror"
@@ -17,29 +18,38 @@ import (
 	"go.uber.org/atomic"
 )
 
-func init() {
-	db := CockroachDb{}
-	database.Register("cockroach", &db)
-	database.Register("cockroachdb", &db)
-	database.Register("crdb-postgres", &db)
-}
-
-var DefaultMigrationsTable = "schema_migrations"
-var DefaultLockTable = "schema_lock"
-
-var (
-	ErrNilConfig      = fmt.Errorf("no config")
-	ErrNoDatabaseName = fmt.Errorf("no database name")
+const (
+	DefaultMaxRetryInterval    = time.Second * 15
+	DefaultMaxRetryElapsedTime = time.Second * 30
+	DefaultMaxRetries          = 10
+	DefaultMigrationsTable     = "migrations"
+	DefaultLockTable           = "migrations_locks"
 )
 
-type Config struct {
-	MigrationsTable string
-	LockTable       string
-	ForceLock       bool
-	DatabaseName    string
+var (
+	ErrNilConfig          = errors.New("no config")
+	ErrNoDatabaseName     = errors.New("no database name")
+	ErrMaxRetriesExceeded = errors.New("max retries exceeded")
+)
+
+func init() {
+	db := YugabyteDB{}
+	database.Register("yugabyte", &db)
+	database.Register("yugabytedb", &db)
+	database.Register("ysql", &db)
 }
 
-type CockroachDb struct {
+type Config struct {
+	MigrationsTable     string
+	LockTable           string
+	ForceLock           bool
+	DatabaseName        string
+	MaxRetryInterval    time.Duration
+	MaxRetryElapsedTime time.Duration
+	MaxRetries          int
+}
+
+type YugabyteDB struct {
 	db       *sql.DB
 	isLocked atomic.Bool
 
@@ -78,7 +88,19 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		config.LockTable = DefaultLockTable
 	}
 
-	px := &CockroachDb{
+	if config.MaxRetryInterval == 0 {
+		config.MaxRetryInterval = DefaultMaxRetryInterval
+	}
+
+	if config.MaxRetryElapsedTime == 0 {
+		config.MaxRetryElapsedTime = DefaultMaxRetryElapsedTime
+	}
+
+	if config.MaxRetries == 0 {
+		config.MaxRetries = DefaultMaxRetries
+	}
+
+	px := &YugabyteDB{
 		db:     instance,
 		config: config,
 	}
@@ -95,15 +117,15 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	return px, nil
 }
 
-func (c *CockroachDb) Open(url string) (database.Driver, error) {
-	purl, err := nurl.Parse(url)
+func (c *YugabyteDB) Open(dbURL string) (database.Driver, error) {
+	purl, err := url.Parse(dbURL)
 	if err != nil {
 		return nil, err
 	}
 
-	// As Cockroach uses the postgres protocol, and 'postgres' is already a registered database, we need to replace the
+	// As YugabyteDB uses the postgres protocol, and 'postgres' is already a registered database, we need to replace the
 	// connect prefix, with the actual protocol, so that the library can differentiate between the implementations
-	re := regexp.MustCompile("^(cockroach(db)?|crdb-postgres)")
+	re := regexp.MustCompile("^(yugabyte(db)?|ysql)")
 	connectString := re.ReplaceAllString(migrate.FilterCustomQuery(purl).String(), "postgres")
 
 	db, err := sql.Open("postgres", connectString)
@@ -127,11 +149,32 @@ func (c *CockroachDb) Open(url string) (database.Driver, error) {
 		forceLock = false
 	}
 
+	maxIntervalStr := purl.Query().Get("x-max-retry-interval")
+	maxInterval, err := time.ParseDuration(maxIntervalStr)
+	if err != nil {
+		maxInterval = DefaultMaxRetryInterval
+	}
+
+	maxElapsedTimeStr := purl.Query().Get("x-max-retry-elapsed-time")
+	maxElapsedTime, err := time.ParseDuration(maxElapsedTimeStr)
+	if err != nil {
+		maxElapsedTime = DefaultMaxRetryElapsedTime
+	}
+
+	maxRetriesStr := purl.Query().Get("x-max-retries")
+	maxRetries, err := strconv.Atoi(maxRetriesStr)
+	if err != nil {
+		maxRetries = DefaultMaxRetries
+	}
+
 	px, err := WithInstance(db, &Config{
-		DatabaseName:    purl.Path,
-		MigrationsTable: migrationsTable,
-		LockTable:       lockTable,
-		ForceLock:       forceLock,
+		DatabaseName:        purl.Path,
+		MigrationsTable:     migrationsTable,
+		LockTable:           lockTable,
+		ForceLock:           forceLock,
+		MaxRetryInterval:    maxInterval,
+		MaxRetryElapsedTime: maxElapsedTime,
+		MaxRetries:          maxRetries,
 	})
 	if err != nil {
 		return nil, err
@@ -140,15 +183,15 @@ func (c *CockroachDb) Open(url string) (database.Driver, error) {
 	return px, nil
 }
 
-func (c *CockroachDb) Close() error {
+func (c *YugabyteDB) Close() error {
 	return c.db.Close()
 }
 
-// Locking is done manually with a separate lock table.  Implementing advisory locks in CRDB is being discussed
-// See: https://github.com/cockroachdb/cockroach/issues/13546
-func (c *CockroachDb) Lock() error {
+// Locking is done manually with a separate lock table. Implementing advisory locks in YugabyteDB is being discussed
+// See: https://github.com/yugabyte/yugabyte-db/issues/3642
+func (c *YugabyteDB) Lock() error {
 	return database.CasRestoreOnErr(&c.isLocked, false, true, database.ErrLocked, func() (err error) {
-		return crdb.ExecuteTx(context.Background(), c.db, nil, func(tx *sql.Tx) (err error) {
+		return c.doTxWithRetry(context.Background(), &sql.TxOptions{Isolation: sql.LevelSerializable}, func(tx *sql.Tx) (err error) {
 			aid, err := database.GenerateAdvisoryLockId(c.config.DatabaseName)
 			if err != nil {
 				return err
@@ -181,24 +224,24 @@ func (c *CockroachDb) Lock() error {
 	})
 }
 
-// Locking is done manually with a separate lock table.  Implementing advisory locks in CRDB is being discussed
-// See: https://github.com/cockroachdb/cockroach/issues/13546
-func (c *CockroachDb) Unlock() error {
+// Locking is done manually with a separate lock table. Implementing advisory locks in YugabyteDB is being discussed
+// See: https://github.com/yugabyte/yugabyte-db/issues/3642
+func (c *YugabyteDB) Unlock() error {
 	return database.CasRestoreOnErr(&c.isLocked, true, false, database.ErrNotLocked, func() (err error) {
 		aid, err := database.GenerateAdvisoryLockId(c.config.DatabaseName)
 		if err != nil {
 			return err
 		}
 
-		// In the event of an implementation (non-migration) error, it is possible for the lock to not be released.  Until
+		// In the event of an implementation (non-migration) error, it is possible for the lock to not be released. Until
 		// a better locking mechanism is added, a manual purging of the lock table may be required in such circumstances
 		query := "DELETE FROM " + c.config.LockTable + " WHERE lock_id = $1"
 		if _, err := c.db.Exec(query, aid); err != nil {
 			if e, ok := err.(*pq.Error); ok {
-				// 42P01 is "UndefinedTableError" in CockroachDB
-				// https://github.com/cockroachdb/cockroach/blob/master/pkg/sql/pgwire/pgerror/codes.go
+				// 42P01 is "UndefinedTableError" in YugabyteDB
+				// https://github.com/yugabyte/yugabyte-db/blob/9c6b8e6beb56eed8eeb357178c0c6b837eb49896/src/postgres/src/backend/utils/errcodes.txt#L366
 				if e.Code == "42P01" {
-					// On drops, the lock table is fully removed;  This is fine, and is a valid "unlocked" state for the schema
+					// On drops, the lock table is fully removed; This is fine, and is a valid "unlocked" state for the schema
 					return nil
 				}
 			}
@@ -210,7 +253,7 @@ func (c *CockroachDb) Unlock() error {
 	})
 }
 
-func (c *CockroachDb) Run(migration io.Reader) error {
+func (c *YugabyteDB) Run(migration io.Reader) error {
 	migr, err := io.ReadAll(migration)
 	if err != nil {
 		return err
@@ -225,8 +268,8 @@ func (c *CockroachDb) Run(migration io.Reader) error {
 	return nil
 }
 
-func (c *CockroachDb) SetVersion(version int, dirty bool) error {
-	return crdb.ExecuteTx(context.Background(), c.db, nil, func(tx *sql.Tx) error {
+func (c *YugabyteDB) SetVersion(version int, dirty bool) error {
+	return c.doTxWithRetry(context.Background(), &sql.TxOptions{Isolation: sql.LevelSerializable}, func(tx *sql.Tx) error {
 		if _, err := tx.Exec(`DELETE FROM "` + c.config.MigrationsTable + `"`); err != nil {
 			return err
 		}
@@ -244,7 +287,7 @@ func (c *CockroachDb) SetVersion(version int, dirty bool) error {
 	})
 }
 
-func (c *CockroachDb) Version() (version int, dirty bool, err error) {
+func (c *YugabyteDB) Version() (version int, dirty bool, err error) {
 	query := `SELECT version, dirty FROM "` + c.config.MigrationsTable + `" LIMIT 1`
 	err = c.db.QueryRow(query).Scan(&version, &dirty)
 
@@ -254,8 +297,8 @@ func (c *CockroachDb) Version() (version int, dirty bool, err error) {
 
 	case err != nil:
 		if e, ok := err.(*pq.Error); ok {
-			// 42P01 is "UndefinedTableError" in CockroachDB
-			// https://github.com/cockroachdb/cockroach/blob/master/pkg/sql/pgwire/pgerror/codes.go
+			// 42P01 is "UndefinedTableError" in YugabyteDB
+			// https://github.com/yugabyte/yugabyte-db/blob/9c6b8e6beb56eed8eeb357178c0c6b837eb49896/src/postgres/src/backend/utils/errcodes.txt#L366
 			if e.Code == "42P01" {
 				return database.NilVersion, false, nil
 			}
@@ -267,9 +310,8 @@ func (c *CockroachDb) Version() (version int, dirty bool, err error) {
 	}
 }
 
-func (c *CockroachDb) Drop() (err error) {
-	// select all tables in current schema
-	query := `SELECT table_name FROM information_schema.tables WHERE table_schema=(SELECT current_schema())`
+func (c *YugabyteDB) Drop() (err error) {
+	query := `SELECT table_name FROM information_schema.tables WHERE table_schema=(SELECT current_schema()) AND table_type='BASE TABLE'`
 	tables, err := c.db.Query(query)
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
@@ -296,7 +338,6 @@ func (c *CockroachDb) Drop() (err error) {
 	}
 
 	if len(tableNames) > 0 {
-		// delete one by one ...
 		for _, t := range tableNames {
 			query = `DROP TABLE IF EXISTS ` + t + ` CASCADE`
 			if _, err := c.db.Exec(query); err != nil {
@@ -309,9 +350,8 @@ func (c *CockroachDb) Drop() (err error) {
 }
 
 // ensureVersionTable checks if versions table exists and, if not, creates it.
-// Note that this function locks the database, which deviates from the usual
-// convention of "caller locks" in the CockroachDb type.
-func (c *CockroachDb) ensureVersionTable() (err error) {
+// Note that this function locks the database
+func (c *YugabyteDB) ensureVersionTable() (err error) {
 	if err = c.Lock(); err != nil {
 		return err
 	}
@@ -344,7 +384,7 @@ func (c *CockroachDb) ensureVersionTable() (err error) {
 	return nil
 }
 
-func (c *CockroachDb) ensureLockTable() error {
+func (c *YugabyteDB) ensureLockTable() error {
 	// check if lock table exists
 	var count int
 	query := `SELECT COUNT(1) FROM information_schema.tables WHERE table_name = $1 AND table_schema = (SELECT current_schema()) LIMIT 1`
@@ -356,10 +396,84 @@ func (c *CockroachDb) ensureLockTable() error {
 	}
 
 	// if not, create the empty lock table
-	query = `CREATE TABLE "` + c.config.LockTable + `" (lock_id INT NOT NULL PRIMARY KEY)`
+	query = `CREATE TABLE "` + c.config.LockTable + `" (lock_id TEXT NOT NULL PRIMARY KEY)`
 	if _, err := c.db.Exec(query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 
 	return nil
+}
+
+func (c *YugabyteDB) doTxWithRetry(
+	ctx context.Context,
+	txOpts *sql.TxOptions,
+	fn func(tx *sql.Tx) error,
+) error {
+	backOff := c.newBackoff(ctx)
+
+	return backoff.Retry(func() error {
+		tx, err := c.db.BeginTx(ctx, txOpts)
+		if err != nil {
+			return backoff.Permanent(err)
+		}
+
+		// If we've tried to commit the transaction Rollback just returns sql.ErrTxDone.
+		//nolint:errcheck
+		defer tx.Rollback()
+
+		if err := fn(tx); err != nil {
+			if errIsRetryable(err) {
+				return err
+			}
+
+			return backoff.Permanent(err)
+		}
+
+		if err := tx.Commit(); err != nil {
+			if errIsRetryable(err) {
+				return err
+			}
+
+			return backoff.Permanent(err)
+		}
+
+		return nil
+	}, backOff)
+}
+
+func (c *YugabyteDB) newBackoff(ctx context.Context) backoff.BackOff {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	retrier := backoff.WithMaxRetries(backoff.WithContext(&backoff.ExponentialBackOff{
+		InitialInterval:     backoff.DefaultInitialInterval,
+		RandomizationFactor: backoff.DefaultRandomizationFactor,
+		Multiplier:          backoff.DefaultMultiplier,
+		MaxInterval:         c.config.MaxRetryInterval,
+		MaxElapsedTime:      c.config.MaxRetryElapsedTime,
+		Stop:                backoff.Stop,
+		Clock:               backoff.SystemClock,
+	}, ctx), uint64(c.config.MaxRetries))
+
+	retrier.Reset()
+
+	return retrier
+}
+
+func errIsRetryable(err error) bool {
+	pqErr := pq.Error{}
+	if !errors.As(err, &pqErr) {
+		return false
+	}
+
+	code := string(pqErr.Code)
+
+	// Assume that it's safe to retry 08006 and XX000 because we check for lock existence
+	// before creating and lock ID is primary key. Version field in migrations table is primary key too
+	// and delete all versions is an idempotend operation.
+	return code == "40001" || // Serialization error (optimistic locking conflict)
+		code == "40P01" || // Deadlock
+		code == "08006" || // Connection failure (node down, need to reconnect)
+		code == "XX000" // Internal error (may happen during HA)
 }
