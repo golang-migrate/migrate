@@ -30,7 +30,7 @@ Just add the code to your app and you're ready to go!
 
 Before commiting your migrations you should run your migrations up, down, and then up again to see if migrations are working properly both ways.
 (e.g. if you created a table in a migration but reverse migration did not delete it, you will encounter an error when running the forward migration again)
-It's also worth checking your migrations in a separate, containerized environment. You can find some tools at the [end of this document](https://github.com/golang-migrate/migrate/blob/master/GETTING_STARTED.md#further-reading).
+It's also worth checking your migrations in a separate, containerized environment. You can find some tools at the [end of this document](#further-reading).
 
 **IMPORTANT:** If you would like to run multiple instances of your app on different machines be sure to use a database that supports locking when running migrations. Otherwise you may encounter issues.
 
