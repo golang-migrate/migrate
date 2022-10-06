@@ -22,8 +22,8 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgerrcode"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/stdlib"
+	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v4/stdlib"
 )
 
 func init() {

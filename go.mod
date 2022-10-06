@@ -34,9 +34,10 @@ require (
 	github.com/jackc/pgconn v1.8.0
 	github.com/jackc/pgerrcode v0.0.0-20201024163028-a0d42d470451
 	github.com/jackc/pgproto3/v2 v2.0.7 // indirect
-	github.com/jackc/pgx/v5 v5.0.0
+	github.com/jackc/pgx/v4 v4.10.1
 	github.com/kardianos/osext v0.0.0-20190222173326-2bc1f35cddc0 // indirect
 	github.com/klauspost/compress v1.13.6 // indirect
+	github.com/kr/pretty v0.3.0 // indirect
 	github.com/ktrysmt/go-bitbucket v0.6.4
 	github.com/lib/pq v1.10.0
 	github.com/markbates/pkger v0.15.1
@@ -53,6 +54,7 @@ require (
 	gitlab.com/nyarla/go-crypt v0.0.0-20160106005555-d9a5dc2b789b // indirect
 	go.mongodb.org/mongo-driver v1.7.0
 	go.uber.org/atomic v1.7.0
+	golang.org/x/crypto v0.0.0-20220829220503-c86fa9a7ed90 // indirect
 	golang.org/x/net v0.0.0-20220906165146-f3363e06e74c // indirect
 	golang.org/x/oauth2 v0.0.0-20220630143837-2104d58473e0
 	golang.org/x/tools v0.1.5
