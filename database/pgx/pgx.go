@@ -22,7 +22,8 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgerrcode"
-	_ "github.com/jackc/pgx/v4/stdlib"
+	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v4/stdlib"
 )
 
 func init() {
@@ -137,6 +138,10 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	}
 
 	return px, nil
+}
+
+func WithPgxConfig(pgxConfig *pgx.ConnConfig, config *Config) (database.Driver, error) {
+	return WithInstance(stdlib.OpenDB(*pgxConfig), config)
 }
 
 func (p *Postgres) Open(url string) (database.Driver, error) {
