@@ -15,8 +15,9 @@ import (
 // It assumes that the driver tests has access to the following migrations:
 //
 // u = up migration, d = down migration, n = version
-//  |  1  |  -  |  3  |  4  |  5  |  -  |  7  |
-//  | u d |  -  | u   | u d |   d |  -  | u d |
+//
+//	|  1  |  -  |  3  |  4  |  5  |  -  |  7  |
+//	| u d |  -  | u   | u d |   d |  -  | u d |
 //
 // See source/stub/stub_test.go or source/file/file_test.go for an example.
 func Test(t *testing.T, d source.Driver) {
