@@ -4,6 +4,7 @@
 package iofs_test
 
 import (
+	"embed"
 	"testing"
 
 	"github.com/golang-migrate/migrate/v4/source/iofs"
@@ -13,6 +14,19 @@ import (
 func Test(t *testing.T) {
 	// reuse the embed.FS set in example_test.go
 	d, err := iofs.New(fs, "testdata/migrations")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	st.Test(t, d)
+}
+
+//go:embed testdata/migrations-tree/*/*.sql
+var fsSub embed.FS
+
+func TestRecursive(t *testing.T) {
+	// reuse the embed.FS set in example_test.go
+	d, err := iofs.New(fsSub, "testdata/migrations-tree/*")
 	if err != nil {
 		t.Fatal(err)
 	}

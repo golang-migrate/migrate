@@ -44,21 +44,40 @@ type PartialDriver struct {
 	migrations *source.Migrations
 	fsys       fs.FS
 	path       string
+
+	isRecursive   bool
+	migrationsMap map[string]string
 }
 
 // RecursiveSuffix for search recursive in paths, base path must be ended by this suffix.
 const RecursiveSuffix = "/*"
 
-func recursivePath(fsys fs.FS, path string, ms *source.Migrations, isRecursive bool) error {
-	entries, err := fs.ReadDir(fsys, path)
+func concatPath(path, suffix string) string {
+	if suffix != "" {
+		path = fmt.Sprintf("%s/%s", path, suffix)
+	}
+
+	return path
+}
+
+func (d *PartialDriver) getRawPath(raw string) string {
+	if d.isRecursive {
+		raw = concatPath(d.migrationsMap[raw], raw)
+	}
+
+	return raw
+}
+
+func (d *PartialDriver) recursivePath(fsys fs.FS, path, suffix string, ms *source.Migrations) error {
+	entries, err := fs.ReadDir(fsys, concatPath(path, suffix))
 	if err != nil {
 		return err
 	}
 
 	for _, e := range entries {
 		if e.IsDir() {
-			if isRecursive {
-				if err = recursivePath(fsys, fmt.Sprintf("%s/%s", path, e.Name()), ms, isRecursive); err != nil {
+			if d.isRecursive {
+				if err = d.recursivePath(fsys, path, concatPath(e.Name(), suffix), ms); err != nil {
 					return err
 				}
 			} else {
@@ -80,6 +99,10 @@ func recursivePath(fsys fs.FS, path string, ms *source.Migrations, isRecursive b
 				FileInfo:  file,
 			}
 		}
+
+		if d.isRecursive {
+			d.migrationsMap[e.Name()] = suffix
+		}
 	}
 
 	return nil
@@ -88,16 +111,15 @@ func recursivePath(fsys fs.FS, path string, ms *source.Migrations, isRecursive b
 // Init prepares not initialized IoFS instance to read migrations from a
 // io/fs#FS instance and a relative path.
 func (d *PartialDriver) Init(fsys fs.FS, path string) error {
-	var isRecursive bool
-
 	if strings.HasSuffix(path, RecursiveSuffix) {
 		path = strings.TrimSuffix(path, RecursiveSuffix)
-		isRecursive = true
+		d.isRecursive = true
+		d.migrationsMap = make(map[string]string)
 	}
 
 	ms := source.NewMigrations()
 
-	if err := recursivePath(fsys, path, ms, isRecursive); err != nil {
+	if err := d.recursivePath(fsys, path, "", ms); err != nil {
 		return err
 	}
 
@@ -156,7 +178,7 @@ func (d *PartialDriver) Next(version uint) (nextVersion uint, err error) {
 // ReadUp is part of source.Driver interface implementation.
 func (d *PartialDriver) ReadUp(version uint) (r io.ReadCloser, identifier string, err error) {
 	if m, ok := d.migrations.Up(version); ok {
-		body, err := d.open(path.Join(d.path, m.Raw))
+		body, err := d.open(path.Join(d.path, d.getRawPath(m.Raw)))
 		if err != nil {
 			return nil, "", err
 		}
@@ -172,7 +194,7 @@ func (d *PartialDriver) ReadUp(version uint) (r io.ReadCloser, identifier string
 // ReadDown is part of source.Driver interface implementation.
 func (d *PartialDriver) ReadDown(version uint) (r io.ReadCloser, identifier string, err error) {
 	if m, ok := d.migrations.Down(version); ok {
-		body, err := d.open(path.Join(d.path, m.Raw))
+		body, err := d.open(path.Join(d.path, d.getRawPath(m.Raw)))
 		if err != nil {
 			return nil, "", err
 		}
