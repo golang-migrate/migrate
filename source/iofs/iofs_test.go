@@ -32,3 +32,13 @@ func TestRecursive(t *testing.T) {
 
 	st.Test(t, d)
 }
+
+//go:embed testdata/migrations-duplicate-tree/*/*.sql
+var fsSubDup embed.FS
+
+func TestRecursiveDuplicate(t *testing.T) {
+	_, err := iofs.New(fsSubDup, "testdata/migrations-duplicate-tree/*")
+	if err == nil {
+		t.Fatal(err)
+	}
+}
