@@ -77,7 +77,13 @@ func (d *PartialDriver) recursivePath(fsys fs.FS, path, suffix string, ms *sourc
 	for _, e := range entries {
 		if e.IsDir() {
 			if d.isRecursive {
-				if err = d.recursivePath(fsys, path, concatPath(e.Name(), suffix), ms); err != nil {
+				rSuffix := e.Name()
+
+				if suffix != "" {
+					rSuffix = concatPath(suffix, e.Name())
+				}
+
+				if err = d.recursivePath(fsys, path, rSuffix, ms); err != nil {
 					return err
 				}
 			} else {

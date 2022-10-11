@@ -21,7 +21,7 @@ func Test(t *testing.T) {
 	st.Test(t, d)
 }
 
-//go:embed testdata/migrations-tree/*/*.sql
+//go:embed testdata/migrations-tree/*
 var fsSub embed.FS
 
 func TestRecursive(t *testing.T) {
