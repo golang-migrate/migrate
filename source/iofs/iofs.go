@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"path"
 	"strconv"
+	"strings"
 
 	"github.com/golang-migrate/migrate/v4/source"
 )
@@ -45,19 +46,26 @@ type PartialDriver struct {
 	path       string
 }
 
-// Init prepares not initialized IoFS instance to read migrations from a
-// io/fs#FS instance and a relative path.
-func (d *PartialDriver) Init(fsys fs.FS, path string) error {
+// RecursiveSuffix for search recursive in paths, base path must be ended by this suffix.
+const RecursiveSuffix = "/*"
+
+func recursivePath(fsys fs.FS, path string, ms *source.Migrations, isRecursive bool) error {
 	entries, err := fs.ReadDir(fsys, path)
 	if err != nil {
 		return err
 	}
 
-	ms := source.NewMigrations()
 	for _, e := range entries {
 		if e.IsDir() {
-			continue
+			if isRecursive {
+				if err = recursivePath(fsys, fmt.Sprintf("%s/%s", path, e.Name()), ms, isRecursive); err != nil {
+					return err
+				}
+			} else {
+				continue
+			}
 		}
+
 		m, err := source.DefaultParse(e.Name())
 		if err != nil {
 			continue
@@ -72,6 +80,25 @@ func (d *PartialDriver) Init(fsys fs.FS, path string) error {
 				FileInfo:  file,
 			}
 		}
+	}
+
+	return nil
+}
+
+// Init prepares not initialized IoFS instance to read migrations from a
+// io/fs#FS instance and a relative path.
+func (d *PartialDriver) Init(fsys fs.FS, path string) error {
+	var isRecursive bool
+
+	if strings.HasSuffix(path, RecursiveSuffix) {
+		path = strings.TrimSuffix(path, RecursiveSuffix)
+		isRecursive = true
+	}
+
+	ms := source.NewMigrations()
+
+	if err := recursivePath(fsys, path, ms, isRecursive); err != nil {
+		return err
 	}
 
 	d.fsys = fsys
