@@ -25,7 +25,6 @@ func Test(t *testing.T) {
 var fsSub embed.FS
 
 func TestRecursive(t *testing.T) {
-	// reuse the embed.FS set in example_test.go
 	d, err := iofs.New(fsSub, "testdata/migrations-tree/*")
 	if err != nil {
 		t.Fatal(err)
