@@ -1,6 +1,6 @@
 module github.com/golang-migrate/migrate/v4
 
-go 1.17
+go 1.19
 
 require (
 	cloud.google.com/go/spanner v1.34.1
