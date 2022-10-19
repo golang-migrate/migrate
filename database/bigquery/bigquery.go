@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	nurl "net/url"
 	"regexp"
 	"strings"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	uatomic "go.uber.org/atomic"
+	"google.golang.org/api/googleapi"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 )
@@ -251,8 +253,6 @@ func (s *BigQuery) Version() (version int, dirty bool, err error) {
 	return version, dirty, nil
 }
 
-var nameMatcher = regexp.MustCompile(`(CREATE TABLE\s(\S+)\s)|(CREATE.+VIEW\s(\S+)\s)`)
-
 // Drop implements database.Driver. Retrieves the database schema first and
 // creates statements to drop the indexes and tables accordingly.
 // Note: The drop statements are created in reverse order to how they're
@@ -283,9 +283,14 @@ func (s *BigQuery) Drop() error {
 		name := fmt.Sprintf("%v", v["name"])
 
 		tbl := s.db.client.Dataset(s.config.DatasetName).Table(name)
-		meta, err := tbl.Metadata(ctx)
-		if meta == nil {
-			continue
+		_, err = tbl.Metadata(ctx)
+		if err != nil {
+			if e, ok := err.(*googleapi.Error); ok {
+				if e.Code == http.StatusNotFound {
+					continue
+				}
+			}
+			return err
 		}
 		err = tbl.Delete(ctx)
 		if err != nil {

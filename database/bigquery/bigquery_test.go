@@ -18,8 +18,8 @@ func withBigQueryEmulator(t *testing.T, testFunc func(t *testing.T, projectID, d
 	projectID := os.Getenv("GCLOUD_PROJECT_ID")
 	datasetID := "golang_migrate"
 	migrationTable := fmt.Sprintf("%s_%d", DefaultMigrationsTable, time.Now().Unix())
-	if projectID == "" {		
-		t.Fatalf("missing google cloud project id (GCLOUD_PROJECT_ID)")
+	if projectID == "" {
+		t.Skip("missing google cloud project id (GCLOUD_PROJECT_ID)")
 	}
 	testFunc(t, projectID, datasetID, migrationTable)
 }
