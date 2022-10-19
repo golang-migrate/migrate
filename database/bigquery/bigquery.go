@@ -50,7 +50,7 @@ var (
 	validDSN = regexp.MustCompile("^projects/(?P<project>[^/]+)/datasets/(?P<dataset>[^/]+)$")
 )
 
-// Config used for a Spanner instance
+// Config used for a BigQuery instance
 type Config struct {
 	MigrationsTable string
 	Location        string
@@ -152,7 +152,7 @@ func (s *BigQuery) Close() error {
 	return s.db.client.Close()
 }
 
-// Lock implements database.Driver but doesn't do anything because Spanner only
+// Lock implements database.Driver but doesn't do anything because BigQuery only
 // enqueues the UpdateDatabaseDdlRequest.
 func (s *BigQuery) Lock() error {
 	if swapped := s.lock.CAS(unlockedVal, lockedVal); swapped {
@@ -298,7 +298,7 @@ func (s *BigQuery) Drop() error {
 
 // ensureVersionTable checks if versions table exists and, if not, creates it.
 // Note that this function locks the database, which deviates from the usual
-// convention of "caller locks" in the Spanner type.
+// convention of "caller locks" in the BigQuery type.
 func (s *BigQuery) ensureVersionTable() (err error) {
 	if err = s.Lock(); err != nil {
 		return err

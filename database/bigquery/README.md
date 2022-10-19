@@ -14,7 +14,7 @@ as described in [README.md#database-urls](../../README.md#database-urls)
 | Param | WithInstance Config | Description |
 | ----- | ------------------- | ----------- |
 | `x-migrations-table` | `MigrationsTable` | Name of the migrations table |
-| `url` | `DatabaseName` | The full path to the Spanner database resource. If provided as part of `Config` it must not contain a scheme or query string to match the format `projects/{projectId}/locations/{location}/dataset/{datasetName}`|
+| `url` | `DatabaseName` | The full path to the BigQuery dataset. If provided as part of `Config` it must not contain a scheme or query string to match the format `projects/{projectId}/locations/{location}/dataset/{datasetName}`|
 | `projectId` || The Google Cloud Platform project id
 | `location` || The location of the BigQuery dataset
 | `datasetName` || The name of the BigQuery dataset
