@@ -58,6 +58,7 @@ type Config struct {
 	Location        string
 	DatasetName     string
 	ProjectID       string
+	useLegacySQL    bool
 }
 
 // BigQuery implements database.Driver for Google Cloud BigQuery
@@ -129,10 +130,12 @@ func (s *BigQuery) Open(url string) (database.Driver, error) {
 		return nil, err
 	}
 	bqOpts := []option.ClientOption{}
+	useLegacySQL := false
 	endpoint := purl.Query().Get("x-endpoint")
 	if endpoint != "" {
 		bqOpts = append(bqOpts, option.WithEndpoint(endpoint))
 		bqOpts = append(bqOpts, option.WithoutAuthentication())
+		useLegacySQL = true
 	}
 	client, err := bigquery.NewClient(ctx, projectID, bqOpts...)
 	if err != nil {
@@ -146,6 +149,7 @@ func (s *BigQuery) Open(url string) (database.Driver, error) {
 		ProjectID:       projectID,
 		DatasetName:     datasetID,
 		MigrationsTable: migrationsTable,
+		useLegacySQL:    useLegacySQL,
 	})
 }
 
@@ -207,18 +211,38 @@ type versionStruct struct {
 func (s *BigQuery) SetVersion(version int, dirty bool) error {
 	ctx := context.Background()
 
-	migrationTable := s.db.client.Dataset(s.config.DatasetName).Table(s.config.MigrationsTable)
-
-	inserter := migrationTable.Inserter()
-	err := inserter.Put(ctx, versionStruct{
-		Version:  version,
-		Dirty:    dirty,
-		Sequence: time.Now().UnixNano(),
-	})
-	if err != nil {
-		return &database.Error{OrigErr: err}
+	if !s.config.useLegacySQL {
+		migrationTable := s.db.client.Dataset(s.config.DatasetName).Table(s.config.MigrationsTable)
+		inserter := migrationTable.Inserter()
+		err := inserter.Put(ctx, versionStruct{
+			Version:  version,
+			Dirty:    dirty,
+			Sequence: time.Now().UnixNano(),
+		})
+		if err != nil {
+			return &database.Error{OrigErr: err}
+		}
+	} else {
+		query := s.asQuery(
+			`INSERT ` + s.config.MigrationsTable + `(version, dirty, sequence) VALUES (@version, @dirty, @sequence)`,
+		)
+		query.Parameters = []bigquery.QueryParameter{
+			{Name: "version", Value: version},
+			{Name: "dirty", Value: dirty},
+			{Name: "sequence", Value: time.Now().UnixNano()},
+		}
+		job, err := query.Run(ctx)
+		if err != nil {
+			return &database.Error{OrigErr: err}
+		}
+		jobStatus, err := job.Wait(ctx)
+		if err != nil {
+			return &database.Error{OrigErr: err}
+		}
+		if jobStatus.Err() != nil {
+			return &database.Error{OrigErr: jobStatus.Err()}
+		}
 	}
-
 	return nil
 }
 
@@ -261,28 +285,17 @@ func (s *BigQuery) Version() (version int, dirty bool, err error) {
 // opposite direction. More testing
 func (s *BigQuery) Drop() error {
 	ctx := context.Background()
-	q := s.asQuery(`SELECT table_name as name, ddl FROM INFORMATION_SCHEMA.TABLES`)
-	job, err := q.Run(ctx)
-	if err != nil {
-		return &database.Error{OrigErr: err, Err: "drop failed"}
-	}
-	iter, err := job.Read(ctx)
-	if err != nil {
-		return &database.Error{OrigErr: err, Err: "drop failed"}
-	}
+	iter := s.db.client.Dataset(s.config.DatasetName).Tables(ctx)
 
-	v := map[string]bigquery.Value{}
 	for {
-		err = iter.Next(&v)
+		tbl, err := iter.Next()
 		if err == iterator.Done {
 			break
 		}
 		if err != nil {
 			return &database.Error{OrigErr: err, Err: "failed iterate on table to delete"}
 		}
-		name := fmt.Sprintf("%v", v["name"])
 
-		tbl := s.db.client.Dataset(s.config.DatasetName).Table(name)
 		_, err = tbl.Metadata(ctx)
 		if err != nil {
 			if e, ok := err.(*googleapi.Error); ok {
@@ -294,7 +307,7 @@ func (s *BigQuery) Drop() error {
 		}
 		err = tbl.Delete(ctx)
 		if err != nil {
-			return &database.Error{OrigErr: err, Err: fmt.Sprintf("failed to delete table %s", name)}
+			return &database.Error{OrigErr: err, Err: fmt.Sprintf("failed to delete table %s", tbl.TableID)}
 		}
 	}
 
@@ -335,7 +348,6 @@ func (s *BigQuery) ensureVersionTable() (err error) {
 	if _, err := job.Wait(ctx); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(stmt)}
 	}
-
 	return nil
 }
 
