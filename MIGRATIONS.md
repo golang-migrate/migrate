@@ -12,11 +12,14 @@ used for them.  `migrate` expects the filenames of migrations to have the format
 
     {version}_{title}.up.{extension}
     {version}_{title}.down.{extension}
+    {version}_{title}.alwaysup.{extension}
+    {version}_{title}.alwaysdown.{extension}
 
 The `title` of each migration is unused, and is only for readability.  Similarly,
 the `extension` of the migration files is not checked by the library, and should
 be an appropriate format for the database in use (`.sql` for SQL variants, for
-instance).
+instance). The `always` designation will run the migration file each time. This
+is useful for stored procedure and custom type definitions.
 
 Versions of migrations may be represented as any 64 bit unsigned integer.
 All migrations are applied upward in order of increasing version number, and

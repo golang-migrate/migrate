@@ -165,6 +165,8 @@ Each migration has an up and down migration. [Why?](FAQ.md#why-two-separate-file
 ```bash
 1481574547_create_users_table.up.sql
 1481574547_create_users_table.down.sql
+1481574547_stored_procs.alwaysup.sql
+1481574547_stored_procs.alwaysdown.sql
 ```
 
 [Best practices: How to write migrations.](MIGRATIONS.md)

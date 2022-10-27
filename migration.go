@@ -4,7 +4,11 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"time"
+
+	"github.com/golang-migrate/migrate/v4/source"
 )
 
 // DefaultBufferSize sets the in memory buffer size (in Bytes) for every
@@ -26,6 +30,9 @@ type Migration struct {
 	// has been applied to the database.
 	// Can be -1, implying that this is a NilVersion.
 	TargetVersion int
+
+	// Direction is either Up, Down, AlwaysUp, or AlwaysDown.
+	Direction source.Direction
 
 	// Body holds an io.ReadCloser to the source.
 	Body io.ReadCloser
@@ -92,6 +99,20 @@ func NewMigration(body io.ReadCloser, identifier string,
 		m.FinishedBuffering = tnow
 		m.FinishedReading = tnow
 		return m, nil
+	}
+
+	m.Direction = source.Up
+	if version > uint(targetVersion) {
+		m.Direction = source.Down
+	}
+
+	if ft, ok := body.(*os.File); ok {
+		_, f := filepath.Split(ft.Name())
+		mp, mpErr := source.Parse(f)
+		if mpErr != nil {
+			return m, mpErr
+		}
+		m.Direction = mp.Direction
 	}
 
 	br, bw := io.Pipe()
