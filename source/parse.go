@@ -17,10 +17,10 @@ var (
 
 // Regex matches the following pattern:
 //
-//		123_name.up.ext
-//		123_name.down.ext
-//	 123_name.alwaysup.ext
-//	 123_name.alwaysdown.ext
+//	123_name.up.ext
+//	123_name.down.ext
+//	123_name.alwaysup.ext
+//	123_name.alwaysdown.ext
 var Regex = regexp.MustCompile(`^([0-9]+)_(.*)\.(` + string(Down) + `|` + string(Up) + `|` + string(AlwaysDown) + `|` + string(AlwaysUp) + `)\.(.*)$`)
 
 // Parse returns Migration for matching Regex pattern.
