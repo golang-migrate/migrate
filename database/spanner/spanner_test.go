@@ -1,41 +1,121 @@
 package spanner
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"testing"
 
+	"github.com/dhui/dktest"
 	"github.com/golang-migrate/migrate/v4"
 
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
+	"github.com/golang-migrate/migrate/v4/dktesting"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 
-	"cloud.google.com/go/spanner/spannertest"
+	database "cloud.google.com/go/spanner/admin/database/apiv1"
+	instance "cloud.google.com/go/spanner/admin/instance/apiv1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	databasepb "google.golang.org/genproto/googleapis/spanner/admin/database/v1"
+	instancepb "google.golang.org/genproto/googleapis/spanner/admin/instance/v1"
 )
 
-// withSpannerEmulator is not thread-safe and cannot be used with parallel tests since it sets the emulator
-func withSpannerEmulator(t *testing.T, testFunc func(t *testing.T)) {
-	t.Helper()
-	srv, err := spannertest.NewServer("localhost:0")
-	if err != nil {
-		t.Fatal("Failed to create Spanner emulator:", err)
-	}
-	// This is not thread-safe
-	if err := os.Setenv("SPANNER_EMULATOR_HOST", srv.Addr); err != nil {
-		t.Fatal("Failed to set SPANNER_EMULATOR_HOST env var:", err)
-	}
-	defer srv.Close()
-	testFunc(t)
+const (
+	projectId    = "abc"
+	instanceId   = "edf"
+	databaseName = "testdb"
+)
 
+var (
+	opts  = dktest.Options{PortRequired: true, ReadyFunc: isReady}
+	specs = []dktesting.ContainerSpec{
+		{ImageName: "gcr.io/cloud-spanner-emulator/emulator", Options: opts},
+	}
+)
+
+func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
+	// Spanner exposes 2 ports (9010 for gRPC, 9020 for REST)
+	// We only need the port bound to 9010
+	ip, port, err := c.Port(9010)
+	if err != nil {
+		return false
+	}
+	ipAndPort := fmt.Sprintf("%s:%s", ip, port)
+	os.Setenv("SPANNER_EMULATOR_HOST", ipAndPort)
+
+	if err := createInstance(ctx); err != nil {
+		return false
+	}
+
+	if err := createDatabase(ctx); err != nil {
+		return false
+	}
+
+	return true
 }
 
-const db = "projects/abc/instances/def/databases/testdb"
+func createInstance(ctx context.Context) error {
+	ic, err := instance.NewInstanceAdminClient(ctx)
+	if err != nil {
+		return err
+	}
+	defer ic.Close()
+
+	giReq := &instancepb.GetInstanceRequest{
+		Name: fmt.Sprintf("projects/%s/instances/%s", projectId, instanceId),
+	}
+	if _, err := ic.GetInstance(ctx, giReq); err == nil {
+		return nil // skip if instance already created
+	}
+
+	ciReq := &instancepb.CreateInstanceRequest{
+		Parent:     fmt.Sprintf("projects/%s", projectId),
+		InstanceId: instanceId,
+		Instance: &instancepb.Instance{
+			Config:      "emu",
+			DisplayName: instanceId,
+			NodeCount:   1,
+		},
+	}
+	op, err := ic.CreateInstance(ctx, ciReq)
+	if err != nil {
+		return err
+	}
+
+	if _, err := op.Wait(ctx); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func createDatabase(ctx context.Context) error {
+	ac, err := database.NewDatabaseAdminClient(ctx)
+	if err != nil {
+		return err
+	}
+	defer ac.Close()
+
+	req := &databasepb.CreateDatabaseRequest{
+		Parent:          fmt.Sprintf("projects/%s/instances/%s", projectId, instanceId),
+		CreateStatement: fmt.Sprintf("CREATE DATABASE `%s`", databaseName),
+	}
+	op, err := ac.CreateDatabase(ctx, req)
+	if err != nil {
+		return err
+	}
+
+	if _, err := op.Wait(ctx); err != nil {
+		return err
+	}
+
+	return nil
+}
 
 func Test(t *testing.T) {
-	withSpannerEmulator(t, func(t *testing.T) {
-		uri := fmt.Sprintf("spanner://%s", db)
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		uri := fmt.Sprintf("spanner://projects/%s/instances/%s/databases/%s", projectId, instanceId, databaseName)
 		s := &Spanner{}
 		d, err := s.Open(uri)
 		if err != nil {
@@ -46,9 +126,9 @@ func Test(t *testing.T) {
 }
 
 func TestMigrate(t *testing.T) {
-	withSpannerEmulator(t, func(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		s := &Spanner{}
-		uri := fmt.Sprintf("spanner://%s", db)
+		uri := fmt.Sprintf("spanner://projects/%s/instances/%s/databases/%s", projectId, instanceId, databaseName)
 		d, err := s.Open(uri)
 		if err != nil {
 			t.Fatal(err)
