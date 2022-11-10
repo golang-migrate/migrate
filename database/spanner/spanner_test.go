@@ -42,7 +42,7 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 		return false
 	}
 	ipAndPort := fmt.Sprintf("%s:%s", ip, port)
-	os.Setenv("SPANNER_EMULATOR_HOST", ipAndPort)
+	_ = os.Setenv("SPANNER_EMULATOR_HOST", ipAndPort)
 
 	if err := createInstance(ctx); err != nil {
 		return false
@@ -60,7 +60,9 @@ func createInstance(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer ic.Close()
+	defer func() {
+		_ = ic.Close()
+	}()
 
 	giReq := &instancepb.GetInstanceRequest{
 		Name: fmt.Sprintf("projects/%s/instances/%s", projectId, instanceId),
@@ -95,7 +97,9 @@ func createDatabase(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer ac.Close()
+	defer func() {
+		_ = ac.Close()
+	}()
 
 	req := &databasepb.CreateDatabaseRequest{
 		Parent:          fmt.Sprintf("projects/%s/instances/%s", projectId, instanceId),
