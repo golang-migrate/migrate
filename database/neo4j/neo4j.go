@@ -3,6 +3,7 @@ package neo4j
 import (
 	"bytes"
 	"fmt"
+	"golang.org/x/mod/semver"
 	"io"
 	neturl "net/url"
 	"strconv"
@@ -282,12 +283,24 @@ func (n *Neo4j) ensureVersionConstraint() (err error) {
 		}
 	}()
 
+	var neo4jVersion string
+
+	res, err := neo4j.Collect(session.Run("call dbms.components() yield versions unwind versions as version return version", nil))
+	if err != nil {
+		return err
+	}
+	if len(res) > 0 && len(res[0].Values()) > 0 {
+		if v, ok := res[0].Values()[0].(string); ok {
+			neo4jVersion = semver.Major("v" + v)
+		}
+	}
+
 	/**
 	Get constraint and check to avoid error duplicate
 	using db.labels() to support Neo4j 3 and 4.
 	Neo4J 3 doesn't support db.constraints() YIELD name
 	*/
-	res, err := neo4j.Collect(session.Run(fmt.Sprintf("CALL db.labels() YIELD label WHERE label=\"%s\" RETURN label", n.config.MigrationsLabel), nil))
+	res, err = neo4j.Collect(session.Run(fmt.Sprintf("CALL db.labels() YIELD label WHERE label=\"%s\" RETURN label", n.config.MigrationsLabel), nil))
 	if err != nil {
 		return err
 	}
@@ -295,7 +308,16 @@ func (n *Neo4j) ensureVersionConstraint() (err error) {
 		return nil
 	}
 
-	query := fmt.Sprintf("CREATE CONSTRAINT ON (a:%s) ASSERT a.version IS UNIQUE", n.config.MigrationsLabel)
+	var query string
+	switch neo4jVersion {
+	case "v5":
+		query = fmt.Sprintf("CREATE CONSTRAINT FOR (a:%s) REQUIRE a.version IS UNIQUE", n.config.MigrationsLabel)
+	case "v3", "v4":
+		query = fmt.Sprintf("CREATE CONSTRAINT ON (a:%s) ASSERT a.version IS UNIQUE", n.config.MigrationsLabel)
+	default:
+		return fmt.Errorf("unsupported neo4j version %v", neo4jVersion)
+	}
+
 	if _, err := neo4j.Collect(session.Run(query, nil)); err != nil {
 		return err
 	}
