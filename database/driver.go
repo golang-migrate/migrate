@@ -65,6 +65,14 @@ type Driver interface {
 	// Run applies a migration to the database. migration is guaranteed to be not nil.
 	Run(migration io.Reader) error
 
+	// Failed sets the migration as failed.
+	// arguments are the
+	//  version: to find the version row to update
+	//  info: information to set about the failure, possibly
+	//  the version and source
+	//  error: the error to
+	Failed(version int, info string, err error) error
+
 	// SetVersion saves version and dirty state.
 	// Migrate will call this function before and after each call to Run.
 	// version must be >= -1. -1 means NilVersion.

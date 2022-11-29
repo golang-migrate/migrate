@@ -8,7 +8,7 @@ import (
 var errNoScheme = errors.New("no scheme")
 var errEmptyURL = errors.New("URL cannot be empty")
 
-// schemeFromURL returns the scheme from a URL string
+// SchemeFromURL find scheme from beginning of string to the first colon
 func SchemeFromURL(url string) (string, error) {
 	if url == "" {
 		return "", errEmptyURL

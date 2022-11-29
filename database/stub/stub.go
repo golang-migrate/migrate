@@ -92,6 +92,10 @@ func (s *Stub) Drop() error {
 	return nil
 }
 
+func (s *Stub) Failed(version int, info string, err error) error {
+	return nil
+}
+
 func (s *Stub) EqualSequence(seq []string) bool {
 	return reflect.DeepEqual(seq, s.MigrationSequence)
 }

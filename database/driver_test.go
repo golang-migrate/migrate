@@ -52,6 +52,10 @@ func (m *mockDriver) Drop() error {
 	return nil
 }
 
+func (s *mockDriver) Failed(version int, info string, err error) error {
+	return nil
+}
+
 func TestRegisterTwice(t *testing.T) {
 	Register("mock", &mockDriver{})
 
