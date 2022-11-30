@@ -259,7 +259,7 @@ func (ch *ClickHouse) ensureVersionTable() (err error) {
 }
 
 func (ch *ClickHouse) Drop() (err error) {
-	query := "SHOW TABLES FROM " + ch.config.DatabaseName
+	query := "SHOW TABLES FROM \"" + ch.config.DatabaseName + "\""
 	tables, err := ch.conn.Query(query)
 
 	if err != nil {
@@ -277,7 +277,7 @@ func (ch *ClickHouse) Drop() (err error) {
 			return err
 		}
 
-		query = "DROP TABLE IF EXISTS " + ch.config.DatabaseName + "." + table
+		query = "DROP TABLE IF EXISTS \"" + ch.config.DatabaseName + "\"." + table
 
 		if _, err := ch.conn.Exec(query); err != nil {
 			return &database.Error{OrigErr: err, Query: []byte(query)}
