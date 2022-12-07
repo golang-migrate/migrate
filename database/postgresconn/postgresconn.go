@@ -147,46 +147,6 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 		return nil, err
 	}
 
-	migrationsTable := purl.Query().Get("x-migrations-table")
-	migrationsTableQuoted := false
-	if s := purl.Query().Get("x-migrations-table-quoted"); len(s) > 0 {
-		migrationsTableQuoted, err = strconv.ParseBool(s)
-		if err != nil {
-			return nil, fmt.Errorf("Unable to parse option x-migrations-table-quoted: %w", err)
-		}
-	}
-	if (len(migrationsTable) > 0) && (migrationsTableQuoted) && ((migrationsTable[0] != '"') || (migrationsTable[len(migrationsTable)-1] != '"')) {
-		return nil, fmt.Errorf("x-migrations-table must be quoted (for instance '\"migrate\".\"schema_migrations\"') when x-migrations-table-quoted is enabled, current value is: %s", migrationsTable)
-	}
-
-	statementTimeoutString := purl.Query().Get("x-statement-timeout")
-	statementTimeout := 0
-	if statementTimeoutString != "" {
-		statementTimeout, err = strconv.Atoi(statementTimeoutString)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	multiStatementMaxSize := DefaultMultiStatementMaxSize
-	if s := purl.Query().Get("x-multi-statement-max-size"); len(s) > 0 {
-		multiStatementMaxSize, err = strconv.Atoi(s)
-		if err != nil {
-			return nil, err
-		}
-		if multiStatementMaxSize <= 0 {
-			multiStatementMaxSize = DefaultMultiStatementMaxSize
-		}
-	}
-
-	multiStatementEnabled := false
-	if s := purl.Query().Get("x-multi-statement"); len(s) > 0 {
-		multiStatementEnabled, err = strconv.ParseBool(s)
-		if err != nil {
-			return nil, fmt.Errorf("Unable to parse option x-multi-statement: %w", err)
-		}
-	}
-
 	conn, err := db.Conn(context.Background())
 	if err != nil {
 		return nil, err
@@ -194,13 +154,9 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 
 	config := Config{
 		DatabaseName:          purl.Path,
-		MigrationsTable:       migrationsTable,
-		MigrationsTableQuoted: migrationsTableQuoted,
-		StatementTimeout:      time.Duration(statementTimeout) * time.Millisecond,
-		MultiStatementEnabled: multiStatementEnabled,
-		MultiStatementMaxSize: multiStatementMaxSize,
+		MigrationsTable:       DefaultMigrationsTable,
+		MultiStatementMaxSize: DefaultMultiStatementMaxSize,
 	}
-	fmt.Printf("config: %+v\n", config)
 	px, err := WithConn(context.Background(), conn, &config)
 	if err != nil {
 		return nil, err
@@ -209,9 +165,9 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 }
 
 func (p *Postgres) Close() error {
-	connErr := p.conn.Close()
-	if connErr != nil {
-		return fmt.Errorf("conn: %v", connErr)
+	err := p.conn.Close()
+	if err != nil {
+		return fmt.Errorf("conn: %w", err)
 	}
 	return nil
 }
@@ -258,7 +214,10 @@ func (p *Postgres) Run(migration io.Reader) error {
 
 		err := multistmt.Parse(migration, multiStmtDelimiter, p.config.MultiStatementMaxSize, p.config.SchemaName, func(m []byte) error {
 			if err := p.runStatement(m); err != nil {
-				return errors.Wrap(err, string(m))
+				// the err returned here will include the failed statement but not the
+				//stack. Using errors.Wrap here to force stack.
+				//Testing shows this generates a pretty readable stack trace.
+				return errors.Wrap(err, "error running statement")
 			}
 			return nil
 		})
@@ -352,17 +311,17 @@ func (p *Postgres) SetVersion(version int, dirty bool) error {
 	// Also re-write the schema version for nil dirty versions to prevent
 	// empty schema version for failed down migration on the first migration
 	// See: https://github.com/getoutreach/migrate/issues/330
-	if version >= 0 || (version == database.NilVersion && dirty) {
-		query := fmt.Sprintf(`INSERT INTO %q.%q`+
-			` (version, dirty, created_at) VALUES ($1, $2, now())`,
-			p.config.migrationsSchemaName, p.config.migrationsTableName)
-		if _, err := tx.Exec(query, version, dirty); err != nil {
-			if errRollback := tx.Rollback(); errRollback != nil {
-				err = multierror.Append(err, errRollback)
-			}
-			return &database.Error{OrigErr: err, Query: []byte(query)}
+	//if version >= 0 || (version == database.NilVersion && dirty) {
+	query := fmt.Sprintf(`INSERT INTO %q.%q`+
+		` (version, dirty, created_at) VALUES ($1, $2, now())`,
+		p.config.migrationsSchemaName, p.config.migrationsTableName)
+	if _, err := tx.Exec(query, version, dirty); err != nil {
+		if errRollback := tx.Rollback(); errRollback != nil {
+			err = multierror.Append(err, errRollback)
 		}
+		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
+	//}
 
 	if err := tx.Commit(); err != nil {
 		return &database.Error{OrigErr: err, Err: "transaction commit failed"}
@@ -376,6 +335,7 @@ func (p *Postgres) Version() (version int, dirty bool, err error) {
 		` ORDER BY created_at desc LIMIT 1`,
 		p.config.migrationsSchemaName, p.config.migrationsTableName)
 	err = p.conn.QueryRowContext(context.Background(), query).Scan(&version, &dirty)
+	fmt.Printf("version: %v, dirty: %v\n", version, dirty)
 	switch {
 	case err == sql.ErrNoRows:
 		return database.NilVersion, false, nil
@@ -551,7 +511,7 @@ FROM pg_index
   JOIN pg_attribute a ON a.attrelid = pg_index.indrelid AND a.attnum = ANY(pg_index.indkey)
   JOIN pg_class ON pg_index.indrelid = pg_class.oid
   JOIN pg_namespace on pg_namespace.oid = pg_class.relnamespace
-WHERE pg_index.indrelid = %s::regclass
+WHERE pg_index.indrelid = '%s'::regclass
   AND  pg_index.indisprimary
   AND pg_namespace.nspname = current_schema()
   and a.attname = '%s'

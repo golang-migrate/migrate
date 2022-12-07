@@ -126,29 +126,71 @@ func TestSetVersion(t *testing.T, d database.Driver) {
 		expectedVersion int
 		expectedDirty   bool
 	}{
-		{name: "set 1 dirty", version: 1, dirty: true, expectedErr: nil, expectedReadErr: nil, expectedVersion: 1, expectedDirty: true},
-		{name: "re-set 1 dirty", version: 1, dirty: true, expectedErr: nil, expectedReadErr: nil, expectedVersion: 1, expectedDirty: true},
-		{name: "set 2 clean", version: 2, dirty: false, expectedErr: nil, expectedReadErr: nil, expectedVersion: 2, expectedDirty: false},
-		{name: "re-set 2 clean", version: 2, dirty: false, expectedErr: nil, expectedReadErr: nil, expectedVersion: 2, expectedDirty: false},
-		{name: "last migration dirty", version: database.NilVersion, dirty: true, expectedErr: nil, expectedReadErr: nil, expectedVersion: database.NilVersion, expectedDirty: true},
-		{name: "last migration clean", version: database.NilVersion, dirty: false, expectedErr: nil, expectedReadErr: nil, expectedVersion: database.NilVersion, expectedDirty: false},
+		{name: "set 1 dirty",
+			version:         1,
+			dirty:           true,
+			expectedErr:     nil,
+			expectedReadErr: nil,
+			expectedVersion: 1,
+			expectedDirty:   true},
+		{name: "re-set 1 dirty",
+			version:         1,
+			dirty:           true,
+			expectedErr:     nil,
+			expectedReadErr: nil,
+			expectedVersion: 1,
+			expectedDirty:   true},
+		{name: "set 2 clean",
+			version:         2,
+			dirty:           false,
+			expectedErr:     nil,
+			expectedReadErr: nil,
+			expectedVersion: 2,
+			expectedDirty:   false},
+		{name: "re-set 2 clean",
+			version:         2,
+			dirty:           false,
+			expectedErr:     nil,
+			expectedReadErr: nil,
+			expectedVersion: 2,
+			expectedDirty:   false},
+		{name: "last migration dirty",
+			version:         database.NilVersion,
+			dirty:           true,
+			expectedErr:     nil,
+			expectedReadErr: nil,
+			expectedVersion: database.NilVersion,
+			expectedDirty:   true},
+		{name: "last migration clean",
+			version:         database.NilVersion,
+			dirty:           false,
+			expectedErr:     nil,
+			expectedReadErr: nil,
+			expectedVersion: database.NilVersion,
+			expectedDirty:   false},
 	}
 
+	//defer time.Sleep(30 * time.Minute)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			fmt.Println(tc.name)
 			err := d.SetVersion(tc.version, tc.dirty)
 			if err != tc.expectedErr {
-				t.Fatal("Got unexpected error:", err, "!=", tc.expectedErr)
+				t.Fatal(tc.name, "Got unexpected error:", err, "!=", tc.expectedErr)
 			}
 			v, dirty, readErr := d.Version()
+			fmt.Printf("v: %v, dirty: %v, readErr: %v, expectedDirty: %v, name: %s\n", v,
+				dirty, readErr,
+				tc.expectedDirty, tc.name)
 			if readErr != tc.expectedReadErr {
-				t.Fatal("Got unexpected error:", readErr, "!=", tc.expectedReadErr)
+				t.Fatal(tc.name, "Got unexpected error:", readErr, "!=",
+					tc.expectedReadErr)
 			}
 			if v != tc.expectedVersion {
-				t.Error("Got unexpected version:", v, "!=", tc.expectedVersion)
+				t.Error(tc.name, "Got unexpected version:", v, "!=", tc.expectedVersion)
 			}
 			if dirty != tc.expectedDirty {
-				t.Error("Got unexpected dirty value:", dirty, "!=", tc.dirty)
+				t.Error(tc.name, "Got unexpected dirty value:", dirty, "!=", tc.dirty)
 			}
 		})
 	}
