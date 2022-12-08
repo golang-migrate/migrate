@@ -64,6 +64,11 @@ func (e ErrVersionNotFound) Error() string {
 	return fmt.Sprintf("no migration found for version %v: %v", e.Version, e.err)
 }
 
+// Is treat ErrVersionNotFound just like os.ErrNotExist to keep backward compatibility
+func (e ErrVersionNotFound) Is(target error) bool {
+	return target == os.ErrNotExist
+}
+
 type Migrate struct {
 	sourceName   string
 	sourceDrv    source.Driver

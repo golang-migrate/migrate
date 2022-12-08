@@ -1247,10 +1247,8 @@ func TestReadUp(t *testing.T) {
 		go m.readUp(v.from, v.limit, ret)
 		migrations, err := migrationsFromChannel(ret)
 
-		if (v.expectErr == os.ErrNotExist && !errors.Is(err, os.ErrNotExist)) ||
-			(v.expectErr != os.ErrNotExist && v.expectErr != err) {
+		if !errors.Is(err, v.expectErr) {
 			t.Errorf("expected %v, got %v, in %v", v.expectErr, err, i)
-			t.Logf("%v, in %v", migrations, i)
 		}
 		if len(v.expectMigrations) > 0 {
 			equalMigSeq(t, i, v.expectMigrations, migrations)
