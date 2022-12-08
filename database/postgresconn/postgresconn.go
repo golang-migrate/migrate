@@ -446,7 +446,7 @@ func (p *Postgres) ensureVersionTable() (err error) {
 
 	// ensure the new 'id' synthetic primary key exists
 	// the old primary key on version only allowed one version to exist in the table
-	// the new primary key allows many to rows with the same version to exist, but
+	// the new primary key allows many rows with the same version to exist, but
 	// only one row should be error free, if there are more than one row with the same
 	// version we expect them to be from failures and the info column populated with
 	// error details.
