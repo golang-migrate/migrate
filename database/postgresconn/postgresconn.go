@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"github.com/getoutreach/migrate/v4"
 	"io"
-	"io/ioutil"
 	nurl "net/url"
 	"regexp"
 	"strconv"
@@ -136,12 +135,12 @@ func WithConn(ctx context.Context, conn *sql.Conn, config *Config) (database.Dri
 // Open opens a database connection and returns wrapped driver
 // this function exists to satisfy tests
 func (p *Postgres) Open(url string) (database.Driver, error) {
-	fmt.Printf("Open(%s)\n", url)
 	purl, err := nurl.Parse(url)
 	if err != nil {
 		return nil, err
 	}
 
+	fmt.Printf("%s\n", purl)
 	db, err := sql.Open("postgres", migrate.FilterCustomQuery(purl).String())
 	if err != nil {
 		return nil, err
@@ -206,28 +205,22 @@ func (p *Postgres) Unlock() error {
 }
 
 func (p *Postgres) Run(migration io.Reader) error {
-	if p.config.MultiStatementEnabled {
-		var currentSchema string
-		if err := p.conn.QueryRowContext(context.Background(), "select current_schema()").Scan(&currentSchema); err != nil {
-			return err
-		}
+	var currentSchema string
+	if err := p.conn.QueryRowContext(context.Background(), "select current_schema()").Scan(&currentSchema); err != nil {
+		return err
+	}
 
-		err := multistmt.Parse(migration, multiStmtDelimiter, p.config.MultiStatementMaxSize, p.config.SchemaName, func(m []byte) error {
-			if err := p.runStatement(m); err != nil {
-				// the err returned here will include the failed statement but not the
-				//stack. Using errors.Wrap here to force stack.
-				//Testing shows this generates a pretty readable stack trace.
-				return errors.Wrap(err, "error running statement")
-			}
-			return nil
-		})
-		return err
-	}
-	migr, err := ioutil.ReadAll(migration)
-	if err != nil {
-		return err
-	}
-	return p.runStatement(migr)
+	err := multistmt.Parse(migration, multiStmtDelimiter, p.config.MultiStatementMaxSize, p.config.SchemaName, func(m []byte) error {
+		if err := p.runStatement(m); err != nil {
+			// the err returned here will include the failed statement but not the
+			//stack. Using errors.WithStack forces stack into the error.
+			//Testing shows this generates a pretty readable stack trace and records
+			//the stack in the schema migrations version table.
+			return errors.WithStack(err)
+		}
+		return nil
+	})
+	return err
 }
 
 func (p *Postgres) runStatement(statement []byte) error {
@@ -335,7 +328,6 @@ func (p *Postgres) Version() (version int, dirty bool, err error) {
 		` ORDER BY created_at desc LIMIT 1`,
 		p.config.migrationsSchemaName, p.config.migrationsTableName)
 	err = p.conn.QueryRowContext(context.Background(), query).Scan(&version, &dirty)
-	fmt.Printf("version: %v, dirty: %v\n", version, dirty)
 	switch {
 	case err == sql.ErrNoRows:
 		return database.NilVersion, false, nil
@@ -516,7 +508,6 @@ WHERE pg_index.indrelid = '%s'::regclass
   AND pg_namespace.nspname = current_schema()
   and a.attname = '%s'
 AND format_type(a.atttypid, a.atttypmod) = 'bigint'`, tableName, primaryKeyName)
-	fmt.Printf("stmt: %s\n", stmt)
 	// We expect one row to come back, for the id bigserial(bigint) column
 	rows := p.conn.QueryRowContext(ctx, stmt)
 	var exists int

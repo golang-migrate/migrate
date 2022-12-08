@@ -170,18 +170,13 @@ func TestSetVersion(t *testing.T, d database.Driver) {
 			expectedDirty:   false},
 	}
 
-	//defer time.Sleep(30 * time.Minute)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			fmt.Println(tc.name)
 			err := d.SetVersion(tc.version, tc.dirty)
 			if err != tc.expectedErr {
 				t.Fatal(tc.name, "Got unexpected error:", err, "!=", tc.expectedErr)
 			}
 			v, dirty, readErr := d.Version()
-			fmt.Printf("v: %v, dirty: %v, readErr: %v, expectedDirty: %v, name: %s\n", v,
-				dirty, readErr,
-				tc.expectedDirty, tc.name)
 			if readErr != tc.expectedReadErr {
 				t.Fatal(tc.name, "Got unexpected error:", readErr, "!=",
 					tc.expectedReadErr)
