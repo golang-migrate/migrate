@@ -36,15 +36,15 @@ func (m *mockDriver) Unlock() error {
 	return nil
 }
 
-func (m *mockDriver) Run(migration io.Reader) error {
+func (m *mockDriver) Run(_ io.Reader) error {
 	return nil
 }
 
-func (m *mockDriver) SetVersion(version int, dirty bool) error {
+func (m *mockDriver) SetVersion(_ int, _ bool) error {
 	return nil
 }
 
-func (m *mockDriver) Version() (version int, dirty bool, err error) {
+func (m *mockDriver) Version() (_ int, _ bool, err error) {
 	return 0, false, nil
 }
 
@@ -52,7 +52,7 @@ func (m *mockDriver) Drop() error {
 	return nil
 }
 
-func (s *mockDriver) Failed(version int, info string, err error) error {
+func (m *mockDriver) SetFailed(_ int, _ string, _ error) error {
 	return nil
 }
 

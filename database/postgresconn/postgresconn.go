@@ -525,8 +525,8 @@ AND format_type(a.atttypid, a.atttypmod) = 'bigint'`, tableName, primaryKeyName)
 	return true, nil
 }
 
-// Failed set the current migration to failed and record the failure in the database
-func (p *Postgres) Failed(version int, info string, err error) error {
+// SetFailed set the current migration to failed and record the failure in the database
+func (p *Postgres) SetFailed(version int, info string, err error) error {
 	ctx := context.Background()
 	stmt := fmt.Sprintf(`UPDATE %q.%q SET info = $1 where version = $2`,
 		p.config.migrationsSchemaName, p.config.migrationsTableName)

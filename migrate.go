@@ -758,7 +758,7 @@ func (m *Migrate) runMigrations(ret <-chan interface{}) error {
 			if migr.Body != nil {
 				m.logVerbosePrintf("Read and execute %v\n", migr.LogString())
 				if err := m.databaseDrv.Run(migr.BufferedBody); err != nil {
-					if err := m.databaseDrv.Failed(migr.TargetVersion,
+					if err := m.databaseDrv.SetFailed(migr.TargetVersion,
 						fmt.Sprintf("%+v", err),
 						err); err != nil {
 						m.logErr(err)
