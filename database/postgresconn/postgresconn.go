@@ -83,7 +83,6 @@ func WithConn(ctx context.Context, conn *sql.Conn, config *Config) (database.Dri
 		if len(databaseName) == 0 {
 			return nil, ErrNoDatabaseName
 		}
-
 		config.DatabaseName = databaseName
 	}
 
@@ -302,7 +301,8 @@ func (p *Postgres) SetVersion(version int, dirty bool) error {
 	// check for in progress version, if it exists use the in-progress
 	// version to record the dirty, info etc. values.
 	row := tx.QueryRowContext(ctx,
-		fmt.Sprintf(`select id from %q.%q where version = $1`,
+		fmt.Sprintf(
+			`SELECT id FROM %q.%q WHERE version = $1 ORDER BY created_at DESC limit 1`,
 			p.config.migrationsSchemaName, p.config.migrationsTableName), version)
 	var id int64
 	if err := row.Scan(&id); err != nil {
@@ -321,7 +321,8 @@ func (p *Postgres) SetVersion(version int, dirty bool) error {
 			}
 		}
 	} else {
-		stmt := fmt.Sprintf(`update %q.%q set dirty = $1, updated_at = now() where id = $2`,
+		stmt := fmt.Sprintf(
+			`UPDATE %q.%q SET dirty = $1, updated_at = now() WHERE id = $2`,
 			p.config.migrationsSchemaName,
 			p.config.migrationsTableName)
 		if _, err := tx.ExecContext(ctx, stmt, dirty, id); err != nil {
@@ -498,7 +499,6 @@ func (p *Postgres) ensureVersionTable() (err error) {
 	if err := p.ensurePrimaryKeyExists(); err != nil {
 		return &database.Error{OrigErr: err}
 	}
-
 	return nil
 }
 
