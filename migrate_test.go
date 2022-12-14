@@ -474,11 +474,11 @@ func TestMigrate(t *testing.T) {
 			t.Errorf("expected err %v, got %v, in %v", v.expectErr, err, i)
 
 		} else if err == nil {
-			version, _, err := m.Version()
+			version, err := m.Version()
 			if err != nil {
 				t.Error(err)
 			}
-			if version != v.expectVersion {
+			if uint(version.Version) != v.expectVersion {
 				t.Errorf("expected version %v, got %v, in %v", v.expectVersion, version, i)
 			}
 		}
@@ -737,14 +737,14 @@ func TestSteps(t *testing.T) {
 			t.Errorf("expected err %v, got %v, in %v", v.expectErr, err, i)
 
 		} else if err == nil {
-			version, _, err := m.Version()
+			version, err := m.Version()
 			if err != ErrNilVersion && err != nil {
 				t.Error(err)
 			}
 			if v.expectVersion == -1 && err != ErrNilVersion {
 				t.Errorf("expected ErrNilVersion, got %v, in %v", version, i)
 
-			} else if v.expectVersion >= 0 && version != uint(v.expectVersion) {
+			} else if v.expectVersion >= 0 && version.Version != v.expectVersion {
 				t.Errorf("expected version %v, got %v, in %v", v.expectVersion, version, i)
 			}
 		}
@@ -949,7 +949,7 @@ func TestVersion(t *testing.T) {
 	m, _ := New("stub://", "stub://")
 	dbDrv := m.databaseDrv.(*dStub.Stub)
 
-	_, _, err := m.Version()
+	_, err := m.Version()
 	if err != ErrNilVersion {
 		t.Fatalf("expected ErrNilVersion, got %v", err)
 	}
@@ -962,12 +962,12 @@ func TestVersion(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	v, _, err := m.Version()
+	v, err := m.Version()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if v != 1 {
+	if v.Version != 1 {
 		t.Fatalf("expected version 1, got %v", v)
 	}
 }
@@ -984,12 +984,12 @@ func TestRun(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	v, _, err := m.Version()
+	v, err := m.Version()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if v != 2 {
+	if v.Version != 2 {
 		t.Errorf("expected version 2, got %v", v)
 	}
 }
@@ -1020,14 +1020,14 @@ func TestForce(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	v, dirty, err := m.Version()
+	v, err := m.Version()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if dirty {
+	if v.Dirty {
 		t.Errorf("expected dirty to be false")
 	}
-	if v != 7 {
+	if v.Version != 7 {
 		t.Errorf("expected version to be 7")
 	}
 }
@@ -1247,10 +1247,8 @@ func TestReadUp(t *testing.T) {
 		go m.readUp(v.from, v.limit, ret)
 		migrations, err := migrationsFromChannel(ret)
 
-		if (v.expectErr == os.ErrNotExist && !errors.Is(err, os.ErrNotExist)) ||
-			(v.expectErr != os.ErrNotExist && v.expectErr != err) {
+		if !errors.Is(err, v.expectErr) {
 			t.Errorf("expected %v, got %v, in %v", v.expectErr, err, i)
-			t.Logf("%v, in %v", migrations, i)
 		}
 		if len(v.expectMigrations) > 0 {
 			equalMigSeq(t, i, v.expectMigrations, migrations)

@@ -17,7 +17,7 @@ func TestMigrate(t *testing.T, m *migrate.Migrate) {
 	TestMigrateDrop(t, m)
 }
 
-// Regression test for preventing a regression for #164 https://github.com/getoutreach/migrate/pull/173
+// TestMigrateDrop Regression test for preventing a regression for #164 https://github.com/getoutreach/migrate/pull/173
 // Similar to TestDrop(), but tests the dropping mechanism through the Migrate logic instead, to check for
 // double-locking during the Drop logic.
 func TestMigrateDrop(t *testing.T, m *migrate.Migrate) {

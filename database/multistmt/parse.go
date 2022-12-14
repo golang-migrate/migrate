@@ -4,7 +4,6 @@ package multistmt
 import (
 	"bytes"
 	"fmt"
-	"github.com/pkg/errors"
 	"io"
 )
 
@@ -137,7 +136,7 @@ func Parse(reader io.Reader, _ []byte, _ int, replacementStatement string, h Han
 						// fully formed statement(stmt), exec the statement
 						trace("%s\n", string(stmt))
 						if err := h(stmt); err != nil {
-							return errors.Wrapf(err, "%s", stmt)
+							return err
 						}
 						// reset accum, maintain allocated memory
 						accum = accum[:0]

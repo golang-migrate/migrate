@@ -8,14 +8,13 @@ import (
 	sqldriver "database/sql/driver"
 	"errors"
 	"fmt"
+	"github.com/getoutreach/migrate/v4"
 	"io"
 	"log"
 	"strconv"
 	"strings"
 	"sync"
 	"testing"
-
-	"github.com/getoutreach/migrate/v4"
 
 	"github.com/dhui/dktest"
 
@@ -35,11 +34,7 @@ var (
 		PortRequired: true, ReadyFunc: isReady}
 	// Supported versions: https://www.postgresql.org/support/versioning/
 	specs = []dktesting.ContainerSpec{
-		{ImageName: "postgres:9.5", Options: opts},
-		{ImageName: "postgres:9.6", Options: opts},
-		{ImageName: "postgres:10", Options: opts},
-		{ImageName: "postgres:11", Options: opts},
-		{ImageName: "postgres:12", Options: opts},
+		{ImageName: "postgres:13", Options: opts},
 	}
 )
 
@@ -156,7 +151,8 @@ func TestMultipleStatements(t *testing.T) {
 
 		// make sure second table exists
 		var exists bool
-		if err := d.(*Postgres).conn.QueryRowContext(context.Background(), "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'bar' AND table_schema = (SELECT current_schema()))").Scan(&exists); err != nil {
+		if err := d.(*Postgres).conn.QueryRowContext(context.Background(),
+			"SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'bar' AND table_schema = (SELECT current_schema()))").Scan(&exists); err != nil {
 			t.Fatal(err)
 		}
 		if !exists {
@@ -189,7 +185,8 @@ func TestMultipleStatementsInMultiStatementMode(t *testing.T) {
 
 		// make sure created index exists
 		var exists bool
-		if err := d.(*Postgres).conn.QueryRowContext(context.Background(), "SELECT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = (SELECT current_schema()) AND indexname = 'idx_foo')").Scan(&exists); err != nil {
+		if err := d.(*Postgres).conn.QueryRowContext(context.Background(),
+			"SELECT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = (SELECT current_schema()) AND indexname = 'idx_foo')").Scan(&exists); err != nil {
 			t.Fatal(err)
 		}
 		if !exists {
@@ -217,9 +214,8 @@ func TestErrorParsing(t *testing.T) {
 			}
 		}()
 
-		wantErr := `migration failed: syntax error at or near "TABLEE" (column 37) in line 1: CREATE TABLE foo ` +
-			`(foo text); CREATE TABLEE bar (bar text); (details: pq: syntax error at or near "TABLEE")`
-		if err := d.Run(strings.NewReader("CREATE TABLE foo (foo text); CREATE TABLEE bar (bar text);")); err == nil {
+		wantErr := `migration failed: syntax error at or near "TABLEE" (column 9) in line 1:  CREATE TABLEE bar (bar text); (details: pq: syntax error at or near "TABLEE")`
+		if err := d.Run(strings.NewReader(`CREATE TABLE foo (foo text); CREATE TABLEE bar (bar text);`)); err == nil {
 			t.Fatal("expected err but got nil")
 		} else if err.Error() != wantErr {
 			t.Fatalf("expected '%s' but got '%s'", wantErr, err.Error())
@@ -269,7 +265,8 @@ func TestWithSchema(t *testing.T) {
 		}()
 
 		// create foobar schema
-		if err := d.Run(strings.NewReader("CREATE SCHEMA foobar AUTHORIZATION postgres")); err != nil {
+		if err := d.Run(strings.NewReader(
+			"CREATE SCHEMA foobar AUTHORIZATION postgres;")); err != nil {
 			t.Fatal(err)
 		}
 		if err := d.SetVersion(1, false); err != nil {
@@ -288,11 +285,11 @@ func TestWithSchema(t *testing.T) {
 			}
 		}()
 
-		version, _, err := d2.Version()
+		version, err := d2.Version()
 		if err != nil {
 			t.Fatal(err)
 		}
-		if version != database.NilVersion {
+		if version.Version != database.NilVersion {
 			t.Fatal("expected NilVersion")
 		}
 
@@ -300,90 +297,22 @@ func TestWithSchema(t *testing.T) {
 		if err := d2.SetVersion(2, false); err != nil {
 			t.Fatal(err)
 		}
-		version, _, err = d2.Version()
+		version, err = d2.Version()
 		if err != nil {
 			t.Fatal(err)
 		}
-		if version != 2 {
+		if version.Version != 2 {
 			t.Fatal("expected version 2")
 		}
 
 		// meanwhile, the public schema still has the other version
-		version, _, err = d.Version()
+		version, err = d.Version()
 		if err != nil {
 			t.Fatal(err)
 		}
-		if version != 1 {
+		if version.Version != 1 {
 			t.Fatal("expected version 2")
 		}
-	})
-}
-
-func TestMigrationTableOption(t *testing.T) {
-	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
-		ip, port, err := c.FirstPort()
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		addr := pgConnectionString(ip, port)
-		p := &Postgres{}
-		d, _ := p.Open(addr)
-		defer func() {
-			if err := d.Close(); err != nil {
-				t.Fatal(err)
-			}
-		}()
-
-		// create migrate schema
-		if err := d.Run(strings.NewReader("CREATE SCHEMA migrate AUTHORIZATION postgres")); err != nil {
-			t.Fatal(err)
-		}
-
-		// bad unquoted x-migrations-table parameter
-		wantErr := "x-migrations-table must be quoted (for instance '\"migrate\".\"schema_migrations\"') when x-migrations-table-quoted is enabled, current value is: migrate.schema_migrations"
-		d, err = p.Open(fmt.Sprintf("postgres://postgres:%s@%v:%v/postgres?sslmode=disable&x-migrations-table=migrate.schema_migrations&x-migrations-table-quoted=1",
-			pgPassword, ip, port))
-		if (err != nil) && (err.Error() != wantErr) {
-			t.Fatalf("expected '%s' but got '%s'", wantErr, err.Error())
-		}
-
-		// too many quoted x-migrations-table parameters
-		wantErr = "\"\"migrate\".\"schema_migrations\".\"toomany\"\" MigrationsTable contains too many dot characters"
-		d, err = p.Open(fmt.Sprintf("postgres://postgres:%s@%v:%v/postgres?sslmode=disable&x-migrations-table=\"migrate\".\"schema_migrations\".\"toomany\"&x-migrations-table-quoted=1",
-			pgPassword, ip, port))
-		if (err != nil) && (err.Error() != wantErr) {
-			t.Fatalf("expected '%s' but got '%s'", wantErr, err.Error())
-		}
-
-		// good quoted x-migrations-table parameter
-		d, err = p.Open(fmt.Sprintf("postgres://postgres:%s@%v:%v/postgres?sslmode=disable&x-migrations-table=\"migrate\".\"schema_migrations\"&x-migrations-table-quoted=1",
-			pgPassword, ip, port))
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		// make sure migrate.schema_migrations table exists
-		var exists bool
-		if err := d.(*Postgres).conn.QueryRowContext(context.Background(), "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'schema_migrations' AND table_schema = 'migrate')").Scan(&exists); err != nil {
-			t.Fatal(err)
-		}
-		if !exists {
-			t.Fatalf("expected table migrate.schema_migrations to exist")
-		}
-
-		d, err = p.Open(fmt.Sprintf("postgres://postgres:%s@%v:%v/postgres?sslmode=disable&x-migrations-table=migrate.schema_migrations",
-			pgPassword, ip, port))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := d.(*Postgres).conn.QueryRowContext(context.Background(), "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'migrate.schema_migrations' AND table_schema = (SELECT current_schema()))").Scan(&exists); err != nil {
-			t.Fatal(err)
-		}
-		if !exists {
-			t.Fatalf("expected table 'migrate.schema_migrations' to exist")
-		}
-
 	})
 }
 
@@ -411,14 +340,16 @@ func TestFailToCreateTableWithoutPermissions(t *testing.T) {
 			}
 		}()
 
-		// create user who is not the owner. Although we're concatenating strings in an sql statement it should be fine
-		// since this is a test environment and we're not expecting to the pgPassword to be malicious
+		// create user who is not the owner.
+		//Although we're concatenating strings in an sql statement it should be fine
+		// since this is a test environment and we're not expecting the pgPassword to
+		//be malicious
 		mustRun(t, d, []string{
-			"CREATE USER not_owner WITH ENCRYPTED PASSWORD '" + pgPassword + "'",
-			"CREATE SCHEMA barfoo AUTHORIZATION postgres",
-			"GRANT USAGE ON SCHEMA barfoo TO not_owner",
-			"REVOKE CREATE ON SCHEMA barfoo FROM PUBLIC",
-			"REVOKE CREATE ON SCHEMA barfoo FROM not_owner",
+			"CREATE USER not_owner WITH ENCRYPTED PASSWORD '" + pgPassword + "';",
+			"CREATE SCHEMA barfoo AUTHORIZATION postgres;",
+			"GRANT USAGE ON SCHEMA barfoo TO not_owner;",
+			"REVOKE CREATE ON SCHEMA barfoo FROM PUBLIC;",
+			"REVOKE CREATE ON SCHEMA barfoo FROM not_owner;",
 		})
 
 		// re-connect using that schema
@@ -435,18 +366,6 @@ func TestFailToCreateTableWithoutPermissions(t *testing.T) {
 		}()
 
 		var e *database.Error
-		if !errors.As(err, &e) || err == nil {
-			t.Fatal("Unexpected error, want permission denied error. Got: ", err)
-		}
-
-		if !strings.Contains(e.OrigErr.Error(), "permission denied for schema barfoo") {
-			t.Fatal(e)
-		}
-
-		// re-connect using that x-migrations-table and x-migrations-table-quoted
-		d2, err = p.Open(fmt.Sprintf("postgres://not_owner:%s@%v:%v/postgres?sslmode=disable&x-migrations-table=\"barfoo\".\"schema_migrations\"&x-migrations-table-quoted=1",
-			pgPassword, ip, port))
-
 		if !errors.As(err, &e) || err == nil {
 			t.Fatal("Unexpected error, want permission denied error. Got: ", err)
 		}
@@ -481,13 +400,15 @@ func TestCheckBeforeCreateTable(t *testing.T) {
 			}
 		}()
 
-		// create user who is not the owner. Although we're concatenating strings in an sql statement it should be fine
-		// since this is a test environment and we're not expecting to the pgPassword to be malicious
+		// create user who is not the owner.
+		// Although we're concatenating strings in an sql statement it should be fine
+		// since this is a test environment and we're not expecting to the pgPassword
+		//to be malicious
 		mustRun(t, d, []string{
-			"CREATE USER not_owner WITH ENCRYPTED PASSWORD '" + pgPassword + "'",
-			"CREATE SCHEMA barfoo AUTHORIZATION postgres",
-			"GRANT USAGE ON SCHEMA barfoo TO not_owner",
-			"GRANT CREATE ON SCHEMA barfoo TO not_owner",
+			"CREATE USER not_owner WITH ENCRYPTED PASSWORD '" + pgPassword + "';",
+			"CREATE SCHEMA barfoo AUTHORIZATION postgres;",
+			"GRANT USAGE ON SCHEMA barfoo TO not_owner;",
+			"GRANT CREATE ON SCHEMA barfoo TO not_owner;",
 		})
 
 		// re-connect using that schema
@@ -504,8 +425,8 @@ func TestCheckBeforeCreateTable(t *testing.T) {
 
 		// revoke privileges
 		mustRun(t, d, []string{
-			"REVOKE CREATE ON SCHEMA barfoo FROM PUBLIC",
-			"REVOKE CREATE ON SCHEMA barfoo FROM not_owner",
+			"REVOKE CREATE ON SCHEMA barfoo FROM PUBLIC;",
+			"REVOKE CREATE ON SCHEMA barfoo FROM not_owner;",
 		})
 
 		// re-connect using that schema
@@ -516,13 +437,12 @@ func TestCheckBeforeCreateTable(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		version, _, err := d3.Version()
-
+		version, err := d3.Version()
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		if version != database.NilVersion {
+		if version.Version != database.NilVersion {
 			t.Fatal("Unexpected version, want database.NilVersion. Got: ", version)
 		}
 
@@ -554,10 +474,12 @@ func TestParallelSchema(t *testing.T) {
 		}()
 
 		// create foo and bar schemas
-		if err := d.Run(strings.NewReader("CREATE SCHEMA foo AUTHORIZATION postgres")); err != nil {
+		if err := d.Run(strings.NewReader(
+			"CREATE SCHEMA foo AUTHORIZATION postgres;")); err != nil {
 			t.Fatal(err)
 		}
-		if err := d.Run(strings.NewReader("CREATE SCHEMA bar AUTHORIZATION postgres")); err != nil {
+		if err := d.Run(strings.NewReader(
+			"CREATE SCHEMA bar AUTHORIZATION postgres;")); err != nil {
 			t.Fatal(err)
 		}
 
