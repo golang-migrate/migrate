@@ -285,11 +285,11 @@ func TestWithSchema(t *testing.T) {
 			}
 		}()
 
-		version, _, err := d2.Version()
+		version, err := d2.Version()
 		if err != nil {
 			t.Fatal(err)
 		}
-		if version != database.NilVersion {
+		if version.Version != database.NilVersion {
 			t.Fatal("expected NilVersion")
 		}
 
@@ -297,20 +297,20 @@ func TestWithSchema(t *testing.T) {
 		if err := d2.SetVersion(2, false); err != nil {
 			t.Fatal(err)
 		}
-		version, _, err = d2.Version()
+		version, err = d2.Version()
 		if err != nil {
 			t.Fatal(err)
 		}
-		if version != 2 {
+		if version.Version != 2 {
 			t.Fatal("expected version 2")
 		}
 
 		// meanwhile, the public schema still has the other version
-		version, _, err = d.Version()
+		version, err = d.Version()
 		if err != nil {
 			t.Fatal(err)
 		}
-		if version != 1 {
+		if version.Version != 1 {
 			t.Fatal("expected version 2")
 		}
 	})
@@ -437,13 +437,12 @@ func TestCheckBeforeCreateTable(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		version, _, err := d3.Version()
-
+		version, err := d3.Version()
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		if version != database.NilVersion {
+		if version.Version != database.NilVersion {
 			t.Fatal("Unexpected version, want database.NilVersion. Got: ", version)
 		}
 

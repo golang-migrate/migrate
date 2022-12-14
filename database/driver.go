@@ -19,6 +19,13 @@ var (
 
 const NilVersion int = -1
 
+type Version struct {
+	Version int
+	Dirty   bool
+	Info    string
+	Schema  string
+}
+
 var driversMu sync.RWMutex
 var drivers = make(map[string]Driver)
 
@@ -68,10 +75,9 @@ type Driver interface {
 	// SetFailed sets the migration as failed.
 	// arguments are the
 	//  version: to find the version row to update
-	//  info: information to set about the failure, possibly
 	//  the version and source
 	//  error: the error to
-	SetFailed(version int, info string, err error) error
+	SetFailed(version int, err error) error
 
 	// SetVersion saves version and dirty state.
 	// Migrate will call this function before and after each call to Run.
@@ -81,7 +87,7 @@ type Driver interface {
 	// Version returns the currently active version and if the database is dirty.
 	// When no migration has been applied, it must return version -1.
 	// Dirty means, a previous migration failed and user interaction is required.
-	Version() (version int, dirty bool, err error)
+	Version() (version *Version, err error)
 
 	// Drop deletes everything in the database.
 	// Note that this is a breaking action, a new call to Open() is necessary to

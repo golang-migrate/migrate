@@ -29,11 +29,11 @@ func Test(t *testing.T, d database.Driver, migration []byte) {
 }
 
 func TestNilVersion(t *testing.T, d database.Driver) {
-	v, _, err := d.Version()
+	v, err := d.Version()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if v != database.NilVersion {
+	if v.Version != database.NilVersion {
 		t.Fatalf("Version: expected version to be NilVersion (-1), got %v", v)
 	}
 }
@@ -176,16 +176,16 @@ func TestSetVersion(t *testing.T, d database.Driver) {
 			if err != tc.expectedErr {
 				t.Fatal(tc.name, "Got unexpected error:", err, "!=", tc.expectedErr)
 			}
-			v, dirty, readErr := d.Version()
+			v, readErr := d.Version()
 			if readErr != tc.expectedReadErr {
 				t.Fatal(tc.name, "Got unexpected error:", readErr, "!=",
 					tc.expectedReadErr)
 			}
-			if v != tc.expectedVersion {
+			if v.Version != tc.expectedVersion {
 				t.Error(tc.name, "Got unexpected version:", v, "!=", tc.expectedVersion)
 			}
-			if dirty != tc.expectedDirty {
-				t.Error(tc.name, "Got unexpected dirty value:", dirty, "!=", tc.dirty)
+			if v.Dirty != tc.expectedDirty {
+				t.Error(tc.name, "Got unexpected dirty value:", v.Dirty, "!=", tc.dirty)
 			}
 		})
 	}

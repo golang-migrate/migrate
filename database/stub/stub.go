@@ -79,8 +79,8 @@ func (s *Stub) SetVersion(version int, state bool) error {
 	return nil
 }
 
-func (s *Stub) Version() (version int, dirty bool, err error) {
-	return s.CurrentVersion, s.IsDirty, nil
+func (s *Stub) Version() (*database.Version, error) {
+	return &database.Version{Version: s.CurrentVersion, Dirty: s.IsDirty, Info: "", Schema: ""}, nil
 }
 
 const DROP = "DROP"
@@ -92,7 +92,7 @@ func (s *Stub) Drop() error {
 	return nil
 }
 
-func (s *Stub) SetFailed(version int, info string, err error) error {
+func (s *Stub) SetFailed(version int, err error) error {
 	return nil
 }
 

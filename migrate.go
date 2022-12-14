@@ -49,10 +49,13 @@ func (e ErrShortLimit) Error() string {
 
 type ErrDirty struct {
 	Version int
+	Info    string
+	Schema  string
 }
 
 func (e ErrDirty) Error() string {
-	return fmt.Sprintf("Dirty database version %v. Fix and force version.", e.Version)
+	return fmt.Sprintf("Dirty database version %v. Schema %s. Fix and force version",
+		e.Version, e.Schema)
 }
 
 type ErrVersionNotFound struct {
@@ -230,17 +233,17 @@ func (m *Migrate) Migrate(version uint) error {
 		return err
 	}
 
-	curVersion, dirty, err := m.databaseDrv.Version()
+	curVersion, err := m.databaseDrv.Version()
 	if err != nil {
 		return m.unlockErr(err)
 	}
 
-	if dirty {
-		return m.unlockErr(ErrDirty{curVersion})
+	if curVersion.Dirty {
+		return m.unlockErr(ErrDirty{curVersion.Version, curVersion.Info, curVersion.Schema})
 	}
 
 	ret := make(chan interface{}, m.PrefetchMigrations)
-	go m.read(curVersion, int(version), ret)
+	go m.read(curVersion.Version, int(version), ret)
 
 	return m.unlockErr(m.runMigrations(ret))
 }
@@ -256,21 +259,21 @@ func (m *Migrate) Steps(n int) error {
 		return err
 	}
 
-	curVersion, dirty, err := m.databaseDrv.Version()
+	curVersion, err := m.databaseDrv.Version()
 	if err != nil {
 		return m.unlockErr(err)
 	}
 
-	if dirty {
-		return m.unlockErr(ErrDirty{curVersion})
+	if curVersion.Dirty {
+		return m.unlockErr(ErrDirty{curVersion.Version, curVersion.Info, curVersion.Schema})
 	}
 
 	ret := make(chan interface{}, m.PrefetchMigrations)
 
 	if n > 0 {
-		go m.readUp(curVersion, n, ret)
+		go m.readUp(curVersion.Version, n, ret)
 	} else {
-		go m.readDown(curVersion, -n, ret)
+		go m.readDown(curVersion.Version, -n, ret)
 	}
 
 	return m.unlockErr(m.runMigrations(ret))
@@ -283,18 +286,18 @@ func (m *Migrate) Up() error {
 		return err
 	}
 
-	curVersion, dirty, err := m.databaseDrv.Version()
+	curVersion, err := m.databaseDrv.Version()
 	if err != nil {
 		return m.unlockErr(err)
 	}
 
-	if dirty {
-		return m.unlockErr(ErrDirty{curVersion})
+	if curVersion.Dirty {
+		return m.unlockErr(ErrDirty{curVersion.Version, curVersion.Info, curVersion.Schema})
 	}
 
 	ret := make(chan interface{}, m.PrefetchMigrations)
 
-	go m.readUp(curVersion, -1, ret)
+	go m.readUp(curVersion.Version, -1, ret)
 	return m.unlockErr(m.runMigrations(ret))
 }
 
@@ -305,17 +308,17 @@ func (m *Migrate) Down() error {
 		return err
 	}
 
-	curVersion, dirty, err := m.databaseDrv.Version()
+	curVersion, err := m.databaseDrv.Version()
 	if err != nil {
 		return m.unlockErr(err)
 	}
 
-	if dirty {
-		return m.unlockErr(ErrDirty{curVersion})
+	if curVersion.Dirty {
+		return m.unlockErr(ErrDirty{curVersion.Version, curVersion.Info, curVersion.Schema})
 	}
 
 	ret := make(chan interface{}, m.PrefetchMigrations)
-	go m.readDown(curVersion, -1, ret)
+	go m.readDown(curVersion.Version, -1, ret)
 	return m.unlockErr(m.runMigrations(ret))
 }
 
@@ -343,13 +346,13 @@ func (m *Migrate) Run(migration ...*Migration) error {
 		return err
 	}
 
-	curVersion, dirty, err := m.databaseDrv.Version()
+	curVersion, err := m.databaseDrv.Version()
 	if err != nil {
 		return m.unlockErr(err)
 	}
 
-	if dirty {
-		return m.unlockErr(ErrDirty{curVersion})
+	if curVersion.Dirty {
+		return m.unlockErr(ErrDirty{curVersion.Version, curVersion.Info, curVersion.Schema})
 	}
 
 	ret := make(chan interface{}, m.PrefetchMigrations)
@@ -396,17 +399,17 @@ func (m *Migrate) Force(version int) error {
 
 // Version returns the currently active migration version.
 // If no migration has been applied, yet, it will return ErrNilVersion.
-func (m *Migrate) Version() (version uint, dirty bool, err error) {
-	v, d, err := m.databaseDrv.Version()
+func (m *Migrate) Version() (version *database.Version, err error) {
+	v, err := m.databaseDrv.Version()
 	if err != nil {
-		return 0, false, err
+		return nil, err
 	}
 
-	if v == database.NilVersion {
-		return 0, false, ErrNilVersion
+	if v.Version == database.NilVersion {
+		return v, ErrNilVersion
 	}
 
-	return suint(v), d, nil
+	return v, nil
 }
 
 // read reads either up or down migrations from source `from` to `to`.
@@ -759,7 +762,6 @@ func (m *Migrate) runMigrations(ret <-chan interface{}) error {
 				m.logVerbosePrintf("Read and execute %v\n", migr.LogString())
 				if err := m.databaseDrv.Run(migr.BufferedBody); err != nil {
 					if err := m.databaseDrv.SetFailed(migr.TargetVersion,
-						fmt.Sprintf("%+v", err),
 						err); err != nil {
 						m.logErr(err)
 					}

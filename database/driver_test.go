@@ -44,15 +44,15 @@ func (m *mockDriver) SetVersion(_ int, _ bool) error {
 	return nil
 }
 
-func (m *mockDriver) Version() (_ int, _ bool, err error) {
-	return 0, false, nil
+func (m *mockDriver) Version() (*Version, error) {
+	return &Version{Version: 0, Dirty: false, Info: "", Schema: ""}, nil
 }
 
 func (m *mockDriver) Drop() error {
 	return nil
 }
 
-func (m *mockDriver) SetFailed(_ int, _ string, _ error) error {
+func (m *mockDriver) SetFailed(_ int, _ error) error {
 	return nil
 }
 

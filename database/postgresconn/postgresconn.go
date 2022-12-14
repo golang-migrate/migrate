@@ -19,7 +19,7 @@ import (
 
 	"github.com/getoutreach/migrate/v4/database"
 	"github.com/getoutreach/migrate/v4/database/multistmt"
-	multierror "github.com/hashicorp/go-multierror"
+	"github.com/hashicorp/go-multierror"
 	"github.com/lib/pq"
 	"github.com/pkg/errors"
 )
@@ -120,8 +120,7 @@ func WithConn(ctx context.Context, conn *sql.Conn, config *Config) (database.Dri
 	}
 
 	px := &Postgres{
-		conn: conn,
-		//db:     instance,
+		conn:   conn,
 		config: config,
 	}
 
@@ -140,7 +139,6 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 		return nil, err
 	}
 
-	fmt.Printf("%s\n", purl)
 	db, err := sql.Open("postgres", migrate.FilterCustomQuery(purl).String())
 	if err != nil {
 		return nil, err
@@ -323,25 +321,53 @@ func (p *Postgres) SetVersion(version int, dirty bool) error {
 	return nil
 }
 
-func (p *Postgres) Version() (version int, dirty bool, err error) {
-	query := fmt.Sprintf(`SELECT version, dirty FROM %q.%q`+
+func (p *Postgres) Version() (*database.Version, error) {
+	query := fmt.Sprintf(`SELECT version, dirty, info, current_schema() FROM %q.%q`+
 		` ORDER BY created_at desc LIMIT 1`,
 		p.config.migrationsSchemaName, p.config.migrationsTableName)
-	err = p.conn.QueryRowContext(context.Background(), query).Scan(&version, &dirty)
+
+	var (
+		version       int
+		dirty         bool
+		info          string
+		infoStr       sql.NullString
+		currentSchema string
+	)
+	err := p.conn.QueryRowContext(context.Background(), query).Scan(&version, &dirty,
+		&infoStr, &currentSchema)
+	if infoStr.Valid {
+		info = infoStr.String
+	}
 	switch {
 	case err == sql.ErrNoRows:
-		return database.NilVersion, false, nil
-
+		return &database.Version{
+			Version: database.NilVersion,
+			Dirty:   false,
+			Info:    info,
+			Schema:  currentSchema}, nil
 	case err != nil:
 		if e, ok := err.(*pq.Error); ok {
 			if e.Code.Name() == "undefined_table" {
-				return database.NilVersion, false, nil
+				return &database.Version{
+						Version: database.NilVersion,
+						Dirty:   false,
+						Info:    info,
+						Schema:  currentSchema},
+					&database.Error{OrigErr: e, Query: []byte(query)}
 			}
 		}
-		return 0, false, &database.Error{OrigErr: err, Query: []byte(query)}
-
+		return &database.Version{
+				Version: 0,
+				Dirty:   false,
+				Info:    info,
+				Schema:  currentSchema},
+			&database.Error{OrigErr: err, Query: []byte(query)}
 	default:
-		return version, dirty, nil
+		return &database.Version{
+			Version: version,
+			Dirty:   dirty,
+			Info:    info,
+			Schema:  currentSchema}, nil
 	}
 }
 
@@ -526,11 +552,11 @@ AND format_type(a.atttypid, a.atttypmod) = 'bigint'`, tableName, primaryKeyName)
 }
 
 // SetFailed set the current migration to failed and record the failure in the database
-func (p *Postgres) SetFailed(version int, info string, err error) error {
+func (p *Postgres) SetFailed(version int, err error) error {
 	ctx := context.Background()
 	stmt := fmt.Sprintf(`UPDATE %q.%q SET info = $1 where version = $2`,
 		p.config.migrationsSchemaName, p.config.migrationsTableName)
-	if _, err := p.conn.ExecContext(ctx, stmt, info, version); err != nil {
+	if _, err := p.conn.ExecContext(ctx, stmt, fmt.Sprintf("%+v", err), version); err != nil {
 		return err
 	}
 	return nil
