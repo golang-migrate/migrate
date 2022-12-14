@@ -302,7 +302,6 @@ func (p *Postgres) SetVersion(version int, dirty bool) error {
 	// Also re-write the schema version for nil dirty versions to prevent
 	// empty schema version for failed down migration on the first migration
 	// See: https://github.com/getoutreach/migrate/issues/330
-	//if version >= 0 || (version == database.NilVersion && dirty) {
 	query := fmt.Sprintf(`INSERT INTO %q.%q`+
 		` (version, dirty, created_at) VALUES ($1, $2, now())`,
 		p.config.migrationsSchemaName, p.config.migrationsTableName)
