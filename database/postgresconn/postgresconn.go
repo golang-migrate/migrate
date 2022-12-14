@@ -58,8 +58,7 @@ type Config struct {
 
 type Postgres struct {
 	// Locking and unlocking need to use the same connection
-	conn *sql.Conn
-	//db       *sql.DB
+	conn     *sql.Conn
 	isLocked atomic.Bool
 	// Open and WithConn need to guarantee that config is never nil
 	config *Config
@@ -294,24 +293,44 @@ func runesLastIndex(input []rune, target rune) int {
 }
 
 func (p *Postgres) SetVersion(version int, dirty bool) error {
-	tx, err := p.conn.BeginTx(context.Background(), &sql.TxOptions{})
+	ctx := context.Background()
+	tx, err := p.conn.BeginTx(ctx, &sql.TxOptions{})
 	if err != nil {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
 	}
 
-	// Also re-write the schema version for nil dirty versions to prevent
-	// empty schema version for failed down migration on the first migration
-	// See: https://github.com/getoutreach/migrate/issues/330
-	query := fmt.Sprintf(`INSERT INTO %q.%q`+
-		` (version, dirty, created_at) VALUES ($1, $2, now())`,
-		p.config.migrationsSchemaName, p.config.migrationsTableName)
-	if _, err := tx.Exec(query, version, dirty); err != nil {
-		if errRollback := tx.Rollback(); errRollback != nil {
-			err = multierror.Append(err, errRollback)
+	// check for in progress version, if it exists use the in-progress
+	// version to record the dirty, info etc. values.
+	row := tx.QueryRowContext(ctx,
+		fmt.Sprintf(`select id from %q.%q where version = $1`,
+			p.config.migrationsSchemaName, p.config.migrationsTableName), version)
+	var id int64
+	if err := row.Scan(&id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			// Also re-write the schema version for nil dirty versions to prevent
+			// empty schema version for failed down migration on the first migration
+			// See: https://github.com/getoutreach/migrate/issues/330
+			stmt := fmt.Sprintf(`INSERT INTO %q.%q`+
+				` (version, dirty, created_at) VALUES ($1, $2, now())`,
+				p.config.migrationsSchemaName, p.config.migrationsTableName)
+			if _, err := tx.ExecContext(ctx, stmt, version, dirty); err != nil {
+				if errRollback := tx.Rollback(); errRollback != nil {
+					err = multierror.Append(err, errRollback)
+				}
+				return &database.Error{OrigErr: err, Query: []byte(stmt)}
+			}
 		}
-		return &database.Error{OrigErr: err, Query: []byte(query)}
+	} else {
+		stmt := fmt.Sprintf(`update %q.%q set dirty = $1, updated_at = now() where id = $2`,
+			p.config.migrationsSchemaName,
+			p.config.migrationsTableName)
+		if _, err := tx.ExecContext(ctx, stmt, dirty, id); err != nil {
+			if errRollback := tx.Rollback(); errRollback != nil {
+				err = multierror.Append(err, errRollback)
+			}
+			return &database.Error{OrigErr: err, Query: []byte(stmt)}
+		}
 	}
-	//}
 
 	if err := tx.Commit(); err != nil {
 		return &database.Error{OrigErr: err, Err: "transaction commit failed"}
@@ -321,7 +340,7 @@ func (p *Postgres) SetVersion(version int, dirty bool) error {
 }
 
 func (p *Postgres) Version() (*database.Version, error) {
-	query := fmt.Sprintf(`SELECT version, dirty, info, current_schema() FROM %q.%q`+
+	stmt := fmt.Sprintf(`SELECT version, dirty, info, current_schema() FROM %q.%q`+
 		` ORDER BY created_at desc LIMIT 1`,
 		p.config.migrationsSchemaName, p.config.migrationsTableName)
 
@@ -332,7 +351,7 @@ func (p *Postgres) Version() (*database.Version, error) {
 		infoStr       sql.NullString
 		currentSchema string
 	)
-	err := p.conn.QueryRowContext(context.Background(), query).Scan(&version, &dirty,
+	err := p.conn.QueryRowContext(context.Background(), stmt).Scan(&version, &dirty,
 		&infoStr, &currentSchema)
 	if infoStr.Valid {
 		info = infoStr.String
@@ -352,7 +371,7 @@ func (p *Postgres) Version() (*database.Version, error) {
 						Dirty:   false,
 						Info:    info,
 						Schema:  currentSchema},
-					&database.Error{OrigErr: e, Query: []byte(query)}
+					&database.Error{OrigErr: e, Query: []byte(stmt)}
 			}
 		}
 		return &database.Version{
@@ -360,7 +379,7 @@ func (p *Postgres) Version() (*database.Version, error) {
 				Dirty:   false,
 				Info:    info,
 				Schema:  currentSchema},
-			&database.Error{OrigErr: err, Query: []byte(query)}
+			&database.Error{OrigErr: err, Query: []byte(stmt)}
 	default:
 		return &database.Version{
 			Version: version,
@@ -372,10 +391,10 @@ func (p *Postgres) Version() (*database.Version, error) {
 
 func (p *Postgres) Drop() (err error) {
 	// select all tables in current schema
-	query := `SELECT table_name FROM information_schema.tables WHERE table_schema=(SELECT current_schema()) AND table_type='BASE TABLE'`
-	tables, err := p.conn.QueryContext(context.Background(), query)
+	stmt := `SELECT table_name FROM information_schema.tables WHERE table_schema=(SELECT current_schema()) AND table_type='BASE TABLE'`
+	tables, err := p.conn.QueryContext(context.Background(), stmt)
 	if err != nil {
-		return &database.Error{OrigErr: err, Query: []byte(query)}
+		return &database.Error{OrigErr: err, Query: []byte(stmt)}
 	}
 	defer func() {
 		if errClose := tables.Close(); errClose != nil {
@@ -395,15 +414,15 @@ func (p *Postgres) Drop() (err error) {
 		}
 	}
 	if err := tables.Err(); err != nil {
-		return &database.Error{OrigErr: err, Query: []byte(query)}
+		return &database.Error{OrigErr: err, Query: []byte(stmt)}
 	}
 
 	if len(tableNames) > 0 {
 		// delete one by one ...
 		for _, t := range tableNames {
-			query = `DROP TABLE IF EXISTS ` + pq.QuoteIdentifier(t) + ` CASCADE`
-			if _, err := p.conn.ExecContext(context.Background(), query); err != nil {
-				return &database.Error{OrigErr: err, Query: []byte(query)}
+			stmt = `DROP TABLE IF EXISTS ` + pq.QuoteIdentifier(t) + ` CASCADE`
+			if _, err := p.conn.ExecContext(context.Background(), stmt); err != nil {
+				return &database.Error{OrigErr: err, Query: []byte(stmt)}
 			}
 		}
 	}
@@ -433,40 +452,41 @@ func (p *Postgres) ensureVersionTable() (err error) {
 	// users to also check the current version of the schema. Previously, even if `MigrationsTable` existed, the
 	// `CREATE TABLE IF NOT EXISTS...` query would fail because the user does not have the CREATE permission.
 	// Taken from https://github.com/mattes/migrate/blob/master/database/postgres/postgres.go#L258
-	query := `SELECT COUNT(1) FROM information_schema.tables WHERE table_schema = $1 AND table_name = $2 LIMIT 1`
-	row := p.conn.QueryRowContext(context.Background(), query, p.config.migrationsSchemaName, p.config.migrationsTableName)
+	stmt := `SELECT COUNT(1) FROM information_schema.tables WHERE table_schema = $1 AND table_name = $2 LIMIT 1`
+	row := p.conn.QueryRowContext(context.Background(), stmt, p.config.migrationsSchemaName, p.config.migrationsTableName)
 
 	var count int
 	err = row.Scan(&count)
 	if err != nil {
-		return &database.Error{OrigErr: err, Query: []byte(query)}
+		return &database.Error{OrigErr: err, Query: []byte(stmt)}
 	}
 
 	if count == 1 {
 		return nil
 	}
 
-	query = fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %q.%q`+
+	stmt = fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %q.%q`+
 		` (version bigint not null, dirty boolean not null)`,
 		p.config.migrationsSchemaName, p.config.migrationsTableName)
-	if _, err = p.conn.ExecContext(context.Background(), query); err != nil {
-		return &database.Error{OrigErr: err, Query: []byte(query)}
+	if _, err = p.conn.ExecContext(context.Background(), stmt); err != nil {
+		return &database.Error{OrigErr: err, Query: []byte(stmt)}
 	}
 
 	// add the created_at and info columns to track history and failures of migrations
-	query = fmt.Sprintf(`ALTER TABLE %q.%q `+
+	stmt = fmt.Sprintf(`ALTER TABLE %q.%q `+
 		`ADD COLUMN IF NOT EXISTS created_at timestamp with time zone NULL, `+
+		`ADD COLUMN IF NOT EXISTS updated_at timestamp with time zone NULL, `+
 		`ADD COLUMN IF NOT EXISTS info text NULL`,
 		p.config.migrationsSchemaName, p.config.migrationsTableName)
-	if _, err = p.conn.ExecContext(context.Background(), query); err != nil {
-		return &database.Error{OrigErr: err, Query: []byte(query)}
+	if _, err = p.conn.ExecContext(context.Background(), stmt); err != nil {
+		return &database.Error{OrigErr: err, Query: []byte(stmt)}
 	}
 
 	// adds index to the created_at to ensure queries ordering by created_at are snappy
-	query = fmt.Sprintf(`CREATE INDEX IF NOT EXISTS idx_on_created_at on %q.%q (created_at)`,
+	stmt = fmt.Sprintf(`CREATE INDEX IF NOT EXISTS idx_on_created_at on %q.%q (created_at)`,
 		p.config.migrationsSchemaName, p.config.migrationsTableName)
-	if _, err = p.conn.ExecContext(context.Background(), query); err != nil {
-		return &database.Error{OrigErr: err, Query: []byte(query)}
+	if _, err = p.conn.ExecContext(context.Background(), stmt); err != nil {
+		return &database.Error{OrigErr: err, Query: []byte(stmt)}
 	}
 
 	// ensure the new 'id' synthetic primary key exists
