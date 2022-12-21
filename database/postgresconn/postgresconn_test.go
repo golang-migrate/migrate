@@ -8,13 +8,14 @@ import (
 	sqldriver "database/sql/driver"
 	"errors"
 	"fmt"
-	"github.com/getoutreach/migrate/v4"
 	"io"
 	"log"
 	"strconv"
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/getoutreach/migrate/v4"
 
 	"github.com/dhui/dktest"
 
@@ -373,84 +374,6 @@ func TestFailToCreateTableWithoutPermissions(t *testing.T) {
 		if !strings.Contains(e.OrigErr.Error(), "permission denied for schema barfoo") {
 			t.Fatal(e)
 		}
-	})
-}
-
-func TestCheckBeforeCreateTable(t *testing.T) {
-	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
-		ip, port, err := c.FirstPort()
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		addr := pgConnectionString(ip, port)
-
-		// Check that opening the postgres connection returns NilVersion
-		p := &Postgres{}
-
-		d, err := p.Open(addr)
-
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		defer func() {
-			if err := d.Close(); err != nil {
-				t.Error(err)
-			}
-		}()
-
-		// create user who is not the owner.
-		// Although we're concatenating strings in an sql statement it should be fine
-		// since this is a test environment and we're not expecting to the pgPassword
-		//to be malicious
-		mustRun(t, d, []string{
-			"CREATE USER not_owner WITH ENCRYPTED PASSWORD '" + pgPassword + "';",
-			"CREATE SCHEMA barfoo AUTHORIZATION postgres;",
-			"GRANT USAGE ON SCHEMA barfoo TO not_owner;",
-			"GRANT CREATE ON SCHEMA barfoo TO not_owner;",
-		})
-
-		// re-connect using that schema
-		d2, err := p.Open(fmt.Sprintf("postgres://not_owner:%s@%v:%v/postgres?sslmode=disable&search_path=barfoo",
-			pgPassword, ip, port))
-
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if err := d2.Close(); err != nil {
-			t.Fatal(err)
-		}
-
-		// revoke privileges
-		mustRun(t, d, []string{
-			"REVOKE CREATE ON SCHEMA barfoo FROM PUBLIC;",
-			"REVOKE CREATE ON SCHEMA barfoo FROM not_owner;",
-		})
-
-		// re-connect using that schema
-		d3, err := p.Open(fmt.Sprintf("postgres://not_owner:%s@%v:%v/postgres?sslmode=disable&search_path=barfoo",
-			pgPassword, ip, port))
-
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		version, err := d3.Version()
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if version.Version != database.NilVersion {
-			t.Fatal("Unexpected version, want database.NilVersion. Got: ", version)
-		}
-
-		defer func() {
-			if err := d3.Close(); err != nil {
-				t.Fatal(err)
-			}
-		}()
 	})
 }
 
