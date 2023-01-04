@@ -342,7 +342,7 @@ func (p *Postgres) SetVersion(version int, dirty bool) error {
 
 func (p *Postgres) Version() (*database.Version, error) {
 	stmt := fmt.Sprintf(`SELECT version, dirty, info, current_schema() FROM %q.%q`+
-		` ORDER BY created_at desc LIMIT 1`,
+		` ORDER BY created_at desc nulls last LIMIT 1`,
 		p.config.migrationsSchemaName, p.config.migrationsTableName)
 
 	var (
