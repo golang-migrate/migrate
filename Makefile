@@ -16,7 +16,10 @@ test:
 
 test-with-flags:
 	@echo SOURCE: $(SOURCE)
-	@go test $(TEST_FLAGS) ./...
+	# avoid heap corruption with apple M1: https://github.com/golang/go/issues/49138
+	# malloc: Heap corruption detected, free list is damaged at 0x60000306efe0
+	# run make like `MallocNanoZone=0 make test`
+	@MallocNanoZone=0 go test $(TEST_FLAGS) ./...
 
 
 kill-orphaned-docker-containers:
