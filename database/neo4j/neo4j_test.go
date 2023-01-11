@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/dhui/dktest"
-	"github.com/neo4j/neo4j-go-driver/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
 
 	"github.com/golang-migrate/migrate/v4"
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
@@ -20,10 +20,12 @@ var (
 	opts = dktest.Options{PortRequired: true, ReadyFunc: isReady,
 		Env: map[string]string{"NEO4J_AUTH": "neo4j/migratetest", "NEO4J_ACCEPT_LICENSE_AGREEMENT": "yes"}}
 	specs = []dktesting.ContainerSpec{
-		{ImageName: "neo4j:4.0", Options: opts},
-		{ImageName: "neo4j:4.0-enterprise", Options: opts},
-		{ImageName: "neo4j:3.5", Options: opts},
-		{ImageName: "neo4j:3.5-enterprise", Options: opts},
+		{ImageName: "neo4j:5-community", Options: opts},
+		//{ImageName: "neo4j:5-enterprise", Options: opts},
+		{ImageName: "neo4j:4.4-community", Options: opts},
+		//{ImageName: "neo4j:4.4-enterprise", Options: opts},
+		//{ImageName: "neo4j:3.5-community", Options: opts},
+		//{ImageName: "neo4j:3.5-enterprise", Options: opts},
 	}
 )
 
@@ -41,7 +43,6 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 		neoConnectionString(ip, port),
 		neo4j.BasicAuth("neo4j", "migratetest", ""),
 		func(config *neo4j.Config) {
-			config.Encrypted = false
 		})
 	if err != nil {
 		return false
@@ -51,7 +52,7 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 			log.Println("close error:", err)
 		}
 	}()
-	session, err := driver.Session(neo4j.AccessModeRead)
+	session := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	if err != nil {
 		return false
 	}
