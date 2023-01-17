@@ -238,8 +238,8 @@ func (p *Snowflake) SetVersion(version int, dirty bool) error {
 	// empty schema version for failed down migration on the first migration
 	// See: https://github.com/golang-migrate/migrate/issues/330
 	if version >= 0 || (version == database.NilVersion && dirty) {
-		query := fmt.Sprintf(`INSERT INTO "%s" (version, dirty) VALUES (?, ?)`, p.config.MigrationsTable)
-		if _, err := tx.Exec(query, strconv.FormatInt(int64(version), 10), strconv.FormatBool(dirty)); err != nil {
+		query := fmt.Sprintf(`INSERT INTO "%s" (version, dirty) VALUES (%v, %v)`, p.config.MigrationsTable, strconv.FormatInt(int64(version), 10), strconv.FormatBool(dirty))
+		if _, err := tx.Exec(query); err != nil {
 			if errRollback := tx.Rollback(); errRollback != nil {
 				err = multierror.Append(err, errRollback)
 			}
