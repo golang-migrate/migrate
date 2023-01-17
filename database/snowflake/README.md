@@ -7,6 +7,8 @@
 Example URL is as follows:
 `snowflake://user:password@accountname/schema/dbname?role=SYSADMIN&warehouse=compute_wh`
 
+- `accountname`: <account_locator>.<region>.<cloud_plotform> (e.g. AB12345.ap-northeast-1.aws)
+
 | URL Query  | WithInstance Config | Description | Optional | Default |
 |------------|---------------------|-------------|----------|---------|
 | `x-migrations-table` | `MigrationsTable` | Name of the migrations table | yes | schema_migrations |
