@@ -167,7 +167,7 @@ func (ch *ClickHouse) Version() (int, bool, error) {
 	var (
 		version int
 		dirty   uint8
-		query   = "SELECT version, dirty FROM `" + ch.config.MigrationsTable + "` ORDER BY sequence DESC LIMIT 1"
+		query   = "SELECT version, dirty FROM default.`" + ch.config.MigrationsTable + "` ORDER BY sequence DESC LIMIT 1"
 	)
 	if err := ch.conn.QueryRow(query).Scan(&version, &dirty); err != nil {
 		if err == sql.ErrNoRows {
@@ -192,7 +192,7 @@ func (ch *ClickHouse) SetVersion(version int, dirty bool) error {
 		return err
 	}
 
-	query := "INSERT INTO " + ch.config.MigrationsTable + " (version, dirty, sequence) VALUES (?, ?, ?)"
+	query := "INSERT INTO default." + ch.config.MigrationsTable + " (version, dirty, sequence) VALUES (?, ?, ?)"
 	if _, err := tx.Exec(query, version, bool(dirty), time.Now().UnixNano()); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
