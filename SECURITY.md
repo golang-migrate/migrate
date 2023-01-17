@@ -11,9 +11,6 @@
 
 ## Reporting a Vulnerability
 
-For a [full disclosure](https://en.wikipedia.org/wiki/Full_disclosure_(computer_security)), create a GitHub issue.
-
-For a [coordinated disclosure](https://en.wikipedia.org/wiki/Coordinated_vulnerability_disclosure), email golangmigrate@proton.me and then create a GitHub issue notifying the maintainers that there's a new vulnerability (without the details).
-We won't be checking that email address regularly so it's important to also create a GitHub issue to notify us.
+We prefer [coordinated disclosures](https://en.wikipedia.org/wiki/Coordinated_vulnerability_disclosure). To start one, create a GitHub security advisory following [these instructions](https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing/privately-reporting-a-security-vulnerability)
 
 Please suggest potential impact and urgency in your reports.
