@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"io"
+
 	nurl "net/url"
 	"strconv"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"go.uber.org/atomic"
 
 	"github.com/golang-migrate/migrate/v4/database"
+	iurl "github.com/golang-migrate/migrate/v4/internal/url"
 	"github.com/hashicorp/go-multierror"
 	"github.com/lib/pq"
 	sf "github.com/snowflakedb/gosnowflake"
@@ -69,12 +71,7 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		config.DatabaseName = databaseName
 	}
 
-	if len(config.MigrationsTable) == 0 {
-		config.MigrationsTable = DefaultMigrationsTable
-	}
-
 	conn, err := instance.Conn(context.Background())
-
 	if err != nil {
 		return nil, err
 	}
@@ -98,35 +95,26 @@ func (p *Snowflake) Open(url string) (database.Driver, error) {
 		return nil, err
 	}
 
-	password, isPasswordSet := purl.User.Password()
-	if !isPasswordSet {
-		return nil, ErrNoPassword
+	migrationsTable := purl.Query().Get("x-migrations-table")
+	if migrationsTable == "" {
+		migrationsTable = DefaultMigrationsTable
+	}
+	fmt.Println(migrationsTable)
+
+	scheme, err := iurl.SchemeFromURL(url)
+	if err != nil {
+		return nil, err
 	}
 
-	splitPath := strings.Split(purl.Path, "/")
-	if len(splitPath) < 3 {
-		return nil, ErrNoSchemaOrDatabase
-	}
+	sfURL := url[len(scheme)+3:]
 
-	database := splitPath[2]
-	if len(database) == 0 {
-		return nil, ErrNoDatabaseName
+	config, err := sf.ParseDSN(sfURL)
+	if err != nil {
+		return nil, err
 	}
+	fmt.Printf("%+v\n", config)
 
-	schema := splitPath[1]
-	if len(schema) == 0 {
-		return nil, ErrNoSchema
-	}
-
-	cfg := &sf.Config{
-		Account:  purl.Host,
-		User:     purl.User.Username(),
-		Password: password,
-		Database: database,
-		Schema:   schema,
-	}
-
-	dsn, err := sf.DSN(cfg)
+	dsn, err := sf.DSN(config)
 	if err != nil {
 		return nil, err
 	}
@@ -136,11 +124,9 @@ func (p *Snowflake) Open(url string) (database.Driver, error) {
 		return nil, err
 	}
 
-	migrationsTable := purl.Query().Get("x-migrations-table")
-
 	px, err := WithInstance(db, &Config{
-		DatabaseName:    database,
 		MigrationsTable: migrationsTable,
+		DatabaseName:    config.Database,
 	})
 	if err != nil {
 		return nil, err
@@ -177,9 +163,10 @@ func (p *Snowflake) Run(migration io.Reader) error {
 	if err != nil {
 		return err
 	}
+	fmt.Println(migr)
 
 	// run migration
-	query := string(migr[:])
+	query := string(migr)
 	if _, err := p.conn.ExecContext(context.Background(), query); err != nil {
 		if pgErr, ok := err.(*pq.Error); ok {
 			var line uint
