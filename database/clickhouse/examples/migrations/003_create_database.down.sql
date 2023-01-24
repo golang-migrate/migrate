@@ -1,0 +1,10 @@
+DROP TABLE IF EXISTS driver_ratings ON CLUSTER cluster_1;
+DROP TABLE IF EXISTS user_ratings ON CLUSTER cluster_1;
+DROP TABLE IF EXISTS orders ON CLUSTER cluster_1;
+DROP TABLE IF EXISTS driver_ratings_queue ON CLUSTER cluster_1;
+DROP TABLE IF EXISTS user_ratings_queue ON CLUSTER cluster_1;
+DROP TABLE IF EXISTS orders_queue ON CLUSTER cluster_1;
+DROP VIEW IF EXISTS user_ratings_queue_mv ON CLUSTER cluster_1;
+DROP VIEW IF EXISTS driver_ratings_queue_mv ON CLUSTER cluster_1;
+DROP VIEW IF EXISTS orders_queue_mv ON CLUSTER cluster_1;
+DROP DATABASE IF EXISTS analytics ON CLUSTER cluster_1;
