@@ -27,10 +27,8 @@ $ scoop install migrate
 ### Linux (*.deb package)
 
 ```bash
-$ curl -L https://packagecloud.io/golang-migrate/migrate/gpgkey | apt-key add -
-$ echo "deb https://packagecloud.io/golang-migrate/migrate/ubuntu/ $(lsb_release -sc) main" > /etc/apt/sources.list.d/migrate.list
-$ apt-get update
-$ apt-get install -y migrate
+wget http://github.com/golang-migrate/migrate/releases/latest/download/migrate.linux-amd64.deb
+sudo dpkg -i migrate.linux-amd64.deb
 ```
 
 ### With Go toolchain
