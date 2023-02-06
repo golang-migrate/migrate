@@ -1,10 +1,10 @@
 package stub
 
 import (
-	"go.uber.org/atomic"
 	"io"
-	"io/ioutil"
 	"reflect"
+
+	"go.uber.org/atomic"
 
 	"github.com/golang-migrate/migrate/v4/database"
 )
@@ -64,7 +64,7 @@ func (s *Stub) Unlock() error {
 }
 
 func (s *Stub) Run(migration io.Reader) error {
-	m, err := ioutil.ReadAll(migration)
+	m, err := io.ReadAll(migration)
 	if err != nil {
 		return err
 	}
