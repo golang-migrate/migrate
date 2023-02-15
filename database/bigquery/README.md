@@ -4,7 +4,7 @@
 * [Examples](./examples)
 
 ### Usage
-`bigquery://https://www.googleapis.com/bigquery/v2:443?x-migrations-table=schema_migrations&x-statement-timeout=0&credentials_filename=./myproject-XXXXXXXXXXXXX-XXXXXXXXXXXX.json&project_id=myproject-XXXXXXXXXXXXX&dataset_id=mydataset`
+`bigquery://https://bigquery.googleapis.com/bigquery/v2/?x-migrations-table=schema_migrations&x-statement-timeout=0&credentials_filename=./myproject-XXXXXXXXXXXXX-XXXXXXXXXXXX.json&project_id=myproject-XXXXXXXXXXXXX&dataset_id=mydataset`
 
 
 ### System variables reference
