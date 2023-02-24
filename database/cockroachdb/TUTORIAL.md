@@ -21,7 +21,7 @@ export COCKROACHDB_URL='cockroachdb://cockroach:@localhost:26257/example?sslmode
 ```
 `sslmode=disable` means that the connection with our database will not be encrypted. This is needed to connect to an insecure node.
 
-**NOTE:** Do not use COCKROACH_URL as a variable name here, it's already in use for discrete parameters and you may run into connection problems. For more info check out [docs](https://www.cockroachlabs.com/docs/stable/connection-parameters.html#connect-using-discrete-parameters).
+**NOTE:** Do not use `COCKROACHDB_URL` as a variable name here, it's already in use for discrete parameters and you may run into connection problems. For more info check out [docs](https://www.cockroachlabs.com/docs/stable/connection-parameters.html#connect-using-discrete-parameters).
 
 You can find further description of database URLs [here](README.md#database-urls).
 
