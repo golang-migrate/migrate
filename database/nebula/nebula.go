@@ -389,7 +389,7 @@ func (nb *Nebula) Drop() error {
 	if err != nil {
 		return database.Error{OrigErr: err, Err: "failed checking query results", Query: []byte(queryTagIndex)}
 	}
-	rawTagIndexes, err := resultSet.GetValuesByColName(columnTagEdgeIndexName)
+	rawTagIndexes, _ := resultSet.GetValuesByColName(columnTagEdgeIndexName)
 	for _, rawTagIndex := range rawTagIndexes {
 		tagIndex, _ := rawTagIndex.AsString()
 		resultedQuery += fmt.Sprintf(queryDropTagIndex, tagIndex)
@@ -404,7 +404,7 @@ func (nb *Nebula) Drop() error {
 	if err != nil {
 		return database.Error{OrigErr: err, Err: "failed checking query results", Query: []byte(queryEdgeIndex)}
 	}
-	rawEdgeIndexes, err := resultSet.GetValuesByColName(columnTagEdgeIndexName)
+	rawEdgeIndexes, _ := resultSet.GetValuesByColName(columnTagEdgeIndexName)
 	for _, rawEdgeIndex := range rawEdgeIndexes {
 		edgeIndex, _ := rawEdgeIndex.AsString()
 		resultedQuery += fmt.Sprintf(queryDropEdgeIndex, edgeIndex)
@@ -419,7 +419,7 @@ func (nb *Nebula) Drop() error {
 	if err != nil {
 		return database.Error{OrigErr: err, Err: "failed checking query results", Query: []byte(queryTag)}
 	}
-	rawTags, err := resultSet.GetValuesByColName(columnTagEdgeName)
+	rawTags, _ := resultSet.GetValuesByColName(columnTagEdgeName)
 	for _, rawTag := range rawTags {
 		tag, _ := rawTag.AsString()
 		resultedQuery += fmt.Sprintf(queryDropTag, tag)
@@ -434,7 +434,7 @@ func (nb *Nebula) Drop() error {
 	if err != nil {
 		return database.Error{OrigErr: err, Err: "failed checking query results", Query: []byte(queryEdge)}
 	}
-	rawEdges, err := resultSet.GetValuesByColName(columnTagEdgeName)
+	rawEdges, _ := resultSet.GetValuesByColName(columnTagEdgeName)
 	for _, rawEdge := range rawEdges {
 		edge, _ := rawEdge.AsString()
 		resultedQuery += fmt.Sprintf(queryDropEdge, edge)
