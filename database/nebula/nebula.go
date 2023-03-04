@@ -19,12 +19,15 @@ const (
 	spaceTypePrefixINT         = "INT"
 	spaceTypePrefixFixedString = "FIXED_STRING"
 
-	columnVersion = "Version"
-	columnDirty   = "Dirty"
+	columnVersion          = "Version"
+	columnDirty            = "Dirty"
+	columnTagEdgeIndexName = "Index Name"
+	columnTagEdgeName      = "Name"
 )
 
 var (
 	DefaultMigrationsTag = "schema_migrations"
+	DefaultTimeout       = 10
 
 	ErrNilConfig = fmt.Errorf("no config")
 )
@@ -33,7 +36,6 @@ var (
 type Nebula struct {
 	pool   *nebula.SessionPool
 	config *Config
-	lock   uint32
 
 	spaceTypePrefix string
 }
@@ -46,6 +48,7 @@ type Config struct {
 	Password        string
 	MigrationsSpace string
 	MigrationsTag   string
+	Timeout         int
 }
 
 func init() {
@@ -118,6 +121,14 @@ func (nb *Nebula) Open(dsn string) (database.Driver, error) {
 		return nil, fmt.Errorf("space can't be empty")
 	}
 
+	timeout := DefaultTimeout
+	if s := purl.Query().Get("x-timeout"); s != "" {
+		timeout, err = strconv.Atoi(s)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	hostAddress := nebula.HostAddress{Host: nbHost, Port: nbPort}
 	hostList := []nebula.HostAddress{hostAddress}
 
@@ -128,7 +139,13 @@ func (nb *Nebula) Open(dsn string) (database.Driver, error) {
 		hostList,
 		nbSpace,
 	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create config for session pool: %w", err)
+	}
 	pool, err := nebula.NewSessionPool(*sessionPoolConfig, nebula.DefaultLogger{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create new session pool: %w", err)
+	}
 
 	nb = &Nebula{
 		pool: pool,
@@ -139,6 +156,7 @@ func (nb *Nebula) Open(dsn string) (database.Driver, error) {
 			Password:        nbPassword,
 			MigrationsSpace: nbSpace,
 			MigrationsTag:   purl.Query().Get("x-migrations-tag"),
+			Timeout:         timeout,
 		},
 	}
 
@@ -169,10 +187,7 @@ func (nb *Nebula) init() error {
 	if err != nil {
 		return fmt.Errorf("failed to get vid column value: %w", err)
 	}
-	vidType, err := rows[0].AsString()
-	if err != nil {
-		return fmt.Errorf("failed to convert vid column value to string: %w", err)
-	}
+	vidType, _ := rows[0].AsString()
 	if strings.HasPrefix(vidType, spaceTypePrefixINT) {
 		nb.spaceTypePrefix = spaceTypePrefixINT
 	}
@@ -207,12 +222,12 @@ func (nb *Nebula) Version() (int, bool, error) {
 		version int64
 		dirty   int64
 		query   = fmt.Sprintf(`
-			USE %s; \
-			MATCH (v:%s) \
-			WITH v LIMIT 1000000 \
-			RETURN v.schema_migrations.version AS %s, \
-				v.schema_migrations.dirty AS %s, \
-				v.schema_migrations.sequence AS Sequence \
+			USE %s;
+			MATCH (v:%s)
+			WITH v LIMIT 1000000
+			RETURN v.schema_migrations.version AS %s,
+				v.schema_migrations.dirty AS %s,
+				v.schema_migrations.sequence AS Sequence
 			ORDER BY Sequence DESC LIMIT 1`, nb.config.MigrationsSpace, nb.config.MigrationsTag, columnVersion, columnDirty)
 	)
 
@@ -236,19 +251,13 @@ func (nb *Nebula) Version() (int, bool, error) {
 	if err != nil {
 		return 0, false, err
 	}
-	version, err = rawVersion.AsInt()
-	if err != nil {
-		return 0, false, err
-	}
+	version, _ = rawVersion.AsInt()
 
 	rawDirty, err := row.GetValueByColName(columnDirty)
 	if err != nil {
 		return 0, false, err
 	}
-	dirty, err = rawDirty.AsInt()
-	if err != nil {
-		return 0, false, err
-	}
+	dirty, _ = rawDirty.AsInt()
 
 	return int(version), dirty == 1, nil
 }
@@ -263,7 +272,7 @@ func (nb *Nebula) SetVersion(version int, dirty bool) error {
 			return 0
 		}
 		query = fmt.Sprintf(`
-			USE %s;\
+			USE %s;
 			INSERT VERTEX IF NOT EXISTS %s(version, dirty, sequence) VALUES`,
 			nb.config.MigrationsSpace, nb.config.MigrationsTag)
 		value string
@@ -271,18 +280,18 @@ func (nb *Nebula) SetVersion(version int, dirty bool) error {
 
 	switch nb.spaceTypePrefix {
 	case spaceTypePrefixINT:
-		value = fmt.Sprintf(`%d:(%d, %d, %d)`,
-			time.Now().UnixNano(),
+		value = fmt.Sprintf(` %d:(%d, %d, %d)`,
+			time.Now().UnixMicro(),
 			version,
 			bool(dirty),
-			time.Now().UnixNano(),
+			time.Now().UnixMicro(),
 		)
 	case nb.spaceTypePrefix:
-		value = fmt.Sprintf(`'%s':(%d, %d, %d)`,
-			strconv.FormatInt(time.Now().UnixNano(), 10),
+		value = fmt.Sprintf(` '%s':(%d, %d, %d)`,
+			strconv.FormatInt(time.Now().UnixMicro(), 10),
 			version,
 			bool(dirty),
-			time.Now().UnixNano(),
+			time.Now().UnixMicro(),
 		)
 	default:
 		return fmt.Errorf("received unknown Space type")
@@ -324,10 +333,10 @@ func (nb *Nebula) ensureVersionTag() (err error) {
 	// if not, create the empty migration table
 	query = fmt.Sprintf(`
 		USE %s;
-		CREATE TAG %s( \
-			version int64, \
-			dirty int8, \
-			sequence int64 \
+		CREATE TAG %s(
+			version int64,
+			dirty int8,
+			sequence int64
 		);`, nb.config.MigrationsSpace, nb.config.MigrationsTag)
 
 	resultSet, err = nb.pool.Execute(query)
@@ -338,28 +347,119 @@ func (nb *Nebula) ensureVersionTag() (err error) {
 	if err != nil {
 		return database.Error{OrigErr: err, Err: "failed checking query results", Query: []byte(query)}
 	}
+
+	// Tag in empty Space is not created immediately
+	// In order to proceed without errors - wait for its creation
+	time.Sleep(time.Duration(nb.config.Timeout) * time.Second)
+
 	return nil
 }
 
 func (nb *Nebula) Drop() error {
+	var (
+		resultSet *nebula.ResultSet
+		err       error
+
+		resultedQuery string
+
+		queryTagIndex     = "SHOW TAG INDEXES;"
+		queryDropTagIndex = "DROP TAG INDEX %s;"
+
+		queryTag     = "SHOW TAGS;"
+		queryDropTag = "DROP TAG %s;"
+
+		queryEdgeIndex     = "SHOW EDGE INDEXES;"
+		queryDropEdgeIndex = "DROP EDGE INDEX %s;"
+
+		queryEdge     = "SHOW EDGES;"
+		queryDropEdge = "DROP EDGE %s;"
+	)
+
+	// To correctly drop all TAGs/EDGEs
+	// We need to DROP them in a proper order
+	// Firstly DROP all INDEXES (TAGs/EDGEs)
+	// Afterwards DROP all TAGs/EDGEs
+
+	// Get TAG INDEXES and form DROP query
+	resultSet, err = nb.pool.Execute(queryTagIndex)
+	if err != nil {
+		return database.Error{OrigErr: err, Err: "failed query execution", Query: []byte(queryTagIndex)}
+	}
+	err = checkResultSet(queryTagIndex, resultSet)
+	if err != nil {
+		return database.Error{OrigErr: err, Err: "failed checking query results", Query: []byte(queryTagIndex)}
+	}
+	rawTagIndexes, err := resultSet.GetValuesByColName(columnTagEdgeIndexName)
+	for _, rawTagIndex := range rawTagIndexes {
+		tagIndex, _ := rawTagIndex.AsString()
+		resultedQuery += fmt.Sprintf(queryDropTagIndex, tagIndex)
+	}
+
+	// Get EDGE INDEXES and form DROP query
+	resultSet, err = nb.pool.Execute(queryEdgeIndex)
+	if err != nil {
+		return database.Error{OrigErr: err, Err: "failed query execution", Query: []byte(queryEdgeIndex)}
+	}
+	err = checkResultSet(queryEdgeIndex, resultSet)
+	if err != nil {
+		return database.Error{OrigErr: err, Err: "failed checking query results", Query: []byte(queryEdgeIndex)}
+	}
+	rawEdgeIndexes, err := resultSet.GetValuesByColName(columnTagEdgeIndexName)
+	for _, rawEdgeIndex := range rawEdgeIndexes {
+		edgeIndex, _ := rawEdgeIndex.AsString()
+		resultedQuery += fmt.Sprintf(queryDropEdgeIndex, edgeIndex)
+	}
+
+	// Get TAGS and form DROP query
+	resultSet, err = nb.pool.Execute(queryTag)
+	if err != nil {
+		return database.Error{OrigErr: err, Err: "failed query execution", Query: []byte(queryTag)}
+	}
+	err = checkResultSet(queryTag, resultSet)
+	if err != nil {
+		return database.Error{OrigErr: err, Err: "failed checking query results", Query: []byte(queryTag)}
+	}
+	rawTags, err := resultSet.GetValuesByColName(columnTagEdgeName)
+	for _, rawTag := range rawTags {
+		tag, _ := rawTag.AsString()
+		resultedQuery += fmt.Sprintf(queryDropTag, tag)
+	}
+
+	// Get EDGE and form DROP query
+	resultSet, err = nb.pool.Execute(queryEdge)
+	if err != nil {
+		return database.Error{OrigErr: err, Err: "failed query execution", Query: []byte(queryEdge)}
+	}
+	err = checkResultSet(queryEdge, resultSet)
+	if err != nil {
+		return database.Error{OrigErr: err, Err: "failed checking query results", Query: []byte(queryEdge)}
+	}
+	rawEdges, err := resultSet.GetValuesByColName(columnTagEdgeName)
+	for _, rawEdge := range rawEdges {
+		edge, _ := rawEdge.AsString()
+		resultedQuery += fmt.Sprintf(queryDropEdge, edge)
+	}
+
+	// Now DROP everything
+	resultSet, err = nb.pool.Execute(resultedQuery)
+	if err != nil {
+		return database.Error{OrigErr: err, Err: "failed query execution", Query: []byte(resultedQuery)}
+	}
+	err = checkResultSet(resultedQuery, resultSet)
+	if err != nil {
+		return database.Error{OrigErr: err, Err: "failed checking query results", Query: []byte(resultedQuery)}
+	}
 
 	return nil
 }
 
-// local locking in order to pass tests, Nebula doesn't support database locking
+// Nebula doesn't support database locking
 func (nb *Nebula) Lock() error {
-	// if !atomic.CompareAndSwapUint32(&nb.lock, 0, 1) {
-	// 	return database.ErrLocked
-	// }
-
 	return nil
 }
 
-// local locking in order to pass tests, Nebula doesn't support database locking
+// Nebula doesn't support database locking
 func (nb *Nebula) Unlock() error {
-	// if !atomic.CompareAndSwapUint32(&nb.lock, 1, 0) {
-	// 	return database.ErrNotLocked
-	// }
 	return nil
 }
 

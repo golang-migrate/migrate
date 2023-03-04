@@ -1,0 +1,3 @@
+CREATE TAG INDEX IF NOT EXISTS test_tag_index on test_tag();
+
+CREATE EDGE INDEX IF NOT EXISTS test_edge_index on test_edge();

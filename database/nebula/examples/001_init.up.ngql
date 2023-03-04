@@ -1,6 +1,0 @@
-CREATE SPACE IF NOT EXISTS test(partition_num=5, replica_factor=1, vid_type=fixed_string(150));
-
-USE test;
-
-CREATE TAG test1(name string);
-CREATE EDGE test1();

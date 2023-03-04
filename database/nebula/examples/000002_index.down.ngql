@@ -1,0 +1,3 @@
+DROP TAG INDEX IF EXISTS test_tag_index;
+
+DROP EDGE INDEX IF EXISTS test_edge_index;

@@ -1,0 +1,2 @@
+DROP TAG IF EXISTS test_tag;
+DROP EDGE IF EXISTS test_edge;

@@ -1,0 +1,6 @@
+CREATE TAG test_tag(
+    name string,
+    counter int, 
+    ts datetime);
+
+CREATE EDGE test_edge();
