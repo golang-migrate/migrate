@@ -1,3 +1,24 @@
+````shell
+
+                          _             
+__      ____ _ _ __ _ __ (_)_ __   __ _ 
+\ \ /\ / / _` | '__| '_ \| | '_ \ / _` |
+ \ V  V / (_| | |  | | | | | | | | (_| |
+  \_/\_/ \__,_|_|  |_| |_|_|_| |_|\__, |
+                                  |___/ 
+
+migrate works substantially different at outreach from the upstream repo. 
+
+Please only use with smartstores and if you plan to use, check with #qss-support
+
+Differences include: a custom multi-statement parser (for fine grained error 
+- reporting and troubleshooting)
+- removal of query string parameters for controlling migration behavior
+- removal of all unsupported backends
+````
+
+
+
 [![GitHub Workflow Status (branch)](https://img.shields.io/github/workflow/status/golang-migrate/migrate/CI/master)](https://github.com/golang-migrate/migrate/actions/workflows/ci.yaml?query=branch%3Amaster)
 [![GoDoc](https://pkg.go.dev/badge/github.com/golang-migrate/migrate)](https://pkg.go.dev/github.com/golang-migrate/migrate/v4)
 [![Coverage Status](https://img.shields.io/coveralls/github/golang-migrate/migrate/master.svg)](https://coveralls.io/github/golang-migrate/migrate?branch=master)
