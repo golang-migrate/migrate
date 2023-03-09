@@ -10,6 +10,12 @@
 $ curl -L https://github.com/golang-migrate/migrate/releases/download/$version/migrate.$platform-amd64.tar.gz | tar xvz
 ```
 
+Move the binary to `/bin`
+
+```bash
+sudo mv migrate /bin/
+```
+
 ### MacOS
 
 ```bash
