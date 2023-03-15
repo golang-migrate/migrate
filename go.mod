@@ -17,11 +17,11 @@ require (
 	github.com/gocql/gocql v0.0.0-20210515062232-b7ef815b4556
 	github.com/google/go-github/v39 v39.2.0
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/jackc/pgconn v1.8.0
+	github.com/jackc/pgconn v1.14.0
 	github.com/jackc/pgerrcode v0.0.0-20201024163028-a0d42d470451
-	github.com/jackc/pgx/v4 v4.10.1
+	github.com/jackc/pgx/v4 v4.18.1
 	github.com/ktrysmt/go-bitbucket v0.6.4
-	github.com/lib/pq v1.10.0
+	github.com/lib/pq v1.10.2
 	github.com/markbates/pkger v0.15.1
 	github.com/mattn/go-sqlite3 v1.14.14
 	github.com/microsoft/go-mssqldb v0.15.0
@@ -78,7 +78,6 @@ require (
 	github.com/form3tech-oss/jwt-go v3.2.5+incompatible // indirect
 	github.com/gabriel-vasile/mimetype v1.4.0 // indirect
 	github.com/go-stack/stack v1.8.0 // indirect
-	github.com/gofrs/uuid v4.0.0+incompatible // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang-jwt/jwt/v4 v4.2.0 // indirect
 	github.com/golang-sql/civil v0.0.0-20190719163853-cb61b32ac6fe // indirect
@@ -99,9 +98,9 @@ require (
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
 	github.com/jackc/pgio v1.0.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
-	github.com/jackc/pgproto3/v2 v2.0.7 // indirect
-	github.com/jackc/pgservicefile v0.0.0-20200714003250-2b9c44734f2b // indirect
-	github.com/jackc/pgtype v1.6.2 // indirect
+	github.com/jackc/pgproto3/v2 v2.3.2 // indirect
+	github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a // indirect
+	github.com/jackc/pgtype v1.14.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/k0kubun/pp v2.3.0+incompatible // indirect
 	github.com/kardianos/osext v0.0.0-20190222173326-2bc1f35cddc0 // indirect
@@ -130,7 +129,7 @@ require (
 	github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d // indirect
 	gitlab.com/nyarla/go-crypt v0.0.0-20160106005555-d9a5dc2b789b // indirect
 	go.opencensus.io v0.24.0 // indirect
-	golang.org/x/crypto v0.0.0-20220314234659-1baeb1ce4c0b // indirect
+	golang.org/x/crypto v0.6.0 // indirect
 	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
 	golang.org/x/net v0.7.0 // indirect
 	golang.org/x/sync v0.1.0 // indirect
