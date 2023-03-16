@@ -30,16 +30,6 @@ jobs:
         with:
           go-version: ${{ matrix.go }}
 
-      - name: Setup Oracle Runtime Dependencies
-        shell: bash
-        run: |
-          sudo apt-get install -y libaio1 wget unzip
-          sudo wget -O /tmp/instantclient-basic-linux-x64.zip https://download.oracle.com/otn_software/linux/instantclient/193000/instantclient-basic-linux.x64-19.3.0.0.0dbru.zip
-          sudo mkdir -p /usr/lib/oracle && sudo unzip /tmp/instantclient-basic-linux-x64.zip -d /usr/lib/oracle
-          sudo ldconfig -v /usr/lib/oracle/instantclient_19_3
-          sudo ldd /usr/lib/oracle/instantclient_19_3/libclntsh.so
-          sudo rm -rf /tmp/instantclient-basic-linux-x64.zip
-
       - name: Run test
         run: make test COVERAGE_DIR=/tmp/coverage
 

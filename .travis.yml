@@ -36,13 +36,6 @@ before_install:
   # Install golangci-lint
   - curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $(go env GOPATH)/bin v1.30.0
   - echo "TRAVIS_GO_VERSION=${TRAVIS_GO_VERSION}"
-  # Install oracle driver runtime dependency
-  - sudo apt-get install -y libaio1 wget unzip
-  - wget -O /tmp/instantclient-basic-linux-x64.zip https://download.oracle.com/otn_software/linux/instantclient/193000/instantclient-basic-linux.x64-19.3.0.0.0dbru.zip
-  - mkdir -p /usr/lib/oracle && unzip /tmp/instantclient-basic-linux-x64.zip -d /usr/lib/oracle
-  - ldconfig -v /usr/lib/oracle/instantclient_19_3
-  - ldd /usr/lib/oracle/instantclient_19_3/libclntsh.so
-  - rm -rf /tmp/instantclient-basic-linux-x64.zip
 
 install:
   - go get github.com/mattn/goveralls
