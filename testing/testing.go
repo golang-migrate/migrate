@@ -1,7 +1,7 @@
 package testing
 
 import (
-	"io/ioutil"
+	"io"
 	"os"
 	"strconv"
 	"testing"
@@ -86,7 +86,7 @@ func containerLogs(t *testing.T, c *DockerContainer) []byte {
 			t.Error(err)
 		}
 	}()
-	b, err := ioutil.ReadAll(r)
+	b, err := io.ReadAll(r)
 	if err != nil {
 		t.Error(err)
 		return nil

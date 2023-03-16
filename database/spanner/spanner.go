@@ -1,17 +1,15 @@
 package spanner
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	nurl "net/url"
 	"regexp"
 	"strconv"
 	"strings"
-
-	"context"
 
 	"cloud.google.com/go/spanner"
 	sdb "cloud.google.com/go/spanner/admin/database/apiv1"
@@ -20,10 +18,10 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 
+	adminpb "cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
 	"github.com/hashicorp/go-multierror"
 	uatomic "go.uber.org/atomic"
 	"google.golang.org/api/iterator"
-	adminpb "google.golang.org/genproto/googleapis/spanner/admin/database/v1"
 )
 
 func init() {
@@ -171,7 +169,7 @@ func (s *Spanner) Unlock() error {
 
 // Run implements database.Driver
 func (s *Spanner) Run(migration io.Reader) error {
-	migr, err := ioutil.ReadAll(migration)
+	migr, err := io.ReadAll(migration)
 	if err != nil {
 		return err
 	}

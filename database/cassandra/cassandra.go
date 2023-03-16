@@ -3,13 +3,13 @@ package cassandra
 import (
 	"errors"
 	"fmt"
-	"go.uber.org/atomic"
 	"io"
-	"io/ioutil"
 	nurl "net/url"
 	"strconv"
 	"strings"
 	"time"
+
+	"go.uber.org/atomic"
 
 	"github.com/gocql/gocql"
 	"github.com/golang-migrate/migrate/v4/database"
@@ -231,7 +231,7 @@ func (c *Cassandra) Run(migration io.Reader) error {
 		return err
 	}
 
-	migr, err := ioutil.ReadAll(migration)
+	migr, err := io.ReadAll(migration)
 	if err != nil {
 		return err
 	}

@@ -4,14 +4,12 @@ import (
 	"bytes"
 	"database/sql"
 	"errors"
-	"io/ioutil"
+	"io"
 	"log"
 	"os"
 	"strings"
 	"testing"
-)
 
-import (
 	dStub "github.com/golang-migrate/migrate/v4/database/stub"
 	"github.com/golang-migrate/migrate/v4/source"
 	sStub "github.com/golang-migrate/migrate/v4/source/stub"
@@ -19,8 +17,9 @@ import (
 
 // sourceStubMigrations hold the following migrations:
 // u = up migration, d = down migration, n = version
-//  |  1  |  -  |  3  |  4  |  5  |  -  |  7  |
-//  | u d |  -  | u   | u d |   d |  -  | u d |
+//
+//	|  1  |  -  |  3  |  4  |  5  |  -  |  7  |
+//	| u d |  -  | u   | u d |   d |  -  | u d |
 var sourceStubMigrations *source.Migrations
 
 const (
@@ -1349,14 +1348,14 @@ func (m *migrationSequence) bodySequence() []string {
 	r := make([]string, 0)
 	for _, v := range *m {
 		if v.Body != nil {
-			body, err := ioutil.ReadAll(v.Body)
+			body, err := io.ReadAll(v.Body)
 			if err != nil {
 				panic(err) // that should never happen
 			}
 
 			// reset body reader
 			// TODO: is there a better/nicer way?
-			v.Body = ioutil.NopCloser(bytes.NewReader(body))
+			v.Body = io.NopCloser(bytes.NewReader(body))
 
 			r = append(r, string(body[:]))
 		} else {
@@ -1388,7 +1387,7 @@ func M(version uint, targetVersion ...int) *Migration {
 // mr is a convenience func to create a new *Migration from the raw database query
 func mr(value string) *Migration {
 	return &Migration{
-		Body: ioutil.NopCloser(strings.NewReader(value)),
+		Body: io.NopCloser(strings.NewReader(value)),
 	}
 }
 

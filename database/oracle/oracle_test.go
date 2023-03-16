@@ -47,13 +47,13 @@ func (s *oracleSuite) SetupSuite() {
 			// password for SYS and SYSTEM users
 			"ORACLE_PWD": password,
 		},
-		BindMounts: map[string]string{
-			// container path : host path
-			"/opt/oracle/scripts/setup/user.sql": filepath.Join(cwd, "testdata/user.sql"),
+		Mounts: testcontainers.ContainerMounts{
+			testcontainers.BindMount(filepath.Join(cwd, "testdata/user.sql"), "/opt/oracle/scripts/setup/user.sql"),
 		},
 		WaitingFor: wait.NewHealthStrategy().WithStartupTimeout(time.Minute * 15),
 		AutoRemove: true,
 	}
+
 	ctx := context.Background()
 	orcl, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: req,
@@ -96,15 +96,18 @@ func (s *oracleSuite) TestOpen() {
 	s.Require().Equal(DefaultMigrationsTable, ora.config.MigrationsTable)
 
 	tbName := ""
-	err = ora.conn.QueryRowContext(context.Background(), `SELECT tname FROM tab WHERE tname = :1`, ora.config.MigrationsTable).Scan(&tbName)
+	err = ora.conn.QueryRowContext(
+		context.Background(),
+		`SELECT tname FROM tab WHERE tname = :1`,
+		ora.config.MigrationsTable,
+	).Scan(&tbName)
 	s.Require().Nil(err)
 	s.Require().Equal(ora.config.MigrationsTable, tbName)
 
 	dt.Test(s.T(), d, []byte(`BEGIN DBMS_OUTPUT.PUT_LINE('hello'); END;`))
-
 }
 
-func (s oracleSuite) TestMigrate() {
+func (s *oracleSuite) TestMigrate() {
 	ora := &Oracle{}
 	d, err := ora.Open(s.dsn)
 	s.Require().Nil(err)

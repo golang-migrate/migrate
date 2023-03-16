@@ -11,10 +11,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/godror/godror"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/hashicorp/go-multierror"
+	_ "github.com/sijms/go-ora/v2"
 )
 
 func init() {
@@ -110,7 +110,7 @@ func (ora *Oracle) Open(url string) (database.Driver, error) {
 	if err != nil {
 		return nil, err
 	}
-	db, err := sql.Open("godror", migrate.FilterCustomQuery(purl).String())
+	db, err := sql.Open("oracle", migrate.FilterCustomQuery(purl).String())
 	if err != nil {
 		return nil, err
 	}
@@ -253,9 +253,6 @@ func (ora *Oracle) Run(migration io.Reader) error {
 
 	for _, query := range queries {
 		if _, err := ora.conn.ExecContext(context.Background(), query); err != nil {
-			if oraErr, ok := godror.AsOraErr(err); ok {
-				return database.Error{OrigErr: oraErr, Err: oraErr.Message(), Query: []byte(query)}
-			}
 			return database.Error{OrigErr: err, Err: "migration failed", Query: []byte(query)}
 		}
 	}
@@ -300,13 +297,8 @@ func (ora *Oracle) Version() (version int, dirty bool, err error) {
 	switch {
 	case err == sql.ErrNoRows:
 		return database.NilVersion, false, nil
-
 	case err != nil:
-		if _, ok := godror.AsOraErr(err); ok {
-			return database.NilVersion, false, nil
-		}
 		return 0, false, &database.Error{OrigErr: err, Query: []byte(query)}
-
 	default:
 		return version, dirty, nil
 	}
