@@ -28,6 +28,7 @@ import (
 func init() {
 	db := Postgres{}
 	database.Register("pgx", &db)
+	database.Register("pgx/v4", &db)
 }
 
 var (
