@@ -23,7 +23,7 @@ require (
 	github.com/ktrysmt/go-bitbucket v0.6.4
 	github.com/lib/pq v1.10.2
 	github.com/markbates/pkger v0.15.1
-	github.com/mattn/go-sqlite3 v1.14.14
+	github.com/mattn/go-sqlite3 v1.14.16
 	github.com/microsoft/go-mssqldb v0.15.0
 	github.com/mutecomm/go-sqlcipher/v4 v4.4.0
 	github.com/nakagami/firebirdsql v0.0.0-20190310045651-3c02a58cfed8
