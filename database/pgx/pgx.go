@@ -267,6 +267,7 @@ func (p *Postgres) Unlock() error {
 	return database.CasRestoreOnErr(&p.isLocked, true, false, database.ErrNotLocked, func() error {
 		tx, ok := p.exec.(*sql.Tx)
 		if ok { // if in transaction lock, simply commit
+			p.exec = p.conn
 			return tx.Commit()
 		}
 		aid, err := database.GenerateAdvisoryLockId(p.config.DatabaseName, p.config.migrationsSchemaName, p.config.migrationsTableName)
