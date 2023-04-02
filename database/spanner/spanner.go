@@ -62,14 +62,16 @@ type Spanner struct {
 }
 
 type DB struct {
-	admin *sdb.DatabaseAdminClient
-	data  *spanner.Client
+	admin  *sdb.DatabaseAdminClient
+	data   *spanner.Client
+	shared bool
 }
 
 func NewDB(admin sdb.DatabaseAdminClient, data spanner.Client) *DB {
 	return &DB{
-		admin: &admin,
-		data:  &data,
+		admin:  &admin,
+		data:   &data,
+		shared: true,
 	}
 }
 
@@ -139,6 +141,9 @@ func (s *Spanner) Open(url string) (database.Driver, error) {
 
 // Close implements database.Driver
 func (s *Spanner) Close() error {
+	if s.db.shared {
+		return nil
+	}
 	s.db.data.Close()
 	return s.db.admin.Close()
 }
