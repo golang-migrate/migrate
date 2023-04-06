@@ -15,10 +15,11 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/dhui/dktest"
 	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database"
 
+	"github.com/dhui/dktest"
+
+	"github.com/golang-migrate/migrate/v4/database"
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
 	"github.com/golang-migrate/migrate/v4/dktesting"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
@@ -126,7 +127,7 @@ func TestMigrate(t *testing.T) {
 				t.Error(err)
 			}
 		}()
-		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "pgx", d)
+		m, err := migrate.NewWithDatabaseInstance("file://../examples/migrations", "pgx", d)
 		if err != nil {
 			t.Fatal(err)
 		}
