@@ -90,16 +90,16 @@ func WithConnection(ctx context.Context, conn *sql.Conn, config *Config) (*Postg
 
 	if config.SchemaName == "" {
 		query := `SELECT CURRENT_SCHEMA()`
-		var schemaName string
+		var schemaName sql.NullString
 		if err := conn.QueryRowContext(ctx, query).Scan(&schemaName); err != nil {
 			return nil, &database.Error{OrigErr: err, Query: []byte(query)}
 		}
 
-		if len(schemaName) == 0 {
+		if !schemaName.Valid {
 			return nil, ErrNoSchema
 		}
 
-		config.SchemaName = schemaName
+		config.SchemaName = schemaName.String
 	}
 
 	if len(config.MigrationsTable) == 0 {
