@@ -72,6 +72,10 @@ type DB struct {
 	data  *spanner.Client
 }
 
+type dmlCleanError struct {
+	err error
+}
+
 func NewDB(admin sdb.DatabaseAdminClient, data spanner.Client) *DB {
 	return &DB{
 		admin: &admin,
@@ -104,6 +108,10 @@ func WithInstance(instance *DB, config *Config) (database.Driver, error) {
 	}
 
 	return sx, nil
+}
+
+func (e *dmlCleanError) Error() string {
+	return fmt.Sprintf("Fail to clean DML migration statements, error: %v", e.err)
 }
 
 // Open implements database.Driver
@@ -174,9 +182,45 @@ func (s *Spanner) Run(migration io.Reader) error {
 		return err
 	}
 
+	err = s.runDML(migr)
+	if !errors.As(err, new(*dmlCleanError)) {
+		return err
+	} // dmlCleanError might indicate the migration is a DDL instead of a DML
+	return s.runDDL(migr)
+}
+
+func (s *Spanner) runDML(migr []byte) error {
+	stmts, err := cleanDMLStatements(migr)
+	if err != nil {
+		return err
+	} else if !s.config.CleanStatements {
+		stmts = []string{string(migr)}
+	}
+
+	ctx := context.Background()
+	_, err = s.db.data.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
+		for _, stmt := range stmts {
+			_, err = txn.Update(ctx, spanner.Statement{SQL: stmt})
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		return &database.Error{OrigErr: err, Err: "migration failed", Query: migr}
+	}
+
+	return nil
+}
+
+func (s *Spanner) runDDL(migr []byte) error {
+	var err error
 	stmts := []string{string(migr)}
+
 	if s.config.CleanStatements {
-		stmts, err = cleanStatements(migr)
+		stmts, err = cleanDDLStatements(migr)
 		if err != nil {
 			return err
 		}
@@ -340,10 +384,23 @@ func (s *Spanner) ensureVersionTable() (err error) {
 	return nil
 }
 
-func cleanStatements(migration []byte) ([]string, error) {
-	// The Spanner GCP backend does not yet support comments for the UpdateDatabaseDdl RPC
-	// (see https://issuetracker.google.com/issues/159730604) we use
-	// spansql to parse the DDL and output valid stamements without comments
+// The Spanner GCP backend does not yet support comments for the UpdateDatabaseDdl RPC
+// (see https://issuetracker.google.com/issues/159730604) we use
+// spansql to parse the DDL and output valid stamements without comments
+
+func cleanDMLStatements(migration []byte) ([]string, error) {
+	dml, err := spansql.ParseDML("", string(migration))
+	if err != nil {
+		return nil, &dmlCleanError{err}
+	}
+	stmts := make([]string, 0, len(dml.List))
+	for _, stmt := range dml.List {
+		stmts = append(stmts, stmt.SQL())
+	}
+	return stmts, nil
+}
+
+func cleanDDLStatements(migration []byte) ([]string, error) {
 	ddl, err := spansql.ParseDDL("", string(migration))
 	if err != nil {
 		return nil, err
