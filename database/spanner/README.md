@@ -33,7 +33,7 @@ as described in [README.md#database-urls](../../README.md#database-urls)
 ## DDL with comments
 
 At the moment the GCP Spanner backed does not seem to allow for comments (See https://issuetracker.google.com/issues/159730604)
-so in order to be able to use migration with DDL containing comments `x-clean-stamements` is required
+so in order to be able to use migration with DDL containing comments `x-clean-statements` is required
 
 ## Multiple statements
 
