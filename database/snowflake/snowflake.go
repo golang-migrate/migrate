@@ -9,12 +9,12 @@ import (
 	"strconv"
 	"strings"
 
-	"go.uber.org/atomic"
-
-	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/hashicorp/go-multierror"
 	"github.com/lib/pq"
 	sf "github.com/snowflakedb/gosnowflake"
+	"go.uber.org/atomic"
+
+	"github.com/golang-migrate/migrate/v4/database"
 )
 
 func init() {
@@ -74,7 +74,6 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	}
 
 	conn, err := instance.Conn(context.Background())
-
 	if err != nil {
 		return nil, err
 	}
@@ -238,6 +237,10 @@ func runesLastIndex(input []rune, target rune) int {
 		}
 	}
 	return -1
+}
+
+func (p *Snowflake) SetMigrationRecord(rec *database.MigrationRecord) error {
+	return p.SetVersion(rec.Version, rec.Dirty)
 }
 
 func (p *Snowflake) SetVersion(version int, dirty bool) error {

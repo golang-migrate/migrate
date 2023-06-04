@@ -10,13 +10,14 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
-	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/hashicorp/go-multierror"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/x/mongo/driver/connstring"
 	"go.uber.org/atomic"
+
+	"github.com/golang-migrate/migrate/v4/database"
 )
 
 func init() {
@@ -27,18 +28,22 @@ func init() {
 
 var DefaultMigrationsCollection = "schema_migrations"
 
-const DefaultLockingCollection = "migrate_advisory_lock" // the collection to use for advisory locking by default.
-const lockKeyUniqueValue = 0                             // the unique value to lock on. If multiple clients try to insert the same key, it will fail (locked).
-const DefaultLockTimeout = 15                            // the default maximum time to wait for a lock to be released.
-const DefaultLockTimeoutInterval = 10                    // the default maximum intervals time for the locking timout.
-const DefaultAdvisoryLockingFlag = true                  // the default value for the advisory locking feature flag. Default is true.
-const LockIndexName = "lock_unique_key"                  // the name of the index which adds unique constraint to the locking_key field.
-const contextWaitTimeout = 5 * time.Second               // how long to wait for the request to mongo to block/wait for.
+const (
+	DefaultLockingCollection   = "migrate_advisory_lock" // the collection to use for advisory locking by default.
+	lockKeyUniqueValue         = 0                       // the unique value to lock on. If multiple clients try to insert the same key, it will fail (locked).
+	DefaultLockTimeout         = 15                      // the default maximum time to wait for a lock to be released.
+	DefaultLockTimeoutInterval = 10                      // the default maximum intervals time for the locking timout.
+	DefaultAdvisoryLockingFlag = true                    // the default value for the advisory locking feature flag. Default is true.
+	LockIndexName              = "lock_unique_key"       // the name of the index which adds unique constraint to the locking_key field.
+	contextWaitTimeout         = 5 * time.Second         // how long to wait for the request to mongo to block/wait for.
+)
 
 var (
 	ErrNoDatabaseName            = fmt.Errorf("no database name")
 	ErrNilConfig                 = fmt.Errorf("no config")
-	ErrLockTimeoutConfigConflict = fmt.Errorf("both x-advisory-lock-timeout-interval and x-advisory-lock-timout-interval were specified")
+	ErrLockTimeoutConfigConflict = fmt.Errorf(
+		"both x-advisory-lock-timeout-interval and x-advisory-lock-timout-interval were specified",
+	)
 )
 
 type Mongo struct {
@@ -130,7 +135,10 @@ func (m *Mongo) Open(dsn string) (database.Driver, error) {
 	if err != nil {
 		return nil, err
 	}
-	advisoryLockingFlag, err := parseBoolean(unknown.Get("x-advisory-locking"), DefaultAdvisoryLockingFlag)
+	advisoryLockingFlag, err := parseBoolean(
+		unknown.Get("x-advisory-locking"),
+		DefaultAdvisoryLockingFlag,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +161,6 @@ func (m *Mongo) Open(dsn string) (database.Driver, error) {
 	}
 
 	maxLockCheckInterval, err := parseInt(lockTimeout, DefaultLockTimeoutInterval)
-
 	if err != nil {
 		return nil, err
 	}
@@ -185,7 +192,6 @@ func (m *Mongo) Open(dsn string) (database.Driver, error) {
 // Parse the url param, convert it to boolean
 // returns error if param invalid. returns defaultValue if param not present
 func parseBoolean(urlParam string, defaultValue bool) (bool, error) {
-
 	// if parameter passed, parse it (otherwise return default value)
 	if urlParam != "" {
 		result, err := strconv.ParseBool(urlParam)
@@ -202,7 +208,6 @@ func parseBoolean(urlParam string, defaultValue bool) (bool, error) {
 // Parse the url param, convert it to int
 // returns error if param invalid. returns defaultValue if param not present
 func parseInt(urlParam string, defaultValue int) (int, error) {
-
 	// if parameter passed, parse it (otherwise return default value)
 	if urlParam != "" {
 		result, err := strconv.Atoi(urlParam)
@@ -215,12 +220,20 @@ func parseInt(urlParam string, defaultValue int) (int, error) {
 	// if no url Param passed, return default value
 	return defaultValue, nil
 }
+
+func (m *Mongo) SetMigrationRecord(rec *database.MigrationRecord) error {
+	return m.SetVersion(rec.Version, rec.Dirty)
+}
+
 func (m *Mongo) SetVersion(version int, dirty bool) error {
 	migrationsCollection := m.db.Collection(m.config.MigrationsCollection)
 	if err := migrationsCollection.Drop(context.TODO()); err != nil {
 		return &database.Error{OrigErr: err, Err: "drop migrations collection failed"}
 	}
-	_, err := migrationsCollection.InsertOne(context.TODO(), bson.M{"version": version, "dirty": dirty})
+	_, err := migrationsCollection.InsertOne(
+		context.TODO(),
+		bson.M{"version": version, "dirty": dirty},
+	)
 	if err != nil {
 		return &database.Error{OrigErr: err, Err: "save version failed"}
 	}
@@ -229,7 +242,9 @@ func (m *Mongo) SetVersion(version int, dirty bool) error {
 
 func (m *Mongo) Version() (version int, dirty bool, err error) {
 	var versionInfo versionInfo
-	err = m.db.Collection(m.config.MigrationsCollection).FindOne(context.TODO(), bson.M{}).Decode(&versionInfo)
+	err = m.db.Collection(m.config.MigrationsCollection).
+		FindOne(context.TODO(), bson.M{}).
+		Decode(&versionInfo)
 	switch {
 	case err == mongo.ErrNoDocuments:
 		return database.NilVersion, false, nil
@@ -287,7 +302,10 @@ func (m *Mongo) executeCommands(ctx context.Context, cmds []bson.D) error {
 	for _, cmd := range cmds {
 		err := m.db.RunCommand(ctx, cmd).Err()
 		if err != nil {
-			return &database.Error{OrigErr: err, Err: fmt.Sprintf("failed to execute command:%v", cmd)}
+			return &database.Error{
+				OrigErr: err,
+				Err:     fmt.Sprintf("failed to execute command:%v", cmd),
+			}
 		}
 	}
 	return nil
@@ -364,7 +382,8 @@ func (m *Mongo) Lock() error {
 		}
 		operation := func() error {
 			timeout, cancelFunc := context.WithTimeout(context.Background(), contextWaitTimeout)
-			_, err := m.db.Collection(m.config.Locking.CollectionName).InsertOne(timeout, newLockObj)
+			_, err := m.db.Collection(m.config.Locking.CollectionName).
+				InsertOne(timeout, newLockObj)
 			defer cancelFunc()
 			return err
 		}

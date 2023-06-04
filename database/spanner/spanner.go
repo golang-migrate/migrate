@@ -13,15 +13,14 @@ import (
 
 	"cloud.google.com/go/spanner"
 	sdb "cloud.google.com/go/spanner/admin/database/apiv1"
-	"cloud.google.com/go/spanner/spansql"
-
-	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database"
-
 	adminpb "cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
+	"cloud.google.com/go/spanner/spansql"
 	"github.com/hashicorp/go-multierror"
 	uatomic "go.uber.org/atomic"
 	"google.golang.org/api/iterator"
+
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database"
 )
 
 func init() {
@@ -187,7 +186,6 @@ func (s *Spanner) Run(migration io.Reader) error {
 		Database:   s.config.DatabaseName,
 		Statements: stmts,
 	})
-
 	if err != nil {
 		return &database.Error{OrigErr: err, Err: "migration failed", Query: migr}
 	}
@@ -197,6 +195,10 @@ func (s *Spanner) Run(migration io.Reader) error {
 	}
 
 	return nil
+}
+
+func (s *Spanner) SetMigrationRecord(rec *database.MigrationRecord) error {
+	return s.SetVersion(rec.Version, rec.Dirty)
 }
 
 // SetVersion implements database.Driver
@@ -210,7 +212,8 @@ func (s *Spanner) SetVersion(version int, dirty bool) error {
 				spanner.Insert(s.config.MigrationsTable,
 					[]string{"Version", "Dirty"},
 					[]interface{}{version, dirty},
-				)}
+				),
+			}
 			return txn.BufferWrite(m)
 		})
 	if err != nil {
@@ -329,7 +332,6 @@ func (s *Spanner) ensureVersionTable() (err error) {
 		Database:   s.config.DatabaseName,
 		Statements: []string{stmt},
 	})
-
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(stmt)}
 	}

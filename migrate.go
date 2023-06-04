@@ -118,7 +118,11 @@ func New(sourceURL, databaseURL string) (*Migrate, error) {
 // and an existing database instance. The source URL scheme is defined by each driver.
 // Use any string that can serve as an identifier during logging as databaseName.
 // You are responsible for closing the underlying database client if necessary.
-func NewWithDatabaseInstance(sourceURL string, databaseName string, databaseInstance database.Driver) (*Migrate, error) {
+func NewWithDatabaseInstance(
+	sourceURL string,
+	databaseName string,
+	databaseInstance database.Driver,
+) (*Migrate, error) {
 	m := newCommon()
 
 	sourceName, err := iurl.SchemeFromURL(sourceURL)
@@ -144,7 +148,11 @@ func NewWithDatabaseInstance(sourceURL string, databaseName string, databaseInst
 // and a database URL. The database URL scheme is defined by each driver.
 // Use any string that can serve as an identifier during logging as sourceName.
 // You are responsible for closing the underlying source client if necessary.
-func NewWithSourceInstance(sourceName string, sourceInstance source.Driver, databaseURL string) (*Migrate, error) {
+func NewWithSourceInstance(
+	sourceName string,
+	sourceInstance source.Driver,
+	databaseURL string,
+) (*Migrate, error) {
 	m := newCommon()
 
 	databaseName, err := iurl.SchemeFromURL(databaseURL)
@@ -170,7 +178,12 @@ func NewWithSourceInstance(sourceName string, sourceInstance source.Driver, data
 // database instance. Use any string that can serve as an identifier during logging
 // as sourceName and databaseName. You are responsible for closing down
 // the underlying source and database client if necessary.
-func NewWithInstance(sourceName string, sourceInstance source.Driver, databaseName string, databaseInstance database.Driver) (*Migrate, error) {
+func NewWithInstance(
+	sourceName string,
+	sourceInstance source.Driver,
+	databaseName string,
+	databaseInstance database.Driver,
+) (*Migrate, error) {
 	m := newCommon()
 
 	m.sourceName = sourceName
@@ -737,7 +750,12 @@ func (m *Migrate) runMigrations(ret <-chan interface{}) error {
 			migr := r
 
 			// set version with dirty state
-			if err := m.databaseDrv.SetVersion(migr.TargetVersion, true); err != nil {
+			if err := m.databaseDrv.SetMigrationRecord(
+				&database.MigrationRecord{
+					Version:    migr.TargetVersion,
+					Identifier: migr.Identifier,
+					Dirty:      true,
+				}); err != nil {
 				return err
 			}
 
@@ -749,7 +767,12 @@ func (m *Migrate) runMigrations(ret <-chan interface{}) error {
 			}
 
 			// set clean state
-			if err := m.databaseDrv.SetVersion(migr.TargetVersion, false); err != nil {
+			if err := m.databaseDrv.SetMigrationRecord(
+				&database.MigrationRecord{
+					Version:    migr.TargetVersion,
+					Identifier: migr.Identifier,
+					Dirty:      false,
+				}); err != nil {
 				return err
 			}
 
@@ -845,7 +868,6 @@ func (m *Migrate) newMigration(version uint, targetVersion int) (*Migration, err
 
 		} else if err != nil {
 			return nil, err
-
 		} else {
 			// create migration from up source
 			migr, err = NewMigration(r, identifier, version, targetVersion)
@@ -865,10 +887,17 @@ func (m *Migrate) newMigration(version uint, targetVersion int) (*Migration, err
 
 		} else if err != nil {
 			return nil, err
-
 		} else {
 			// create migration from down source
-			migr, err = NewMigration(r, identifier, version, targetVersion)
+
+			// when we move the schema back to previous version,
+			// we should use version identifier from previous version
+			// so that it is consistent with TargetVersion
+			prevIdentifier, err := m.prevMigrationID(version)
+			if err != nil {
+				prevIdentifier = identifier
+			}
+			migr, err = NewMigration(r, prevIdentifier, version, targetVersion)
 			if err != nil {
 				return nil, err
 			}
@@ -882,6 +911,18 @@ func (m *Migrate) newMigration(version uint, targetVersion int) (*Migration, err
 	}
 
 	return migr, nil
+}
+
+func (m *Migrate) prevMigrationID(version uint) (string, error) {
+	// when we move the schema back to previous version,
+	// we should use version identifier from previous version
+	// so that it is consistent with TargetVersion
+	prevVer, err := m.sourceDrv.Prev(version)
+	if err != nil {
+		return "", nil
+	}
+	_, prevIdentifier, err := m.sourceDrv.ReadDown(prevVer)
+	return prevIdentifier, err
 }
 
 // lock is a thread safe helper function to lock the database.

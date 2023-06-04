@@ -19,8 +19,16 @@ var (
 
 const NilVersion int = -1
 
-var driversMu sync.RWMutex
-var drivers = make(map[string]Driver)
+var (
+	driversMu sync.RWMutex
+	drivers   = make(map[string]Driver)
+)
+
+type MigrationRecord struct {
+	Version    int
+	Identifier string
+	Dirty      bool
+}
 
 // Driver is the interface every database driver must implement.
 //
@@ -64,6 +72,11 @@ type Driver interface {
 
 	// Run applies a migration to the database. migration is guaranteed to be not nil.
 	Run(migration io.Reader) error
+
+	// SetMigrationRecord saves version, identifier and dirty state etc.
+	// Migrate will call this function before and after each call to Run.
+	// version must be >= -1. -1 means NilVersion.
+	SetMigrationRecord(rec *MigrationRecord) error
 
 	// SetVersion saves version and dirty state.
 	// Migrate will call this function before and after each call to Run.

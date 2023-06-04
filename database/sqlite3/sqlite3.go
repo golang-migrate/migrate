@@ -8,12 +8,12 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/hashicorp/go-multierror"
+	_ "github.com/mattn/go-sqlite3"
 	"go.uber.org/atomic"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
-	"github.com/hashicorp/go-multierror"
-	_ "github.com/mattn/go-sqlite3"
 )
 
 func init() {
@@ -228,6 +228,10 @@ func (m *Sqlite) executeQueryNoTx(query string) error {
 	return nil
 }
 
+func (m *Sqlite) SetMigrationRecord(rec *database.MigrationRecord) error {
+	return m.SetVersion(rec.Version, rec.Dirty)
+}
+
 func (m *Sqlite) SetVersion(version int, dirty bool) error {
 	tx, err := m.db.Begin()
 	if err != nil {
@@ -243,7 +247,10 @@ func (m *Sqlite) SetVersion(version int, dirty bool) error {
 	// empty schema version for failed down migration on the first migration
 	// See: https://github.com/golang-migrate/migrate/issues/330
 	if version >= 0 || (version == database.NilVersion && dirty) {
-		query := fmt.Sprintf(`INSERT INTO %s (version, dirty) VALUES (?, ?)`, m.config.MigrationsTable)
+		query := fmt.Sprintf(
+			`INSERT INTO %s (version, dirty) VALUES (?, ?)`,
+			m.config.MigrationsTable,
+		)
 		if _, err := tx.Exec(query, version, dirty); err != nil {
 			if errRollback := tx.Rollback(); errRollback != nil {
 				err = multierror.Append(err, errRollback)

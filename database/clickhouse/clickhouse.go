@@ -9,12 +9,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hashicorp/go-multierror"
 	"go.uber.org/atomic"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/golang-migrate/migrate/v4/database/multistmt"
-	"github.com/hashicorp/go-multierror"
 )
 
 var (
@@ -163,6 +163,7 @@ func (ch *ClickHouse) Run(r io.Reader) error {
 
 	return nil
 }
+
 func (ch *ClickHouse) Version() (int, bool, error) {
 	var (
 		version int
@@ -176,6 +177,10 @@ func (ch *ClickHouse) Version() (int, bool, error) {
 		return 0, false, &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 	return version, dirty == 1, nil
+}
+
+func (ch *ClickHouse) SetMigrationRecord(rec *database.MigrationRecord) error {
+	return ch.SetVersion(rec.Version, rec.Dirty)
 }
 
 func (ch *ClickHouse) SetVersion(version int, dirty bool) error {
@@ -261,7 +266,6 @@ func (ch *ClickHouse) ensureVersionTable() (err error) {
 func (ch *ClickHouse) Drop() (err error) {
 	query := "SHOW TABLES FROM " + ch.config.DatabaseName
 	tables, err := ch.conn.Query(query)
-
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
@@ -297,6 +301,7 @@ func (ch *ClickHouse) Lock() error {
 
 	return nil
 }
+
 func (ch *ClickHouse) Unlock() error {
 	if !ch.isLocked.CAS(true, false) {
 		return database.ErrNotLocked

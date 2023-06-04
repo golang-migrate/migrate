@@ -5,6 +5,7 @@ require (
 	cloud.google.com/go/storage v1.27.0
 	github.com/Azure/go-autorest/autorest/adal v0.9.16
 	github.com/ClickHouse/clickhouse-go v1.4.3
+	github.com/Masterminds/semver/v3 v3.1.1
 	github.com/aws/aws-sdk-go v1.34.0
 	github.com/cenkalti/backoff/v4 v4.1.2
 	github.com/cockroachdb/cockroach-go/v2 v2.1.1
@@ -29,6 +30,7 @@ require (
 	github.com/mutecomm/go-sqlcipher/v4 v4.4.0
 	github.com/nakagami/firebirdsql v0.0.0-20190310045651-3c02a58cfed8
 	github.com/neo4j/neo4j-go-driver v1.8.1-0.20200803113522-b626aa943eba
+	github.com/sigurn/crc8 v0.0.0-20220107193325-2243fe600f9f
 	github.com/snowflakedb/gosnowflake v1.6.3
 	github.com/stretchr/testify v1.8.1
 	github.com/xanzy/go-gitlab v0.15.0

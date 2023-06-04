@@ -16,11 +16,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-sql-driver/mysql"
+	"github.com/hashicorp/go-multierror"
 	"go.uber.org/atomic"
 
-	"github.com/go-sql-driver/mysql"
 	"github.com/golang-migrate/migrate/v4/database"
-	"github.com/hashicorp/go-multierror"
 )
 
 var _ database.Driver = (*Mysql)(nil) // explicit compile time type check
@@ -36,7 +36,9 @@ var (
 	ErrNilConfig        = fmt.Errorf("no config")
 	ErrNoDatabaseName   = fmt.Errorf("no database name")
 	ErrAppendPEM        = fmt.Errorf("failed to append PEM")
-	ErrTLSCertKeyConfig = fmt.Errorf("To use TLS client authentication, both x-tls-cert and x-tls-key must not be empty")
+	ErrTLSCertKeyConfig = fmt.Errorf(
+		"To use TLS client authentication, both x-tls-cert and x-tls-key must not be empty",
+	)
 )
 
 type Config struct {
@@ -167,7 +169,8 @@ func urlToMySQLConfig(url string) (*mysql.Config, error) {
 				}
 
 				clientCert := make([]tls.Certificate, 0, 1)
-				if ccert, ckey := parsedParams.Get("x-tls-cert"), parsedParams.Get("x-tls-key"); ccert != "" || ckey != "" {
+				if ccert, ckey := parsedParams.Get("x-tls-cert"), parsedParams.Get("x-tls-key"); ccert != "" ||
+					ckey != "" {
 					if ccert == "" || ckey == "" {
 						return nil, ErrTLSCertKeyConfig
 					}
@@ -355,8 +358,12 @@ func (m *Mysql) Run(migration io.Reader) error {
 	return nil
 }
 
-func (m *Mysql) SetVersion(version int, dirty bool) error {
-	tx, err := m.conn.BeginTx(context.Background(), &sql.TxOptions{Isolation: sql.LevelSerializable})
+func (m *Mysql) SetMigrationRecord(rec *database.MigrationRecord) error {
+	version, identifier, dirty := rec.Version, rec.Identifier, rec.Dirty
+	tx, err := m.conn.BeginTx(
+		context.Background(),
+		&sql.TxOptions{Isolation: sql.LevelSerializable},
+	)
 	if err != nil {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
 	}
@@ -373,8 +380,8 @@ func (m *Mysql) SetVersion(version int, dirty bool) error {
 	// empty schema version for failed down migration on the first migration
 	// See: https://github.com/golang-migrate/migrate/issues/330
 	if version >= 0 || (version == database.NilVersion && dirty) {
-		query := "INSERT INTO `" + m.config.MigrationsTable + "` (version, dirty) VALUES (?, ?)"
-		if _, err := tx.ExecContext(context.Background(), query, version, dirty); err != nil {
+		query := "INSERT INTO `" + m.config.MigrationsTable + "` (version, dirty, identifier, last_updated) VALUES (?, ?, ?, now())"
+		if _, err := tx.ExecContext(context.Background(), query, version, dirty, identifier); err != nil {
 			if errRollback := tx.Rollback(); errRollback != nil {
 				err = multierror.Append(err, errRollback)
 			}
@@ -387,6 +394,12 @@ func (m *Mysql) SetVersion(version int, dirty bool) error {
 	}
 
 	return nil
+}
+
+func (m *Mysql) SetVersion(version int, dirty bool) error {
+	return m.SetMigrationRecord(&database.MigrationRecord{
+		Version: version, Identifier: "", Dirty: dirty,
+	})
 }
 
 func (m *Mysql) Version() (version int, dirty bool, err error) {
@@ -491,7 +504,7 @@ func (m *Mysql) ensureVersionTable() (err error) {
 	}
 
 	// if not, create the empty migration table
-	query = "CREATE TABLE `" + m.config.MigrationsTable + "` (version bigint not null primary key, dirty boolean not null)"
+	query = "CREATE TABLE `" + m.config.MigrationsTable + "` (version bigint not null primary key, identifier varchar(200) null, dirty boolean not null, last_updated datetime null)"
 	if _, err := m.conn.ExecContext(context.Background(), query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}

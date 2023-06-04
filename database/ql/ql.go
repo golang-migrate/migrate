@@ -9,10 +9,10 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	"go.uber.org/atomic"
+	_ "modernc.org/ql/driver"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
-	_ "modernc.org/ql/driver"
 )
 
 func init() {
@@ -122,9 +122,11 @@ func (m *Ql) Open(url string) (database.Driver, error) {
 	}
 	return mx, nil
 }
+
 func (m *Ql) Close() error {
 	return m.db.Close()
 }
+
 func (m *Ql) Drop() (err error) {
 	query := `SELECT Name FROM __Table`
 	tables, err := m.db.Query(query)
@@ -165,18 +167,21 @@ func (m *Ql) Drop() (err error) {
 
 	return nil
 }
+
 func (m *Ql) Lock() error {
 	if !m.isLocked.CAS(false, true) {
 		return database.ErrLocked
 	}
 	return nil
 }
+
 func (m *Ql) Unlock() error {
 	if !m.isLocked.CAS(true, false) {
 		return database.ErrNotLocked
 	}
 	return nil
 }
+
 func (m *Ql) Run(migration io.Reader) error {
 	migr, err := io.ReadAll(migration)
 	if err != nil {
@@ -186,6 +191,7 @@ func (m *Ql) Run(migration io.Reader) error {
 
 	return m.executeQuery(query)
 }
+
 func (m *Ql) executeQuery(query string) error {
 	tx, err := m.db.Begin()
 	if err != nil {
@@ -202,6 +208,11 @@ func (m *Ql) executeQuery(query string) error {
 	}
 	return nil
 }
+
+func (m *Ql) SetMigrationRecord(rec *database.MigrationRecord) error {
+	return m.SetVersion(rec.Version, rec.Dirty)
+}
+
 func (m *Ql) SetVersion(version int, dirty bool) error {
 	tx, err := m.db.Begin()
 	if err != nil {

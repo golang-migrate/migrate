@@ -12,12 +12,12 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/hashicorp/go-multierror"
+	"github.com/lib/pq"
 	"go.uber.org/atomic"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
-	"github.com/hashicorp/go-multierror"
-	"github.com/lib/pq"
 )
 
 func init() {
@@ -74,7 +74,6 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	}
 
 	conn, err := instance.Conn(context.Background())
-
 	if err != nil {
 		return nil, err
 	}
@@ -207,6 +206,10 @@ func runesLastIndex(input []rune, target rune) int {
 		}
 	}
 	return -1
+}
+
+func (p *Redshift) SetMigrationRecord(rec *database.MigrationRecord) error {
+	return p.SetVersion(rec.Version, rec.Dirty)
 }
 
 func (p *Redshift) SetVersion(version int, dirty bool) error {
