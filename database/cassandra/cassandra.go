@@ -14,6 +14,7 @@ import (
 	"github.com/gocql/gocql"
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/golang-migrate/migrate/v4/database/multistmt"
+	"github.com/golang-migrate/migrate/v4/source"
 	"github.com/hashicorp/go-multierror"
 )
 
@@ -304,6 +305,10 @@ func (c *Cassandra) Drop() error {
 	}
 
 	return nil
+}
+
+func (c *Cassandra) Exec(e source.Executor) error {
+	return e.Execute(c.session)
 }
 
 // ensureVersionTable checks if versions table exists and, if not, creates it.

@@ -17,6 +17,7 @@ import (
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
+	"github.com/golang-migrate/migrate/v4/source"
 
 	adminpb "cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
 	"github.com/hashicorp/go-multierror"
@@ -293,6 +294,11 @@ func (s *Spanner) Drop() error {
 	}
 
 	return nil
+}
+
+// Exec implements database.Driver. Executes a migration exectuor.
+func (s *Spanner) Exec(e source.Executor) error {
+	return e.Execute(s.db)
 }
 
 // ensureVersionTable checks if versions table exists and, if not, creates it.

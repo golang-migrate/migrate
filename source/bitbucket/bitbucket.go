@@ -160,7 +160,7 @@ func (b *Bitbucket) Next(version uint) (nextVersion uint, err error) {
 	}
 }
 
-func (b *Bitbucket) ReadUp(version uint) (r io.ReadCloser, identifier string, err error) {
+func (b *Bitbucket) ReadUp(version uint) (r io.ReadCloser, e source.Executor, identifier string, err error) {
 	b.ensureFields()
 
 	if m, ok := b.migrations.Up(version); ok {
@@ -172,17 +172,17 @@ func (b *Bitbucket) ReadUp(version uint) (r io.ReadCloser, identifier string, er
 		}
 		file, err := b.client.Repositories.Repository.GetFileBlob(fBlobOpt)
 		if err != nil {
-			return nil, "", err
+			return nil, nil, "", err
 		}
 		if file != nil {
 			r := file.Content
-			return io.NopCloser(strings.NewReader(string(r))), m.Identifier, nil
+			return io.NopCloser(strings.NewReader(string(r))), nil, m.Identifier, nil
 		}
 	}
-	return nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: b.config.Path, Err: os.ErrNotExist}
+	return nil, nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: b.config.Path, Err: os.ErrNotExist}
 }
 
-func (b *Bitbucket) ReadDown(version uint) (r io.ReadCloser, identifier string, err error) {
+func (b *Bitbucket) ReadDown(version uint) (r io.ReadCloser, e source.Executor, identifier string, err error) {
 	b.ensureFields()
 
 	if m, ok := b.migrations.Down(version); ok {
@@ -195,13 +195,13 @@ func (b *Bitbucket) ReadDown(version uint) (r io.ReadCloser, identifier string, 
 		file, err := b.client.Repositories.Repository.GetFileBlob(fBlobOpt)
 
 		if err != nil {
-			return nil, "", err
+			return nil, nil, "", err
 		}
 		if file != nil {
 			r := file.Content
 
-			return io.NopCloser(strings.NewReader(string(r))), m.Identifier, nil
+			return io.NopCloser(strings.NewReader(string(r))), nil, m.Identifier, nil
 		}
 	}
-	return nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: b.config.Path, Err: os.ErrNotExist}
+	return nil, nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: b.config.Path, Err: os.ErrNotExist}
 }

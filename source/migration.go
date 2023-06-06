@@ -29,6 +29,9 @@ type Migration struct {
 	// Raw holds the raw location path to this migration in source.
 	// ReadUp and ReadDown will use this.
 	Raw string
+
+	// Executor is the executor of this migration.
+	Executor Executor
 }
 
 // Migrations wraps Migration and has an internal index

@@ -12,6 +12,7 @@ import (
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
+	"github.com/golang-migrate/migrate/v4/source"
 	"github.com/hashicorp/go-multierror"
 	_ "github.com/nakagami/firebirdsql"
 	"go.uber.org/atomic"
@@ -214,6 +215,10 @@ func (f *Firebird) Drop() (err error) {
 	}
 
 	return nil
+}
+
+func (f *Firebird) Exec(e source.Executor) error {
+	return e.Execute(f.db)
 }
 
 // ensureVersionTable checks if versions table exists and, if not, creates it.

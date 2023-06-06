@@ -11,6 +11,7 @@ import (
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/golang-migrate/migrate/v4/database"
+	"github.com/golang-migrate/migrate/v4/source"
 	"github.com/hashicorp/go-multierror"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -299,6 +300,10 @@ func (m *Mongo) Close() error {
 
 func (m *Mongo) Drop() error {
 	return m.db.Drop(context.TODO())
+}
+
+func (m *Mongo) Exec(e source.Executor) error {
+	return e.Execute(m.db)
 }
 
 func (m *Mongo) ensureLockTable() error {

@@ -741,9 +741,15 @@ func (m *Migrate) runMigrations(ret <-chan interface{}) error {
 				return err
 			}
 
-			if migr.Body != nil {
+			switch {
+			case migr.Body != nil:
 				m.logVerbosePrintf("Read and execute %v\n", migr.LogString())
 				if err := m.databaseDrv.Run(migr.BufferedBody); err != nil {
+					return err
+				}
+			case migr.Executor != nil:
+				m.logVerbosePrintf("Execute %v\n", migr.LogString())
+				if err := m.databaseDrv.Exec(migr.Executor); err != nil {
 					return err
 				}
 			}
@@ -777,8 +783,8 @@ func (m *Migrate) runMigrations(ret <-chan interface{}) error {
 // the specified migration version exists.
 func (m *Migrate) versionExists(version uint) (result error) {
 	// try up migration first
-	up, _, err := m.sourceDrv.ReadUp(version)
-	if err == nil {
+	up, _, _, err := m.sourceDrv.ReadUp(version)
+	if err == nil && up != nil {
 		defer func() {
 			if errClose := up.Close(); errClose != nil {
 				result = multierror.Append(result, errClose)
@@ -792,8 +798,8 @@ func (m *Migrate) versionExists(version uint) (result error) {
 	}
 
 	// then try down migration
-	down, _, err := m.sourceDrv.ReadDown(version)
-	if err == nil {
+	down, _, _, err := m.sourceDrv.ReadDown(version)
+	if err == nil && down != nil {
 		defer func() {
 			if errClose := down.Close(); errClose != nil {
 				result = multierror.Append(result, errClose)
@@ -835,10 +841,10 @@ func (m *Migrate) newMigration(version uint, targetVersion int) (*Migration, err
 	var migr *Migration
 
 	if targetVersion >= int(version) {
-		r, identifier, err := m.sourceDrv.ReadUp(version)
+		r, e, identifier, err := m.sourceDrv.ReadUp(version)
 		if errors.Is(err, os.ErrNotExist) {
 			// create "empty" migration
-			migr, err = NewMigration(nil, "", version, targetVersion)
+			migr, err = NewMigration(nil, nil, "", version, targetVersion)
 			if err != nil {
 				return nil, err
 			}
@@ -848,17 +854,17 @@ func (m *Migrate) newMigration(version uint, targetVersion int) (*Migration, err
 
 		} else {
 			// create migration from up source
-			migr, err = NewMigration(r, identifier, version, targetVersion)
+			migr, err = NewMigration(r, e, identifier, version, targetVersion)
 			if err != nil {
 				return nil, err
 			}
 		}
 
 	} else {
-		r, identifier, err := m.sourceDrv.ReadDown(version)
+		r, e, identifier, err := m.sourceDrv.ReadDown(version)
 		if errors.Is(err, os.ErrNotExist) {
 			// create "empty" migration
-			migr, err = NewMigration(nil, "", version, targetVersion)
+			migr, err = NewMigration(nil, nil, "", version, targetVersion)
 			if err != nil {
 				return nil, err
 			}
@@ -868,7 +874,7 @@ func (m *Migrate) newMigration(version uint, targetVersion int) (*Migration, err
 
 		} else {
 			// create migration from down source
-			migr, err = NewMigration(r, identifier, version, targetVersion)
+			migr, err = NewMigration(r, e, identifier, version, targetVersion)
 			if err != nil {
 				return nil, err
 			}

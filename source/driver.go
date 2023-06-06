@@ -57,19 +57,19 @@ type Driver interface {
 	// If there is no next version available, it must return os.ErrNotExist.
 	Next(version uint) (nextVersion uint, err error)
 
-	// ReadUp returns the UP migration body and an identifier that helps
-	// finding this migration in the source for a given version.
+	// ReadUp returns the UP migration body or executor and an identifier that
+	// helps finding this migration in the source for a given version.
 	// If there is no up migration available for this version,
 	// it must return os.ErrNotExist.
 	// Do not start reading, just return the ReadCloser!
-	ReadUp(version uint) (r io.ReadCloser, identifier string, err error)
+	ReadUp(version uint) (r io.ReadCloser, e Executor, identifier string, err error)
 
-	// ReadDown returns the DOWN migration body and an identifier that helps
-	// finding this migration in the source for a given version.
+	// ReadDown returns the DOWN migration body or executor and an identifier
+	// that helps finding this migration in the source for a given version.
 	// If there is no down migration available for this version,
 	// it must return os.ErrNotExist.
 	// Do not start reading, just return the ReadCloser!
-	ReadDown(version uint) (r io.ReadCloser, identifier string, err error)
+	ReadDown(version uint) (r io.ReadCloser, e Executor, identifier string, err error)
 }
 
 // Open returns a new driver instance.

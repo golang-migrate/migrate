@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	iurl "github.com/golang-migrate/migrate/v4/internal/url"
+	"github.com/golang-migrate/migrate/v4/source"
 )
 
 var (
@@ -79,6 +80,9 @@ type Driver interface {
 	// Note that this is a breaking action, a new call to Open() is necessary to
 	// ensure subsequent calls work as expected.
 	Drop() error
+
+	// Exec executes a migration exectuor.
+	Exec(e source.Executor) error
 }
 
 // Open returns a new driver instance.
