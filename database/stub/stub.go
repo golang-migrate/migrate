@@ -73,6 +73,10 @@ func (s *Stub) Run(migration io.Reader) error {
 	return nil
 }
 
+func (s *Stub) SetMigrationRecord(rec *database.MigrationRecord) error {
+	return s.SetVersion(rec.Version, rec.Dirty)
+}
+
 func (s *Stub) SetVersion(version int, state bool) error {
 	s.CurrentVersion = version
 	s.IsDirty = state

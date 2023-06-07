@@ -9,13 +9,13 @@ import (
 	"strconv"
 	"strings"
 
-	"go.uber.org/atomic"
-
 	"github.com/Azure/go-autorest/autorest/adal"
-	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/hashicorp/go-multierror"
 	mssql "github.com/microsoft/go-mssqldb" // mssql support
+	"go.uber.org/atomic"
+
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database"
 )
 
 func init() {
@@ -103,7 +103,6 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	}
 
 	conn, err := instance.Conn(context.Background())
-
 	if err != nil {
 		return nil, err
 	}
@@ -172,7 +171,6 @@ func (ss *SQLServer) Open(url string) (database.Driver, error) {
 		DatabaseName:    purl.Path,
 		MigrationsTable: migrationsTable,
 	})
-
 	if err != nil {
 		return nil, err
 	}
@@ -204,7 +202,8 @@ func (ss *SQLServer) Lock() error {
 		query := `EXEC sp_getapplock @Resource = @p1, @LockMode = 'Update', @LockOwner = 'Session', @LockTimeout = 0`
 
 		var status mssql.ReturnStatus
-		if _, err = ss.conn.ExecContext(context.Background(), query, aid, &status); err == nil && status > -1 {
+		if _, err = ss.conn.ExecContext(context.Background(), query, aid, &status); err == nil &&
+			status > -1 {
 			return nil
 		} else if err != nil {
 			return &database.Error{OrigErr: err, Err: "try lock failed", Query: []byte(query)}
@@ -255,9 +254,12 @@ func (ss *SQLServer) Run(migration io.Reader) error {
 	return nil
 }
 
+func (ss *SQLServer) SetMigrationRecord(rec *database.MigrationRecord) error {
+	return ss.SetVersion(rec.Version, rec.Dirty)
+}
+
 // SetVersion for the current database
 func (ss *SQLServer) SetVersion(version int, dirty bool) error {
-
 	tx, err := ss.conn.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
@@ -314,7 +316,6 @@ func (ss *SQLServer) Version() (version int, dirty bool, err error) {
 
 // Drop all tables from the database.
 func (ss *SQLServer) Drop() error {
-
 	// drop all referential integrity constraints
 	query := `
 	DECLARE @Sql NVARCHAR(500) DECLARE @Cursor CURSOR
@@ -397,5 +398,9 @@ func getMSITokenProvider(resource string) (func() (string, error), error) {
 // dynamically based on the server uri.
 // ex. <server name>.database.windows.net -> https://database.windows.net
 func getAADResourceFromServerUri(purl *nurl.URL) string {
-	return fmt.Sprintf("%s%s", "https://", strings.Join(strings.Split(purl.Hostname(), ".")[1:], "."))
+	return fmt.Sprintf(
+		"%s%s",
+		"https://",
+		strings.Join(strings.Split(purl.Hostname(), ".")[1:], "."),
+	)
 }

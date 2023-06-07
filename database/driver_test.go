@@ -1,8 +1,10 @@
-package database
+package database_test
 
 import (
 	"io"
 	"testing"
+
+	"github.com/golang-migrate/migrate/v4/database"
 )
 
 func ExampleDriver() {
@@ -18,7 +20,7 @@ type mockDriver struct {
 	url string
 }
 
-func (m *mockDriver) Open(url string) (Driver, error) {
+func (m *mockDriver) Open(url string) (database.Driver, error) {
 	return &mockDriver{
 		url: url,
 	}, nil
@@ -40,6 +42,10 @@ func (m *mockDriver) Run(migration io.Reader) error {
 	return nil
 }
 
+func (m *mockDriver) SetMigrationRecord(rec *database.MigrationRecord) error {
+	return nil
+}
+
 func (m *mockDriver) SetVersion(version int, dirty bool) error {
 	return nil
 }
@@ -53,14 +59,14 @@ func (m *mockDriver) Drop() error {
 }
 
 func TestRegisterTwice(t *testing.T) {
-	Register("mock", &mockDriver{})
+	database.Register("mock", &mockDriver{})
 
 	var err interface{}
 	func() {
 		defer func() {
 			err = recover()
 		}()
-		Register("mock", &mockDriver{})
+		database.Register("mock", &mockDriver{})
 	}()
 
 	if err == nil {
@@ -76,7 +82,7 @@ func TestOpen(t *testing.T) {
 		defer func() {
 			_ = recover()
 		}()
-		Register("mock", &mockDriver{})
+		database.Register("mock", &mockDriver{})
 	}()
 
 	cases := []struct {
@@ -95,7 +101,7 @@ func TestOpen(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.url, func(t *testing.T) {
-			d, err := Open(c.url)
+			d, err := database.Open(c.url)
 
 			if err == nil {
 				if c.err {

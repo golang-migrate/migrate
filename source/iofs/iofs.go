@@ -9,7 +9,12 @@ import (
 	"io"
 	"io/fs"
 	"path"
+	"path/filepath"
+	"regexp"
 	"strconv"
+
+	"github.com/Masterminds/semver/v3"
+	"github.com/sigurn/crc8"
 
 	"github.com/golang-migrate/migrate/v4/source"
 )
@@ -45,6 +50,10 @@ type PartialDriver struct {
 	path       string
 }
 
+var semVerMigDirPat = regexp.MustCompile(
+	`^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$`,
+)
+
 // Init prepares not initialized IoFS instance to read migrations from a
 // io/fs#FS instance and a relative path.
 func (d *PartialDriver) Init(fsys fs.FS, path string) error {
@@ -52,28 +61,43 @@ func (d *PartialDriver) Init(fsys fs.FS, path string) error {
 	if err != nil {
 		return err
 	}
+	type migrationFilePair struct {
+		migration *source.Migration
+		file      fs.FileInfo
+	}
 
+	var list []migrationFilePair
 	ms := source.NewMigrations()
 	for _, e := range entries {
-		if e.IsDir() {
-			continue
-		}
-		m, err := source.DefaultParse(e.Name())
-		if err != nil {
-			continue
-		}
 		file, err := e.Info()
 		if err != nil {
 			return err
 		}
-		if !ms.Append(m) {
-			return source.ErrDuplicateMigration{
-				Migration: *m,
-				FileInfo:  file,
+		if !e.IsDir() {
+			m, err := source.DefaultParse(e.Name())
+			if err != nil {
+				continue
+			}
+			list = append(list, migrationFilePair{migration: m, file: file})
+		} else if e.IsDir() && semVerMigDirPat.MatchString(e.Name()) {
+			mlist, err := ParseSemVer(fsys, path, e.Name())
+			if err != nil {
+				continue
+			}
+			for _, sm := range mlist {
+				list = append(list, migrationFilePair{migration: sm, file: file})
 			}
 		}
 	}
 
+	for _, m := range list {
+		if !ms.Append(m.migration) {
+			return source.ErrDuplicateMigration{
+				Migration: *m.migration,
+				FileInfo:  m.file,
+			}
+		}
+	}
 	d.fsys = fsys
 	d.path = path
 	d.migrations = ms
@@ -173,4 +197,47 @@ func (d *PartialDriver) open(path string) (fs.File, error) {
 		}
 	}
 	return nil, err
+}
+
+// ParseSemVer returns Migration for matching Regex pattern.
+func ParseSemVer(fsys fs.FS, path string, semVerDir string) ([]*source.Migration, error) {
+	versionUint64, err := toBigInt(semVerDir)
+	if err != nil {
+		return nil, err
+	}
+	entries, err := fs.ReadDir(fsys, filepath.Join(path, semVerDir))
+	if err != nil {
+		return nil, err
+	}
+	migs := make([]*source.Migration, 0, 64)
+	for _, e := range entries {
+		mig, err := source.ParseSemVer(versionUint64, semVerDir, e.Name())
+		if err != nil {
+			return nil, err
+		}
+		migs = append(migs, mig)
+	}
+	return migs, nil
+}
+
+func toBigInt(vstr string) (uint64, error) {
+	var other string
+	v, err := semver.NewVersion(vstr)
+	if err != nil {
+		return 0, err
+	}
+	other = v.Prerelease()
+	var crc uint8
+	if other != "" {
+		table := crc8.MakeTable(crc8.CRC8_MAXIM)
+		crc = crc8.Checksum([]byte(other), table)
+	}
+
+	ver := v.Major()*100*100*1000 + v.Minor()*100*1000 + v.Patch()*1000
+	if crc == 0 {
+		ver += 999
+	} else {
+		ver += uint64(crc)
+	}
+	return ver, nil
 }

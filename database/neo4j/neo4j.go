@@ -8,10 +8,11 @@ import (
 	"strconv"
 	"sync/atomic"
 
-	"github.com/golang-migrate/migrate/v4/database"
-	"github.com/golang-migrate/migrate/v4/database/multistmt"
 	"github.com/hashicorp/go-multierror"
 	"github.com/neo4j/neo4j-go-driver/neo4j"
+
+	"github.com/golang-migrate/migrate/v4/database"
+	"github.com/golang-migrate/migrate/v4/database/multistmt"
 )
 
 func init() {
@@ -26,9 +27,7 @@ var (
 	DefaultMultiStatementMaxSize = 10 * 1 << 20 // 10 MB
 )
 
-var (
-	ErrNilConfig = fmt.Errorf("no config")
-)
+var ErrNilConfig = fmt.Errorf("no config")
 
 type Config struct {
 	MigrationsLabel       string
@@ -181,6 +180,10 @@ func (n *Neo4j) Run(migration io.Reader) (err error) {
 	return err
 }
 
+func (n *Neo4j) SetMigrationRecord(rec *database.MigrationRecord) error {
+	return n.SetVersion(rec.Version, rec.Dirty)
+}
+
 func (n *Neo4j) SetVersion(version int, dirty bool) (err error) {
 	session, err := n.driver.Session(neo4j.AccessModeWrite)
 	if err != nil {
@@ -192,9 +195,13 @@ func (n *Neo4j) SetVersion(version int, dirty bool) (err error) {
 		}
 	}()
 
-	query := fmt.Sprintf("MERGE (sm:%s {version: $version}) SET sm.dirty = $dirty, sm.ts = datetime()",
-		n.config.MigrationsLabel)
-	_, err = neo4j.Collect(session.Run(query, map[string]interface{}{"version": version, "dirty": dirty}))
+	query := fmt.Sprintf(
+		"MERGE (sm:%s {version: $version}) SET sm.dirty = $dirty, sm.ts = datetime()",
+		n.config.MigrationsLabel,
+	)
+	_, err = neo4j.Collect(
+		session.Run(query, map[string]interface{}{"version": version, "dirty": dirty}),
+	)
 	if err != nil {
 		return err
 	}
@@ -220,30 +227,32 @@ func (n *Neo4j) Version() (version int, dirty bool, err error) {
 	query := fmt.Sprintf(`MATCH (sm:%s) RETURN sm.version AS version, sm.dirty AS dirty
 ORDER BY COALESCE(sm.ts, datetime({year: 0})) DESC, sm.version DESC LIMIT 1`,
 		n.config.MigrationsLabel)
-	result, err := session.ReadTransaction(func(transaction neo4j.Transaction) (interface{}, error) {
-		result, err := transaction.Run(query, nil)
-		if err != nil {
-			return nil, err
-		}
-		if result.Next() {
-			record := result.Record()
-			mr := MigrationRecord{}
-			versionResult, ok := record.Get("version")
-			if !ok {
-				mr.Version = database.NilVersion
-			} else {
-				mr.Version = int(versionResult.(int64))
+	result, err := session.ReadTransaction(
+		func(transaction neo4j.Transaction) (interface{}, error) {
+			result, err := transaction.Run(query, nil)
+			if err != nil {
+				return nil, err
 			}
+			if result.Next() {
+				record := result.Record()
+				mr := MigrationRecord{}
+				versionResult, ok := record.Get("version")
+				if !ok {
+					mr.Version = database.NilVersion
+				} else {
+					mr.Version = int(versionResult.(int64))
+				}
 
-			dirtyResult, ok := record.Get("dirty")
-			if ok {
-				mr.Dirty = dirtyResult.(bool)
+				dirtyResult, ok := record.Get("dirty")
+				if ok {
+					mr.Dirty = dirtyResult.(bool)
+				}
+
+				return mr, nil
 			}
-
-			return mr, nil
-		}
-		return nil, result.Err()
-	})
+			return nil, result.Err()
+		},
+	)
 	if err != nil {
 		return database.NilVersion, false, err
 	}
@@ -287,7 +296,15 @@ func (n *Neo4j) ensureVersionConstraint() (err error) {
 	using db.labels() to support Neo4j 3 and 4.
 	Neo4J 3 doesn't support db.constraints() YIELD name
 	*/
-	res, err := neo4j.Collect(session.Run(fmt.Sprintf("CALL db.labels() YIELD label WHERE label=\"%s\" RETURN label", n.config.MigrationsLabel), nil))
+	res, err := neo4j.Collect(
+		session.Run(
+			fmt.Sprintf(
+				"CALL db.labels() YIELD label WHERE label=\"%s\" RETURN label",
+				n.config.MigrationsLabel,
+			),
+			nil,
+		),
+	)
 	if err != nil {
 		return err
 	}
@@ -295,7 +312,10 @@ func (n *Neo4j) ensureVersionConstraint() (err error) {
 		return nil
 	}
 
-	query := fmt.Sprintf("CREATE CONSTRAINT ON (a:%s) ASSERT a.version IS UNIQUE", n.config.MigrationsLabel)
+	query := fmt.Sprintf(
+		"CREATE CONSTRAINT ON (a:%s) ASSERT a.version IS UNIQUE",
+		n.config.MigrationsLabel,
+	)
 	if _, err := neo4j.Collect(session.Run(query, nil)); err != nil {
 		return err
 	}

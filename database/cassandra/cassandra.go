@@ -9,12 +9,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gocql/gocql"
+	"github.com/hashicorp/go-multierror"
 	"go.uber.org/atomic"
 
-	"github.com/gocql/gocql"
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/golang-migrate/migrate/v4/database/multistmt"
-	"github.com/hashicorp/go-multierror"
 )
 
 func init() {
@@ -165,7 +165,8 @@ func (c *Cassandra) Open(url string) (database.Driver, error) {
 	}
 
 	if len(u.Query().Get("disable-host-lookup")) > 0 {
-		if flag, err := strconv.ParseBool(u.Query().Get("disable-host-lookup")); err != nil && flag {
+		if flag, err := strconv.ParseBool(u.Query().Get("disable-host-lookup")); err != nil &&
+			flag {
 			cluster.DisableInitialHostLookup = true
 		} else if err != nil {
 			return nil, err
@@ -243,6 +244,10 @@ func (c *Cassandra) Run(migration io.Reader) error {
 	return nil
 }
 
+func (c *Cassandra) SetMigrationRecord(rec *database.MigrationRecord) error {
+	return c.SetVersion(rec.Version, rec.Dirty)
+}
+
 func (c *Cassandra) SetVersion(version int, dirty bool) error {
 	// DELETE instead of TRUNCATE because AWS Keyspaces does not support it
 	// see: https://docs.aws.amazon.com/keyspaces/latest/devguide/cassandra-apis.html
@@ -293,7 +298,10 @@ func (c *Cassandra) Version() (version int, dirty bool, err error) {
 
 func (c *Cassandra) Drop() error {
 	// select all tables in current schema
-	query := fmt.Sprintf(`SELECT table_name from system_schema.tables WHERE keyspace_name='%s'`, c.config.KeyspaceName)
+	query := fmt.Sprintf(
+		`SELECT table_name from system_schema.tables WHERE keyspace_name='%s'`,
+		c.config.KeyspaceName,
+	)
 	iter := c.session.Query(query).Iter()
 	var tableName string
 	for iter.Scan(&tableName) {
@@ -324,7 +332,8 @@ func (c *Cassandra) ensureVersionTable() (err error) {
 		}
 	}()
 
-	err = c.session.Query(fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (version bigint, dirty boolean, PRIMARY KEY(version))", c.config.MigrationsTable)).Exec()
+	err = c.session.Query(fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (version bigint, dirty boolean, PRIMARY KEY(version))", c.config.MigrationsTable)).
+		Exec()
 	if err != nil {
 		return err
 	}
