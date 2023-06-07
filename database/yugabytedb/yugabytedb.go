@@ -14,6 +14,8 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/hashicorp/go-multierror"
+	"github.com/jackc/pgconn"
+	"github.com/jackc/pgerrcode"
 	"github.com/lib/pq"
 	"go.uber.org/atomic"
 )
@@ -462,18 +464,16 @@ func (c *YugabyteDB) newBackoff(ctx context.Context) backoff.BackOff {
 }
 
 func errIsRetryable(err error) bool {
-	pqErr := pq.Error{}
-	if !errors.As(err, &pqErr) {
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) {
 		return false
 	}
 
-	code := string(pqErr.Code)
-
 	// Assume that it's safe to retry 08006 and XX000 because we check for lock existence
 	// before creating and lock ID is primary key. Version field in migrations table is primary key too
-	// and delete all versions is an idempotend operation.
-	return code == "40001" || // Serialization error (optimistic locking conflict)
-		code == "40P01" || // Deadlock
-		code == "08006" || // Connection failure (node down, need to reconnect)
-		code == "XX000" // Internal error (may happen during HA)
+	// and delete all versions is an idempotent operation.
+	return pgErr.Code == pgerrcode.SerializationFailure || // optimistic locking conflict
+		pgErr.Code == pgerrcode.DeadlockDetected ||
+		pgErr.Code == pgerrcode.ConnectionFailure || // node down, need to reconnect
+		pgErr.Code == pgerrcode.InternalError // may happen during HA
 }
