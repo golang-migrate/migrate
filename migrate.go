@@ -166,6 +166,10 @@ func NewWithSourceInstance(sourceName string, sourceInstance source.Driver, data
 	return m, nil
 }
 
+// NewWithSourceInstance returns a new Migrate instance from an existing source instance
+// and an existing database instance. The database URL scheme is defined by each driver.
+// You are responsible for closing the underlying source client if necessary.
+// You are responsible for closing the underlying database client if necessary.
 func NewWithSourceAndDatabaseInstance(sourceName string, sourceInstance source.Driver, databaseName string, databaseInstance database.Driver) (*Migrate, error) {
 	m := newCommon()
 
