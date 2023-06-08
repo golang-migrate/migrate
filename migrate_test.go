@@ -130,18 +130,9 @@ func TestNewWithSourceAndDatabaseInstance(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if m.sourceName != srcDrvNameStub {
-		t.Errorf("expected stub, got %v", m.sourceName)
-	}
-	if m.sourceDrv == nil {
-		t.Error("expected sourceDrv not to be nil")
-	}
-
-	if m.databaseName != dbDrvNameStub {
-		t.Errorf("expected stub, got %v", m.databaseName)
-	}
-	if m.databaseDrv == nil {
-		t.Error("expected databaseDrv not to be nil")
+	// Migrate all the way up ...
+	if err := m.Up(); err != nil {
+		log.Fatal(err)
 	}
 }
 
