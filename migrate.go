@@ -166,6 +166,17 @@ func NewWithSourceInstance(sourceName string, sourceInstance source.Driver, data
 	return m, nil
 }
 
+func NewWithSourceAndDatabaseInstance(sourceName string, sourceInstance source.Driver, databaseName string, databaseInstance database.Driver) (*Migrate, error) {
+	m := newCommon()
+
+	m.databaseName = databaseName
+	m.sourceName = sourceName
+	m.databaseDrv = databaseInstance
+	m.sourceDrv = sourceInstance
+
+	return m, nil
+}
+
 // NewWithInstance returns a new Migrate instance from an existing source and
 // database instance. Use any string that can serve as an identifier during logging
 // as sourceName and databaseName. You are responsible for closing down
