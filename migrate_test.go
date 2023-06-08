@@ -102,6 +102,49 @@ func TestNewWithDatabaseInstance(t *testing.T) {
 	}
 }
 
+func TestNewWithSourceAndDatabaseInstance(t *testing.T) {
+	// Create and use an existing database instance.
+	db, err := sql.Open("postgres", "postgres://mattes:secret@localhost:5432/database?sslmode=disable")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+	dummySource := &DummyInstance{"source"}
+	sInst, err := sStub.WithInstance(dummySource, &sStub.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dbInst, err := dStub.WithInstance(db, &dStub.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	m, err := NewWithSourceAndDatabaseInstance("stub://", sInst, "postgres", dbInst)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if m.sourceName != srcDrvNameStub {
+		t.Errorf("expected stub, got %v", m.sourceName)
+	}
+	if m.sourceDrv == nil {
+		t.Error("expected sourceDrv not to be nil")
+	}
+
+	if m.databaseName != dbDrvNameStub {
+		t.Errorf("expected stub, got %v", m.databaseName)
+	}
+	if m.databaseDrv == nil {
+		t.Error("expected databaseDrv not to be nil")
+	}
+}
+
 func ExampleNewWithDatabaseInstance() {
 	// Create and use an existing database instance.
 	db, err := sql.Open("postgres", "postgres://mattes:secret@localhost:5432/database?sslmode=disable")
