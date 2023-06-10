@@ -1,0 +1,32 @@
+on:
+  workflow_call:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go: ["1.19.x", "1.20.x"]
+    services:
+      cassandra-3:
+        image: cassandra:3.0
+
+      cassandra-3.11:
+        image: cassandra:3.11
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-go@v3
+        with:
+          go-version: ${{ matrix.go }}
+
+      - name: Run test
+        run: make test COVERAGE_DIR=/tmp/coverage
+
+      - name: Send goveralls coverage
+        uses: shogo82148/actions-goveralls@v1
+        with:
+          path-to-profile: /tmp/coverage/combined.txt
+          flag-name: Go-${{ matrix.go }}
+          parallel: true

@@ -1,0 +1,11 @@
+on:
+  workflow_call:
+
+jobs:
+  check-coverage:
+    name: Check coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: shogo82148/actions-goveralls@v1
+        with:
+          parallel-finished: true
