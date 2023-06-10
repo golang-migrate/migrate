@@ -1,0 +1,22 @@
+version: '3'
+
+services:
+  cassandra3:
+    image: cassandra:3.0
+    ports:
+      - 9042:9042
+
+  cassandra3.11:
+    image: cassandra:3.11
+    ports:
+      - 9043:9042
+  
+  clickhouse:
+    image: "yandex/clickhouse-server:21.3"
+    ports:
+      - 9000:9000
+    
+    environment:
+      - CLICKHOUSE_USER=user
+      - CLICKHOUSE_PASSWORD=password
+      - CLICKHOUSE_DB=db

@@ -3,7 +3,6 @@ package cassandra
 import (
 	"fmt"
 	"os"
-	"strconv"
 	"testing"
 
 	"github.com/gocql/gocql"
@@ -11,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
+	"github.com/golang-migrate/migrate/v4/helper/envvars"
 
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
@@ -23,16 +23,16 @@ const (
 )
 
 func TestCasandraTable(t *testing.T) {
-	Cassandra3_Host := os.Getenv("CASSANDRA3_HOST")
-	Cassandra3_Port := os.Getenv("CASSANDRA3_PORT")
+	Cassandra3_Host := envvars.GetVarOrString("CASSANDRA3_HOST", "localhost")
+	Cassandra3_Port := envvars.GetVarOrInt("CASSANDRA3_PORT", 9042)
 
-	Cassandra3_11_Host := os.Getenv("CASSANDRA3.11_HOST")
-	Cassandra3_11_Port := os.Getenv("CASSANDRA3.11_PORT")
+	Cassandra3_11_Host := envvars.GetVarOrString("CASSANDRA3.11_HOST", "localhost")
+	Cassandra3_11_Port := envvars.GetVarOrInt("CASSANDRA3.11_PORT", 9043)
 
 	cases := []struct {
 		description string
 		host        string
-		port        string
+		port        int
 		mode        TestMode
 	}{
 		{
@@ -50,30 +50,26 @@ func TestCasandraTable(t *testing.T) {
 		{
 			description: "Test Cassandra 3.11",
 			host:        Cassandra3_11_Host,
-			port:        "9043",
+			port:        Cassandra3_11_Port,
 			mode:        SimpleTest,
 		},
 		{
 			description: "Test Cassandra 3.11",
 			host:        Cassandra3_11_Host,
-			port:        "9043",
+			port:        Cassandra3_11_Port,
 			mode:        MigrationTest,
 		},
 	}
 
 	for _, tt := range cases {
 		t.Run(tt.description, func(t *testing.T) {
-			ip, port := getHostAndPort()
-
-			portAsInt, portAsIntErr := strconv.Atoi(port)
-			assert.NoError(t, portAsIntErr, "could not convert port to int")
-			isReady(t, ip, portAsInt)
-			defer cleanUp(t, ip, portAsInt)
+			isReady(t, tt.host, tt.port)
 
 			p := &Cassandra{}
-			d, err := p.Open(fmt.Sprintf("cassandra://%v:%v/testks", ip, port))
+			d, err := p.Open(fmt.Sprintf("cassandra://%v:%v/testks", tt.host, tt.port))
 			assert.NoError(t, err, "could not open cassandra instance")
 
+			defer cleanUp(t, tt.host, tt.port)
 			defer func() {
 				assert.NoError(t, d.Close(), "could not close  cassandra instance")
 			}()
