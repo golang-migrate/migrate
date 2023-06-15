@@ -24,13 +24,13 @@ type Func struct {
 }
 
 // Open implements source.Driver.
-func (b *Func) Open(url string) (source.Driver, error) {
+func (fn *Func) Open(url string) (source.Driver, error) {
 	return nil, fmt.Errorf("not yet implemented")
 }
 
 // WithInstance returns a source.Driver that is backed by an map of Migrations.
 func WithInstance(mgrs map[string]*Migration) (source.Driver, error) {
-	gb := &Func{
+	fn := &Func{
 		migrations: source.NewMigrations(),
 	}
 
@@ -55,51 +55,51 @@ func WithInstance(mgrs map[string]*Migration) (source.Driver, error) {
 		}
 		m.Executor = exec
 
-		if !gb.migrations.Append(m) {
+		if !fn.migrations.Append(m) {
 			return nil, fmt.Errorf("unable to parse key %v", k)
 		}
 	}
 
-	return gb, nil
+	return fn, nil
 }
 
-func (gb *Func) Close() error {
+func (fn *Func) Close() error {
 	return nil
 }
 
-func (gb *Func) First() (version uint, err error) {
-	v, ok := gb.migrations.First()
+func (fn *Func) First() (version uint, err error) {
+	v, ok := fn.migrations.First()
 	if !ok {
 		return 0, os.ErrNotExist
 	}
 	return v, nil
 }
 
-func (gb *Func) Prev(version uint) (prevVersion uint, err error) {
-	v, ok := gb.migrations.Prev(version)
+func (fn *Func) Prev(version uint) (prevVersion uint, err error) {
+	v, ok := fn.migrations.Prev(version)
 	if !ok {
 		return 0, os.ErrNotExist
 	}
 	return v, nil
 }
 
-func (gb *Func) Next(version uint) (nextVersion uint, err error) {
-	v, ok := gb.migrations.Next(version)
+func (fn *Func) Next(version uint) (nextVersion uint, err error) {
+	v, ok := fn.migrations.Next(version)
 	if !ok {
 		return 0, os.ErrNotExist
 	}
 	return v, nil
 }
 
-func (gb *Func) ReadUp(version uint) (r io.ReadCloser, e source.Executor, identifier string, err error) {
-	if m, ok := gb.migrations.Up(version); ok {
+func (fn *Func) ReadUp(version uint) (r io.ReadCloser, e source.Executor, identifier string, err error) {
+	if m, ok := fn.migrations.Up(version); ok {
 		return nil, m.Executor, m.Identifier, nil
 	}
 	return nil, nil, "", os.ErrNotExist
 }
 
-func (gb *Func) ReadDown(version uint) (r io.ReadCloser, e source.Executor, identifier string, err error) {
-	if m, ok := gb.migrations.Down(version); ok {
+func (fn *Func) ReadDown(version uint) (r io.ReadCloser, e source.Executor, identifier string, err error) {
+	if m, ok := fn.migrations.Down(version); ok {
 		return nil, m.Executor, m.Identifier, nil
 	}
 	return nil, nil, "", os.ErrNotExist
