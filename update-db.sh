@@ -1,5 +1,5 @@
 #!/bin/sh
-# This is a script to migrate the SQL database with up-to date data
+# This is a script to migrate the SQL database with up-to date data or force the database back to certain version
 #
 # Usage ./update-db.sh
 
