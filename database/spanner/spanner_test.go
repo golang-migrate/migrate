@@ -14,11 +14,11 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 
 	database "cloud.google.com/go/spanner/admin/database/apiv1"
+	"cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
 	instance "cloud.google.com/go/spanner/admin/instance/apiv1"
+	"cloud.google.com/go/spanner/admin/instance/apiv1/instancepb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	databasepb "google.golang.org/genproto/googleapis/spanner/admin/database/v1"
-	instancepb "google.golang.org/genproto/googleapis/spanner/admin/instance/v1"
 )
 
 const (
