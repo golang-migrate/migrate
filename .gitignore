@@ -8,3 +8,4 @@ vendor/
 .vscode/
 .idea
 dist/
+migrate
