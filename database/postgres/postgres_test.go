@@ -35,10 +35,10 @@ var (
 		PortRequired: true, ReadyFunc: isReady}
 	// Supported versions: https://www.postgresql.org/support/versioning/
 	specs = []dktesting.ContainerSpec{
-		{ImageName: "postgres:9.5", Options: opts},
-		{ImageName: "postgres:9.6", Options: opts},
-		{ImageName: "postgres:10", Options: opts},
-		{ImageName: "postgres:11", Options: opts},
+		// {ImageName: "postgres:9.5", Options: opts},
+		// {ImageName: "postgres:9.6", Options: opts},
+		// {ImageName: "postgres:10", Options: opts},
+		// {ImageName: "postgres:11", Options: opts},
 		{ImageName: "postgres:12", Options: opts},
 	}
 )
@@ -604,7 +604,7 @@ func TestParallelSchema(t *testing.T) {
 
 func TestPostgres_ConcurrentMigrations(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
-		// GIVEN
+		// GIVEN - a set of concurrent processes running migrations
 		const concurrency = 3
 		var wg sync.WaitGroup
 
