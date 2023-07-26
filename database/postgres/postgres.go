@@ -257,6 +257,8 @@ func (p *Postgres) tryLock() (bool, error) {
 		return false, err
 	}
 
+	// https://www.postgresql.org/docs/current/functions-admin.html#FUNCTIONS-ADVISORY-LOCKS
+	// should always return true or false
 	query := `SELECT pg_try_advisory_lock($1)`
 	var ok bool
 	if err := p.conn.QueryRowContext(context.Background(), query, aid).Scan(&ok); err != nil {
