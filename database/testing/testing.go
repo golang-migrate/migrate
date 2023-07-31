@@ -29,6 +29,12 @@ func Test(t *testing.T, d database.Driver, migration []byte) {
 }
 
 func TestNilVersion(t *testing.T, d database.Driver) {
+	if err := d.Begin(); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		_ = d.Rollback()
+	}()
 	v, err := d.Version()
 	if err != nil {
 		t.Fatal(err)
@@ -104,12 +110,30 @@ func TestRun(t *testing.T, d database.Driver, migration io.Reader) {
 		t.Fatal("migration can't be nil")
 	}
 
+	if err := d.Begin(); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := d.Commit(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
 	if err := d.Run(migration); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestDrop(t *testing.T, d database.Driver) {
+	if err := d.Begin(); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := d.Commit(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
 	if err := d.Drop(); err != nil {
 		t.Fatal(err)
 	}
@@ -172,6 +196,17 @@ func TestSetVersion(t *testing.T, d database.Driver) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			if err := d.Begin(); err != nil {
+				t.Fatal(tc.name, "unexpected error, on Begin", err)
+			}
+
+			// no-op if committed
+			defer func() {
+				if err := d.Rollback(); err != nil {
+					t.Logf("error on rollback %v", err)
+				}
+			}()
+
 			err := d.SetVersion(tc.version, tc.dirty)
 			if err != tc.expectedErr {
 				t.Fatal(tc.name, "Got unexpected error:", err, "!=", tc.expectedErr)
@@ -186,6 +221,10 @@ func TestSetVersion(t *testing.T, d database.Driver) {
 			}
 			if v.Dirty != tc.expectedDirty {
 				t.Error(tc.name, "Got unexpected dirty value:", v.Dirty, "!=", tc.dirty)
+			}
+
+			if err := d.Commit(); err != nil {
+				t.Fatal(err)
 			}
 		})
 	}

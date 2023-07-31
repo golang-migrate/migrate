@@ -753,8 +753,15 @@ func (m *Migrate) runMigrations(ret <-chan interface{}) error {
 		case *Migration:
 			migr := r
 
+			if err := m.databaseDrv.Begin(); err != nil {
+				return err
+			}
+
 			// set version with dirty state
 			if err := m.databaseDrv.SetVersion(migr.TargetVersion, true); err != nil {
+				if err := m.databaseDrv.Rollback(); err != nil {
+					m.logErr(err)
+				}
 				return err
 			}
 
@@ -763,6 +770,9 @@ func (m *Migrate) runMigrations(ret <-chan interface{}) error {
 				if err := m.databaseDrv.Run(migr.BufferedBody); err != nil {
 					if err := m.databaseDrv.SetFailed(migr.TargetVersion,
 						err); err != nil {
+						if err := m.databaseDrv.Rollback(); err != nil {
+							m.logErr(err)
+						}
 						m.logErr(err)
 					}
 					return err
@@ -771,6 +781,15 @@ func (m *Migrate) runMigrations(ret <-chan interface{}) error {
 
 			// set clean state
 			if err := m.databaseDrv.SetVersion(migr.TargetVersion, false); err != nil {
+				m.logErr(err)
+				if err := m.databaseDrv.Rollback(); err != nil {
+					m.logErr(err)
+				}
+				return err
+			}
+
+			if err := m.databaseDrv.Commit(); err != nil {
+				m.logErr(err)
 				return err
 			}
 

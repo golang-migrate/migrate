@@ -93,6 +93,15 @@ type Driver interface {
 	// Note that this is a breaking action, a new call to Open() is necessary to
 	// ensure subsequent calls work as expected.
 	Drop() error
+
+	// Begin driver to begin transaction here
+	Begin() error
+
+	// Commit driver to commit transaction here
+	Commit() error
+
+	// Rollback driver to rollback here
+	Rollback() error
 }
 
 // Open returns a new driver instance.

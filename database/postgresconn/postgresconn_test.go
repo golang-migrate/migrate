@@ -162,6 +162,74 @@ func TestMultipleStatements(t *testing.T) {
 	})
 }
 
+func TestBeginAndRollback(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := pgConnectionString(ip, port)
+		p := &Postgres{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
+
+		if err := d.Begin(); err != nil {
+			t.Fatal(err)
+		}
+
+		// set version to 1, we'll check version record exists during and after tx.
+		if err := d.SetVersion(1, false); err != nil {
+			t.Fatal(err)
+		}
+
+		var exists bool
+		if err := d.(*Postgres).conn.QueryRowContext(context.Background(),
+			fmt.Sprintf("SELECT 1 FROM %s WHERE version = 1", DefaultMigrationsTable)).Scan(&exists); err != nil {
+			t.Fatal(err)
+		}
+		if !exists {
+			t.Fatal("expected to find version 1")
+		}
+
+		if err := d.Run(strings.NewReader("CREATE TABLE a (c1 text)")); err != nil {
+			t.Fatalf("expected err to be nil, got %v", err)
+		}
+
+		if err := d.Rollback(); err != nil {
+			t.Fatal(err)
+		}
+
+		// make sure table does not exist after rollback
+		if err := d.(*Postgres).conn.QueryRowContext(context.Background(),
+			"SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'a' AND table_schema = (SELECT current_schema()))").Scan(&exists); err != nil {
+			t.Fatal(err)
+		}
+		if exists {
+			t.Fatalf("unexpected, table a should not exist(rollback)")
+		}
+
+		if err := d.(*Postgres).conn.QueryRowContext(context.Background(),
+			fmt.Sprintf("SELECT 1 FROM %s WHERE version = 1", DefaultMigrationsTable)).Scan(&exists); err != nil {
+			// ErrNoRows is good, we expect not to find version one since it should have
+			// rolled back.
+			if !errors.Is(err, sql.ErrNoRows) {
+				t.Fatal(err)
+			}
+		}
+		if exists {
+			t.Fatal("expected no version 1 record after rollback")
+		}
+	})
+}
+
 func TestMultipleStatementsInMultiStatementMode(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.FirstPort()
@@ -180,7 +248,7 @@ func TestMultipleStatementsInMultiStatementMode(t *testing.T) {
 				t.Error(err)
 			}
 		}()
-		if err := d.Run(strings.NewReader("CREATE TABLE foo (foo text); CREATE INDEX CONCURRENTLY idx_foo ON foo (foo);")); err != nil {
+		if err := d.Run(strings.NewReader("CREATE TABLE foo (foo text); CREATE INDEX idx_foo ON foo (foo);")); err != nil {
 			t.Fatalf("expected err to be nil, got %v", err)
 		}
 

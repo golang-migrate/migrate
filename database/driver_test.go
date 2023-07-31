@@ -56,6 +56,18 @@ func (m *mockDriver) SetFailed(_ int, _ error) error {
 	return nil
 }
 
+func (m *mockDriver) Begin() error {
+	return nil
+}
+
+func (m *mockDriver) Commit() error {
+	return nil
+}
+
+func (m *mockDriver) Rollback() error {
+	return nil
+}
+
 func TestRegisterTwice(t *testing.T) {
 	Register("mock", &mockDriver{})
 

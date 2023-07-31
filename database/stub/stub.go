@@ -1,10 +1,11 @@
 package stub
 
 import (
-	"go.uber.org/atomic"
 	"io"
 	"io/ioutil"
 	"reflect"
+
+	"go.uber.org/atomic"
 
 	"github.com/getoutreach/migrate/v4/database"
 )
@@ -98,4 +99,16 @@ func (s *Stub) SetFailed(version int, err error) error {
 
 func (s *Stub) EqualSequence(seq []string) bool {
 	return reflect.DeepEqual(seq, s.MigrationSequence)
+}
+
+func (m *Stub) Begin() error {
+	return nil
+}
+
+func (m *Stub) Commit() error {
+	return nil
+}
+
+func (m *Stub) Rollback() error {
+	return nil
 }

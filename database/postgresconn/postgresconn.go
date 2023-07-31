@@ -7,7 +7,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/getoutreach/migrate/v4"
 	"io"
 	nurl "net/url"
 	"regexp"
@@ -15,13 +14,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/getoutreach/migrate/v4"
+
 	"go.uber.org/atomic"
 
-	"github.com/getoutreach/migrate/v4/database"
-	"github.com/getoutreach/migrate/v4/database/multistmt"
 	"github.com/hashicorp/go-multierror"
 	"github.com/lib/pq"
 	"github.com/pkg/errors"
+
+	"github.com/getoutreach/migrate/v4/database"
+	"github.com/getoutreach/migrate/v4/database/multistmt"
 )
 
 func init() {
@@ -62,6 +64,10 @@ type Postgres struct {
 	isLocked atomic.Bool
 	// Open and WithConn need to guarantee that config is never nil
 	config *Config
+	// tx transaction surrounding migration
+	tx *sql.Tx
+	// context used during migrations
+	ctx context.Context
 }
 
 func WithConn(ctx context.Context, conn *sql.Conn, config *Config) (database.Driver, error) {
@@ -202,16 +208,16 @@ func (p *Postgres) Unlock() error {
 
 func (p *Postgres) Run(migration io.Reader) error {
 	var currentSchema string
-	if err := p.conn.QueryRowContext(context.Background(), "select current_schema()").Scan(&currentSchema); err != nil {
+	if err := p.conn.QueryRowContext(p.context(), "select current_schema()").Scan(&currentSchema); err != nil {
 		return err
 	}
 
 	err := multistmt.Parse(migration, multiStmtDelimiter, p.config.MultiStatementMaxSize, p.config.SchemaName, func(m []byte) error {
 		if err := p.runStatement(m); err != nil {
-			// the err returned here will include the failed statement but not the
-			//stack. Using errors.WithStack forces stack into the error.
-			//Testing shows this generates a pretty readable stack trace and records
-			//the stack in the schema migrations version table.
+			// the 'err' returned here will include the failed statement but not the
+			// stack. Using errors.WithStack forces stack into the error.
+			// Testing shows this generates a pretty readable stack trace and records
+			// the stack in the schema migrations version table.
 			return errors.WithStack(err)
 		}
 		return nil
@@ -220,10 +226,10 @@ func (p *Postgres) Run(migration io.Reader) error {
 }
 
 func (p *Postgres) runStatement(statement []byte) error {
-	ctx := context.Background()
+	ctx := p.context()
 	if p.config.StatementTimeout != 0 {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, p.config.StatementTimeout)
+		ctx, cancel = context.WithTimeout(p.ctx, p.config.StatementTimeout)
 		defer cancel()
 	}
 	query := string(statement)
@@ -253,6 +259,8 @@ func (p *Postgres) runStatement(statement []byte) error {
 
 		return database.Error{OrigErr: err, Err: "migration failed", Query: statement}
 	}
+
+	// exec was successful, commit here, then nothing to rollback
 	return nil
 }
 
@@ -292,15 +300,15 @@ func runesLastIndex(input []rune, target rune) int {
 }
 
 func (p *Postgres) SetVersion(version int, dirty bool) error {
-	ctx := context.Background()
-	tx, err := p.conn.BeginTx(ctx, &sql.TxOptions{})
-	if err != nil {
-		return &database.Error{OrigErr: err, Err: "transaction start failed"}
-	}
+	// This function used to use its own transaction for writing
+	// dirty to the schema_version. But since we moved to externally
+	// managed transaction, we want the version to rollback when the
+	// migration fails. At some point it probably makes sense to remove
+	// dirty flag.
 
 	// check for in progress version, if it exists use the in-progress
 	// version to record the dirty, info etc. values.
-	row := tx.QueryRowContext(ctx,
+	row := p.conn.QueryRowContext(p.context(),
 		fmt.Sprintf(
 			`SELECT id FROM %q.%q WHERE version = $1 ORDER BY created_at DESC limit 1`,
 			p.config.migrationsSchemaName, p.config.migrationsTableName), version)
@@ -313,10 +321,7 @@ func (p *Postgres) SetVersion(version int, dirty bool) error {
 			stmt := fmt.Sprintf(`INSERT INTO %q.%q`+
 				` (version, dirty, created_at) VALUES ($1, $2, now())`,
 				p.config.migrationsSchemaName, p.config.migrationsTableName)
-			if _, err := tx.ExecContext(ctx, stmt, version, dirty); err != nil {
-				if errRollback := tx.Rollback(); errRollback != nil {
-					err = multierror.Append(err, errRollback)
-				}
+			if _, err := p.conn.ExecContext(p.context(), stmt, version, dirty); err != nil {
 				return &database.Error{OrigErr: err, Query: []byte(stmt)}
 			}
 		}
@@ -325,21 +330,15 @@ func (p *Postgres) SetVersion(version int, dirty bool) error {
 			`UPDATE %q.%q SET dirty = $1, updated_at = now() WHERE id = $2`,
 			p.config.migrationsSchemaName,
 			p.config.migrationsTableName)
-		if _, err := tx.ExecContext(ctx, stmt, dirty, id); err != nil {
-			if errRollback := tx.Rollback(); errRollback != nil {
-				err = multierror.Append(err, errRollback)
-			}
+		if _, err := p.conn.ExecContext(p.context(), stmt, dirty, id); err != nil {
 			return &database.Error{OrigErr: err, Query: []byte(stmt)}
 		}
-	}
-
-	if err := tx.Commit(); err != nil {
-		return &database.Error{OrigErr: err, Err: "transaction commit failed"}
 	}
 
 	return nil
 }
 
+// Version get version from schema version table
 func (p *Postgres) Version() (*database.Version, error) {
 	stmt := fmt.Sprintf(`SELECT version, dirty, info, current_schema() FROM %q.%q`+
 		` ORDER BY created_at desc nulls last LIMIT 1`,
@@ -352,7 +351,7 @@ func (p *Postgres) Version() (*database.Version, error) {
 		infoStr       sql.NullString
 		currentSchema string
 	)
-	err := p.conn.QueryRowContext(context.Background(), stmt).Scan(&version, &dirty,
+	err := p.conn.QueryRowContext(p.context(), stmt).Scan(&version, &dirty,
 		&infoStr, &currentSchema)
 	if infoStr.Valid {
 		info = infoStr.String
@@ -393,7 +392,7 @@ func (p *Postgres) Version() (*database.Version, error) {
 func (p *Postgres) Drop() (err error) {
 	// select all tables in current schema
 	stmt := `SELECT table_name FROM information_schema.tables WHERE table_schema=(SELECT current_schema()) AND table_type='BASE TABLE'`
-	tables, err := p.conn.QueryContext(context.Background(), stmt)
+	tables, err := p.conn.QueryContext(p.context(), stmt)
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(stmt)}
 	}
@@ -422,7 +421,7 @@ func (p *Postgres) Drop() (err error) {
 		// delete one by one ...
 		for _, t := range tableNames {
 			stmt = `DROP TABLE IF EXISTS ` + pq.QuoteIdentifier(t) + ` CASCADE`
-			if _, err := p.conn.ExecContext(context.Background(), stmt); err != nil {
+			if _, err := p.conn.ExecContext(p.context(), stmt); err != nil {
 				return &database.Error{OrigErr: err, Query: []byte(stmt)}
 			}
 		}
@@ -452,7 +451,7 @@ func (p *Postgres) ensureVersionTable() (err error) {
 	stmt := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %q.%q`+
 		` (version bigint not null, dirty boolean not null)`,
 		p.config.migrationsSchemaName, p.config.migrationsTableName)
-	if _, err = p.conn.ExecContext(context.Background(), stmt); err != nil {
+	if _, err = p.conn.ExecContext(p.context(), stmt); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(stmt)}
 	}
 
@@ -462,14 +461,14 @@ func (p *Postgres) ensureVersionTable() (err error) {
 		`ADD COLUMN IF NOT EXISTS updated_at timestamp with time zone NULL, `+
 		`ADD COLUMN IF NOT EXISTS info text NULL`,
 		p.config.migrationsSchemaName, p.config.migrationsTableName)
-	if _, err = p.conn.ExecContext(context.Background(), stmt); err != nil {
+	if _, err = p.conn.ExecContext(p.context(), stmt); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(stmt)}
 	}
 
 	// adds index to the created_at to ensure queries ordering by created_at are snappy
 	stmt = fmt.Sprintf(`CREATE INDEX IF NOT EXISTS idx_on_created_at on %q.%q (created_at)`,
 		p.config.migrationsSchemaName, p.config.migrationsTableName)
-	if _, err = p.conn.ExecContext(context.Background(), stmt); err != nil {
+	if _, err = p.conn.ExecContext(p.context(), stmt); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(stmt)}
 	}
 
@@ -494,16 +493,15 @@ func (p *Postgres) ensureVersionTable() (err error) {
 func (p *Postgres) ensurePrimaryKeyExists() error {
 	// adding primary key will fill in missing primary key column values with values from the sequence.
 	// alter table schema_version add column id bigserial primary key
-	ctx := context.Background()
 	oldPrimaryKeyName := "schema_version_pkey"
-	// Remove the old (column name: versio) primary key if it exists
+	// Remove the old (column name: version) primary key if it exists
 	exists, err := p.primaryKeyExists(p.config.MigrationsTable, "version")
 	if err != nil {
 		return err
 	}
 	if exists {
 		// drop the constraint but not the column, keep the version column
-		_, err = p.conn.ExecContext(ctx,
+		_, err = p.conn.ExecContext(p.context(),
 			fmt.Sprintf(`ALTER TABLE %q DROP CONSTRAINT %s`,
 				p.config.MigrationsTable, oldPrimaryKeyName))
 		if err != nil {
@@ -518,7 +516,7 @@ func (p *Postgres) ensurePrimaryKeyExists() error {
 	}
 	if !exists {
 		// generated column will be schema_version_pkey
-		_, err = p.conn.ExecContext(ctx,
+		_, err = p.conn.ExecContext(p.context(),
 			fmt.Sprintf(`ALTER TABLE %q ADD COLUMN id BIGSERIAL PRIMARY KEY`,
 				p.config.MigrationsTable))
 		if err != nil {
@@ -530,7 +528,6 @@ func (p *Postgres) ensurePrimaryKeyExists() error {
 
 // primaryKeyExists query for named table constraint
 func (p *Postgres) primaryKeyExists(tableName, primaryKeyName string) (bool, error) {
-	ctx := context.Background()
 	stmt := fmt.Sprintf(`SELECT 1
 FROM pg_index
   JOIN pg_attribute a ON a.attrelid = pg_index.indrelid AND a.attnum = ANY(pg_index.indkey)
@@ -542,7 +539,7 @@ WHERE pg_index.indrelid = '%s'::regclass
   and a.attname = '%s'
 AND format_type(a.atttypid, a.atttypmod) = 'bigint'`, tableName, primaryKeyName)
 	// We expect one row to come back, for the id bigserial(bigint) column
-	rows := p.conn.QueryRowContext(ctx, stmt)
+	rows := p.conn.QueryRowContext(p.context(), stmt)
 	var exists int
 	err := rows.Scan(&exists)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -560,7 +557,6 @@ AND format_type(a.atttypid, a.atttypmod) = 'bigint'`, tableName, primaryKeyName)
 
 // ensureUniqueConstraintExists will add new unique constraint to the schema version table
 func (p *Postgres) ensureUniqueConstraintExists() error {
-	ctx := context.Background()
 	exists, err := p.uniqueConstraintExists(p.config.MigrationsTable, "version")
 	if err != nil {
 		return err
@@ -569,7 +565,7 @@ func (p *Postgres) ensureUniqueConstraintExists() error {
 		return nil
 	}
 
-	_, err = p.conn.ExecContext(ctx,
+	_, err = p.conn.ExecContext(p.context(),
 		fmt.Sprintf(`ALTER TABLE %q ADD CONSTRAINT unique_version UNIQUE (version)`,
 			p.config.MigrationsTable))
 	if err != nil {
@@ -581,7 +577,6 @@ func (p *Postgres) ensureUniqueConstraintExists() error {
 // uniqueConstraintExists check existence of unique constraint
 // only supports single column unique check, could add array support for multiple columns
 func (p *Postgres) uniqueConstraintExists(tableName, columnName string) (bool, error) {
-	ctx := context.Background()
 	stmt := fmt.Sprintf(`SELECT 1
 FROM pg_index
   JOIN pg_attribute a ON a.attrelid = pg_index.indrelid AND a.attnum = ANY(pg_index.indkey)
@@ -593,7 +588,7 @@ WHERE pg_index.indrelid = '%s'::regclass
   and a.attname = '%s'
 AND format_type(a.atttypid, a.atttypmod) = 'bigint'`, tableName, columnName)
 	// We expect one row to come back, for the version column and
-	rows := p.conn.QueryRowContext(ctx, stmt)
+	rows := p.conn.QueryRowContext(p.context(), stmt)
 	var exists int
 	err := rows.Scan(&exists)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -611,11 +606,70 @@ AND format_type(a.atttypid, a.atttypmod) = 'bigint'`, tableName, columnName)
 
 // SetFailed set the current migration to failed and record the failure in the database
 func (p *Postgres) SetFailed(version int, err error) error {
-	ctx := context.Background()
 	stmt := fmt.Sprintf(`UPDATE %q.%q SET info = $1 where version = $2`,
 		p.config.migrationsSchemaName, p.config.migrationsTableName)
-	if _, err := p.conn.ExecContext(ctx, stmt, fmt.Sprintf("%+v", err), version); err != nil {
+	if _, err := p.conn.ExecContext(p.context(), stmt, fmt.Sprintf("%+v", err), version); err != nil {
 		return err
 	}
 	return nil
+}
+
+// Begin begins transaction
+func (p *Postgres) Begin() error {
+	if p.tx != nil {
+		return fmt.Errorf("transaction already started")
+	}
+
+	p.ctx = context.Background()
+	tx, err := p.conn.BeginTx(p.ctx, nil)
+	if err != nil {
+		return err
+	}
+	// capture tx so we know a transaction was started
+	p.tx = tx
+	return nil
+}
+
+// Commit commits in progress transaction
+func (p *Postgres) Commit() error {
+	if p.tx == nil {
+		return fmt.Errorf("no transaction in progress")
+	}
+
+	defer func() {
+		// reset p.tx so a new transaction can be started
+		p.tx = nil
+	}()
+
+	if err := p.tx.Commit(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Rollback rolls back in progress transaction
+func (p *Postgres) Rollback() error {
+	if p.tx == nil {
+		return fmt.Errorf("no transaction in progress")
+	}
+
+	defer func() {
+		// reset p.tx so a new transaction can be started
+		p.tx = nil
+	}()
+
+	if err := p.tx.Rollback(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Context returns the a context that was created when transactions begins, or a
+// background context if no context is set(no transaction started).
+func (p *Postgres) context() context.Context {
+	if p.ctx == nil {
+		p.ctx = context.Background()
+	}
+	return p.ctx
 }
