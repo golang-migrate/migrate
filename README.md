@@ -142,7 +142,7 @@ func main() {
     db, err := sql.Open("postgres", "postgres://localhost:5432/database?sslmode=enable")
     driver, err := postgres.WithInstance(db, &postgres.Config{})
     m, err := migrate.NewWithDatabaseInstance(
-        "file:///migrations",
+        "file://migrations",
         "postgres", driver)
     m.Up() // or m.Step(2) if you want to explicitly set the number of migrations to run
 }
