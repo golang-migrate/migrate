@@ -8,19 +8,17 @@ import (
 	sqldriver "database/sql/driver"
 	"errors"
 	"fmt"
-	"log"
-
 	"io"
+	"log"
 	"strconv"
 	"strings"
 	"sync"
 	"testing"
 
-	"github.com/golang-migrate/migrate/v4"
-
 	"github.com/dhui/dktest"
-
+	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
+
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
 	"github.com/golang-migrate/migrate/v4/dktesting"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
@@ -41,6 +39,9 @@ var (
 		{ImageName: "postgres:10", Options: opts},
 		{ImageName: "postgres:11", Options: opts},
 		{ImageName: "postgres:12", Options: opts},
+		{ImageName: "postgres:13", Options: opts},
+		{ImageName: "postgres:14", Options: opts},
+		{ImageName: "postgres:15", Options: opts},
 	}
 )
 

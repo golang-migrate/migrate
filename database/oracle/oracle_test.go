@@ -3,83 +3,93 @@ package oracle
 import (
 	"bytes"
 	"context"
+	"database/sql"
+	sqldriver "database/sql/driver"
 	"fmt"
+	"io"
+	"log"
 	"os"
-	"path/filepath"
 	"testing"
-	"time"
 
-	"github.com/docker/go-connections/nat"
+	"github.com/dhui/dktest"
 	"github.com/golang-migrate/migrate/v4"
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
+	"github.com/golang-migrate/migrate/v4/dktesting"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/wait"
 )
 
-type oracleSuite struct {
-	suite.Suite
-	dsn       string
-	container testcontainers.Container
+const (
+	orclPassword = "postgres"
+)
+
+var (
+	opts = dktest.Options{
+		Env:          map[string]string{"ORACLE_PWD": orclPassword},
+		PortRequired: true, ReadyFunc: isReady}
+	specs = []dktesting.ContainerSpec{
+		{ImageName: "container-registry.oracle.com/database/express:18.4.0-xe", Options: opts},
+	}
+)
+
+func orclConnectionString(host, port string, options ...string) string {
+	options = append(options, "sslmode=disable")
+	return fmt.Sprintf("oracle://orcl:%s@%s:%s/XEPDB1", orclPassword, host, port)
 }
 
-func (s *oracleSuite) SetupSuite() {
-	dsn := os.Getenv("ORACLE_DSN")
-	if dsn != "" {
-		s.dsn = dsn
-		return
-	}
-
-	username := "orcl"
-	password := "orcl"
-	db := "XEPDB1"
-	nPort, err := nat.NewPort("tcp", "1521")
+func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
+	ip, port, err := c.FirstPort()
 	if err != nil {
-		return
-	}
-	cwd, _ := os.Getwd()
-	req := testcontainers.ContainerRequest{
-		Image:        "container-registry.oracle.com/database/express:18.4.0-xe",
-		ExposedPorts: []string{nPort.Port()},
-		Env: map[string]string{
-			// password for SYS and SYSTEM users
-			"ORACLE_PWD": password,
-		},
-		Mounts: testcontainers.ContainerMounts{
-			testcontainers.BindMount(filepath.Join(cwd, "testdata/user.sql"), "/opt/oracle/scripts/setup/user.sql"),
-		},
-		WaitingFor: wait.NewHealthStrategy().WithStartupTimeout(time.Minute * 15),
-		AutoRemove: true,
+		return false
 	}
 
-	ctx := context.Background()
-	orcl, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
-		ContainerRequest: req,
-		Started:          true,
-	})
-	s.Require().NoError(err)
-	host, err := orcl.Host(ctx)
-	s.Require().NoError(err)
-	mappedPort, err := orcl.MappedPort(ctx, nPort)
-	s.Require().NoError(err)
-	port := mappedPort.Port()
+	db, err := sql.Open("oracle", orclConnectionString(ip, port))
+	if err != nil {
+		return false
+	}
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Println("close error:", err)
+		}
+	}()
+	if err = db.PingContext(ctx); err != nil {
+		switch err {
+		case sqldriver.ErrBadConn, io.EOF:
+			return false
+		default:
+			log.Println(err)
+		}
+		return false
+	}
 
-	s.dsn = fmt.Sprintf("oracle://%s:%s@%s:%s/%s", username, password, host, port, db)
-	s.container = orcl
+	return true
 }
 
-func (s *oracleSuite) TearDownSuite() {
-	if s.container != nil {
-		_ = s.container.Terminate(context.Background())
-	}
+type oracleSuite struct {
+	dsn string
+	suite.Suite
 }
 
 // In order for 'go test' to run this suite, we need to create
 // a normal test function and pass our suite to suite.Run
 func TestOracleTestSuite(t *testing.T) {
-	suite.Run(t, new(oracleSuite))
+	if dsn := os.Getenv("ORACLE_DSN"); dsn != "" {
+		s := oracleSuite{dsn: dsn}
+		suite.Run(t, &s)
+		return
+	}
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		dsn := orclConnectionString(ip, port)
+		s := oracleSuite{dsn: dsn}
+
+		suite.Run(t, &s)
+	})
 }
 
 func (s *oracleSuite) TestOpen() {
