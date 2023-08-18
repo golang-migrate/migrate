@@ -9,9 +9,12 @@ import (
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/dhui/dktest"
+	"github.com/docker/docker/api/types/mount"
 	"github.com/golang-migrate/migrate/v4"
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
 	"github.com/golang-migrate/migrate/v4/dktesting"
@@ -20,22 +23,32 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-const (
-	orclPassword = "postgres"
-)
-
 var (
 	opts = dktest.Options{
-		Env:          map[string]string{"ORACLE_PWD": orclPassword},
-		PortRequired: true, ReadyFunc: isReady}
+		PortRequired: true,
+		ReadyFunc:    isReady,
+		Timeout:      time.Minute * 30,
+		Mounts:       orclMountOptions(),
+	}
 	specs = []dktesting.ContainerSpec{
 		{ImageName: "container-registry.oracle.com/database/express:18.4.0-xe", Options: opts},
 	}
 )
 
+func orclMountOptions() []mount.Mount {
+	cwd, _ := os.Getwd()
+	return []mount.Mount{
+		{
+			Type:   mount.TypeBind,
+			Source: filepath.Join(cwd, "testdata/user.sql"),
+			Target: "/opt/oracle/scripts/setup/user.sql",
+		},
+	}
+}
+
 func orclConnectionString(host, port string, options ...string) string {
 	options = append(options, "sslmode=disable")
-	return fmt.Sprintf("oracle://orcl:%s@%s:%s/XEPDB1", orclPassword, host, port)
+	return fmt.Sprintf("oracle://orcl:orcl@%s:%s/XEPDB1", host, port)
 }
 
 func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
