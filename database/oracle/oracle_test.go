@@ -15,6 +15,7 @@ import (
 
 	"github.com/dhui/dktest"
 	"github.com/docker/docker/api/types/mount"
+	"github.com/docker/go-connections/nat"
 	"github.com/golang-migrate/migrate/v4"
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
 	"github.com/golang-migrate/migrate/v4/dktesting"
@@ -23,37 +24,48 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
+const defaultPort = 1521
+
 var (
-	opts = dktest.Options{
-		PortRequired: true,
-		ReadyFunc:    isReady,
-		Timeout:      time.Minute * 30,
-		Mounts:       orclMountOptions(),
-	}
 	specs = []dktesting.ContainerSpec{
-		{ImageName: "container-registry.oracle.com/database/express:18.4.0-xe", Options: opts},
+		{ImageName: "container-registry.oracle.com/database/express:18.4.0-xe", Options: orclOptions()},
 	}
 )
 
-func orclMountOptions() []mount.Mount {
+func orclOptions() dktest.Options {
 	cwd, _ := os.Getwd()
-	return []mount.Mount{
+	mounts := []mount.Mount{
 		{
 			Type:   mount.TypeBind,
 			Source: filepath.Join(cwd, "testdata/user.sql"),
 			Target: "/opt/oracle/scripts/setup/user.sql",
 		},
 	}
+	return dktest.Options{
+		PortRequired: true,
+		PortBindings: map[nat.Port][]nat.PortBinding{
+			nat.Port(fmt.Sprintf("%d/tcp", defaultPort)): {
+				nat.PortBinding{
+					HostIP:   "0.0.0.0",
+					HostPort: "0/tcp",
+				},
+			},
+		},
+		ReadyFunc:   isReady,
+		PullTimeout: time.Minute * 10,
+		Timeout:     time.Minute * 30,
+		Mounts:      mounts,
+	}
 }
 
-func orclConnectionString(host, port string, options ...string) string {
-	options = append(options, "sslmode=disable")
+func orclConnectionString(host, port string) string {
 	return fmt.Sprintf("oracle://orcl:orcl@%s:%s/XEPDB1", host, port)
 }
 
 func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
-	ip, port, err := c.FirstPort()
+	ip, port, err := c.Port(defaultPort)
 	if err != nil {
+		log.Println("get port error", err)
 		return false
 	}
 
@@ -69,10 +81,12 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 	if err = db.PingContext(ctx); err != nil {
 		switch err {
 		case sqldriver.ErrBadConn, io.EOF:
+			log.Println(err)
 			return false
 		default:
 			log.Println(err)
 		}
+		log.Println(ip, port)
 		return false
 	}
 
@@ -93,7 +107,7 @@ func TestOracleTestSuite(t *testing.T) {
 		return
 	}
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
-		ip, port, err := c.FirstPort()
+		ip, port, err := c.Port(defaultPort)
 		if err != nil {
 			t.Fatal(err)
 		}

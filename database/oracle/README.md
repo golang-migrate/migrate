@@ -61,7 +61,7 @@ There are two ways to run the test code:
 
 1. Start the `Oracle Database Instance` via docker first, so that you can reuse whenever you want to run the test code.
 
-```
+```bash
 $ cat docker-compose.yaml
 ---
 version: '2'
@@ -80,7 +80,7 @@ services:
 
 2. Go into the sqlplus console
 
-```
+```bash
 $ docker exec -it orclxe bash
 # su oracle
 $ sqlplus / as sysdba
@@ -88,7 +88,7 @@ $ sqlplus / as sysdba
 
 3. Create a test DB
 
-```
+```sql
 alter session set container=XEPDB1;
 create user orcl identified by orcl;
 grant dba to orcl;
@@ -101,5 +101,5 @@ grant all privileges to orcl;
 
 ```bash
 $ cd /path/to/repo/database/oracle/dir
-$ ORACLE_DSN=oracle://orcl:orcl@localhost:1521/XEPDB1 go test -tags "oracle" -race -v -covermode atomic ./... -coverprofile .coverage
+$ ORACLE_DSN=oracle://orcl:orcl@localhost:1521/XEPDB1 go test -tags "oracle" -race -v -covermode atomic ./... -coverprofile .coverage  -timeout 20m
 ```
