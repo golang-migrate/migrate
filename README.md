@@ -172,6 +172,11 @@ Each migration has an up and down migration. [Why?](FAQ.md#why-two-separate-file
 
 [Best practices: How to write migrations.](MIGRATIONS.md)
 
+## Coming from another db migration tool?
+
+Check out [migradaptor](https://github.com/musinit/migradaptor/).
+*Note: migradaptor is not affliated or supported by this project*
+
 ## Versions
 
 Version | Supported? | Import | Notes
