@@ -80,10 +80,11 @@ jobs:
       - run: echo "SOURCE=$(make echo-source)" >> $GITHUB_ENV
       - run: echo "DATABASE=$(make echo-database)" >> $GITHUB_ENV
 
-      - uses: goreleaser/goreleaser-action@v2
+      - uses: goreleaser/goreleaser-action@v4
         with:
+          distrubution: goreleaser
           version: latest
-          args: release --rm-dist
+          args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
