@@ -15,10 +15,11 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/dhui/dktest"
 	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database"
 
+	"github.com/dhui/dktest"
+
+	"github.com/golang-migrate/migrate/v4/database"
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
 	"github.com/golang-migrate/migrate/v4/dktesting"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
@@ -87,27 +88,25 @@ func mustRun(t *testing.T, d database.Driver, statements []string) {
 }
 
 func Test(t *testing.T) {
-	for _, opt := range []string{"", "x-transaction-lock=true"} {
-		dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
-			ip, port, err := c.FirstPort()
-			if err != nil {
-				t.Fatal(err)
-			}
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
 
-			addr := pgConnectionString(ip, port, opt)
-			p := &Postgres{}
-			d, err := p.Open(addr)
-			if err != nil {
-				t.Fatal(err)
+		addr := pgConnectionString(ip, port)
+		p := &Postgres{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
 			}
-			defer func() {
-				if err := d.Close(); err != nil {
-					t.Error(err)
-				}
-			}()
-			dt.Test(t, d, []byte("SELECT 1"))
-		})
-	}
+		}()
+		dt.Test(t, d, []byte("SELECT 1"))
+	})
 }
 
 func TestMigrate(t *testing.T) {
@@ -128,33 +127,7 @@ func TestMigrate(t *testing.T) {
 				t.Error(err)
 			}
 		}()
-		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "pgx", d)
-		if err != nil {
-			t.Fatal(err)
-		}
-		dt.TestMigrate(t, m)
-	})
-}
-
-func TestMigrateTrnsactionLock(t *testing.T) {
-	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
-		ip, port, err := c.FirstPort()
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		addr := pgConnectionString(ip, port, "x-transaction-lock=true")
-		p := &Postgres{}
-		d, err := p.Open(addr)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func() {
-			if err := d.Close(); err != nil {
-				t.Error(err)
-			}
-		}()
-		m, err := migrate.NewWithDatabaseInstance("file://./examples/transact_migrations", "pgx", d)
+		m, err := migrate.NewWithDatabaseInstance("file://../examples/migrations", "pgx", d)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -563,113 +536,109 @@ func TestCheckBeforeCreateTable(t *testing.T) {
 }
 
 func TestParallelSchema(t *testing.T) {
-	for _, opt := range []string{"", "&x-transaction-lock=true"} {
-		dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
-			ip, port, err := c.FirstPort()
-			if err != nil {
-				t.Fatal(err)
-			}
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
 
-			addr := pgConnectionString(ip, port, opt)
-			p := &Postgres{}
-			d, err := p.Open(addr)
-			if err != nil {
-				t.Fatal(err)
+		addr := pgConnectionString(ip, port)
+		p := &Postgres{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
 			}
-			defer func() {
-				if err := d.Close(); err != nil {
-					t.Error(err)
-				}
-			}()
+		}()
 
-			// create foo and bar schemas
-			if err := d.Run(strings.NewReader("CREATE SCHEMA foo AUTHORIZATION postgres")); err != nil {
-				t.Fatal(err)
-			}
-			if err := d.Run(strings.NewReader("CREATE SCHEMA bar AUTHORIZATION postgres")); err != nil {
-				t.Fatal(err)
-			}
+		// create foo and bar schemas
+		if err := d.Run(strings.NewReader("CREATE SCHEMA foo AUTHORIZATION postgres")); err != nil {
+			t.Fatal(err)
+		}
+		if err := d.Run(strings.NewReader("CREATE SCHEMA bar AUTHORIZATION postgres")); err != nil {
+			t.Fatal(err)
+		}
 
-			// re-connect using that schemas
-			dfoo, err := p.Open(pgConnectionString(ip, port, "search_path=foo"))
-			if err != nil {
-				t.Fatal(err)
+		// re-connect using that schemas
+		dfoo, err := p.Open(pgConnectionString(ip, port, "search_path=foo"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := dfoo.Close(); err != nil {
+				t.Error(err)
 			}
-			defer func() {
-				if err := dfoo.Close(); err != nil {
-					t.Error(err)
-				}
-			}()
+		}()
 
-			dbar, err := p.Open(pgConnectionString(ip, port, "search_path=bar"))
-			if err != nil {
-				t.Fatal(err)
+		dbar, err := p.Open(pgConnectionString(ip, port, "search_path=bar"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := dbar.Close(); err != nil {
+				t.Error(err)
 			}
-			defer func() {
-				if err := dbar.Close(); err != nil {
-					t.Error(err)
-				}
-			}()
+		}()
 
-			if err := dfoo.Lock(); err != nil {
-				t.Fatal(err)
-			}
+		if err := dfoo.Lock(); err != nil {
+			t.Fatal(err)
+		}
 
-			if err := dbar.Lock(); err != nil {
-				t.Fatal(err)
-			}
+		if err := dbar.Lock(); err != nil {
+			t.Fatal(err)
+		}
 
-			if err := dbar.Unlock(); err != nil {
-				t.Fatal(err)
-			}
+		if err := dbar.Unlock(); err != nil {
+			t.Fatal(err)
+		}
 
-			if err := dfoo.Unlock(); err != nil {
-				t.Fatal(err)
-			}
-		})
-	}
+		if err := dfoo.Unlock(); err != nil {
+			t.Fatal(err)
+		}
+	})
 }
 
 func TestPostgres_Lock(t *testing.T) {
-	for _, opt := range []string{"", "&x-transaction-lock=true"} {
-		dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
-			ip, port, err := c.FirstPort()
-			if err != nil {
-				t.Fatal(err)
-			}
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
 
-			addr := pgConnectionString(ip, port, opt)
-			p := &Postgres{}
-			d, err := p.Open(addr)
-			if err != nil {
-				t.Fatal(err)
-			}
+		addr := pgConnectionString(ip, port)
+		p := &Postgres{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-			dt.Test(t, d, []byte("SELECT 1"))
+		dt.Test(t, d, []byte("SELECT 1"))
 
-			ps := d.(*Postgres)
+		ps := d.(*Postgres)
 
-			err = ps.Lock()
-			if err != nil {
-				t.Fatal(err)
-			}
+		err = ps.Lock()
+		if err != nil {
+			t.Fatal(err)
+		}
 
-			err = ps.Unlock()
-			if err != nil {
-				t.Fatal(err)
-			}
+		err = ps.Unlock()
+		if err != nil {
+			t.Fatal(err)
+		}
 
-			err = ps.Lock()
-			if err != nil {
-				t.Fatal(err)
-			}
+		err = ps.Lock()
+		if err != nil {
+			t.Fatal(err)
+		}
 
-			err = ps.Unlock()
-			if err != nil {
-				t.Fatal(err)
-			}
-		})
-	}
+		err = ps.Unlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
 }
 
 func TestWithInstance_Concurrent(t *testing.T) {

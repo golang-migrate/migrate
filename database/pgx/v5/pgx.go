@@ -16,20 +16,18 @@ import (
 
 	"go.uber.org/atomic"
 
-	"github.com/hashicorp/go-multierror"
-	"github.com/jackc/pgconn"
-	"github.com/jackc/pgerrcode"
-	_ "github.com/jackc/pgx/v4/stdlib"
-
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/golang-migrate/migrate/v4/database/multistmt"
+	"github.com/hashicorp/go-multierror"
+	"github.com/jackc/pgerrcode"
+	"github.com/jackc/pgx/v5/pgconn"
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 func init() {
 	db := Postgres{}
-	database.Register("pgx", &db)
-	database.Register("pgx4", &db)
+	database.Register("pgx5", &db)
 }
 
 var (
@@ -43,7 +41,6 @@ var (
 	ErrNilConfig      = fmt.Errorf("no config")
 	ErrNoDatabaseName = fmt.Errorf("no database name")
 	ErrNoSchema       = fmt.Errorf("no schema")
-	ErrDatabaseDirty  = fmt.Errorf("database is dirty")
 )
 
 type Config struct {
@@ -56,20 +53,12 @@ type Config struct {
 	MigrationsTableQuoted bool
 	MultiStatementEnabled bool
 	MultiStatementMaxSize int
-	TransactionLock       bool
-}
-
-type Execer interface {
-	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
-	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
-	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
 }
 
 type Postgres struct {
 	// Locking and unlocking need to use the same connection
 	conn     *sql.Conn
 	db       *sql.DB
-	exec     Execer
 	isLocked atomic.Bool
 
 	// Open and WithInstance need to guarantee that config is never nil
@@ -138,7 +127,6 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 
 	px := &Postgres{
 		conn:   conn,
-		exec:   conn,
 		db:     instance,
 		config: config,
 	}
@@ -161,7 +149,7 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 	// i.e. pgx://user:password@host:port/db => postgres://user:password@host:port/db
 	purl.Scheme = "postgres"
 
-	db, err := sql.Open("pgx/v4", migrate.FilterCustomQuery(purl).String())
+	db, err := sql.Open("pgx/v5", migrate.FilterCustomQuery(purl).String())
 	if err != nil {
 		return nil, err
 	}
@@ -205,13 +193,6 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 			return nil, fmt.Errorf("Unable to parse option x-multi-statement: %w", err)
 		}
 	}
-	transactionLockParam := false
-	if s := purl.Query().Get("x-transaction-lock"); len(s) > 0 {
-		transactionLockParam, err = strconv.ParseBool(s)
-		if err != nil {
-			return nil, fmt.Errorf("Unable to parse option x-transaction-lock: %w", err)
-		}
-	}
 
 	px, err := WithInstance(db, &Config{
 		DatabaseName:          purl.Path,
@@ -220,7 +201,6 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 		StatementTimeout:      time.Duration(statementTimeout) * time.Millisecond,
 		MultiStatementEnabled: multiStatementEnabled,
 		MultiStatementMaxSize: multiStatementMaxSize,
-		TransactionLock:       transactionLockParam,
 	})
 
 	if err != nil {
@@ -246,18 +226,10 @@ func (p *Postgres) Lock() error {
 		if err != nil {
 			return err
 		}
+
 		// This will wait indefinitely until the lock can be acquired.
 		query := `SELECT pg_advisory_lock($1)`
-
-		if p.config.TransactionLock {
-			p.exec, err = p.conn.BeginTx(context.Background(), nil)
-			if err != nil {
-				return err
-			}
-			// This will be unlocked on transaction end
-			query = `SELECT pg_advisory_xact_lock($1)`
-		}
-		if _, err := p.exec.ExecContext(context.Background(), query, aid); err != nil {
+		if _, err := p.conn.ExecContext(context.Background(), query, aid); err != nil {
 			return &database.Error{OrigErr: err, Err: "try lock failed", Query: []byte(query)}
 		}
 		return nil
@@ -266,11 +238,6 @@ func (p *Postgres) Lock() error {
 
 func (p *Postgres) Unlock() error {
 	return database.CasRestoreOnErr(&p.isLocked, true, false, database.ErrNotLocked, func() error {
-		tx, ok := p.exec.(*sql.Tx)
-		if ok { // if in transaction lock, simply commit
-			p.exec = p.conn
-			return tx.Commit()
-		}
 		aid, err := database.GenerateAdvisoryLockId(p.config.DatabaseName, p.config.migrationsSchemaName, p.config.migrationsTableName)
 		if err != nil {
 			return err
@@ -315,7 +282,7 @@ func (p *Postgres) runStatement(statement []byte) error {
 	if strings.TrimSpace(query) == "" {
 		return nil
 	}
-	if _, err := p.exec.ExecContext(ctx, query); err != nil {
+	if _, err := p.conn.ExecContext(ctx, query); err != nil {
 
 		if pgErr, ok := err.(*pgconn.PgError); ok {
 			var line uint
@@ -372,13 +339,9 @@ func runesLastIndex(input []rune, target rune) int {
 }
 
 func (p *Postgres) SetVersion(version int, dirty bool) error {
-	var err error
-	tx, isTxglobal := p.exec.(*sql.Tx)
-	if !isTxglobal {
-		tx, err = p.conn.BeginTx(context.Background(), &sql.TxOptions{})
-		if err != nil {
-			return &database.Error{OrigErr: err, Err: "transaction start failed"}
-		}
+	tx, err := p.conn.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return &database.Error{OrigErr: err, Err: "transaction start failed"}
 	}
 
 	query := `TRUNCATE ` + quoteIdentifier(p.config.migrationsSchemaName) + `.` + quoteIdentifier(p.config.migrationsTableName)
@@ -401,10 +364,9 @@ func (p *Postgres) SetVersion(version int, dirty bool) error {
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
 	}
-	if !isTxglobal {
-		if err := tx.Commit(); err != nil {
-			return &database.Error{OrigErr: err, Err: "transaction commit failed"}
-		}
+
+	if err := tx.Commit(); err != nil {
+		return &database.Error{OrigErr: err, Err: "transaction commit failed"}
 	}
 
 	return nil
@@ -412,7 +374,7 @@ func (p *Postgres) SetVersion(version int, dirty bool) error {
 
 func (p *Postgres) Version() (version int, dirty bool, err error) {
 	query := `SELECT version, dirty FROM ` + quoteIdentifier(p.config.migrationsSchemaName) + `.` + quoteIdentifier(p.config.migrationsTableName) + ` LIMIT 1`
-	err = p.exec.QueryRowContext(context.Background(), query).Scan(&version, &dirty)
+	err = p.conn.QueryRowContext(context.Background(), query).Scan(&version, &dirty)
 	switch {
 	case err == sql.ErrNoRows:
 		return database.NilVersion, false, nil
@@ -433,7 +395,7 @@ func (p *Postgres) Version() (version int, dirty bool, err error) {
 func (p *Postgres) Drop() (err error) {
 	// select all tables in current schema
 	query := `SELECT table_name FROM information_schema.tables WHERE table_schema=(SELECT current_schema()) AND table_type='BASE TABLE'`
-	tables, err := p.exec.QueryContext(context.Background(), query)
+	tables, err := p.conn.QueryContext(context.Background(), query)
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
@@ -462,7 +424,7 @@ func (p *Postgres) Drop() (err error) {
 		// delete one by one ...
 		for _, t := range tableNames {
 			query = `DROP TABLE IF EXISTS ` + quoteIdentifier(t) + ` CASCADE`
-			if _, err := p.exec.ExecContext(context.Background(), query); err != nil {
+			if _, err := p.conn.ExecContext(context.Background(), query); err != nil {
 				return &database.Error{OrigErr: err, Query: []byte(query)}
 			}
 		}
@@ -494,7 +456,7 @@ func (p *Postgres) ensureVersionTable() (err error) {
 	// `CREATE TABLE IF NOT EXISTS...` query would fail because the user does not have the CREATE permission.
 	// Taken from https://github.com/mattes/migrate/blob/master/database/postgres/postgres.go#L258
 	query := `SELECT COUNT(1) FROM information_schema.tables WHERE table_schema = $1 AND table_name = $2 LIMIT 1`
-	row := p.exec.QueryRowContext(context.Background(), query, p.config.migrationsSchemaName, p.config.migrationsTableName)
+	row := p.conn.QueryRowContext(context.Background(), query, p.config.migrationsSchemaName, p.config.migrationsTableName)
 
 	var count int
 	err = row.Scan(&count)
@@ -507,7 +469,7 @@ func (p *Postgres) ensureVersionTable() (err error) {
 	}
 
 	query = `CREATE TABLE IF NOT EXISTS ` + quoteIdentifier(p.config.migrationsSchemaName) + `.` + quoteIdentifier(p.config.migrationsTableName) + ` (version bigint not null primary key, dirty boolean not null)`
-	if _, err = p.exec.ExecContext(context.Background(), query); err != nil {
+	if _, err = p.conn.ExecContext(context.Background(), query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 

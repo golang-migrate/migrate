@@ -24,7 +24,8 @@ Forked from [mattes/migrate](https://github.com/mattes/migrate)
 Database drivers run migrations. [Add a new database?](database/driver.go)
 
 * [PostgreSQL](database/postgres)
-* [PGX](database/pgx)
+* [PGX v4](database/pgx)
+* [PGX v5](database/pgx/v5)
 * [Redshift](database/redshift)
 * [Ql](database/ql)
 * [Cassandra](database/cassandra)
@@ -168,6 +169,11 @@ Each migration has an up and down migration. [Why?](FAQ.md#why-two-separate-file
 ```
 
 [Best practices: How to write migrations.](MIGRATIONS.md)
+
+## Coming from another db migration tool?
+
+Check out [migradaptor](https://github.com/musinit/migradaptor/).
+*Note: migradaptor is not affliated or supported by this project*
 
 ## Versions
 
