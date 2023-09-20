@@ -218,6 +218,7 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 	}
 
 	lockStrategy := purl.Query().Get("x-lock-strategy")
+	lockTable := purl.Query().Get("x-lock-table")
 
 	px, err := WithInstance(db, &Config{
 		DatabaseName:          purl.Path,
@@ -227,6 +228,7 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 		MultiStatementEnabled: multiStatementEnabled,
 		MultiStatementMaxSize: multiStatementMaxSize,
 		LockStrategy:          lockStrategy,
+		LockTable:             lockTable,
 	})
 
 	if err != nil {
@@ -512,6 +514,12 @@ func (p *Postgres) Drop() (err error) {
 		if err := tables.Scan(&tableName); err != nil {
 			return err
 		}
+
+		// do not drop lock table
+		if tableName == p.config.LockTable && p.config.LockStrategy == LockStrategyTable {
+			continue
+		}
+
 		if len(tableName) > 0 {
 			tableNames = append(tableNames, tableName)
 		}
