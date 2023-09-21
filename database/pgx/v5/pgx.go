@@ -65,19 +65,19 @@ type Postgres struct {
 	config *Config
 }
 
-func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
+func WithConnection(ctx context.Context, conn *sql.Conn, config *Config) (*Postgres, error) {
 	if config == nil {
 		return nil, ErrNilConfig
 	}
 
-	if err := instance.Ping(); err != nil {
+	if err := conn.PingContext(ctx); err != nil {
 		return nil, err
 	}
 
 	if config.DatabaseName == "" {
 		query := `SELECT CURRENT_DATABASE()`
 		var databaseName string
-		if err := instance.QueryRow(query).Scan(&databaseName); err != nil {
+		if err := conn.QueryRowContext(ctx, query).Scan(&databaseName); err != nil {
 			return nil, &database.Error{OrigErr: err, Query: []byte(query)}
 		}
 
@@ -91,7 +91,7 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	if config.SchemaName == "" {
 		query := `SELECT CURRENT_SCHEMA()`
 		var schemaName string
-		if err := instance.QueryRow(query).Scan(&schemaName); err != nil {
+		if err := conn.QueryRowContext(ctx, query).Scan(&schemaName); err != nil {
 			return nil, &database.Error{OrigErr: err, Query: []byte(query)}
 		}
 
@@ -119,15 +119,8 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		}
 	}
 
-	conn, err := instance.Conn(context.Background())
-
-	if err != nil {
-		return nil, err
-	}
-
 	px := &Postgres{
 		conn:   conn,
-		db:     instance,
 		config: config,
 	}
 
@@ -135,6 +128,26 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		return nil, err
 	}
 
+	return px, nil
+}
+
+func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
+	ctx := context.Background()
+
+	if err := instance.Ping(); err != nil {
+		return nil, err
+	}
+
+	conn, err := instance.Conn(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	px, err := WithConnection(ctx, conn, config)
+	if err != nil {
+		return nil, err
+	}
+	px.db = instance
 	return px, nil
 }
 
@@ -212,7 +225,11 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 
 func (p *Postgres) Close() error {
 	connErr := p.conn.Close()
-	dbErr := p.db.Close()
+	var dbErr error
+	if p.db != nil {
+		dbErr = p.db.Close()
+	}
+
 	if connErr != nil || dbErr != nil {
 		return fmt.Errorf("conn: %v, db: %v", connErr, dbErr)
 	}
