@@ -146,6 +146,8 @@ func Parse(reader io.Reader, _ []byte, _ int, replacementStatement string, h Han
 					discard = false
 					if fnbody {
 						accum = append(accum, ch)
+					} else {
+						accum = append(accum, ch)
 					}
 					trace("discard(2): %v, fnbody: %v, i: %v, len(buf): %v\n",
 						discard, fnbody,

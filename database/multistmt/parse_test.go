@@ -12,8 +12,8 @@ import (
 const maxMigrationSize = 1024
 
 func TestParse(t *testing.T) {
-
-	plpgsqlBody := `CREATE OR REPLACE function fn1() returns TRIGGER as $$
+	plpgsqlBody := `CREATE OR REPLACE function fn1() returns TRIGGER as
+	$$
 	-- this is a function body
 	DECLARE
 	BEGIN
@@ -33,31 +33,41 @@ func TestParse(t *testing.T) {
 		parseBufSize int
 	}{
 		// these tests are changed from their original, why would we expect to add a missing delimiter?
-		{name: "single statement, no delimiter",
+		{
+			name:        "single statement, no delimiter",
 			multiStmt:   "single statement, no delimiter",
 			delimiter:   ";",
 			expected:    []string{},
-			expectedErr: nil},
-		{name: "single statement, one delimiter",
+			expectedErr: nil,
+		},
+		{
+			name:        "single statement, one delimiter",
 			multiStmt:   "single statement, one delimiter;",
 			delimiter:   ";",
 			expected:    []string{"single statement, one delimiter;"},
-			expectedErr: nil},
-		{name: "two statements, no trailing delimiter",
+			expectedErr: nil,
+		},
+		{
+			name:        "two statements, no trailing delimiter",
 			multiStmt:   "statement one; statement two",
 			delimiter:   ";",
 			expected:    []string{"statement one;"},
-			expectedErr: nil},
-		{name: "two statements, with trailing delimiter",
+			expectedErr: nil,
+		},
+		{
+			name:        "two statements, with trailing delimiter",
 			multiStmt:   "statement one; statement two;",
 			delimiter:   ";",
 			expected:    []string{"statement one;", " statement two;"},
-			expectedErr: nil},
-		{name: "multi line plpgsql body",
+			expectedErr: nil,
+		},
+		{
+			name:        "multi line plpgsql body",
 			multiStmt:   plpgsqlBody,
 			delimiter:   "$$.*;",
 			expected:    []string{plpgsqlBody},
-			expectedErr: nil},
+			expectedErr: nil,
+		},
 		// this test case has the following characteristics:
 		// 1. there is a comment at the very last character/index of the read
 		//    buffer when the buffer size is 5
@@ -65,7 +75,8 @@ func TestParse(t *testing.T) {
 		//    then a dash(4)(this dash is at the end of the buffer and must be
 		//    carreied over to the next loop iteration (
 		//   two characters in the buffer needed to check for comment.
-		{name: "pg_dump output,comments",
+		{
+			name: "pg_dump output,comments",
 			multiStmt: `--
 	-- PostgreSQL database dump
 --
@@ -73,9 +84,10 @@ CREATE EXTENSION IF NOT EXISTS citext SCHEMA public;
 `,
 			delimiter:    ";",
 			parseBufSize: 5,
-			expected: []string{"\tCREATE EXTENSION IF NOT EXISTS citext SCHEMA" +
+			expected: []string{"\n\t\n\nCREATE EXTENSION IF NOT EXISTS citext SCHEMA" +
 				" public;"},
-			expectedErr: nil},
+			expectedErr: nil,
+		},
 	}
 
 	for _, tc := range testCases {
