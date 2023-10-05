@@ -193,7 +193,13 @@ func (ch *ClickHouse) SetVersion(version int, dirty bool) error {
 		return err
 	}
 
-	query := "INSERT INTO " + ch.config.MigrationsTable + " (version, dirty, sequence) VALUES (?, ?, ?)"
+	query := fmt.Sprintf(
+		"INSERT INTO %s (version, dirty, sequence) VALUES (%d, %d, %d)",
+		ch.config.MigrationsTable,
+		version,
+		bool(dirty),
+		time.Now().UnixNano(),
+	)
 	if _, err := tx.Exec(query, version, bool(dirty), time.Now().UnixNano()); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
