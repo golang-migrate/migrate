@@ -26,7 +26,7 @@ build-cli: clean
 	cat ./cli/build/sha256sum.txt
 
 build:
-	docker build --build-arg VERSION=$(VERSION) . -t infoblox/migrate -t infoblox/migrate:$(VERSION)
+	docker build --pull --build-arg VERSION=$(VERSION) . -t infoblox/migrate -t infoblox/migrate:$(VERSION)
 
 docker-push:
 	docker push infoblox/migrate:$(VERSION)

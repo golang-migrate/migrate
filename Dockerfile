@@ -1,4 +1,4 @@
-FROM golang:1.16-alpine3.13 AS builder
+FROM golang:1.20-alpine3.18 AS builder
 ARG VERSION
 
 RUN apk add --no-cache git gcc musl-dev make
@@ -15,7 +15,7 @@ COPY . ./
 
 RUN make build-docker
 
-FROM alpine:3.13
+FROM alpine:latest
 
 COPY --from=builder /go/src/github.com/infobloxopen/migrate/cmd/migrate/config /cli/config/
 COPY --from=builder /go/src/github.com/infobloxopen/migrate/build/migrate.linux-386 /usr/local/bin/migrate
