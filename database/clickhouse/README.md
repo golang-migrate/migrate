@@ -7,12 +7,13 @@
 | `x-migrations-table`| Name of the migrations table |
 | `x-migrations-table-engine`| Engine to use for the migrations table, defaults to TinyLog |
 | `x-cluster-name` | Name of cluster for creating `schema_migrations` table cluster wide |
+| `x-sharding` | Use distributed `schema_migrations` table in cluster with sharding enabled |
 | `database` | The name of the database to connect to |
 | `username` | The user to sign in as |
 | `password` | The user's password |
 | `host` | The host to connect to. |
 | `port` | The port to bind to. |
-| `x-multi-statement` | false | Enable multiple statements to be ran in a single migration (See note below) |
+| `x-multi-statement` | Enable multiple statements to be ran in a single migration |
 
 ## Notes
 
@@ -23,3 +24,4 @@
 * Clickhouse cluster mode is not officially supported, since it's not tested right now, but you can try enabling `schema_migrations` table replication by specifying a `x-cluster-name`:
   * When `x-cluster-name` is specified, `x-migrations-table-engine` also should be specified. See the docs regarding [replicated table engines](https://clickhouse.tech/docs/en/engines/table-engines/mergetree-family/replication/#table_engines-replication).
   * When `x-cluster-name` is specified, only the `schema_migrations` table is replicated across the cluster. You still need to write your migrations so that the application tables are replicated within the cluster.
+  * When `x-cluster-name` is specified, you can use `x-sharding` if your cluster supports multiple shards. The `schema_migrations` table will be created as distributed table so that is is accessible on any shard.

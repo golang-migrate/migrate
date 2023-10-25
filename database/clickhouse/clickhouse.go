@@ -34,6 +34,7 @@ type Config struct {
 	MigrationsTableEngine string
 	MultiStatementEnabled bool
 	MultiStatementMaxSize int
+	Sharding              bool
 }
 
 func init() {
@@ -101,6 +102,7 @@ func (ch *ClickHouse) Open(dsn string) (database.Driver, error) {
 			ClusterName:           purl.Query().Get("x-cluster-name"),
 			MultiStatementEnabled: purl.Query().Get("x-multi-statement") == "true",
 			MultiStatementMaxSize: multiStatementMaxSize,
+			Sharding:              purl.Query().Get("x-sharding") == "true",
 		},
 	}
 
@@ -232,25 +234,66 @@ func (ch *ClickHouse) ensureVersionTable() (err error) {
 	}
 
 	// if not, create the empty migration table
-	if len(ch.config.ClusterName) > 0 {
-		query = fmt.Sprintf(`
-			CREATE TABLE %s ON CLUSTER %s (
-				version    Int64,
-				dirty      UInt8,
-				sequence   UInt64
-			) Engine=%s`, ch.config.MigrationsTable, ch.config.ClusterName, ch.config.MigrationsTableEngine)
-	} else {
-		query = fmt.Sprintf(`
-			CREATE TABLE %s (
-				version    Int64,
-				dirty      UInt8,
-				sequence   UInt64
-			) Engine=%s`, ch.config.MigrationsTable, ch.config.MigrationsTableEngine)
+	return ch.createVersionTable()
+}
+
+func (ch *ClickHouse) createVersionTable() (err error) {
+	if len(ch.config.ClusterName) == 0 {
+		return ch.createBasicVersionTable(ch.config.MigrationsTable)
 	}
+
+	if ch.config.Sharding {
+		localTableName := ch.config.MigrationsTable + "_local"
+		if err := ch.createClusterWideVersionTable(localTableName); err != nil {
+			return err
+		}
+		return ch.createDistributedVersionTable(ch.config.MigrationsTable, localTableName)
+	} else {
+		return ch.createClusterWideVersionTable(ch.config.MigrationsTable)
+	}
+}
+
+func (ch *ClickHouse) createBasicVersionTable(tableName string) (err error) {
+	query := fmt.Sprintf(`
+		CREATE TABLE %s (
+			version    Int64,
+			dirty      UInt8,
+			sequence   UInt64
+		) Engine=%s`, tableName, ch.config.MigrationsTableEngine)
 
 	if strings.HasSuffix(ch.config.MigrationsTableEngine, "Tree") {
 		query = fmt.Sprintf(`%s ORDER BY sequence`, query)
 	}
+
+	if _, err := ch.conn.Exec(query); err != nil {
+		return &database.Error{OrigErr: err, Query: []byte(query)}
+	}
+	return nil
+}
+
+func (ch *ClickHouse) createClusterWideVersionTable(tableName string) (err error) {
+	query := fmt.Sprintf(`
+		CREATE TABLE %s ON CLUSTER %s (
+			version    Int64,
+			dirty      UInt8,
+			sequence   UInt64
+		) Engine=%s`, tableName, ch.config.ClusterName, ch.config.MigrationsTableEngine)
+	if strings.HasSuffix(ch.config.MigrationsTableEngine, "Tree") {
+		query = fmt.Sprintf(`%s ORDER BY sequence`, query)
+	}
+
+	if _, err := ch.conn.Exec(query); err != nil {
+		return &database.Error{OrigErr: err, Query: []byte(query)}
+	}
+	return nil
+}
+
+func (ch *ClickHouse) createDistributedVersionTable(distTableName, localTableName string) (err error) {
+	query := fmt.Sprintf(`
+		CREATE TABLE %s ON CLUSTER %s
+		AS %s
+		ENGINE = Distributed(%s, %s, %s, cityHash64(sequence))`,
+		distTableName, ch.config.ClusterName, localTableName, ch.config.ClusterName, ch.config.DatabaseName, localTableName)
 
 	if _, err := ch.conn.Exec(query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
