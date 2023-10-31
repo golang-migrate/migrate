@@ -5,12 +5,17 @@ import (
 	"io"
 	"os"
 	"strings"
+	"sync"
 	"text/template"
 )
 
 var envMapCache map[string]string
+var envMapCacheLock sync.Mutex
 
 func envMap() map[string]string {
+	// get the lock before accessing envMap to prevent concurrent reads and writes
+	envMapCacheLock.Lock()
+	defer envMapCacheLock.Unlock()
 	if envMapCache != nil {
 		return envMapCache
 	}
