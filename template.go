@@ -47,13 +47,21 @@ func applyEnvironmentTemplate(body io.ReadCloser, logger Logger) (io.ReadCloser,
 	r, w := io.Pipe()
 
 	go func() {
-		err = tmpl.Execute(w, envMap())
+		em := envMap()
+		err = tmpl.Execute(w, em)
 		if err != nil {
-			logger.Printf("applyEnvironmentTemplate: error executing template: %v", err)
+			if logger != nil {
+				logger.Printf("applyEnvironmentTemplate: error executing template: %v", err)
+				if logger.Verbose() {
+					logger.Printf("applyEnvironmentTemplate: env map used for template execution: %v", em)
+				}
+			}
 		}
 		err = w.Close()
 		if err != nil {
-			logger.Printf("applyEnvironmentTemplate: error closing writer: %v", err)
+			if logger != nil {
+				logger.Printf("applyEnvironmentTemplate: error closing writer: %v", err)
+			}
 		}
 	}()
 
