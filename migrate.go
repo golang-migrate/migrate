@@ -867,7 +867,7 @@ func (m *Migrate) newMigration(version uint, targetVersion int) (*Migration, err
 
 	} else {
 		if m.EnableTemplating {
-			if r, err = applyEnvironmentTemplate(r); err != nil {
+			if r, err = applyEnvironmentTemplate(r, m.Log); err != nil {
 				return nil, err
 			}
 		}

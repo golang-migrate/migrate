@@ -5,12 +5,17 @@ import (
 	"io"
 	"os"
 	"strings"
+	"sync"
 	"text/template"
 )
 
 var envMapCache map[string]string
+var envMapCacheLock sync.Mutex
 
 func envMap() map[string]string {
+	// get the lock before accessing envMap to prevent concurrent reads and writes
+	envMapCacheLock.Lock()
+	defer envMapCacheLock.Unlock()
 	if envMapCache != nil {
 		return envMapCache
 	}
@@ -22,13 +27,16 @@ func envMap() map[string]string {
 	return envMapCache
 }
 
-func applyEnvironmentTemplate(body io.ReadCloser) (io.ReadCloser, error) {
+func applyEnvironmentTemplate(body io.ReadCloser, logger Logger) (io.ReadCloser, error) {
 	bodyBytes, err := io.ReadAll(body)
 	if err != nil {
 		return nil, fmt.Errorf("reading body: %w", err)
 	}
 	defer func() {
-		_ = body.Close()
+		err = body.Close()
+		if err != nil {
+			logger.Printf("applyEnvironmentTemplate: error closing body: %v", err)
+		}
 	}()
 
 	tmpl, err := template.New("migration").Parse(string(bodyBytes))
@@ -39,8 +47,14 @@ func applyEnvironmentTemplate(body io.ReadCloser) (io.ReadCloser, error) {
 	r, w := io.Pipe()
 
 	go func() {
-		_ = tmpl.Execute(w, envMap())
-		_ = w.Close()
+		err = tmpl.Execute(w, envMap())
+		if err != nil {
+			logger.Printf("applyEnvironmentTemplate: error executing template: %v", err)
+		}
+		err = w.Close()
+		if err != nil {
+			logger.Printf("applyEnvironmentTemplate: error closing writer: %v", err)
+		}
 	}()
 
 	return r, nil
