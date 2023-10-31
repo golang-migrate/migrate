@@ -13,7 +13,7 @@ func Test_applyEnvironmentTemplate(t *testing.T) {
 
 	migration := io.NopCloser(bytes.NewBuffer([]byte(`SELECT * FROM {{.WAREHOUSE_DB}}.STD.INVOICES`)))
 
-	gotReader, err := applyEnvironmentTemplate(migration)
+	gotReader, err := applyEnvironmentTemplate(migration, nil)
 	if err != nil {
 		t.Fatalf("expected no error applying template")
 	}
