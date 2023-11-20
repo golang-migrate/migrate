@@ -279,7 +279,7 @@ func (n *Neo4j) ensureVersionConstraint() (err error) {
 		return nil
 	}
 
-	query := fmt.Sprintf("CREATE CONSTRAINT ON (a:%s) ASSERT a.version IS UNIQUE", n.config.MigrationsLabel)
+	query := fmt.Sprintf("CREATE CONSTRAINT FOR (a:%s) REQUIRE a.version IS UNIQUE", n.config.MigrationsLabel)
 	if _, err := neo4j.Collect(session.Run(query, nil)); err != nil {
 		return err
 	}
