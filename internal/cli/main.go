@@ -13,6 +13,7 @@ import (
 
 	"github.com/infobloxopen/hotload"
 	_ "github.com/infobloxopen/hotload/fsnotify"
+	"github.com/jackc/pgx/stdlib"
 	"github.com/lib/pq"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -43,6 +44,7 @@ const (
 
 func init() {
 	hotload.RegisterSQLDriver("postgres", pq.Driver{})
+	hotload.RegisterSQLDriver("pgx", stdlib.GetDefaultDriver())
 }
 
 func handleSubCmdHelp(help bool, usage string, flagSet *flag.FlagSet) {
@@ -165,7 +167,8 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 		if err != nil {
 			log.fatalErr(fmt.Errorf("could not parse hotload dsn %v: %s", databasePtr, err))
 		}
-		if hostname := u.Hostname(); hostname != "postgres" {
+		hostname := u.Hostname()
+		if !(hostname == "postgres" || hostname == "pgx") {
 			log.fatalErr(fmt.Errorf("unsupported hotload base driver: %s", hostname))
 		}
 		db, err := sql.Open(driver, databasePtr)
