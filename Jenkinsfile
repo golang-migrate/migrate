@@ -7,7 +7,7 @@ pipeline {
     label 'ubuntu_docker_label'
   }
   tools {
-    go "Go 1.17"
+    go "Go 1.21"
   }
   options {
     checkoutToSubdirectory('src/github.com/infobloxopen/migrate')

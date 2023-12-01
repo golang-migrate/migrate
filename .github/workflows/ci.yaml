@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: ["1.17.x", "1.18.x"]
+        go: ["1.17.x", "1.18.x", "1.21.x"]
     steps:
       - uses: actions/checkout@v2
 
