@@ -13,7 +13,6 @@ import (
 
 	"github.com/infobloxopen/hotload"
 	_ "github.com/infobloxopen/hotload/fsnotify"
-	"github.com/jackc/pgx/stdlib"
 	"github.com/lib/pq"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -44,7 +43,6 @@ const (
 
 func init() {
 	hotload.RegisterSQLDriver("postgres", pq.Driver{})
-	hotload.RegisterSQLDriver("pgx", stdlib.GetDefaultDriver())
 }
 
 func handleSubCmdHelp(help bool, usage string, flagSet *flag.FlagSet) {
