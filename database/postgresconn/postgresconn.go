@@ -4,6 +4,7 @@
 package postgresconn
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"fmt"
@@ -23,7 +24,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/getoutreach/migrate/v4/database"
-	"github.com/getoutreach/migrate/v4/database/multistmt"
 )
 
 func init() {
@@ -33,8 +33,6 @@ func init() {
 }
 
 var (
-	multiStmtDelimiter = []byte(";")
-
 	DefaultMigrationsTable       = "schema_migrations"
 	DefaultMultiStatementMaxSize = 10 * 1 << 20 // 10 MB
 )
@@ -207,44 +205,31 @@ func (p *Postgres) Unlock() error {
 }
 
 func (p *Postgres) Run(migration io.Reader) error {
-	var currentSchema string
-	if err := p.conn.QueryRowContext(p.context(), "select current_schema()").Scan(&currentSchema); err != nil {
-		return err
+	buf, err := io.ReadAll(migration)
+	if err != nil {
+		return errors.Wrap(err, "error reading migration")
 	}
 
-	err := multistmt.Parse(migration, multiStmtDelimiter, p.config.MultiStatementMaxSize, p.config.SchemaName, func(m []byte) error {
-		if err := p.runStatement(m); err != nil {
-			// the 'err' returned here will include the failed statement but not the
-			// stack. Using errors.WithStack forces stack into the error.
-			// Testing shows this generates a pretty readable stack trace and records
-			// the stack in the schema migrations version table.
-			return errors.WithStack(err)
-		}
-		return nil
-	})
-	return err
-}
-
-func (p *Postgres) runStatement(statement []byte) error {
 	ctx := p.context()
 	if p.config.StatementTimeout != 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(p.ctx, p.config.StatementTimeout)
 		defer cancel()
 	}
-	query := string(statement)
-	if strings.TrimSpace(query) == "" {
-		return nil
+
+	if p.config.SchemaName != "" {
+		buf = bytes.ReplaceAll(buf, []byte("<SCHEMA_NAME>"),
+			[]byte(p.config.SchemaName))
 	}
 
-	if _, err := p.conn.ExecContext(ctx, query); err != nil {
+	if _, err := p.conn.ExecContext(ctx, string(buf)); err != nil {
 		if pgErr, ok := err.(*pq.Error); ok {
 			var line uint
 			var col uint
 			var lineColOK bool
 			if pgErr.Position != "" {
 				if pos, err := strconv.ParseUint(pgErr.Position, 10, 64); err == nil {
-					line, col, lineColOK = computeLineFromPos(query, int(pos))
+					line, col, lineColOK = computeLineFromPos(string(buf), int(pos))
 				}
 			}
 			message := fmt.Sprintf("migration failed: %s", pgErr.Message)
@@ -254,10 +239,10 @@ func (p *Postgres) runStatement(statement []byte) error {
 			if pgErr.Detail != "" {
 				message = fmt.Sprintf("%s, %s", message, pgErr.Detail)
 			}
-			return database.Error{OrigErr: err, Err: message, Query: statement, Line: line}
+			return database.Error{OrigErr: err, Err: message, Query: buf, Line: line}
 		}
 
-		return database.Error{OrigErr: err, Err: "migration failed", Query: statement}
+		return database.Error{OrigErr: err, Err: "migration failed", Query: buf}
 	}
 
 	// exec was successful, commit here, then nothing to rollback

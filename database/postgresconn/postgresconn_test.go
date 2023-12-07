@@ -283,11 +283,38 @@ func TestErrorParsing(t *testing.T) {
 			}
 		}()
 
-		wantErr := `migration failed: syntax error at or near "TABLEE" (column 9) in line 1:  CREATE TABLEE bar (bar text); (details: pq: syntax error at or near "TABLEE")`
+		// Parser no longer does line or statement parsing.
+		//
+		wantErr := `migration failed: syntax error at or near "TABLEE" (column 37) in line 1: CREATE TABLE foo (foo text); CREATE TABLEE bar (bar text); (details: pq: syntax error at or near "TABLEE")`
 		if err := d.Run(strings.NewReader(`CREATE TABLE foo (foo text); CREATE TABLEE bar (bar text);`)); err == nil {
 			t.Fatal("expected err but got nil")
 		} else if err.Error() != wantErr {
 			t.Fatalf("expected '%s' but got '%s'", wantErr, err.Error())
+		}
+	})
+}
+
+func TestEmbeddedComment(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := pgConnectionString(ip, port)
+		p := &Postgres{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
+
+		if err := d.Run(strings.NewReader(`create table consumers(skip boolean, skip_reason text, name text); UPDATE consumers SET skip = true, skip_reason = 'https://outreach-hq.slack.com/archives/C03TX2QNHTQ/p1686116838617179 -- settings org life events are unneeded' WHERE name = 'settings'`)); err != nil {
+			t.Fatalf("expected no error but got %v", err)
 		}
 	})
 }
