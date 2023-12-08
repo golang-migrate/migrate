@@ -5,6 +5,10 @@ import (
 	"strings"
 
 	"github.com/golang-migrate/migrate/v4/internal/cli"
+	"github.com/infobloxopen/hotload"
+	_ "github.com/infobloxopen/hotload/fsnotify"
+	"github.com/jackc/pgx/v4/stdlib"
+	"github.com/lib/pq"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -25,6 +29,10 @@ func init() {
 	// logrus formatter
 	customFormatter := new(logrus.JSONFormatter)
 	logrus.SetFormatter(customFormatter)
+
+	hotload.RegisterSQLDriver("pgx", stdlib.GetDefaultDriver())
+	hotload.RegisterSQLDriver("postgres", pq.Driver{})
+	hotload.RegisterSQLDriver("postgresql", pq.Driver{})
 }
 
 func main() {

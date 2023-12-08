@@ -182,7 +182,7 @@ func (m *Mongo) Open(dsn string) (database.Driver, error) {
 	return mc, nil
 }
 
-//Parse the url param, convert it to boolean
+// Parse the url param, convert it to boolean
 // returns error if param invalid. returns defaultValue if param not present
 func parseBoolean(urlParam string, defaultValue bool) (bool, error) {
 
@@ -199,7 +199,7 @@ func parseBoolean(urlParam string, defaultValue bool) (bool, error) {
 	return defaultValue, nil
 }
 
-//Parse the url param, convert it to int
+// Parse the url param, convert it to int
 // returns error if param invalid. returns defaultValue if param not present
 func parseInt(urlParam string, defaultValue int) (int, error) {
 

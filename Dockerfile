@@ -15,7 +15,7 @@ COPY . ./
 
 RUN make build-docker
 
-FROM alpine:latest
+FROM alpine:3.18
 
 COPY --from=builder /go/src/github.com/infobloxopen/migrate/cmd/migrate/config /cli/config/
 COPY --from=builder /go/src/github.com/infobloxopen/migrate/build/migrate.linux-386 /usr/local/bin/migrate

@@ -11,9 +11,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/infobloxopen/hotload"
-	_ "github.com/infobloxopen/hotload/fsnotify"
-	"github.com/lib/pq"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
@@ -40,10 +37,6 @@ const (
 	Use -f to bypass confirmation`
 	forceUsage = `force V      Set version V but don't run migration (ignores dirty state)`
 )
-
-func init() {
-	hotload.RegisterSQLDriver("postgres", pq.Driver{})
-}
 
 func handleSubCmdHelp(help bool, usage string, flagSet *flag.FlagSet) {
 	if help {
@@ -161,14 +154,6 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 	var migraterErr error
 
 	if driver := viper.GetString("database.driver"); driver == "hotload" {
-		u, err := url.Parse(databasePtr)
-		if err != nil {
-			log.fatalErr(fmt.Errorf("could not parse hotload dsn %v: %s", databasePtr, err))
-		}
-		hostname := u.Hostname()
-		if !(hostname == "postgres" || hostname == "pgx") {
-			log.fatalErr(fmt.Errorf("unsupported hotload base driver: %s", hostname))
-		}
 		db, err := sql.Open(driver, databasePtr)
 		if err != nil {
 			log.fatalErr(fmt.Errorf("could not open hotload dsn %s: %s", databasePtr, err))
