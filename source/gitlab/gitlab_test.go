@@ -2,7 +2,7 @@ package gitlab
 
 import (
 	"bytes"
-	"io/ioutil"
+	"os"
 	"testing"
 
 	st "github.com/golang-migrate/migrate/v4/source/testing"
@@ -11,7 +11,7 @@ import (
 var GitlabTestSecret = "" // username:token
 
 func init() {
-	secrets, err := ioutil.ReadFile(".gitlab_test_secrets")
+	secrets, err := os.ReadFile(".gitlab_test_secrets")
 	if err == nil {
 		GitlabTestSecret = string(bytes.TrimSpace(secrets)[:])
 	}

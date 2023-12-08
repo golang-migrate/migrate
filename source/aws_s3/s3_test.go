@@ -2,7 +2,7 @@ package awss3
 
 import (
 	"errors"
-	"io/ioutil"
+	"io"
 	"strings"
 	"testing"
 
@@ -120,7 +120,7 @@ func (s *fakeS3) GetObject(input *s3.GetObjectInput) (*s3.GetObjectOutput, error
 		return nil, errors.New("bucket not found")
 	}
 	if data, ok := s.objects[aws.StringValue(input.Key)]; ok {
-		body := ioutil.NopCloser(strings.NewReader(data))
+		body := io.NopCloser(strings.NewReader(data))
 		return &s3.GetObjectOutput{Body: body}, nil
 	}
 	return nil, errors.New("object not found")

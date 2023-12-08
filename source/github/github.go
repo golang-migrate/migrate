@@ -3,14 +3,14 @@ package github
 import (
 	"context"
 	"fmt"
-	"golang.org/x/oauth2"
 	"io"
-	"io/ioutil"
 	"net/http"
 	nurl "net/url"
 	"os"
 	"path"
 	"strings"
+
+	"golang.org/x/oauth2"
 
 	"github.com/golang-migrate/migrate/v4/source"
 	"github.com/google/go-github/v39/github"
@@ -178,7 +178,7 @@ func (g *Github) ReadUp(version uint) (r io.ReadCloser, identifier string, err e
 	g.ensureFields()
 
 	if m, ok := g.migrations.Up(version); ok {
-		file, _, _, err := g.client.Repositories.GetContents(
+		r, _, err := g.client.Repositories.DownloadContents(
 			context.Background(),
 			g.config.Owner,
 			g.config.Repo,
@@ -189,13 +189,7 @@ func (g *Github) ReadUp(version uint) (r io.ReadCloser, identifier string, err e
 		if err != nil {
 			return nil, "", err
 		}
-		if file != nil {
-			r, err := file.GetContent()
-			if err != nil {
-				return nil, "", err
-			}
-			return ioutil.NopCloser(strings.NewReader(r)), m.Identifier, nil
-		}
+		return r, m.Identifier, nil
 	}
 	return nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: g.config.Path, Err: os.ErrNotExist}
 }
@@ -204,7 +198,7 @@ func (g *Github) ReadDown(version uint) (r io.ReadCloser, identifier string, err
 	g.ensureFields()
 
 	if m, ok := g.migrations.Down(version); ok {
-		file, _, _, err := g.client.Repositories.GetContents(
+		r, _, err := g.client.Repositories.DownloadContents(
 			context.Background(),
 			g.config.Owner,
 			g.config.Repo,
@@ -215,13 +209,7 @@ func (g *Github) ReadDown(version uint) (r io.ReadCloser, identifier string, err
 		if err != nil {
 			return nil, "", err
 		}
-		if file != nil {
-			r, err := file.GetContent()
-			if err != nil {
-				return nil, "", err
-			}
-			return ioutil.NopCloser(strings.NewReader(r)), m.Identifier, nil
-		}
+		return r, m.Identifier, nil
 	}
 	return nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: g.config.Path, Err: os.ErrNotExist}
 }

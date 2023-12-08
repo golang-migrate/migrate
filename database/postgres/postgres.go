@@ -8,7 +8,6 @@ import (
 	"database/sql"
 	"fmt"
 	"io"
-	"io/ioutil"
 	nurl "net/url"
 	"regexp"
 	"strconv"
@@ -91,16 +90,16 @@ func WithConnection(ctx context.Context, conn *sql.Conn, config *Config) (*Postg
 
 	if config.SchemaName == "" {
 		query := `SELECT CURRENT_SCHEMA()`
-		var schemaName string
+		var schemaName sql.NullString
 		if err := conn.QueryRowContext(ctx, query).Scan(&schemaName); err != nil {
 			return nil, &database.Error{OrigErr: err, Query: []byte(query)}
 		}
 
-		if len(schemaName) == 0 {
+		if !schemaName.Valid {
 			return nil, ErrNoSchema
 		}
 
-		config.SchemaName = schemaName
+		config.SchemaName = schemaName.String
 	}
 
 	if len(config.MigrationsTable) == 0 {
@@ -278,7 +277,7 @@ func (p *Postgres) Run(migration io.Reader) error {
 		}
 		return err
 	}
-	migr, err := ioutil.ReadAll(migration)
+	migr, err := io.ReadAll(migration)
 	if err != nil {
 		return err
 	}

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 
 	"github.com/golang-migrate/migrate/v4/source"
@@ -72,14 +71,14 @@ func (s *Stub) Next(version uint) (nextVersion uint, err error) {
 
 func (s *Stub) ReadUp(version uint) (r io.ReadCloser, identifier string, err error) {
 	if m, ok := s.Migrations.Up(version); ok {
-		return ioutil.NopCloser(bytes.NewBufferString(m.Identifier)), fmt.Sprintf("%v.up.stub", version), nil
+		return io.NopCloser(bytes.NewBufferString(m.Identifier)), fmt.Sprintf("%v.up.stub", version), nil
 	}
 	return nil, "", &os.PathError{Op: fmt.Sprintf("read up version %v", version), Path: s.Url, Err: os.ErrNotExist}
 }
 
 func (s *Stub) ReadDown(version uint) (r io.ReadCloser, identifier string, err error) {
 	if m, ok := s.Migrations.Down(version); ok {
-		return ioutil.NopCloser(bytes.NewBufferString(m.Identifier)), fmt.Sprintf("%v.down.stub", version), nil
+		return io.NopCloser(bytes.NewBufferString(m.Identifier)), fmt.Sprintf("%v.down.stub", version), nil
 	}
 	return nil, "", &os.PathError{Op: fmt.Sprintf("read down version %v", version), Path: s.Url, Err: os.ErrNotExist}
 }
