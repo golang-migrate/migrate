@@ -7,7 +7,7 @@
 [Release Downloads](https://github.com/golang-migrate/migrate/releases)
 
 ```bash
-$ curl -L https://github.com/golang-migrate/migrate/releases/download/$version/migrate.$platform-amd64.tar.gz | tar xvz
+$ curl -L https://github.com/golang-migrate/migrate/releases/download/$version/migrate.$os-$arch.tar.gz | tar xvz
 ```
 
 ### MacOS
