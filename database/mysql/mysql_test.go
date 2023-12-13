@@ -152,6 +152,38 @@ func TestMigrate(t *testing.T) {
 	})
 }
 
+func TestMigrateSafeUpdate(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.Port(defaultPort)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := fmt.Sprintf("mysql://root:root@tcp(%v:%v)/public?x-safe-update=true", ip, port)
+		p := &Mysql{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
+
+		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "public", d)
+		if err != nil {
+			t.Fatal(err)
+		}
+		dt.TestMigrate(t, m)
+
+		// check ensureVersionTable
+		if err := d.(*Mysql).ensureVersionTable(); err != nil {
+			t.Fatal(err)
+		}
+	})
+}
+
 func TestMigrateAnsiQuotes(t *testing.T) {
 	// mysql.SetLogger(mysql.Logger(log.New(io.Discard, "", log.Ltime)))
 
@@ -277,6 +309,17 @@ func TestNoLockWorks(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
+}
+
+func TestSafeUpdateParamValidation(t *testing.T) {
+	ip := "127.0.0.1"
+	port := 3306
+	addr := fmt.Sprintf("mysql://root:root@tcp(%v:%v)/public", ip, port)
+	p := &Mysql{}
+	_, err := p.Open(addr + "?x-safe-update=not-a-bool")
+	if !errors.Is(err, strconv.ErrSyntax) {
+		t.Fatal("Expected syntax error when passing a non-bool as x-safe-update parameter")
+	}
 }
 
 func TestExtractCustomQueryParams(t *testing.T) {

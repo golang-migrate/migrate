@@ -43,6 +43,7 @@ type Config struct {
 	MigrationsTable  string
 	DatabaseName     string
 	NoLock           bool
+	SafeUpdate       bool
 	StatementTimeout time.Duration
 }
 
@@ -253,6 +254,14 @@ func (m *Mysql) Open(url string) (database.Driver, error) {
 		}
 	}
 
+	safeUpdateParam, safeUpdate := customParams["x-safe-update"], false
+	if safeUpdateParam != "" {
+		safeUpdate, err = strconv.ParseBool(safeUpdateParam)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse x-safe-update as bool: %w", err)
+		}
+	}
+
 	db, err := sql.Open("mysql", config.FormatDSN())
 	if err != nil {
 		return nil, err
@@ -262,6 +271,7 @@ func (m *Mysql) Open(url string) (database.Driver, error) {
 		DatabaseName:     config.DBName,
 		MigrationsTable:  customParams["x-migrations-table"],
 		NoLock:           noLock,
+		SafeUpdate:       safeUpdate,
 		StatementTimeout: time.Duration(statementTimeout) * time.Millisecond,
 	})
 	if err != nil {
@@ -361,7 +371,12 @@ func (m *Mysql) SetVersion(version int, dirty bool) error {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
 	}
 
+	// Either use DELETE or TRUNCATE, based on safe update selection
 	query := "DELETE FROM `" + m.config.MigrationsTable + "`"
+	if m.config.SafeUpdate {
+		query = "TRUNCATE `" + m.config.MigrationsTable + "`"
+	}
+
 	if _, err := tx.ExecContext(context.Background(), query); err != nil {
 		if errRollback := tx.Rollback(); errRollback != nil {
 			err = multierror.Append(err, errRollback)
