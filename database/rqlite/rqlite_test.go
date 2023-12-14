@@ -27,7 +27,7 @@ var opts = dktest.Options{
 }
 var specs = []dktesting.ContainerSpec{
 	{ImageName: "rqlite/rqlite:7.21.4", Options: opts},
-	{ImageName: "rqlite/rqlite:8.0.0", Options: opts},
+	{ImageName: "rqlite/rqlite:8.0.6", Options: opts},
 }
 
 func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
