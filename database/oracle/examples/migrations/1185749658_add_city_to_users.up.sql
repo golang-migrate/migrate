@@ -1,0 +1,3 @@
+ALTER TABLE USERS ADD CITY varchar(100)
+
+
