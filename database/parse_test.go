@@ -8,13 +8,15 @@ import (
 )
 
 const reservedChars = "!#$%&'()*+,/:;=?@[]"
+const reservedCharTestNamePrefix = "reserved char "
 
 const baseUsername = "username"
+
+const scheme = "database://"
 
 // TestUserUnencodedReservedURLChars documents the behavior of using unencoded reserved characters in usernames with
 // net/url Parse()
 func TestUserUnencodedReservedURLChars(t *testing.T) {
-	scheme := "database://"
 	urlSuffix := "password@localhost:12345/myDB?someParam=true"
 	urlSuffixAndSep := ":" + urlSuffix
 
@@ -64,7 +66,7 @@ func TestUserUnencodedReservedURLChars(t *testing.T) {
 	testedChars := make([]string, 0, len(reservedChars))
 	for _, tc := range testcases {
 		testedChars = append(testedChars, tc.char)
-		t.Run("reserved char "+tc.char, func(t *testing.T) {
+		t.Run(reservedCharTestNamePrefix+tc.char, func(t *testing.T) {
 			s := scheme + baseUsername + tc.char + urlSuffixAndSep
 			u, err := url.Parse(s)
 			if err == nil {
@@ -98,13 +100,12 @@ func TestUserUnencodedReservedURLChars(t *testing.T) {
 }
 
 func TestUserEncodedReservedURLChars(t *testing.T) {
-	scheme := "database://"
 	urlSuffix := "password@localhost:12345/myDB?someParam=true"
 	urlSuffixAndSep := ":" + urlSuffix
 
 	for _, c := range reservedChars {
 		c := string(c)
-		t.Run("reserved char "+c, func(t *testing.T) {
+		t.Run(reservedCharTestNamePrefix+c, func(t *testing.T) {
 			encodedChar := "%" + hex.EncodeToString([]byte(c))
 			s := scheme + baseUsername + encodedChar + urlSuffixAndSep
 			expectedUsername := baseUsername + c
@@ -126,7 +127,7 @@ func TestUserEncodedReservedURLChars(t *testing.T) {
 // with net/url Parse()
 func TestPasswordUnencodedReservedURLChars(t *testing.T) {
 	username := baseUsername
-	schemeAndUsernameAndSep := "database://" + username + ":"
+	schemeAndUsernameAndSep := scheme + username + ":"
 	basePassword := "password"
 	urlSuffixAndSep := "@localhost:12345/myDB?someParam=true"
 
@@ -174,7 +175,7 @@ func TestPasswordUnencodedReservedURLChars(t *testing.T) {
 	testedChars := make([]string, 0, len(reservedChars))
 	for _, tc := range testcases {
 		testedChars = append(testedChars, tc.char)
-		t.Run("reserved char "+tc.char, func(t *testing.T) {
+		t.Run(reservedCharTestNamePrefix+tc.char, func(t *testing.T) {
 			s := schemeAndUsernameAndSep + basePassword + tc.char + urlSuffixAndSep
 			u, err := url.Parse(s)
 			if err == nil {
@@ -213,13 +214,13 @@ func TestPasswordUnencodedReservedURLChars(t *testing.T) {
 
 func TestPasswordEncodedReservedURLChars(t *testing.T) {
 	username := baseUsername
-	schemeAndUsernameAndSep := "database://" + username + ":"
+	schemeAndUsernameAndSep := scheme + username + ":"
 	basePassword := "password"
 	urlSuffixAndSep := "@localhost:12345/myDB?someParam=true"
 
 	for _, c := range reservedChars {
 		c := string(c)
-		t.Run("reserved char "+c, func(t *testing.T) {
+		t.Run(reservedCharTestNamePrefix+c, func(t *testing.T) {
 			encodedChar := "%" + hex.EncodeToString([]byte(c))
 			s := schemeAndUsernameAndSep + basePassword + encodedChar + urlSuffixAndSep
 			expectedPassword := basePassword + c

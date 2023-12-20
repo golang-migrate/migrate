@@ -27,7 +27,7 @@ If there were no errors, we should have two files available under `db/migrations
 Note the `sql` extension that we provided.
 
 In the `.up.sql` file let's create the table:
-```
+```sql
 CREATE TABLE IF NOT EXISTS users(
    user_id serial PRIMARY KEY,
    username VARCHAR (50) UNIQUE NOT NULL,
@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS users(
 );
 ```
 And in the `.down.sql` let's delete it:
-```
+```sql
 DROP TABLE IF EXISTS users;
 ```
 By adding `IF EXISTS/IF NOT EXISTS` we are making migrations idempotent - you can read more about idempotency in [getting started](../../GETTING_STARTED.md#create-migrations)
@@ -79,7 +79,7 @@ Again, it should create for us two migrations files:
 In Postgres, when we want our queries to be done in a transaction, we need to wrap it with `BEGIN` and `COMMIT` commands.
 In our example, we are going to add a column to our database that can only accept enumerable values or NULL.
 Migration up:
-```
+```sql
 BEGIN;
 
 CREATE TYPE enum_mood AS ENUM (
@@ -92,7 +92,7 @@ ALTER TABLE users ADD COLUMN mood enum_mood;
 COMMIT;
 ```
 Migration down:
-```
+```sql
 BEGIN;
 
 ALTER TABLE users DROP COLUMN mood;
@@ -124,7 +124,7 @@ Indexes:
 
 ## Optional: Run migrations within your Go app
 Here is a very simple app running migrations for the above configuration:
-```
+```go
 import (
 	"log"
 

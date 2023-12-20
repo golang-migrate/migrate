@@ -50,7 +50,7 @@
   and whenever we want, not just once at the beginning of all tests.
 
 #### Can I maintain my driver in my own repository?
-  Yes, technically thats possible. We want to encourage you to contribute your driver to this respository though.
+  Yes, technically thats possible. We want to encourage you to contribute your driver to this repository though.
   The driver's functionality is dictated by migrate's interfaces. That means there should really
   just be one driver for a database/ source. We want to prevent a future where several drivers doing the exact same thing,
   just implemented a bit differently, co-exist somewhere on GitHub. If users have to do research first to find the

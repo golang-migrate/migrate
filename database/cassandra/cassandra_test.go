@@ -25,9 +25,11 @@ var (
 	// Although Cassandra 2.x is supported by the Apache Foundation,
 	// the migrate db driver only supports Cassandra 3.x since it uses
 	// the system_schema keyspace.
+	// last ScyllaDB version tested is 5.1.11
 	specs = []dktesting.ContainerSpec{
 		{ImageName: "cassandra:3.0", Options: opts},
 		{ImageName: "cassandra:3.11", Options: opts},
+		{ImageName: "scylladb/scylla:5.1.11", Options: opts},
 	}
 )
 
