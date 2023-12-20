@@ -23,6 +23,7 @@ import (
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgerrcode"
 	_ "github.com/jackc/pgx/v4/stdlib"
+	"github.com/lib/pq"
 )
 
 const (
@@ -42,7 +43,7 @@ var (
 	DefaultMigrationsTable       = "schema_migrations"
 	DefaultMultiStatementMaxSize = 10 * 1 << 20 // 10 MB
 	DefaultLockTable             = "schema_lock"
-	DefaultLockStrategy          = "advisory"
+	DefaultLockStrategy          = LockStrategyAdvisory
 )
 
 var (
@@ -293,13 +294,19 @@ func (p *Postgres) applyTableLock() error {
 	if err != nil {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
 	}
+	defer func() {
+		errRollback := tx.Rollback()
+		if errRollback != nil {
+			err = multierror.Append(err, errRollback)
+		}
+	}()
 
 	aid, err := database.GenerateAdvisoryLockId(p.config.DatabaseName)
 	if err != nil {
 		return err
 	}
 
-	query := "SELECT * FROM " + p.config.LockTable + " WHERE lock_id = $1"
+	query := "SELECT * FROM " + pq.QuoteIdentifier(p.config.LockTable) + " WHERE lock_id = $1"
 	rows, err := tx.Query(query, aid)
 	if err != nil {
 		return database.Error{OrigErr: err, Err: "failed to fetch migration lock", Query: []byte(query)}
@@ -317,7 +324,7 @@ func (p *Postgres) applyTableLock() error {
 		return database.ErrLocked
 	}
 
-	query = "INSERT INTO " + p.config.LockTable + " (lock_id) VALUES ($1)"
+	query = "INSERT INTO " + pq.QuoteIdentifier(p.config.LockTable) + " (lock_id) VALUES ($1)"
 	if _, err := tx.Exec(query, aid); err != nil {
 		return database.Error{OrigErr: err, Err: "failed to set migration lock", Query: []byte(query)}
 	}
@@ -345,7 +352,7 @@ func (p *Postgres) releaseTableLock() error {
 		return err
 	}
 
-	query := "DELETE FROM " + p.config.LockTable + " WHERE lock_id = $1"
+	query := "DELETE FROM " + pq.QuoteIdentifier(p.config.LockTable) + " WHERE lock_id = $1"
 	if _, err := p.db.Exec(query, aid); err != nil {
 		return database.Error{OrigErr: err, Err: "failed to release migration lock", Query: []byte(query)}
 	}
@@ -598,7 +605,7 @@ func (p *Postgres) ensureLockTable() error {
 		return nil
 	}
 
-	query = `CREATE TABLE "` + p.config.LockTable + `" (lock_id BIGINT NOT NULL PRIMARY KEY)`
+	query = `CREATE TABLE ` + pq.QuoteIdentifier(p.config.LockTable) + ` (lock_id BIGINT NOT NULL PRIMARY KEY)`
 	if _, err := p.db.Exec(query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
