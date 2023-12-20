@@ -30,7 +30,7 @@ require (
 	github.com/nakagami/firebirdsql v0.0.0-20190310045651-3c02a58cfed8
 	github.com/neo4j/neo4j-go-driver v1.8.1-0.20200803113522-b626aa943eba
 	github.com/snowflakedb/gosnowflake v1.6.19
-	github.com/stretchr/testify v1.8.1
+	github.com/stretchr/testify v1.8.3
 	github.com/xanzy/go-gitlab v0.15.0
 	go.mongodb.org/mongo-driver v1.7.5
 	go.uber.org/atomic v1.7.0
@@ -78,7 +78,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/cloudflare/golz4 v0.0.0-20150217214814-ef862a3cdc58 // indirect
 	github.com/cncf/udpa/go v0.0.0-20220112060539-c52dc94e7fbe // indirect
-	github.com/cncf/xds/go v0.0.0-20230310173818-32f1caf87195 // indirect
+	github.com/cncf/xds/go v0.0.0-20230607035331-e9ce68804cb4 // indirect
 	github.com/cznic/mathutil v0.0.0-20180504122225-ca4c9f2c1369 // indirect
 	github.com/danieljoos/wincred v1.1.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
@@ -86,8 +86,8 @@ require (
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dvsekhvalnov/jose2go v1.5.0 // indirect
 	github.com/edsrzf/mmap-go v0.0.0-20170320065105-0bce6a688712 // indirect
-	github.com/envoyproxy/go-control-plane v0.11.0 // indirect
-	github.com/envoyproxy/protoc-gen-validate v0.10.0 // indirect
+	github.com/envoyproxy/go-control-plane v0.11.1-0.20230524094728-9239064ad72f // indirect
+	github.com/envoyproxy/protoc-gen-validate v0.10.1 // indirect
 	github.com/form3tech-oss/jwt-go v3.2.5+incompatible // indirect
 	github.com/gabriel-vasile/mimetype v1.4.1 // indirect
 	github.com/go-stack/stack v1.8.0 // indirect
@@ -139,7 +139,7 @@ require (
 	github.com/opencontainers/image-spec v1.0.2 // indirect
 	github.com/pierrec/lz4/v4 v4.1.16 // indirect
 	github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8 // indirect
-	github.com/pkg/errors v0.9.1 // indirect
+	github.com/pkg/errors v0.9.1
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20200410134404-eec4a21b6bb0 // indirect
 	github.com/rqlite/gorqlite v0.0.0-20230708021416-2acd02b70b79
@@ -165,7 +165,7 @@ require (
 	google.golang.org/genproto v0.0.0-20230530153820-e85fd2cbaebc // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20230530153820-e85fd2cbaebc // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20230530153820-e85fd2cbaebc // indirect
-	google.golang.org/grpc v1.55.0 // indirect
+	google.golang.org/grpc v1.56.3 // indirect
 	google.golang.org/protobuf v1.30.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
