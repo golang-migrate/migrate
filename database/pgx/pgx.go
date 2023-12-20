@@ -14,15 +14,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hashicorp/go-multierror"
+	"github.com/jackc/pgconn"
+	"github.com/jackc/pgerrcode"
+	_ "github.com/jackc/pgx/v4/stdlib"
 	"go.uber.org/atomic"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/golang-migrate/migrate/v4/database/multistmt"
-	"github.com/hashicorp/go-multierror"
-	"github.com/jackc/pgconn"
-	"github.com/jackc/pgerrcode"
-	_ "github.com/jackc/pgx/v4/stdlib"
 )
 
 func init() {
@@ -196,8 +196,11 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 		}
 	}
 
+	searchPath := purl.Query().Get("search_path")
+
 	px, err := WithInstance(db, &Config{
 		DatabaseName:          purl.Path,
+		SchemaName:            searchPath,
 		MigrationsTable:       migrationsTable,
 		MigrationsTableQuoted: migrationsTableQuoted,
 		StatementTimeout:      time.Duration(statementTimeout) * time.Millisecond,
