@@ -1,9 +1,9 @@
-[![GitHub Workflow Status (branch)](https://img.shields.io/github/workflow/status/golang-migrate/migrate/CI/master)](https://github.com/golang-migrate/migrate/actions/workflows/ci.yaml?query=branch%3Amaster)
+[![GitHub Workflow Status (branch)](https://img.shields.io/github/actions/workflow/status/golang-migrate/migrate/ci.yaml?branch=master)](https://github.com/golang-migrate/migrate/actions/workflows/ci.yaml?query=branch%3Amaster)
 [![GoDoc](https://pkg.go.dev/badge/github.com/golang-migrate/migrate)](https://pkg.go.dev/github.com/golang-migrate/migrate/v4)
 [![Coverage Status](https://img.shields.io/coveralls/github/golang-migrate/migrate/master.svg)](https://coveralls.io/github/golang-migrate/migrate?branch=master)
 [![packagecloud.io](https://img.shields.io/badge/deb-packagecloud.io-844fec.svg)](https://packagecloud.io/golang-migrate/migrate?filter=debs)
 [![Docker Pulls](https://img.shields.io/docker/pulls/migrate/migrate.svg)](https://hub.docker.com/r/migrate/migrate/)
-![Supported Go Versions](https://img.shields.io/badge/Go-1.18%2C%201.19-lightgrey.svg)
+![Supported Go Versions](https://img.shields.io/badge/Go-1.19%2C%201.20-lightgrey.svg)
 [![GitHub Release](https://img.shields.io/github/release/golang-migrate/migrate.svg)](https://github.com/golang-migrate/migrate/releases)
 [![Go Report Card](https://goreportcard.com/badge/github.com/golang-migrate/migrate/v4)](https://goreportcard.com/report/github.com/golang-migrate/migrate/v4)
 
@@ -24,7 +24,8 @@ Forked from [mattes/migrate](https://github.com/mattes/migrate)
 Database drivers run migrations. [Add a new database?](database/driver.go)
 
 * [PostgreSQL](database/postgres)
-* [PGX](database/pgx)
+* [PGX v4](database/pgx)
+* [PGX v5](database/pgx/v5)
 * [Redshift](database/redshift)
 * [Ql](database/ql)
 * [Cassandra](database/cassandra)
@@ -42,6 +43,7 @@ Database drivers run migrations. [Add a new database?](database/driver.go)
 * [ClickHouse](database/clickhouse)
 * [Firebird](database/firebird)
 * [MS SQL Server](database/sqlserver)
+* [RQLite](database/rqlite)
 
 ### Database URLs
 
@@ -168,6 +170,11 @@ Each migration has an up and down migration. [Why?](FAQ.md#why-two-separate-file
 ```
 
 [Best practices: How to write migrations.](MIGRATIONS.md)
+
+## Coming from another db migration tool?
+
+Check out [migradaptor](https://github.com/musinit/migradaptor/).
+*Note: migradaptor is not affliated or supported by this project*
 
 ## Versions
 
