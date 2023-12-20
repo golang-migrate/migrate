@@ -1,5 +1,7 @@
 module github.com/golang-migrate/migrate/v4
 
+go 1.18
+
 require (
 	cloud.google.com/go/spanner v1.47.0
 	cloud.google.com/go/storage v1.29.0
@@ -188,5 +190,3 @@ require (
 	modernc.org/token v1.0.0 // indirect
 	modernc.org/zappy v1.0.0 // indirect
 )
-
-go 1.18
