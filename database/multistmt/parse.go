@@ -15,7 +15,7 @@ var StartBufSize = 4096
 // from the multi-statement migration should be parsed and handled.
 type Handler func(migration []byte) bool
 
-func splitWithDelimiter(delimiter []byte) func(d []byte, atEOF bool) (int, []byte, error) {
+func splitWithDelimiter(delimiter []byte) bufio.SplitFunc {
 	return func(d []byte, atEOF bool) (int, []byte, error) {
 		// SplitFunc inspired by bufio.ScanLines() implementation
 		if atEOF {
@@ -31,11 +31,13 @@ func splitWithDelimiter(delimiter []byte) func(d []byte, atEOF bool) (int, []byt
 	}
 }
 
-// Parse parses the given multi-statement migration
-func Parse(reader io.Reader, delimiter []byte, maxMigrationSize int, h Handler) error {
+type scanFuncFactory func(delimiter []byte) bufio.SplitFunc
+
+// parse parses the given multi-statement migration
+func parse(reader io.Reader, delimiter []byte, maxMigrationSize int, h Handler, factory scanFuncFactory) error {
 	scanner := bufio.NewScanner(reader)
 	scanner.Buffer(make([]byte, 0, StartBufSize), maxMigrationSize)
-	scanner.Split(splitWithDelimiter(delimiter))
+	scanner.Split(factory(delimiter))
 	for scanner.Scan() {
 		cont := h(scanner.Bytes())
 		if !cont {
@@ -43,4 +45,9 @@ func Parse(reader io.Reader, delimiter []byte, maxMigrationSize int, h Handler) 
 		}
 	}
 	return scanner.Err()
+}
+
+// Parse parses the given multi-statement migration
+func Parse(reader io.Reader, delimiter []byte, maxMigrationSize int, h Handler) error {
+	return parse(reader, delimiter, maxMigrationSize, h, splitWithDelimiter)
 }
