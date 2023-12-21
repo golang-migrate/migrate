@@ -1,5 +1,5 @@
 SOURCE ?= file go_bindata github github_ee bitbucket aws_s3 google_cloud_storage godoc_vfs gitlab
-DATABASE ?= postgres mysql redshift cassandra spanner cockroachdb yugabytedb clickhouse mongodb sqlserver firebird neo4j pgx pgx5
+DATABASE ?= postgres mysql redshift cassandra spanner cockroachdb yugabytedb clickhouse mongodb sqlserver firebird neo4j pgx pgx5 rqlite
 DATABASE_TEST ?= $(DATABASE) sqlite sqlite3 sqlcipher
 BUILD_NUMBER ?= 0
 VERSION ?= $(shell git describe --tags --long --dirty=-unsupported 2>/dev/null | cut -c 2-)-j$(BUILD_NUMBER)
