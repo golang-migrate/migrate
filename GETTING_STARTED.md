@@ -28,7 +28,7 @@ migrate -database YOUR_DATABASE_URL -path PATH_TO_YOUR_MIGRATIONS up
 
 Just add the code to your app and you're ready to go!
 
-Before commiting your migrations you should run your migrations up, down, and then up again to see if migrations are working properly both ways.
+Before committing your migrations you should run your migrations up, down, and then up again to see if migrations are working properly both ways.
 (e.g. if you created a table in a migration but reverse migration did not delete it, you will encounter an error when running the forward migration again)
 It's also worth checking your migrations in a separate, containerized environment. You can find some tools at the [end of this document](#further-reading).
 
