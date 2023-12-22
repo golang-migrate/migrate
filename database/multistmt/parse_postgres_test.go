@@ -69,8 +69,9 @@ $$  LANGUAGE plpgsql
 			expected: []string{nestedDollarQuotes}},
 		{name: "three statements with dollar-quoted strings", multiStmt: strings.Join([]string{createFunctionStmt,
 			createFunctionEmptyTagStmt, advancedCreateFunction, createTriggerStmt, nestedDollarQuotes}, ""),
-			delimiter: ";", expected: []string{createFunctionStmt, createFunctionEmptyTagStmt, advancedCreateFunction,
-			createTriggerStmt, nestedDollarQuotes}},
+			delimiter: ";",
+			expected: []string{createFunctionStmt, createFunctionEmptyTagStmt, advancedCreateFunction,
+				createTriggerStmt, nestedDollarQuotes}},
 	}
 
 	for _, tc := range testCases {
