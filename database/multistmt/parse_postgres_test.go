@@ -67,7 +67,7 @@ $$  LANGUAGE plpgsql
 			expected: []string{"statement one;", " statement two;"}, expectedErr: nil},
 		{name: "singe statement with nested dollar-quoted string", multiStmt: nestedDollarQuotes, delimiter: ";",
 			expected: []string{nestedDollarQuotes}},
-		{name: "three statements with dollar-quoted strings", multiStmt: strings.Join([]string{createFunctionStmt,
+		{name: "multiple statements with dollar-quoted strings", multiStmt: strings.Join([]string{createFunctionStmt,
 			createFunctionEmptyTagStmt, advancedCreateFunction, createTriggerStmt, nestedDollarQuotes}, ""),
 			delimiter: ";",
 			expected: []string{createFunctionStmt, createFunctionEmptyTagStmt, advancedCreateFunction,
