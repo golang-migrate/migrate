@@ -35,6 +35,21 @@ BEGIN
 END;
 $function$;`
 
+	advancedCreateFunction := `CREATE FUNCTION check_password(uname TEXT, pass TEXT)
+RETURNS BOOLEAN AS $$
+DECLARE passed BOOLEAN;
+BEGIN
+        SELECT  (pwd = $2) INTO passed
+        FROM    pwds
+        WHERE   username = $1;
+
+        RETURN passed;
+END;
+$$  LANGUAGE plpgsql
+    SECURITY DEFINER
+    -- Set a secure search_path: trusted schema(s), then 'pg_temp'.
+    SET search_path = admin, pg_temp;`
+
 	testCases := []struct {
 		name        string
 		multiStmt   string
@@ -53,8 +68,9 @@ $function$;`
 		{name: "singe statement with nested dollar-quoted string", multiStmt: nestedDollarQuotes, delimiter: ";",
 			expected: []string{nestedDollarQuotes}},
 		{name: "three statements with dollar-quoted strings", multiStmt: strings.Join([]string{createFunctionStmt,
-			createFunctionEmptyTagStmt, createTriggerStmt, nestedDollarQuotes}, ""), delimiter: ";",
-			expected: []string{createFunctionStmt, createFunctionEmptyTagStmt, createTriggerStmt, nestedDollarQuotes}},
+			createFunctionEmptyTagStmt, advancedCreateFunction, createTriggerStmt, nestedDollarQuotes}, ""),
+			delimiter: ";", expected: []string{createFunctionStmt, createFunctionEmptyTagStmt, advancedCreateFunction,
+			createTriggerStmt, nestedDollarQuotes}},
 	}
 
 	for _, tc := range testCases {
