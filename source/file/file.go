@@ -35,6 +35,9 @@ func (f *File) Open(url string) (source.Driver, error) {
 }
 
 func parseURL(url string) (string, error) {
+	// change separators with slash in url
+	url = filepath.ToSlash(url)
+
 	u, err := nurl.Parse(url)
 	if err != nil {
 		return "", err
