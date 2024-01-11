@@ -11,6 +11,8 @@ import (
 	st "github.com/golang-migrate/migrate/v4/source/testing"
 )
 
+const scheme = "file://"
+
 func Test(t *testing.T) {
 	tmpDir := t.TempDir()
 
@@ -29,7 +31,7 @@ func Test(t *testing.T) {
 	mustWriteFile(t, tmpDir, "7_foobar.down.sql", "7 down")
 
 	f := &File{}
-	d, err := f.Open("file://" + tmpDir)
+	d, err := f.Open(scheme + tmpDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,7 +50,7 @@ func TestOpen(t *testing.T) {
 	}
 
 	f := &File{}
-	_, err := f.Open("file://" + tmpDir) // absolute path
+	_, err := f.Open(scheme + tmpDir) // absolute path
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +110,7 @@ func TestOpenDefaultsToCurrentDirectory(t *testing.T) {
 	}
 
 	f := &File{}
-	d, err := f.Open("file://")
+	d, err := f.Open(scheme)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +127,7 @@ func TestOpenWithDuplicateVersion(t *testing.T) {
 	mustWriteFile(t, tmpDir, "1_bar.up.sql", "") // 1 up
 
 	f := &File{}
-	_, err := f.Open("file://" + tmpDir)
+	_, err := f.Open(scheme + tmpDir)
 	if err == nil {
 		t.Fatal("expected err")
 	}
@@ -135,7 +137,7 @@ func TestClose(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	f := &File{}
-	d, err := f.Open("file://" + tmpDir)
+	d, err := f.Open(scheme + tmpDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +174,7 @@ func BenchmarkOpen(b *testing.B) {
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		f := &File{}
-		_, err := f.Open("file://" + dir)
+		_, err := f.Open(scheme + dir)
 		if err != nil {
 			b.Error(err)
 		}
@@ -188,7 +190,7 @@ func BenchmarkNext(b *testing.B) {
 		}
 	}()
 	f := &File{}
-	d, _ := f.Open("file://" + dir)
+	d, _ := f.Open(scheme + dir)
 	b.ResetTimer()
 	v, err := d.First()
 	for n := 0; n < b.N; n++ {
