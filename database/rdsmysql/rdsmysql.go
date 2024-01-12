@@ -20,6 +20,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/go-sql-driver/mysql"
 	"github.com/shogo82148/rdsmysql"
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/hashicorp/go-multierror"
@@ -202,7 +203,7 @@ func urlToMySQLConfig(url string) (*mysql.Config, error) {
 		}
 	}
 
-	config, err := mysql.ParseDSN(strings.TrimPrefix(url, "mysql://"))
+	config, err := mysql.ParseDSN(strings.TrimPrefix(url, "rdsmysql://"))
 	if err != nil {
 		return nil, err
 	}
@@ -261,15 +262,10 @@ func (m *Mysql) Open(url string) (database.Driver, error) {
 
 	connector := &rdsmysql.Connector{
 		Session: awsSession,
-		Config:  config.FormatDSN(),
+		Config:  config,
 	}
 
-	db, err := sql.Open("mysql", connector)
-	if err != nil {
-		return nil, err
-	}
-
-	mx, err := WithInstance(db, &Config{
+	mx, err := WithInstance(sql.OpenDB(connector), &Config{
 		DatabaseName:     config.DBName,
 		MigrationsTable:  customParams["x-migrations-table"],
 		NoLock:           noLock,
