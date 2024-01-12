@@ -3,9 +3,7 @@ package ydb
 import (
 	"context"
 	"database/sql"
-	sqldriver "database/sql/driver"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"testing"
@@ -73,12 +71,7 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 	defer cancel()
 
 	if err = db.PingContext(ctxWithTimeout); err != nil {
-		switch err {
-		case sqldriver.ErrBadConn, io.EOF:
-			return false
-		default:
-			log.Println(err)
-		}
+		log.Println(err)
 		return false
 	}
 
