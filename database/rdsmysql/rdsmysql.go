@@ -32,6 +32,7 @@ func init() {
 	database.Register("rdsmysql", &Mysql{})
 }
 
+var DefaultRegion = "us-east-1"
 var DefaultMigrationsTable = "schema_migrations"
 
 var (
@@ -257,7 +258,11 @@ func (m *Mysql) Open(url string) (database.Driver, error) {
 	}
 
 	// configure AWS session
-	awsConfig := aws.NewConfig().WithRegion("us-east-1")
+	awsRegion := customParams["x-region"]
+	if awsRegion == "" {
+		awsRegion = DefaultRegion
+	}
+	awsConfig := aws.NewConfig().WithRegion(awsRegion)
 	awsSession := session.Must(session.NewSession(awsConfig))
 
 	connector := &rdsmysql.Connector{

@@ -31,6 +31,7 @@ require (
 	github.com/mutecomm/go-sqlcipher/v4 v4.4.0
 	github.com/nakagami/firebirdsql v0.0.0-20190310045651-3c02a58cfed8
 	github.com/neo4j/neo4j-go-driver v1.8.1-0.20200803113522-b626aa943eba
+	github.com/shogo82148/rdsmysql v1.5.0
 	github.com/snowflakedb/gosnowflake v1.6.19
 	github.com/stretchr/testify v1.8.3
 	github.com/xanzy/go-gitlab v0.15.0
@@ -42,8 +43,6 @@ require (
 	modernc.org/ql v1.0.0
 	modernc.org/sqlite v1.18.1
 )
-
-require github.com/shogo82148/rdsmysql v1.5.0 // indirect
 
 require (
 	cloud.google.com/go v0.110.10 // indirect
