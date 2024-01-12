@@ -1,5 +1,5 @@
-//go:build mysql
-// +build mysql
+//go:build rdsmysql
+// +build rdsmysql
 
 package cli
 

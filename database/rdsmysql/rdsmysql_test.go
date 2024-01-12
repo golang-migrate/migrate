@@ -18,9 +18,7 @@ import (
 	"testing"
 
 	"github.com/dhui/dktest"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/shogo82148/rdsmysql"
+	"github.com/go-sql-driver/mysql"
 	"github.com/golang-migrate/migrate/v4"
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
 	"github.com/golang-migrate/migrate/v4/dktesting"
