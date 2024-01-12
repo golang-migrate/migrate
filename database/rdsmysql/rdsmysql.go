@@ -21,9 +21,9 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/go-sql-driver/mysql"
-	"github.com/shogo82148/rdsmysql"
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/hashicorp/go-multierror"
+	"github.com/shogo82148/rdsmysql"
 )
 
 var _ database.Driver = (*Mysql)(nil) // explicit compile time type check
