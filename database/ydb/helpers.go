@@ -51,7 +51,6 @@ func skipComments(statements string) (string, error) {
 	stringDelimiter := byte(0)
 
 	for i := 0; i < len(statements); i++ {
-		// Check for string literal start/end
 		if (statements[i] == '\'' || statements[i] == '`') && (i == 0 || statements[i-1] != '\\') {
 			if inString {
 				if statements[i] == stringDelimiter {
