@@ -29,11 +29,12 @@ var DefaultPrefetchMigrations = uint(10)
 var DefaultLockTimeout = 15 * time.Second
 
 var (
-	ErrNoChange       = errors.New("no change")
-	ErrNilVersion     = errors.New("no migration")
-	ErrInvalidVersion = errors.New("version must be >= -1")
-	ErrLocked         = errors.New("database locked")
-	ErrLockTimeout    = errors.New("timeout: can't acquire database lock")
+	ErrNoChange         = errors.New("no change")
+	ErrNilVersion       = errors.New("no migration")
+	ErrInvalidVersion   = errors.New("version must be >= -1")
+	ErrLocked           = errors.New("database locked")
+	ErrLockTimeout      = errors.New("timeout: can't acquire database lock")
+	ErrPendingMigration = errors.New("has pending migration")
 )
 
 // ErrShortLimit is an error returned when not enough migrations
@@ -393,6 +394,50 @@ func (m *Migrate) Version() (version uint, dirty bool, err error) {
 	}
 
 	return suint(v), d, nil
+}
+
+// Check if exists a pending migration
+func (m *Migrate) Check() error {
+	if err := m.lock(); err != nil {
+		return err
+	}
+
+	curVersion, dirty, err := m.databaseDrv.Version()
+	if err != nil {
+		return m.unlockErr(err)
+	}
+
+	if dirty {
+		return m.unlockErr(ErrDirty{curVersion})
+	}
+
+	ret := make(chan interface{}, m.PrefetchMigrations)
+
+	go m.readUp(curVersion, 1, ret)
+	return m.unlockErr(m.hasPendingMigration(ret))
+}
+
+// hasPendingMigration read a channel of migrations
+// If a migration exists, return an error
+func (m *Migrate) hasPendingMigration(ret <-chan interface{}) error {
+	for r := range ret {
+
+		if m.stop() {
+			return nil
+		}
+
+		switch r := r.(type) {
+		case error:
+			return r
+
+		case *Migration:
+			return ErrPendingMigration
+
+		default:
+			return fmt.Errorf("unknown type: %T with value: %+v", r, r)
+		}
+	}
+	return nil
 }
 
 // read reads either up or down migrations from source `from` to `to`.
