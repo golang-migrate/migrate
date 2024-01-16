@@ -7,6 +7,8 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database"
+	"github.com/pkg/errors"
 	"log"
 	"strings"
 	"testing"
@@ -26,13 +28,12 @@ import (
 const defaultPort = 26257
 
 var (
-	opts = dktest.Options{Cmd: []string{"start", "--insecure"}, PortRequired: true, ReadyFunc: isReady}
+	opts = dktest.Options{Cmd: []string{"start-single-node", "--insecure"}, PortRequired: true, ReadyFunc: isReady}
 	// Released versions: https://www.cockroachlabs.com/docs/releases/
 	specs = []dktesting.ContainerSpec{
-		{ImageName: "cockroachdb/cockroach:v1.0.7", Options: opts},
-		{ImageName: "cockroachdb/cockroach:v1.1.9", Options: opts},
-		{ImageName: "cockroachdb/cockroach:v2.0.7", Options: opts},
-		{ImageName: "cockroachdb/cockroach:v2.1.3", Options: opts},
+		{ImageName: "cockroachdb/cockroach:latest-v22.1", Options: opts},
+		{ImageName: "cockroachdb/cockroach:latest-v22.2", Options: opts},
+		{ImageName: "cockroachdb/cockroach:latest-v23.1", Options: opts},
 	}
 )
 
@@ -79,6 +80,14 @@ func createDB(t *testing.T, c dktest.ContainerInfo) {
 
 	if _, err = db.Exec("CREATE DATABASE migrate"); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func mustRun(t *testing.T, d database.Driver, statements []string) {
+	for _, statement := range statements {
+		if err := d.Run(strings.NewReader(statement)); err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 
@@ -169,6 +178,69 @@ func TestFilterCustomQuery(t *testing.T) {
 		_, err = c.Open(addr)
 		if err != nil {
 			t.Fatal(err)
+		}
+	})
+}
+
+func TestRole(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, ci dktest.ContainerInfo) {
+		createDB(t, ci)
+
+		ip, port, err := ci.Port(26257)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		c := &CockroachDb{}
+
+		d, err := c.Open(fmt.Sprintf("cockroach://root@%v:%v/migrate?sslmode=disable", ip, port))
+		if err != nil {
+			t.Fatal(err)
+		}
+		mustRun(t, d, []string{
+			"CREATE ROLE IF NOT EXISTS _fa NOLOGIN;",
+			"CREATE ROLE IF NOT EXISTS _fa_ungranted NOLOGIN",
+			"CREATE ROLE deploy LOGIN",
+			"GRANT _fa TO deploy",
+			"GRANT CREATE ON DATABASE migrate TO _fa, _fa_ungranted;",
+			"GRANT CONNECT ON DATABASE migrate TO deploy",
+			"GRANT SELECT, INSERT, DELETE ON TABLE schema_lock TO deploy",
+		})
+
+		// positive: connecting with deploy user and setting role to _fa
+		d2, err := c.Open(fmt.Sprintf("cockroach://deploy@%v:%v/migrate?sslmode=disable&x-role=_fa", ip, port))
+		if err != nil {
+			t.Fatal(err)
+		}
+		mustRun(t, d2, []string{
+			"CREATE TABLE foo (role INT UNIQUE);",
+		})
+		var exists bool
+		if err := d2.(*CockroachDb).db.QueryRow("SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'foo' AND schemaname = (SELECT current_schema()) AND tableowner = '_fa');").Scan(&exists); err != nil {
+			t.Fatal(err)
+		}
+		if !exists {
+			t.Fatalf("expected table foo owned by _fa role to exist")
+		}
+
+		// negative: connecting with deploy user and trying to set not existing role
+		_, err = c.Open(fmt.Sprintf("cockroach://root@%v:%v/migrate?sslmode=disable&x-role=_not_existing_role", ip, port))
+		if err != ErrNoSuchRole {
+			t.Fatal(fmt.Errorf("expected %w, but got %w", ErrNoSuchRole, err))
+		}
+
+		// negative: connecting with deploy user and trying to set not granted role
+		d3, err := c.Open(fmt.Sprintf("cockroach://deploy@%v:%v/migrate?sslmode=disable&x-role=_fa_ungranted", ip, port))
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = d3.Run(strings.NewReader("CREATE TABLE imdasuperuser (foo text);"))
+		var e database.Error
+		if !errors.As(err, &e) || err == nil {
+			t.Fatal(fmt.Errorf("unexpected success, wanted permission denied error, got: %w", err))
+		}
+		if !strings.Contains(e.OrigErr.Error(), "permission denied to set role") {
+			t.Fatal(fmt.Errorf("unexpected error, wanted permission denied error, got: %w", err))
 		}
 	})
 }

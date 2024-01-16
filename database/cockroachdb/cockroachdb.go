@@ -30,6 +30,7 @@ var DefaultLockTable = "schema_lock"
 var (
 	ErrNilConfig      = fmt.Errorf("no config")
 	ErrNoDatabaseName = fmt.Errorf("no database name")
+	ErrNoSuchRole     = fmt.Errorf("no such role")
 )
 
 type Config struct {
@@ -37,6 +38,7 @@ type Config struct {
 	LockTable       string
 	ForceLock       bool
 	DatabaseName    string
+	Role            string
 }
 
 type CockroachDb struct {
@@ -76,6 +78,17 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 
 	if len(config.LockTable) == 0 {
 		config.LockTable = DefaultLockTable
+	}
+	if len(config.Role) > 0 {
+		var role string
+		query := `SELECT rolname FROM pg_roles WHERE rolname = $1`
+		if err := instance.QueryRow(query, config.Role).Scan(&role); err != nil {
+			if err == sql.ErrNoRows {
+				return nil, ErrNoSuchRole
+			}
+			return nil, &database.Error{OrigErr: err, Query: []byte(query)}
+		}
+		config.Role = role
 	}
 
 	px := &CockroachDb{
@@ -127,11 +140,17 @@ func (c *CockroachDb) Open(url string) (database.Driver, error) {
 		forceLock = false
 	}
 
+	role := ""
+	if s := purl.Query().Get("x-role"); len(s) > 0 {
+		role = s
+	}
+
 	px, err := WithInstance(db, &Config{
 		DatabaseName:    purl.Path,
 		MigrationsTable: migrationsTable,
 		LockTable:       lockTable,
 		ForceLock:       forceLock,
+		Role:            role,
 	})
 	if err != nil {
 		return nil, err
@@ -214,6 +233,12 @@ func (c *CockroachDb) Run(migration io.Reader) error {
 	migr, err := io.ReadAll(migration)
 	if err != nil {
 		return err
+	}
+
+	if len(c.config.Role) > 0 {
+		if _, err := c.db.Exec(fmt.Sprintf("SET ROLE %s", c.config.Role)); err != nil {
+			return database.Error{OrigErr: err, Err: "failed to set role", Query: migr}
+		}
 	}
 
 	// run migration
