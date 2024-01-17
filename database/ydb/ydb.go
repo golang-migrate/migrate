@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/url"
-	"strings"
 	"sync/atomic"
 	"time"
 
@@ -26,6 +25,35 @@ var _ database.Driver = (*YDB)(nil)
 func init() {
 	database.Register("ydb", &YDB{})
 }
+
+const (
+	createVersionTableQueryTemplate = `
+	CREATE TABLE %s (
+		version Int32,
+		dirty Bool,
+		applied_at Timestamp,
+		PRIMARY KEY (version)
+	);
+	`
+
+	deleteVersionsQueryTemplate = `
+	DELETE FROM %s;`
+
+	setVersionQueryTemplate = `
+	DECLARE $version AS Int32;
+	DECLARE $dirty AS Bool;
+	DECLARE $applied_at AS Timestamp;
+	UPSERT INTO %s (version, dirty, applied_at) 
+	VALUES ($version, $dirty, $applied_at);`
+
+	getCurrentVersionQueryTemplate = `
+	SELECT version, dirty FROM %s 
+	ORDER BY version DESC LIMIT 1;`
+
+	dropTablesQueryTemplate = "DROP TABLE `%s`;"
+
+	getAllTablesQueryTemplate = "SELECT Path FROM `%s/.sys/partition_stats` WHERE Path NOT LIKE '%%/.sys%%'"
+)
 
 type YDB struct {
 	db              *sql.DB
@@ -105,8 +133,12 @@ func (y *YDB) createMigrationsTable(ctx context.Context) (err error) {
 
 	ctx = ydb.WithQueryMode(ctx, ydb.SchemeQueryMode)
 
-	if _, err := y.db.ExecContext(ctx, fmt.Sprintf(createVersionTableQueryTemplate, y.tableWithPrefix(y.migrationsTable))); err != nil {
-		return err
+	createTableQuery := fmt.Sprintf(createVersionTableQueryTemplate, y.tableWithPrefix(y.migrationsTable))
+	if _, err := y.db.ExecContext(ctx, createTableQuery); err != nil {
+		return database.Error{
+			OrigErr: err,
+			Query:   []byte(createTableQuery),
+		}
 	}
 
 	return nil
@@ -118,7 +150,7 @@ func (y *YDB) Close() error {
 
 func (y *YDB) Drop() (err error) {
 	tablesQuery := fmt.Sprintf(
-		"SELECT Path FROM `%s/.sys/partition_stats` WHERE Path NOT LIKE '%%/.sys%%'",
+		getAllTablesQueryTemplate,
 		y.prefix,
 	)
 
@@ -163,50 +195,12 @@ func (y *YDB) Run(migration io.Reader) error {
 		return err
 	}
 
-	statements, err := skipComments(string(data))
-	if err != nil {
-		return database.Error{
-			OrigErr: err,
-			Err:     "failed to skip comments",
-		}
-	}
-
-	currentMode := notSetMode
-
-	for _, statement := range strings.Split(statements, ";") {
-		statement = strings.TrimSpace(statement)
-
-		if statement == "" {
-			continue
-		}
-
-		mode := detectQueryMode(statement)
-
-		if currentMode == notSetMode {
-			currentMode = mode
-		} else if currentMode != mode {
-			return database.Error{
-				Err:   "mixed query modes in one migration",
-				Query: []byte(statements),
-			}
-		}
-	}
-
-	ctx := context.Background()
-
-	switch currentMode {
-	case ddlMode:
-		ctx = ydb.WithQueryMode(ctx, ydb.SchemeQueryMode)
-	case dmlMode:
-		ctx = ydb.WithQueryMode(ctx, ydb.DataQueryMode)
-	}
-
-	_, err = y.db.ExecContext(ctx, statements)
+	_, err = y.db.ExecContext(ydb.WithQueryMode(context.Background(), ydb.ScriptingQueryMode), string(data))
 	if err != nil {
 		return database.Error{
 			OrigErr: err,
 			Err:     "migration failed",
-			Query:   []byte(statements),
+			Query:   data,
 		}
 	}
 
@@ -222,9 +216,10 @@ func (y *YDB) SetVersion(version int, dirty bool) error {
 		return err
 	}
 
-	deleteVersions := fmt.Sprintf(deleteVersionsQueryTemplate, y.tableWithPrefix(y.migrationsTable))
+	ctx := ydb.WithQueryMode(context.Background(), ydb.DataQueryMode)
 
-	if _, err = tx.Exec(deleteVersions); err != nil {
+	deleteVersions := fmt.Sprintf(deleteVersionsQueryTemplate, y.tableWithPrefix(y.migrationsTable))
+	if _, err = tx.ExecContext(ctx, deleteVersions); err != nil {
 		if rollbackErr := tx.Rollback(); rollbackErr != nil {
 			err = errors.Join(err, rollbackErr)
 		}
@@ -237,8 +232,8 @@ func (y *YDB) SetVersion(version int, dirty bool) error {
 	}
 
 	versionQuery := fmt.Sprintf(setVersionQueryTemplate, y.tableWithPrefix(y.migrationsTable))
-
-	_, err = tx.Exec(
+	_, err = tx.ExecContext(
+		ctx,
 		versionQuery,
 		sql.Named("version", version),
 		sql.Named("dirty", dirty),
@@ -252,6 +247,7 @@ func (y *YDB) SetVersion(version int, dirty bool) error {
 		return database.Error{
 			OrigErr: err,
 			Err:     "failed to set version",
+			Query:   []byte(versionQuery),
 		}
 	}
 
@@ -259,7 +255,7 @@ func (y *YDB) SetVersion(version int, dirty bool) error {
 }
 
 func (y *YDB) Version() (version int, dirty bool, err error) {
-	versionQuery := fmt.Sprintf(getVersionQueryTemplate, y.tableWithPrefix(y.migrationsTable))
+	versionQuery := fmt.Sprintf(getCurrentVersionQueryTemplate, y.tableWithPrefix(y.migrationsTable))
 
 	row, err := y.db.QueryContext(ydb.WithQueryMode(context.Background(), ydb.ScanQueryMode), versionQuery)
 	if err != nil {
