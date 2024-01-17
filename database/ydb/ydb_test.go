@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	"os"
 	"testing"
 	"time"
 
@@ -29,7 +28,8 @@ var (
 		ReadyTimeout: 15 * time.Second,
 		Hostname:     host,
 		Env: map[string]string{
-			"YDB_USE_IN_MEMORY_PDISKS": "true",
+			"YDB_USE_IN_MEMORY_PDISKS":  "true",
+			"YDB_LOCAL_SURVIVE_RESTART": "true",
 		},
 		PortBindings: nat.PortMap{
 			nat.Port(fmt.Sprintf("%s/tcp", port)): []nat.PortBinding{{
@@ -43,12 +43,8 @@ var (
 	image = "cr.yandex/yc/yandex-docker-local-ydb:latest"
 )
 
-func init() {
-	_ = os.Setenv("YDB_ANONYMOUS_CREDENTIALS", "1")
-}
-
 func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
-	nativeDriver, err := ydb.Open(context.Background(), fmt.Sprintf("grpc://localhost:%s/%s", port, testDB))
+	nativeDriver, err := ydb.Open(context.Background(), fmt.Sprintf("grpc://%s:%s/%s", host, port, testDB))
 	if err != nil {
 		log.Println(err)
 		return false
@@ -93,7 +89,7 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 
 func Test(t *testing.T) {
 	dktest.Run(t, image, opts, func(t *testing.T, c dktest.ContainerInfo) {
-		addr := fmt.Sprintf("grpc://localhost:%s/%s", port, testDB)
+		addr := fmt.Sprintf("grpc://%s:%s/%s", host, port, testDB)
 		p := &YDB{}
 		d, err := p.Open(addr)
 		if err != nil {
