@@ -2,21 +2,22 @@
 
 `mysql://user:password@tcp(host:port)/dbname?query`
 
-| URL Query  | WithInstance Config | Description |
-|------------|---------------------|-------------|
-| `x-migrations-table` | `MigrationsTable` | Name of the migrations table |
-| `x-no-lock` | `NoLock` | Set to `true` to skip `GET_LOCK`/`RELEASE_LOCK` statements. Useful for [multi-master MySQL flavors](https://www.percona.com/doc/percona-xtradb-cluster/LATEST/features/pxc-strict-mode.html#explicit-table-locking). Only run migrations from one host when this is enabled. |
-| `x-statement-timeout` | `StatementTimeout` | Abort any statement that takes more than the specified number of milliseconds, functionally similar to [Server-side SELECT statement timeouts](https://dev.mysql.com/blog-archive/server-side-select-statement-timeouts/) but enforced by the client. Available for all versions of MySQL, not just >=5.7. | 
-| `dbname` | `DatabaseName` | The name of the database to connect to |
-| `user` | | The user to sign in as |
-| `password` | | The user's password | 
-| `host` | | The host to connect to. |
-| `port` | | The port to bind to. |
-| `tls`  | | TLS / SSL encrypted connection parameter; see [go-sql-driver](https://github.com/go-sql-driver/mysql#tls). Use any name (e.g. `migrate`) if you want to use a custom TLS config (`x-tls-` queries). |
-| `x-tls-ca` | | The location of the CA (certificate authority) file. |
-| `x-tls-cert` | | The location of the client certicicate file. Must be used with `x-tls-key`. |
-| `x-tls-key` | | The location of the private key file. Must be used with `x-tls-cert`. |
-| `x-tls-insecure-skip-verify` | | Whether or not to use SSL (true\|false) | 
+| URL Query                    | WithInstance Config | Description                                                                                                                                                                                                                                                                                                |
+|------------------------------|---------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `x-migrations-table`         | `MigrationsTable`   | Name of the migrations table                                                                                                                                                                                                                                                                               |
+| `x-no-lock`                  | `NoLock`            | Set to `true` to skip `GET_LOCK`/`RELEASE_LOCK` statements. Useful for [multi-master MySQL flavors](https://www.percona.com/doc/percona-xtradb-cluster/LATEST/features/pxc-strict-mode.html#explicit-table-locking). Only run migrations from one host when this is enabled.                               |
+| `x-statement-timeout`        | `StatementTimeout`  | Abort any statement that takes more than the specified number of milliseconds, functionally similar to [Server-side SELECT statement timeouts](https://dev.mysql.com/blog-archive/server-side-select-statement-timeouts/) but enforced by the client. Available for all versions of MySQL, not just >=5.7. | 
+| `x-safe-update`              | `SafeUpdate`        | Set to `true` if we should respect safe updates (TRUNCATE vs DELETE)                                                                                                                                                                                                                                       |
+| `dbname`                     | `DatabaseName`      | The name of the database to connect to                                                                                                                                                                                                                                                                     |
+| `user`                       |                     | The user to sign in as                                                                                                                                                                                                                                                                                     |
+| `password`                   |                     | The user's password                                                                                                                                                                                                                                                                                        | 
+| `host`                       |                     | The host to connect to.                                                                                                                                                                                                                                                                                    |
+| `port`                       |                     | The port to bind to.                                                                                                                                                                                                                                                                                       |
+| `tls`                        |                     | TLS / SSL encrypted connection parameter; see [go-sql-driver](https://github.com/go-sql-driver/mysql#tls). Use any name (e.g. `migrate`) if you want to use a custom TLS config (`x-tls-` queries).                                                                                                        |
+| `x-tls-ca`                   |                     | The location of the CA (certificate authority) file.                                                                                                                                                                                                                                                       |
+| `x-tls-cert`                 |                     | The location of the client certicicate file. Must be used with `x-tls-key`.                                                                                                                                                                                                                                |
+| `x-tls-key`                  |                     | The location of the private key file. Must be used with `x-tls-cert`.                                                                                                                                                                                                                                      |
+| `x-tls-insecure-skip-verify` |                     | Whether or not to use SSL (true\|false)                                                                                                                                                                                                                                                                    | 
 
 ## Use with existing client
 
