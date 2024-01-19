@@ -53,7 +53,7 @@ type Config struct {
 	migrationsTableName   string
 	StatementTimeout      time.Duration
 	MultiStatementMaxSize int
-	NoLock           bool
+	NoLock                bool
 }
 
 type Postgres struct {
