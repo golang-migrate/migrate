@@ -10,8 +10,8 @@ import (
 
 	"github.com/docker/go-connections/nat"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 
 	"github.com/dhui/dktest"
 	"github.com/golang-migrate/migrate/v4/database"
@@ -47,23 +47,11 @@ var (
 )
 
 func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
-	nativeDriver, err := ydb.Open(
-		context.Background(),
-		fmt.Sprintf("grpc://%s:%s/%s", host, port, testDB),
-		ydb.WithBalancer(balancers.SingleConn()),
-	)
+	db, err := sql.Open("ydb", fmt.Sprintf("grpc://%s:%s/%s", host, port, testDB))
 	if err != nil {
 		log.Println(err)
 		return false
 	}
-
-	connector, err := ydb.Connector(nativeDriver)
-	if err != nil {
-		log.Println("close error:", err)
-		return false
-	}
-
-	db := sql.OpenDB(connector)
 	defer func() {
 		if err := db.Close(); err != nil {
 			log.Println("close error:", err)
@@ -94,6 +82,44 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 	return true
 }
 
+func TestOpen(t *testing.T) {
+	dktest.Run(t, image, opts, func(t *testing.T, c dktest.ContainerInfo) {
+		addr := fmt.Sprintf("grpc://%s:%s/%s", host, port, testDB)
+		p := &YDB{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
+
+		version, dirty, err := d.Version()
+		assert.NoError(t, err)
+		assert.Equal(t, database.NilVersion, version)
+		assert.False(t, dirty)
+	})
+}
+
+func TestClose(t *testing.T) {
+	dktest.Run(t, image, opts, func(t *testing.T, c dktest.ContainerInfo) {
+		addr := fmt.Sprintf("grpc://%s:%s/%s", host, port, testDB)
+		p := &YDB{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := d.Close(); err != nil {
+			t.Error(err)
+		}
+
+		_, _, err = d.Version()
+		assert.ErrorContains(t, err, "database is closed")
+	})
+}
+
 func Test(t *testing.T) {
 	dktest.Run(t, image, opts, func(t *testing.T, c dktest.ContainerInfo) {
 		addr := fmt.Sprintf("grpc://%s:%s/%s", host, port, testDB)
@@ -116,28 +142,15 @@ func Test(t *testing.T) {
 	})
 }
 
-func TestClose(t *testing.T) {
+func TestWithInstance(t *testing.T) {
 	dktest.Run(t, image, opts, func(t *testing.T, c dktest.ContainerInfo) {
 		addr := fmt.Sprintf("grpc://%s:%s/%s", host, port, testDB)
-		p := &YDB{}
-		d, err := p.Open(addr)
+		db, err := sql.Open("ydb", addr)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := d.Close(); err != nil {
-			t.Error(err)
-		}
 
-		_, _, err = d.Version()
-		assert.ErrorContains(t, err, "database is closed")
-	})
-}
-
-func TestOpen(t *testing.T) {
-	dktest.Run(t, image, opts, func(t *testing.T, c dktest.ContainerInfo) {
-		addr := fmt.Sprintf("grpc://%s:%s/%s", host, port, testDB)
-		p := &YDB{}
-		d, err := p.Open(addr)
+		d, err := WithInstance(db, Config{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -148,8 +161,15 @@ func TestOpen(t *testing.T) {
 		}()
 
 		version, dirty, err := d.Version()
-		assert.NoError(t, err)
-		assert.Equal(t, database.NilVersion, version)
-		assert.False(t, dirty)
+		require.NoError(t, err)
+		require.Equal(t, database.NilVersion, version)
+		require.False(t, dirty)
+
+		dt.Test(t, d, []byte(`
+		CREATE TABLE test (
+			id Int,
+			PRIMARY KEY(id)
+		);
+		DROP TABLE test;`))
 	})
 }
