@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -52,18 +53,55 @@ const (
 
 	dropTablesQueryTemplate = "DROP TABLE `%s`;"
 
-	getAllTablesQueryTemplate = "SELECT Path FROM `%s/.sys/partition_stats` WHERE Path NOT LIKE '%%/.sys%%'"
+	getAllTablesQueryTemplate = "SELECT Path FROM `%s.sys/partition_stats` WHERE Path NOT LIKE '%%.sys%%'"
 )
 
+type Config struct {
+	MigrationsTable string
+	Path            string
+}
+
+func WithInstance(db *sql.DB, config Config) (database.Driver, error) {
+	if err := db.Ping(); err != nil {
+		return nil, err
+	}
+
+	if config.MigrationsTable == "" {
+		config.MigrationsTable = defaultMigrationsTable
+	}
+
+	if config.Path != "" && !strings.HasSuffix(config.Path, "/") {
+		config.Path += "/"
+	}
+
+	ydbDriver := &YDB{
+		db:     db,
+		config: config,
+	}
+
+	err := ydbDriver.createMigrationsTable(context.Background())
+	if err != nil {
+		return nil, database.Error{
+			OrigErr: err,
+			Err:     "failed to create migrations table",
+		}
+	}
+
+	return ydbDriver, nil
+}
+
 type YDB struct {
-	db              *sql.DB
-	locked          atomic.Bool
-	migrationsTable string
-	prefix          string
+	db     *sql.DB
+	locked atomic.Bool
+	config Config
 }
 
 func (y *YDB) tableWithPrefix(table string) string {
-	return fmt.Sprintf("`%s/%s`", y.prefix, table)
+	if y.config.Path == "" {
+		return table
+	}
+
+	return fmt.Sprintf("`%s%s`", y.config.Path, table)
 }
 
 func (y *YDB) Lock() error {
@@ -103,10 +141,18 @@ func (y *YDB) Open(dsn string) (database.Driver, error) {
 		migrationsTable = defaultMigrationsTable
 	}
 
+	databaseName := nativeDriver.Name()
+
+	if databaseName != "" {
+		databaseName += "/"
+	}
+
 	ydbDriver := &YDB{
-		db:              sql.OpenDB(connector),
-		migrationsTable: migrationsTable,
-		prefix:          nativeDriver.Name(),
+		db: sql.OpenDB(connector),
+		config: Config{
+			MigrationsTable: migrationsTable,
+			Path:            databaseName,
+		},
 	}
 
 	err = ydbDriver.createMigrationsTable(context.Background())
@@ -133,7 +179,7 @@ func (y *YDB) createMigrationsTable(ctx context.Context) (err error) {
 
 	ctx = ydb.WithQueryMode(ctx, ydb.SchemeQueryMode)
 
-	createTableQuery := fmt.Sprintf(createVersionTableQueryTemplate, y.tableWithPrefix(y.migrationsTable))
+	createTableQuery := fmt.Sprintf(createVersionTableQueryTemplate, y.tableWithPrefix(y.config.MigrationsTable))
 	if _, err := y.db.ExecContext(ctx, createTableQuery); err != nil {
 		return database.Error{
 			OrigErr: err,
@@ -151,7 +197,7 @@ func (y *YDB) Close() error {
 func (y *YDB) Drop() (err error) {
 	tablesQuery := fmt.Sprintf(
 		getAllTablesQueryTemplate,
-		y.prefix,
+		y.config.Path,
 	)
 
 	rows, err := y.db.QueryContext(ydb.WithQueryMode(context.Background(), ydb.ScanQueryMode), tablesQuery)
@@ -218,7 +264,7 @@ func (y *YDB) SetVersion(version int, dirty bool) error {
 
 	ctx := ydb.WithQueryMode(context.Background(), ydb.DataQueryMode)
 
-	deleteVersions := fmt.Sprintf(deleteVersionsQueryTemplate, y.tableWithPrefix(y.migrationsTable))
+	deleteVersions := fmt.Sprintf(deleteVersionsQueryTemplate, y.tableWithPrefix(y.config.MigrationsTable))
 	if _, err = tx.ExecContext(ctx, deleteVersions); err != nil {
 		if rollbackErr := tx.Rollback(); rollbackErr != nil {
 			err = errors.Join(err, rollbackErr)
@@ -231,7 +277,7 @@ func (y *YDB) SetVersion(version int, dirty bool) error {
 		}
 	}
 
-	versionQuery := fmt.Sprintf(setVersionQueryTemplate, y.tableWithPrefix(y.migrationsTable))
+	versionQuery := fmt.Sprintf(setVersionQueryTemplate, y.tableWithPrefix(y.config.MigrationsTable))
 	_, err = tx.ExecContext(
 		ctx,
 		versionQuery,
@@ -255,7 +301,7 @@ func (y *YDB) SetVersion(version int, dirty bool) error {
 }
 
 func (y *YDB) Version() (version int, dirty bool, err error) {
-	versionQuery := fmt.Sprintf(getCurrentVersionQueryTemplate, y.tableWithPrefix(y.migrationsTable))
+	versionQuery := fmt.Sprintf(getCurrentVersionQueryTemplate, y.tableWithPrefix(y.config.MigrationsTable))
 
 	row, err := y.db.QueryContext(ydb.WithQueryMode(context.Background(), ydb.ScanQueryMode), versionQuery)
 	if err != nil {
