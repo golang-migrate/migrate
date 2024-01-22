@@ -13,12 +13,15 @@ import (
 
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 
+	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 )
 
 const (
 	migrationsTableQueryParam = "x-migrations-table"
-	defaultMigrationsTable    = "schema_migrations"
+	useGRPCSQueryParam        = "x-use-grpcs"
+
+	defaultMigrationsTable = "schema_migrations"
 )
 
 var _ database.Driver = (*YDB)(nil)
@@ -120,7 +123,19 @@ func (y *YDB) Unlock() error {
 }
 
 func (y *YDB) Open(dsn string) (database.Driver, error) {
-	nativeDriver, err := ydb.Open(context.Background(), dsn)
+	customUrl, err := url.Parse(dsn)
+	if err != nil {
+		return nil, err
+	}
+
+	connUrl := migrate.FilterCustomQuery(customUrl)
+	if customUrl.Query().Get(useGRPCSQueryParam) != "" {
+		connUrl.Scheme = "grpcs"
+	} else {
+		connUrl.Scheme = "grpc"
+	}
+
+	nativeDriver, err := ydb.Open(context.Background(), connUrl.String())
 	if err != nil {
 		return nil, err
 	}
@@ -130,12 +145,7 @@ func (y *YDB) Open(dsn string) (database.Driver, error) {
 		return nil, err
 	}
 
-	connUrl, err := url.Parse(dsn)
-	if err != nil {
-		return nil, err
-	}
-
-	migrationsTable := connUrl.Query().Get(migrationsTableQueryParam)
+	migrationsTable := customUrl.Query().Get(migrationsTableQueryParam)
 
 	if migrationsTable == "" {
 		migrationsTable = defaultMigrationsTable

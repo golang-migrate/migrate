@@ -84,7 +84,7 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 
 func TestOpen(t *testing.T) {
 	dktest.Run(t, image, opts, func(t *testing.T, c dktest.ContainerInfo) {
-		addr := fmt.Sprintf("grpc://%s:%s/%s", host, port, testDB)
+		addr := fmt.Sprintf("ydb://%s:%s/%s", host, port, testDB)
 		p := &YDB{}
 		d, err := p.Open(addr)
 		if err != nil {
@@ -105,7 +105,7 @@ func TestOpen(t *testing.T) {
 
 func TestClose(t *testing.T) {
 	dktest.Run(t, image, opts, func(t *testing.T, c dktest.ContainerInfo) {
-		addr := fmt.Sprintf("grpc://%s:%s/%s", host, port, testDB)
+		addr := fmt.Sprintf("ydb://%s:%s/%s", host, port, testDB)
 		p := &YDB{}
 		d, err := p.Open(addr)
 		if err != nil {
@@ -122,7 +122,7 @@ func TestClose(t *testing.T) {
 
 func Test(t *testing.T) {
 	dktest.Run(t, image, opts, func(t *testing.T, c dktest.ContainerInfo) {
-		addr := fmt.Sprintf("grpc://%s:%s/%s", host, port, testDB)
+		addr := fmt.Sprintf("ydb://%s:%s/%s", host, port, testDB)
 		p := &YDB{}
 		d, err := p.Open(addr)
 		if err != nil {
