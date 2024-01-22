@@ -11,9 +11,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/golang-migrate/migrate/v4/database"
-
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
+
+	"github.com/golang-migrate/migrate/v4/database"
 )
 
 const (
