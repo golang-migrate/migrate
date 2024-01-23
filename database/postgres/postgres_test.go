@@ -631,6 +631,7 @@ func TestPostgres_ConcurrentMigrations(t *testing.T) {
 						t.Error(err)
 					}
 				}()
+				
 				m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "postgres", d)
 				if err != nil {
 					t.Error(err)
