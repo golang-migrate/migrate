@@ -3,6 +3,7 @@ package cockroachdb
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"io"
 	nurl "net/url"
@@ -83,7 +84,7 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		var role string
 		query := `SELECT rolname FROM pg_roles WHERE rolname = $1`
 		if err := instance.QueryRow(query, config.Role).Scan(&role); err != nil {
-			if err == sql.ErrNoRows {
+			if errors.Is(err, sql.ErrNoRows) {
 				return nil, ErrNoSuchRole
 			}
 			return nil, &database.Error{OrigErr: err, Query: []byte(query)}
@@ -140,7 +141,7 @@ func (c *CockroachDb) Open(url string) (database.Driver, error) {
 		forceLock = false
 	}
 
-	role := ""
+	var role string
 	if s := purl.Query().Get("x-role"); len(s) > 0 {
 		role = s
 	}

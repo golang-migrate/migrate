@@ -203,8 +203,8 @@ func TestRole(t *testing.T) {
 			"CREATE ROLE deploy LOGIN",
 			"GRANT _fa TO deploy",
 			"GRANT CREATE ON DATABASE migrate TO _fa, _fa_ungranted;",
-			"GRANT CONNECT ON DATABASE migrate TO deploy",
-			"GRANT SELECT, INSERT, DELETE ON TABLE schema_lock TO deploy",
+			"GRANT CONNECT ON DATABASE migrate TO _fa",
+			"GRANT SELECT, INSERT, DELETE ON TABLE schema_lock TO _fa",
 		})
 
 		// positive: connecting with deploy user and setting role to _fa

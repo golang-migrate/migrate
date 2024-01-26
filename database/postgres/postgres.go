@@ -6,6 +6,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"io"
 	nurl "net/url"
@@ -112,7 +113,7 @@ func WithConnection(ctx context.Context, conn *sql.Conn, config *Config) (*Postg
 		var role string
 		query := `SELECT rolname FROM pg_roles WHERE rolname = $1`
 		if err := conn.QueryRowContext(ctx, query, config.Role).Scan(&role); err != nil {
-			if err == sql.ErrNoRows {
+			if errors.Is(err, sql.ErrNoRows) {
 				return nil, ErrNoSuchRole
 			}
 			return nil, &database.Error{OrigErr: err, Query: []byte(query)}
@@ -216,7 +217,7 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 		}
 	}
 
-	role := ""
+	var role string
 	if s := purl.Query().Get("x-role"); len(s) > 0 {
 		role = s
 	}
