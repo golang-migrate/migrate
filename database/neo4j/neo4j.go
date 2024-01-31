@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"log"
 	neturl "net/url"
 	"strconv"
+	"strings"
 	"sync/atomic"
 
 	"github.com/golang-migrate/migrate/v4/database"
@@ -34,6 +36,7 @@ type Config struct {
 	MigrationsLabel       string
 	MultiStatement        bool
 	MultiStatementMaxSize int
+	DatabaseName          string
 }
 
 type Neo4j struct {
@@ -91,7 +94,14 @@ func (n *Neo4j) Open(url string) (database.Driver, error) {
 		return nil, err
 	}
 
+	dbName := strings.Trim(uri.Path, "/")
+	if dbName == "" {
+		log.Printf("Using default neo4j database")
+	} else {
+		log.Printf("Using db name %s", dbName)
+	}
 	return WithInstance(driver, &Config{
+		DatabaseName:          dbName,
 		MigrationsLabel:       DefaultMigrationsLabel,
 		MultiStatement:        multi,
 		MultiStatementMaxSize: multiStatementMaxSize,
@@ -118,11 +128,23 @@ func (n *Neo4j) Unlock() error {
 	return nil
 }
 
-func (n *Neo4j) Run(migration io.Reader) (err error) {
-	session, err := n.driver.Session(neo4j.AccessModeWrite)
-	if err != nil {
-		return err
+func getReadSessionConfig(dbName string) neo4j.SessionConfig {
+	return neo4j.SessionConfig{
+		AccessMode:   neo4j.AccessModeRead,
+		DatabaseName: dbName,
 	}
+}
+
+func getWriteSessionConfig(dbName string) neo4j.SessionConfig {
+	return neo4j.SessionConfig{
+		AccessMode:   neo4j.AccessModeWrite,
+		DatabaseName: dbName,
+	}
+}
+
+func (n *Neo4j) Run(migration io.Reader) (err error) {
+	session := n.driver.NewSession(
+		getWriteSessionConfig(n.config.DatabaseName))
 	defer func() {
 		if cerr := session.Close(); cerr != nil {
 			err = multierror.Append(err, cerr)
@@ -166,10 +188,8 @@ func (n *Neo4j) Run(migration io.Reader) (err error) {
 }
 
 func (n *Neo4j) SetVersion(version int, dirty bool) (err error) {
-	session, err := n.driver.Session(neo4j.AccessModeWrite)
-	if err != nil {
-		return err
-	}
+	session := n.driver.NewSession(
+		getWriteSessionConfig(n.config.DatabaseName))
 	defer func() {
 		if cerr := session.Close(); cerr != nil {
 			err = multierror.Append(err, cerr)
@@ -191,10 +211,8 @@ type MigrationRecord struct {
 }
 
 func (n *Neo4j) Version() (version int, dirty bool, err error) {
-	session, err := n.driver.Session(neo4j.AccessModeRead)
-	if err != nil {
-		return database.NilVersion, false, err
-	}
+	session := n.driver.NewSession(
+		getReadSessionConfig(n.config.DatabaseName))
 	defer func() {
 		if cerr := session.Close(); cerr != nil {
 			err = multierror.Append(err, cerr)
@@ -239,7 +257,8 @@ ORDER BY COALESCE(sm.ts, datetime({year: 0})) DESC, sm.version DESC LIMIT 1`,
 }
 
 func (n *Neo4j) Drop() (err error) {
-	session, err := n.driver.Session(neo4j.AccessModeWrite)
+	session := n.driver.NewSession(
+		getWriteSessionConfig(n.config.DatabaseName))
 	if err != nil {
 		return err
 	}
@@ -256,7 +275,8 @@ func (n *Neo4j) Drop() (err error) {
 }
 
 func (n *Neo4j) ensureVersionConstraint() (err error) {
-	session, err := n.driver.Session(neo4j.AccessModeWrite)
+	session := n.driver.NewSession(
+		getWriteSessionConfig(n.config.DatabaseName))
 	if err != nil {
 		return err
 	}
