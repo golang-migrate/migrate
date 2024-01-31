@@ -6,6 +6,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"io"
 	nurl "net/url"
@@ -41,6 +42,7 @@ var (
 	ErrNoDatabaseName = fmt.Errorf("no database name")
 	ErrNoSchema       = fmt.Errorf("no schema")
 	ErrDatabaseDirty  = fmt.Errorf("database is dirty")
+	ErrNoSuchRole     = fmt.Errorf("no such role")
 )
 
 type Config struct {
@@ -53,6 +55,7 @@ type Config struct {
 	migrationsTableName   string
 	StatementTimeout      time.Duration
 	MultiStatementMaxSize int
+	Role                  string
 }
 
 type Postgres struct {
@@ -104,6 +107,18 @@ func WithConnection(ctx context.Context, conn *sql.Conn, config *Config) (*Postg
 
 	if len(config.MigrationsTable) == 0 {
 		config.MigrationsTable = DefaultMigrationsTable
+	}
+
+	if len(config.Role) > 0 {
+		var role string
+		query := `SELECT rolname FROM pg_roles WHERE rolname = $1`
+		if err := conn.QueryRowContext(ctx, query, config.Role).Scan(&role); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, ErrNoSuchRole
+			}
+			return nil, &database.Error{OrigErr: err, Query: []byte(query)}
+		}
+		config.Role = role
 	}
 
 	config.migrationsSchemaName = config.SchemaName
@@ -202,6 +217,11 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 		}
 	}
 
+	var role string
+	if s := purl.Query().Get("x-role"); len(s) > 0 {
+		role = s
+	}
+
 	px, err := WithInstance(db, &Config{
 		DatabaseName:          purl.Path,
 		MigrationsTable:       migrationsTable,
@@ -209,6 +229,7 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 		StatementTimeout:      time.Duration(statementTimeout) * time.Millisecond,
 		MultiStatementEnabled: multiStatementEnabled,
 		MultiStatementMaxSize: multiStatementMaxSize,
+		Role:                  role,
 	})
 
 	if err != nil {
@@ -290,6 +311,12 @@ func (p *Postgres) runStatement(statement []byte) error {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, p.config.StatementTimeout)
 		defer cancel()
+	}
+	if len(p.config.Role) > 0 {
+		query := "SET ROLE " + p.config.Role
+		if _, err := p.conn.ExecContext(ctx, query); err != nil {
+			return database.Error{OrigErr: err, Err: "failed to set role", Query: statement}
+		}
 	}
 	query := string(statement)
 	if strings.TrimSpace(query) == "" {
