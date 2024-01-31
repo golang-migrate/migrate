@@ -3,7 +3,6 @@ package cockroachdb
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"io"
 	nurl "net/url"
@@ -31,7 +30,6 @@ var DefaultLockTable = "schema_lock"
 var (
 	ErrNilConfig      = fmt.Errorf("no config")
 	ErrNoDatabaseName = fmt.Errorf("no database name")
-	ErrNoSuchRole     = fmt.Errorf("no such role")
 )
 
 type Config struct {
@@ -81,15 +79,10 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		config.LockTable = DefaultLockTable
 	}
 	if len(config.Role) > 0 {
-		var role string
-		query := `SELECT rolname FROM pg_roles WHERE rolname = $1`
-		if err := instance.QueryRow(query, config.Role).Scan(&role); err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, ErrNoSuchRole
-			}
+		query := fmt.Sprintf("SET ROLE %s", database.QuoteString(config.Role))
+		if _, err := instance.Exec(query); err != nil {
 			return nil, &database.Error{OrigErr: err, Query: []byte(query)}
 		}
-		config.Role = role
 	}
 
 	px := &CockroachDb{
@@ -234,12 +227,6 @@ func (c *CockroachDb) Run(migration io.Reader) error {
 	migr, err := io.ReadAll(migration)
 	if err != nil {
 		return err
-	}
-
-	if len(c.config.Role) > 0 {
-		if _, err := c.db.Exec(fmt.Sprintf("SET ROLE %s", c.config.Role)); err != nil {
-			return database.Error{OrigErr: err, Err: "failed to set role", Query: migr}
-		}
 	}
 
 	// run migration

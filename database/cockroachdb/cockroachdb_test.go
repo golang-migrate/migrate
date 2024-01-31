@@ -10,6 +10,7 @@ import (
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/pkg/errors"
 	"log"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -191,21 +192,24 @@ func TestRole(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		c := &CockroachDb{}
-
-		d, err := c.Open(fmt.Sprintf("cockroach://root@%v:%v/migrate?sslmode=disable", ip, port))
+		d, err := sql.Open("postgres", fmt.Sprintf("postgres://root@%v:%v?sslmode=disable", ip, port))
 		if err != nil {
 			t.Fatal(err)
 		}
-		mustRun(t, d, []string{
+		prepare := []string{
 			"CREATE ROLE IF NOT EXISTS _fa NOLOGIN;",
 			"CREATE ROLE IF NOT EXISTS _fa_ungranted NOLOGIN",
 			"CREATE ROLE deploy LOGIN",
 			"GRANT _fa TO deploy",
 			"GRANT CREATE ON DATABASE migrate TO _fa, _fa_ungranted;",
-			"GRANT CONNECT ON DATABASE migrate TO _fa",
-			"GRANT SELECT, INSERT, DELETE ON TABLE schema_lock TO _fa",
-		})
+		}
+		for _, query := range prepare {
+			if _, err := d.Exec(query); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		c := &CockroachDb{}
 
 		// positive: connecting with deploy user and setting role to _fa
 		d2, err := c.Open(fmt.Sprintf("cockroach://deploy@%v:%v/migrate?sslmode=disable&x-role=_fa", ip, port))
@@ -223,24 +227,24 @@ func TestRole(t *testing.T) {
 			t.Fatalf("expected table foo owned by _fa role to exist")
 		}
 
+		var e *database.Error
 		// negative: connecting with deploy user and trying to set not existing role
 		_, err = c.Open(fmt.Sprintf("cockroach://root@%v:%v/migrate?sslmode=disable&x-role=_not_existing_role", ip, port))
-		if err != ErrNoSuchRole {
-			t.Fatal(fmt.Errorf("expected %w, but got %w", ErrNoSuchRole, err))
+		if !errors.As(err, &e) || err == nil {
+			t.Fatal(fmt.Errorf("unexpected success, wanted pq: role/user does not exist, got: %w", err))
+		}
+		re := regexp.MustCompile("^pq: role(/user)? (\")?_not_existing_role(\")? does not exist$")
+		if !re.MatchString(e.OrigErr.Error()) {
+			t.Fatal(fmt.Errorf("unexpected error, wanted _not_existing_role does not exist, got: %s", e.OrigErr.Error()))
 		}
 
 		// negative: connecting with deploy user and trying to set not granted role
-		d3, err := c.Open(fmt.Sprintf("cockroach://deploy@%v:%v/migrate?sslmode=disable&x-role=_fa_ungranted", ip, port))
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = d3.Run(strings.NewReader("CREATE TABLE imdasuperuser (foo text);"))
-		var e database.Error
+		_, err = c.Open(fmt.Sprintf("cockroach://deploy@%v:%v/migrate?sslmode=disable&x-role=_fa_ungranted", ip, port))
 		if !errors.As(err, &e) || err == nil {
 			t.Fatal(fmt.Errorf("unexpected success, wanted permission denied error, got: %w", err))
 		}
 		if !strings.Contains(e.OrigErr.Error(), "permission denied to set role") {
-			t.Fatal(fmt.Errorf("unexpected error, wanted permission denied error, got: %w", err))
+			t.Fatal(fmt.Errorf("unexpected error, wanted permission denied error, got: %s", e.OrigErr.Error()))
 		}
 	})
 }
