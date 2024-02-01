@@ -44,7 +44,7 @@ Database drivers run migrations. [Add a new database?](database/driver.go)
 * [Firebird](database/firebird)
 * [MS SQL Server](database/sqlserver)
 * [rqlite](database/rqlite)
-* [SurrealDB (Beta)](database/surrealdb)
+* [SurrealDB](database/surrealdb)
 
 ### Database URLs
 
