@@ -34,7 +34,6 @@ require (
 	github.com/snowflakedb/gosnowflake v1.6.19
 	github.com/stretchr/testify v1.8.3
 	github.com/xanzy/go-gitlab v0.15.0
-	github.com/surrealdb/surrealdb.go v0.2.0
 	go.mongodb.org/mongo-driver v1.7.5
 	go.uber.org/atomic v1.7.0
 	golang.org/x/oauth2 v0.14.0
@@ -42,6 +41,8 @@ require (
 	google.golang.org/api v0.150.0
 	modernc.org/ql v1.0.0
 	modernc.org/sqlite v1.18.1
+	github.com/gorilla/websocket v1.5.0
+	github.com/surrealdb/surrealdb.go v0.2.1
 )
 
 require (
