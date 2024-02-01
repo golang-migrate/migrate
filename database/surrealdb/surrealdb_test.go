@@ -53,7 +53,7 @@ var (
 		PortBindings: getPortBindings(),
 		PortRequired: true, ReadyFunc: isReady}
 	specs = []dktesting.ContainerSpec{
-		{ImageName: "surrealdb/surrealdb:1.0.0-beta.9-20230402", Options: opts},
+		{ImageName: "surrealdb/surrealdb:v1.1.1", Options: opts},
 	}
 )
 
