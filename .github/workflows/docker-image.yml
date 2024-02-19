@@ -1,0 +1,26 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Login to Artifactory Docker
+      uses: docker/login-action@v1
+      with:
+        registry: docker.artifactory.banno-tools.com
+        username: ${{ secrets.ARTIFACTORY_USERNAME }}
+        password: ${{ secrets.ARTIFACTORY_PASSWORD }}
+    - name: Build the Docker image
+      run: docker build . --file Dockerfile --tag docker.artifactory.banno-tools.com/migrate:1.0.0
+    - name: Push the Docker image to the registry
+      run: docker push docker.artifactory.banno-tools.com/migrate:1.0.0
