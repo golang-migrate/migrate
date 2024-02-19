@@ -1,0 +1,17 @@
+name: Run Gosec
+on:
+  pull_request:
+    branches-ignore:
+      - '!main'   # excludes main
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    env:
+      GO111MODULE: on
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v2
+      - name: Run Gosec Security Scanner
+        uses: securego/gosec@master
+        with:
+          args: -exclude=G307 ./...

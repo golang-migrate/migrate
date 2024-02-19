@@ -1,0 +1,12 @@
+name: Test
+
+on:
+  pull_request:
+    types: [synchronize, opened, reopened, edited]
+
+jobs:
+  test:
+    uses: Banno/go-shared-files/.github/workflows/test.yml@mirai-v1
+    secrets: inherit
+    with:
+      go-version: 1.19
