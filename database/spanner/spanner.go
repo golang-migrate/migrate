@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"cloud.google.com/go/spanner"
 	sdb "cloud.google.com/go/spanner/admin/database/apiv1"
@@ -56,6 +57,9 @@ type Config struct {
 	// Parsing outputs clean DDL statements such as reformatted
 	// and void of comments.
 	CleanStatements bool
+	// Comment flag name to treat a migration file as DML
+	// Example #DML
+	DmlFlag string
 }
 
 // Spanner implements database.Driver for Google Cloud Spanner
@@ -125,9 +129,10 @@ func (s *Spanner) Open(url string) (database.Driver, error) {
 		log.Fatal(err)
 	}
 
+	dmlFlag := purl.Query().Get("x-dml-comment-flag")
 	migrationsTable := purl.Query().Get("x-migrations-table")
-
 	cleanQuery := purl.Query().Get("x-clean-statements")
+
 	clean := false
 	if cleanQuery != "" {
 		clean, err = strconv.ParseBool(cleanQuery)
@@ -141,6 +146,7 @@ func (s *Spanner) Open(url string) (database.Driver, error) {
 		DatabaseName:    dbname,
 		MigrationsTable: migrationsTable,
 		CleanStatements: clean,
+		DmlFlag:         dmlFlag,
 	})
 }
 
@@ -174,26 +180,50 @@ func (s *Spanner) Run(migration io.Reader) error {
 		return err
 	}
 
-	stmts := []string{string(migr)}
-	if s.config.CleanStatements {
-		stmts, err = cleanStatements(migr)
-		if err != nil {
-			return err
-		}
-	}
+	migrstr := string(migr)
+	stmts := []string{migrstr}
 
 	ctx := context.Background()
-	op, err := s.db.admin.UpdateDatabaseDdl(ctx, &adminpb.UpdateDatabaseDdlRequest{
-		Database:   s.config.DatabaseName,
-		Statements: stmts,
-	})
 
-	if err != nil {
-		return &database.Error{OrigErr: err, Err: "migration failed", Query: migr}
-	}
+	if s.config.DmlFlag != "" && strings.HasPrefix(migrstr, "#"+s.config.DmlFlag) {
+		_, err := s.db.data.ReadWriteTransaction(ctx,
+			func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
+				for _, v := range strings.Split(migrstr, ";") {
+					if replaceWhiteSpaceWithSpace(strings.TrimSpace(v)) != "" {
+						_, err = txn.Update(ctx, spanner.NewStatement(v))
+						if err != nil {
+							return err
+						}
+					}
+				}
+				return nil
+			})
 
-	if err := op.Wait(ctx); err != nil {
-		return &database.Error{OrigErr: err, Err: "migration failed", Query: migr}
+		if err != nil {
+			return &database.Error{OrigErr: err, Err: "migration failed", Query: migr}
+		}
+
+	} else {
+
+		if s.config.CleanStatements {
+			stmts, err = cleanStatements(migr)
+			if err != nil {
+				return err
+			}
+		}
+
+		op, err := s.db.admin.UpdateDatabaseDdl(ctx, &adminpb.UpdateDatabaseDdlRequest{
+			Database:   s.config.DatabaseName,
+			Statements: stmts,
+		})
+
+		if err != nil {
+			return &database.Error{OrigErr: err, Err: "migration failed", Query: migr}
+		}
+
+		if err := op.Wait(ctx); err != nil {
+			return &database.Error{OrigErr: err, Err: "migration failed", Query: migr}
+		}
 	}
 
 	return nil
@@ -353,4 +383,14 @@ func cleanStatements(migration []byte) ([]string, error) {
 		stmts = append(stmts, stmt.SQL())
 	}
 	return stmts, nil
+}
+
+func replaceWhiteSpaceWithSpace(str string) string {
+	s := strings.Map(func(r rune) rune {
+		if unicode.IsSpace(r) {
+			return ' '
+		}
+		return r
+	}, str)
+	return strings.TrimSpace(strings.Join(strings.Fields(s), " "))
 }

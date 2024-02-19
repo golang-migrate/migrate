@@ -61,6 +61,22 @@ func TestMigrate(t *testing.T) {
 	})
 }
 
+func TestMigrateWithMultipleDDLStatementsAndDML(t *testing.T) {
+	withSpannerEmulator(t, func(t *testing.T) {
+		s := &Spanner{}
+		uri := fmt.Sprintf("spanner://%s?x-dml-comment-flag=DML&x-clean-statements=true", db)
+		d, err := s.Open(uri)
+		if err != nil {
+			t.Fatal(err)
+		}
+		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrationswithdml", uri, d)
+		if err != nil {
+			t.Fatal(err)
+		}
+		dt.TestMigrate(t, m)
+	})
+}
+
 func TestCleanStatements(t *testing.T) {
 	testCases := []struct {
 		name           string
