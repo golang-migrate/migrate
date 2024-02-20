@@ -612,7 +612,7 @@ func TestPostgres_ConcurrentMigrations(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		addr := pgConnectionString(ip, port)
+		addr := pgConnectionString(ip, port, "x-lock-retry-max-interval=2000")
 
 		// WHEN
 		for i := 0; i < concurrency; i++ {
@@ -631,7 +631,7 @@ func TestPostgres_ConcurrentMigrations(t *testing.T) {
 						t.Error(err)
 					}
 				}()
-				
+
 				m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "postgres", d)
 				if err != nil {
 					t.Error(err)
