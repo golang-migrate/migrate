@@ -4,19 +4,18 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/denisenkom/go-mssqldb/batch"
 	"io"
 	nurl "net/url"
 	"strconv"
 	"strings"
-
-	"go.uber.org/atomic"
 
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/hashicorp/go-multierror"
 	mssql "github.com/microsoft/go-mssqldb" // mssql support
+	"github.com/microsoft/go-mssqldb/batch"
+	"go.uber.org/atomic"
 )
 
 func init() {
@@ -31,7 +30,7 @@ var (
 	ErrNoDatabaseName            = fmt.Errorf("no database name")
 	ErrNoSchema                  = fmt.Errorf("no schema")
 	ErrDatabaseDirty             = fmt.Errorf("database is dirty")
-	ErrMultipleAuthOptionsPassed = fmt.Errorf("both password and useMsi=true were passed.")
+	ErrMultipleAuthOptionsPassed = fmt.Errorf("both password and useMsi=true were passed")
 )
 
 var lockErrorMap = map[mssql.ReturnStatus]string{
@@ -174,7 +173,7 @@ func (ss *SQLServer) Open(url string) (database.Driver, error) {
 	if s := purl.Query().Get("x-batch"); len(s) > 0 {
 		batchStatementEnabled, err = strconv.ParseBool(s)
 		if err != nil {
-			return nil, fmt.Errorf("Unable to parse option x-batch: %w", err)
+			return nil, fmt.Errorf("unable to parse option x-batch: %w", err)
 		}
 	}
 
