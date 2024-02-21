@@ -9,13 +9,13 @@ import (
 	"strconv"
 	"strings"
 
-	"go.uber.org/atomic"
-
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/hashicorp/go-multierror"
 	mssql "github.com/microsoft/go-mssqldb" // mssql support
+	"github.com/microsoft/go-mssqldb/batch"
+	"go.uber.org/atomic"
 )
 
 func init() {
@@ -30,7 +30,7 @@ var (
 	ErrNoDatabaseName            = fmt.Errorf("no database name")
 	ErrNoSchema                  = fmt.Errorf("no schema")
 	ErrDatabaseDirty             = fmt.Errorf("database is dirty")
-	ErrMultipleAuthOptionsPassed = fmt.Errorf("both password and useMsi=true were passed.")
+	ErrMultipleAuthOptionsPassed = fmt.Errorf("both password and useMsi=true were passed")
 )
 
 var lockErrorMap = map[mssql.ReturnStatus]string{
@@ -42,9 +42,10 @@ var lockErrorMap = map[mssql.ReturnStatus]string{
 
 // Config for database
 type Config struct {
-	MigrationsTable string
-	DatabaseName    string
-	SchemaName      string
+	MigrationsTable       string
+	DatabaseName          string
+	SchemaName            string
+	BatchStatementEnabled bool
 }
 
 // SQL Server connection
@@ -168,9 +169,18 @@ func (ss *SQLServer) Open(url string) (database.Driver, error) {
 
 	migrationsTable := purl.Query().Get("x-migrations-table")
 
+	batchStatementEnabled := false
+	if s := purl.Query().Get("x-batch"); len(s) > 0 {
+		batchStatementEnabled, err = strconv.ParseBool(s)
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse option x-batch: %w", err)
+		}
+	}
+
 	px, err := WithInstance(db, &Config{
-		DatabaseName:    purl.Path,
-		MigrationsTable: migrationsTable,
+		DatabaseName:          purl.Path,
+		MigrationsTable:       migrationsTable,
+		BatchStatementEnabled: batchStatementEnabled,
 	})
 
 	if err != nil {
@@ -241,15 +251,23 @@ func (ss *SQLServer) Run(migration io.Reader) error {
 
 	// run migration
 	query := string(migr[:])
-	if _, err := ss.conn.ExecContext(context.Background(), query); err != nil {
-		if msErr, ok := err.(mssql.Error); ok {
-			message := fmt.Sprintf("migration failed: %s", msErr.Message)
-			if msErr.ProcName != "" {
-				message = fmt.Sprintf("%s (proc name %s)", msErr.Message, msErr.ProcName)
+	scripts := []string{query}
+
+	if ss.config.BatchStatementEnabled {
+		scripts = batch.Split(query, "go")
+	}
+
+	for _, script := range scripts {
+		if _, err := ss.conn.ExecContext(context.Background(), script); err != nil {
+			if msErr, ok := err.(mssql.Error); ok {
+				message := fmt.Sprintf("migration failed: %s", msErr.Message)
+				if msErr.ProcName != "" {
+					message = fmt.Sprintf("%s (proc name %s)", msErr.Message, msErr.ProcName)
+				}
+				return database.Error{OrigErr: err, Err: message, Query: []byte(script), Line: uint(msErr.LineNo)}
 			}
-			return database.Error{OrigErr: err, Err: message, Query: migr, Line: uint(msErr.LineNo)}
+			return database.Error{OrigErr: err, Err: "migration failed", Query: []byte(script)}
 		}
-		return database.Error{OrigErr: err, Err: "migration failed", Query: migr}
 	}
 
 	return nil
