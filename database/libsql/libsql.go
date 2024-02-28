@@ -1,4 +1,4 @@
-package turso
+package libsql
 
 import (
 	"database/sql"
@@ -6,7 +6,6 @@ import (
 	"io"
 	nurl "net/url"
 	"strconv"
-	"strings"
 	"sync/atomic"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -17,7 +16,7 @@ import (
 )
 
 func init() {
-	database.Register("turso", &Turso{})
+	database.Register("libsql", &LibSQL{})
 }
 
 var DefaultMigrationsTable = "schema_migrations"
@@ -34,21 +33,20 @@ type Config struct {
 	NoTxWrap        bool
 }
 
-type Turso struct {
+type LibSQL struct {
 	db       *sql.DB
 	isLocked atomic.Bool
 
 	config *Config
 }
 
-func (t *Turso) Open(url string) (database.Driver, error) {
+func (d *LibSQL) Open(url string) (database.Driver, error) {
 	purl, err := nurl.Parse(url)
 	if err != nil {
 		return nil, err
 	}
 
-	dbfile := strings.Replace(migrate.FilterCustomQuery(purl).String(), "turso://", "libsql://", 1)
-	fmt.Println(dbfile)
+	dbfile := migrate.FilterCustomQuery(purl).String()
 	db, err := sql.Open("libsql", dbfile)
 	if err != nil {
 		return nil, err
@@ -93,7 +91,7 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		config.MigrationsTable = DefaultMigrationsTable
 	}
 
-	mx := &Turso{
+	mx := &LibSQL{
 		db:     instance,
 		config: config,
 	}
@@ -106,13 +104,13 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 // ensureVersionTable checks if versions table exists and, if not, creates it.
 // Note that this function locks the database, which deviates from the usual
 // convention of "caller locks" in the Sqlite type.
-func (m *Turso) ensureVersionTable() (err error) {
-	if err = m.Lock(); err != nil {
+func (d *LibSQL) ensureVersionTable() (err error) {
+	if err = d.Lock(); err != nil {
 		return err
 	}
 
 	defer func() {
-		if e := m.Unlock(); e != nil {
+		if e := d.Unlock(); e != nil {
 			if err == nil {
 				err = e
 			} else {
@@ -124,50 +122,50 @@ func (m *Turso) ensureVersionTable() (err error) {
 	query := fmt.Sprintf(`
 	CREATE TABLE IF NOT EXISTS %s (version uint64,dirty bool);
   CREATE UNIQUE INDEX IF NOT EXISTS version_unique ON %s (version);
-  `, m.config.MigrationsTable, m.config.MigrationsTable)
+  `, d.config.MigrationsTable, d.config.MigrationsTable)
 
-	if _, err := m.db.Exec(query); err != nil {
+	if _, err := d.db.Exec(query); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (t *Turso) Close() error {
-	if t.db != nil {
-		return t.db.Close()
+func (d *LibSQL) Close() error {
+	if d.db != nil {
+		return d.db.Close()
 	}
 	return nil
 }
 
-func (t *Turso) Lock() error {
-	if !t.isLocked.CompareAndSwap(false, true) {
+func (d *LibSQL) Lock() error {
+	if !d.isLocked.CompareAndSwap(false, true) {
 		return database.ErrLocked
 	}
 	return nil
 }
 
-func (t *Turso) Unlock() error {
-	if !t.isLocked.CompareAndSwap(true, false) {
+func (d *LibSQL) Unlock() error {
+	if !d.isLocked.CompareAndSwap(true, false) {
 		return database.ErrNotLocked
 	}
 	return nil
 }
 
-func (m *Turso) Run(migration io.Reader) error {
+func (d *LibSQL) Run(migration io.Reader) error {
 	migr, err := io.ReadAll(migration)
 	if err != nil {
 		return err
 	}
 	query := string(migr[:])
 
-	if m.config.NoTxWrap {
-		return m.executeQueryNoTx(query)
+	if d.config.NoTxWrap {
+		return d.executeQueryNoTx(query)
 	}
-	return m.executeQuery(query)
+	return d.executeQuery(query)
 }
 
-func (m *Turso) executeQuery(query string) error {
-	tx, err := m.db.Begin()
+func (d *LibSQL) executeQuery(query string) error {
+	tx, err := d.db.Begin()
 	if err != nil {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
 	}
@@ -183,20 +181,20 @@ func (m *Turso) executeQuery(query string) error {
 	return nil
 }
 
-func (m *Turso) executeQueryNoTx(query string) error {
-	if _, err := m.db.Exec(query); err != nil {
+func (d *LibSQL) executeQueryNoTx(query string) error {
+	if _, err := d.db.Exec(query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 	return nil
 }
 
-func (m *Turso) SetVersion(version int, dirty bool) error {
-	tx, err := m.db.Begin()
+func (d *LibSQL) SetVersion(version int, dirty bool) error {
+	tx, err := d.db.Begin()
 	if err != nil {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
 	}
 
-	query := "DELETE FROM " + m.config.MigrationsTable
+	query := "DELETE FROM " + d.config.MigrationsTable
 	if _, err := tx.Exec(query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
@@ -205,7 +203,7 @@ func (m *Turso) SetVersion(version int, dirty bool) error {
 	// empty schema version for failed down migration on the first migration
 	// See: https://github.com/golang-migrate/migrate/issues/330
 	if version >= 0 || (version == database.NilVersion && dirty) {
-		query := fmt.Sprintf(`INSERT INTO %s (version, dirty) VALUES (?, ?)`, m.config.MigrationsTable)
+		query := fmt.Sprintf(`INSERT INTO %s (version, dirty) VALUES (?, ?)`, d.config.MigrationsTable)
 		if _, err := tx.Exec(query, version, dirty); err != nil {
 			if errRollback := tx.Rollback(); errRollback != nil {
 				err = multierror.Append(err, errRollback)
@@ -221,18 +219,18 @@ func (m *Turso) SetVersion(version int, dirty bool) error {
 	return nil
 }
 
-func (m *Turso) Version() (version int, dirty bool, err error) {
-	query := "SELECT version, dirty FROM " + m.config.MigrationsTable + " LIMIT 1"
-	err = m.db.QueryRow(query).Scan(&version, &dirty)
+func (d *LibSQL) Version() (version int, dirty bool, err error) {
+	query := "SELECT version, dirty FROM " + d.config.MigrationsTable + " LIMIT 1"
+	err = d.db.QueryRow(query).Scan(&version, &dirty)
 	if err != nil {
 		return database.NilVersion, false, nil
 	}
 	return version, dirty, nil
 }
 
-func (m *Turso) Drop() (err error) {
+func (d *LibSQL) Drop() (err error) {
 	query := `SELECT name FROM sqlite_master WHERE type = 'table';`
-	tables, err := m.db.Query(query)
+	tables, err := d.db.Query(query)
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
@@ -259,13 +257,13 @@ func (m *Turso) Drop() (err error) {
 	if len(tableNames) > 0 {
 		for _, t := range tableNames {
 			query := "DROP TABLE " + t
-			err = m.executeQuery(query)
+			err = d.executeQuery(query)
 			if err != nil {
 				return &database.Error{OrigErr: err, Query: []byte(query)}
 			}
 		}
 		query := "VACUUM"
-		_, err = m.db.Query(query)
+		_, err = d.db.Query(query)
 		if err != nil {
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}

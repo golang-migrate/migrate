@@ -1,4 +1,4 @@
-package turso
+package libsql
 
 import (
 	"database/sql"
@@ -9,15 +9,15 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
-	_ "github.com/libsql/go-libsql"
+
 	"github.com/stretchr/testify/assert"
 )
 
 func Test(t *testing.T) {
 	dir := t.TempDir()
-	dbPath := filepath.Join(dir, "turso.db")
+	dbPath := filepath.Join(dir, "libsql.db")
 	t.Logf("DB path : %s\n", dbPath)
-	p := &Turso{}
+	p := &LibSQL{}
 	addr := fmt.Sprintf("file://%s", dbPath)
 	d, err := p.Open(addr)
 	if err != nil {
@@ -28,7 +28,7 @@ func Test(t *testing.T) {
 
 func TestMigrate(t *testing.T) {
 	dir := t.TempDir()
-	dbPath := filepath.Join("file://", dir, "turso.db")
+	dbPath := filepath.Join("file://", dir, "libsql.db")
 	t.Logf("DB path : %s\n", dbPath)
 
 	db, err := sql.Open("libsql", dbPath)
@@ -58,7 +58,7 @@ func TestMigrate(t *testing.T) {
 
 func TestMigrationTable(t *testing.T) {
 	dir := t.TempDir()
-	dbPath := filepath.Join("file://", dir, "turso.db")
+	dbPath := filepath.Join("file://", dir, "libsql.db")
 	t.Logf("DB path : %s\n", dbPath)
 
 	db, err := sql.Open("libsql", dbPath)
@@ -99,9 +99,9 @@ func TestMigrationTable(t *testing.T) {
 
 func TestNoTxWrap(t *testing.T) {
 	dir := t.TempDir()
-	dbPath := filepath.Join(dir, "turso.db")
+	dbPath := filepath.Join(dir, "libsql.db")
 	t.Logf("DB path : %s\n", dbPath)
-	p := &Turso{}
+	p := &LibSQL{}
 	addr := fmt.Sprintf("file://%s?x-no-tx-wrap=true", dbPath)
 	d, err := p.Open(addr)
 	if err != nil {
@@ -114,9 +114,9 @@ func TestNoTxWrap(t *testing.T) {
 
 func TestNoTxWrapInvalidValue(t *testing.T) {
 	dir := t.TempDir()
-	dbPath := filepath.Join(dir, "turso.db")
+	dbPath := filepath.Join(dir, "libsql.db")
 	t.Logf("DB path : %s\n", dbPath)
-	p := &Turso{}
+	p := &LibSQL{}
 	addr := fmt.Sprintf("libsql://%s?x-no-tx-wrap=yeppers", dbPath)
 	_, err := p.Open(addr)
 	if assert.Error(t, err) {

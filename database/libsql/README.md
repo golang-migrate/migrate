@@ -1,8 +1,10 @@
-# Turso
+# libsql
 
-`turso://[DATABASE].turso.io?authToken=[TOKEN]?query`
+To use with Turso
 
-Unlike other migrate database drivers, the turso driver will automatically wrap each migration in an implicit transaction by default. Migrations must not contain explicit `BEGIN` or `COMMIT` statements. This behavior may change in a future major release. (See below for a workaround.)
+`libsql://[DATABASE].turso.io?authToken=[TOKEN]&query`
+
+Unlike other migrate database drivers, the libsql driver will automatically wrap each migration in an implicit transaction by default. Migrations must not contain explicit `BEGIN` or `COMMIT` statements. This behavior may change in a future major release. (See below for a workaround.)
 
 Refer to [upstream documentation](https://github.com/mattn/go-sqlite3/blob/master/README.md#connection-string) for a complete list of query parameters supported by the sqlite3 database driver. The auxiliary query parameters listed below may be supplied to tailor migrate behavior. All auxiliary query parameters are optional.
 
