@@ -25,6 +25,7 @@ require (
 	github.com/jackc/pgx/v5 v5.3.1
 	github.com/ktrysmt/go-bitbucket v0.6.4
 	github.com/lib/pq v1.10.9
+	github.com/libsql/go-libsql v0.0.0-20240219083324-cbcdf96c10a5
 	github.com/markbates/pkger v0.15.1
 	github.com/mattn/go-sqlite3 v1.14.16
 	github.com/microsoft/go-mssqldb v1.0.0
@@ -41,6 +42,11 @@ require (
 	google.golang.org/api v0.150.0
 	modernc.org/ql v1.0.0
 	modernc.org/sqlite v1.18.1
+)
+
+require (
+	github.com/antlr/antlr4/runtime/Go/antlr/v4 v4.0.0-20230512164433-5d1fd1a340c9 // indirect
+	github.com/libsql/sqlite-antlr4-parser v0.0.0-20230802215326-5cb5bb604475 // indirect
 )
 
 require (
@@ -157,7 +163,7 @@ require (
 	golang.org/x/exp v0.0.0-20230315142452-642cacee5cc0 // indirect
 	golang.org/x/mod v0.11.0 // indirect
 	golang.org/x/net v0.18.0 // indirect
-	golang.org/x/sync v0.5.0 // indirect
+	golang.org/x/sync v0.6.0 // indirect
 	golang.org/x/sys v0.15.0 // indirect
 	golang.org/x/term v0.15.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
