@@ -9,6 +9,7 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+	_ "modernc.org/sqlite"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -18,7 +19,7 @@ func Test(t *testing.T) {
 	dbPath := filepath.Join(dir, "libsql.db")
 	t.Logf("DB path : %s\n", dbPath)
 	p := &LibSQL{}
-	addr := fmt.Sprintf("file://%s", dbPath)
+	addr := fmt.Sprintf("file:%s", dbPath)
 	d, err := p.Open(addr)
 	if err != nil {
 		t.Fatal(err)
@@ -28,7 +29,7 @@ func Test(t *testing.T) {
 
 func TestMigrate(t *testing.T) {
 	dir := t.TempDir()
-	dbPath := filepath.Join("file://", dir, "libsql.db")
+	dbPath := filepath.Join("file:", dir, "libsql.db")
 	t.Logf("DB path : %s\n", dbPath)
 
 	db, err := sql.Open("libsql", dbPath)

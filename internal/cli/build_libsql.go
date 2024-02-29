@@ -1,5 +1,5 @@
-//go:build turso
-// +build turso
+//go:build libsql
+// +build libsql
 
 package cli
 

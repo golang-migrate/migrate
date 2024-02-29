@@ -6,13 +6,14 @@ import (
 	"io"
 	nurl "net/url"
 	"strconv"
+	"strings"
 	"sync/atomic"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/hashicorp/go-multierror"
 
-	_ "github.com/libsql/go-libsql"
+	_ "github.com/tursodatabase/libsql-client-go/libsql"
 )
 
 func init() {
@@ -46,7 +47,7 @@ func (d *LibSQL) Open(url string) (database.Driver, error) {
 		return nil, err
 	}
 
-	dbfile := migrate.FilterCustomQuery(purl).String()
+	dbfile := strings.Replace(migrate.FilterCustomQuery(purl).String(), "libsql://", "", 1)
 	db, err := sql.Open("libsql", dbfile)
 	if err != nil {
 		return nil, err
