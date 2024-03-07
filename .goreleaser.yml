@@ -87,7 +87,6 @@ release:
   prerelease: auto
 source:
   enabled: true
-  rlcp: true
   format: zip
 changelog:
   skip: false

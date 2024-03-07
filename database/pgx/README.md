@@ -11,6 +11,8 @@ This package is for [pgx/v4](https://pkg.go.dev/github.com/jackc/pgx/v4). A back
 | `x-statement-timeout` | `StatementTimeout` | Abort any statement that takes more than the specified number of milliseconds |
 | `x-multi-statement` | `MultiStatementEnabled` | Enable multi-statement execution (default: false) |
 | `x-multi-statement-max-size` | `MultiStatementMaxSize` | Maximum size of single statement in bytes (default: 10MB) |
+| `x-lock-strategy` | `LockStrategy` | Strategy used for locking during migration (default: advisory) |
+| `x-lock-table` | `LockTable` | Name of the table which maintains the migration lock (default: schema_lock) |
 | `dbname` | `DatabaseName` | The name of the database to connect to |
 | `search_path` | | This variable specifies the order in which schemas are searched when an object is referenced by a simple name with no schema specified. |
 | `user` | | The user to sign in as |
