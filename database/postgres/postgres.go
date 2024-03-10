@@ -436,13 +436,51 @@ func (p *Postgres) Drop() (err error) {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 
-	if len(tableNames) > 0 {
-		// delete one by one ...
-		for _, t := range tableNames {
-			query = `DROP TABLE IF EXISTS ` + pq.QuoteIdentifier(t) + ` CASCADE`
-			if _, err := p.conn.ExecContext(context.Background(), query); err != nil {
-				return &database.Error{OrigErr: err, Query: []byte(query)}
-			}
+	for _, t := range tableNames {
+		query = `DROP TABLE IF EXISTS ` + pq.QuoteIdentifier(t) + ` CASCADE`
+		if _, err := p.conn.ExecContext(context.Background(), query); err != nil {
+			return &database.Error{OrigErr: err, Query: []byte(query)}
+		}
+	}
+
+	// select all custom types
+	query = `
+SELECT    t.typname as type
+FROM      pg_type t
+LEFT JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace
+WHERE     (t.typrelid = 0 OR (SELECT c.relkind = 'c' FROM pg_catalog.pg_class c WHERE c.oid = t.typrelid))
+AND       NOT EXISTS(SELECT 1 FROM pg_catalog.pg_type el WHERE el.oid = t.typelem AND el.typarray = t.oid)
+AND       n.nspname = current_schema()
+`
+	types, err := p.conn.QueryContext(context.Background(), query)
+	if err != nil {
+		return &database.Error{OrigErr: err, Query: []byte(query)}
+	}
+	defer func() {
+		if errClose := types.Close(); errClose != nil {
+			err = multierror.Append(err, errClose)
+		}
+	}()
+
+	// delete one type after another
+	typeNames := make([]string, 0)
+	for types.Next() {
+		var typeName string
+		if err := types.Scan(&typeName); err != nil {
+			return err
+		}
+		if len(typeName) > 0 {
+			typeNames = append(typeNames, typeName)
+		}
+	}
+	if err := types.Err(); err != nil {
+		return &database.Error{OrigErr: err, Query: []byte(query)}
+	}
+
+	for _, t := range typeNames {
+		query = `DROP TYPE IF EXISTS ` + pq.QuoteIdentifier(t) + ` CASCADE`
+		if _, err := p.conn.ExecContext(context.Background(), query); err != nil {
+			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
 	}
 
