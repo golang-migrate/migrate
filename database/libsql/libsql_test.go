@@ -48,9 +48,7 @@ func TestMigrate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	m, err := migrate.NewWithDatabaseInstance(
-		"file://./examples/migrations",
-		"ql", driver)
+	m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "ql", driver)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -222,7 +222,9 @@ func (d *LibSQL) SetVersion(version int, dirty bool) error {
 
 func (d *LibSQL) Version() (version int, dirty bool, err error) {
 	query := "SELECT version, dirty FROM " + d.config.MigrationsTable + " LIMIT 1"
-	err = d.db.QueryRow(query).Scan(&version, &dirty)
+	q := d.db.QueryRow(query)
+	err = q.Scan(&version, &dirty)
+
 	if err != nil {
 		return database.NilVersion, false, nil
 	}
@@ -253,6 +255,7 @@ func (d *LibSQL) dropViews() (err error) {
 		}
 	}()
 
+	viewNames := make([]string, 0)
 	for views.Next() {
 		var viewName string
 		if err := views.Scan(&viewName); err != nil {
@@ -262,7 +265,11 @@ func (d *LibSQL) dropViews() (err error) {
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
 
-		query = "DROP VIEW " + viewName
+		viewNames = append(viewNames, viewName)
+	}
+
+	for _, v := range viewNames {
+		query := "DROP VIEW " + v
 		err = d.executeQuery(query)
 		if err != nil {
 			return &database.Error{OrigErr: err, Query: []byte(query)}
