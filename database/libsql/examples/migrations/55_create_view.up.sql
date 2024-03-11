@@ -1,0 +1,1 @@
+CREATE VIEW pets_view AS SELECT name FROM pets;

@@ -1,0 +1,4 @@
+CREATE TABLE pets (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name string
+);
