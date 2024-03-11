@@ -230,6 +230,49 @@ func (d *LibSQL) Version() (version int, dirty bool, err error) {
 }
 
 func (d *LibSQL) Drop() (err error) {
+	if err := d.dropViews(); err != nil {
+		return err
+	}
+
+	if err := d.dropTables(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (d *LibSQL) dropViews() (err error) {
+	query := `SELECT name FROM sqlite_master WHERE type = 'view';`
+	views, err := d.db.Query(query)
+	if err != nil {
+		return &database.Error{OrigErr: err, Query: []byte(query)}
+	}
+	defer func() {
+		if errClose := views.Close(); errClose != nil {
+			err = multierror.Append(err, errClose)
+		}
+	}()
+
+	for views.Next() {
+		var viewName string
+		if err := views.Scan(&viewName); err != nil {
+			return err
+		}
+		if err := views.Err(); err != nil {
+			return &database.Error{OrigErr: err, Query: []byte(query)}
+		}
+
+		query = "DROP VIEW " + viewName
+		err = d.executeQuery(query)
+		if err != nil {
+			return &database.Error{OrigErr: err, Query: []byte(query)}
+		}
+	}
+
+	return nil
+}
+
+func (d *LibSQL) dropTables() (err error) {
 	query := `SELECT name FROM sqlite_master WHERE type = 'table';`
 	tables, err := d.db.Query(query)
 	if err != nil {
@@ -247,15 +290,15 @@ func (d *LibSQL) Drop() (err error) {
 		if err := tables.Scan(&tableName); err != nil {
 			return err
 		}
-		if len(tableName) > 0 {
-			tableNames = append(tableNames, tableName)
+
+		if err := tables.Err(); err != nil {
+			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
-	}
-	if err := tables.Err(); err != nil {
-		return &database.Error{OrigErr: err, Query: []byte(query)}
+
+		tableNames = append(tableNames, tableName)
 	}
 
-	// We range over the tables in reverse order to avoid hitting foreign key constaints
+	// We range over the tables in reverse order to avoid hitting foreign key constraints
 	for i := len(tableNames) - 1; i >= 0; i-- {
 		t := tableNames[i]
 
