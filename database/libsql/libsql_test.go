@@ -25,6 +25,7 @@ func Test(t *testing.T) {
 		t.Fatal(err)
 	}
 	dt.Test(t, d, []byte("CREATE TABLE t (Qty int, Name string);"))
+	dt.TestDrop(t, d)
 }
 
 func TestMigrate(t *testing.T) {
@@ -111,6 +112,7 @@ func TestNoTxWrap(t *testing.T) {
 	// An explicit BEGIN statement would ordinarily fail without x-no-tx-wrap.
 	// (Transactions in sqlite may not be nested.)
 	dt.Test(t, d, []byte("BEGIN; CREATE TABLE t (Qty int, Name string); COMMIT;"))
+	dt.TestDrop(t, d)
 }
 
 func TestNoTxWrapInvalidValue(t *testing.T) {

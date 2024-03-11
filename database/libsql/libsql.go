@@ -255,16 +255,17 @@ func (d *LibSQL) Drop() (err error) {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 
-	if len(tableNames) > 0 {
-		for _, t := range tableNames {
-			query := "DROP TABLE " + t
-			err = d.executeQuery(query)
-			if err != nil {
-				return &database.Error{OrigErr: err, Query: []byte(query)}
-			}
+	// We range over the tables in reverse order to avoid hitting foreign key constaints
+	for i := len(tableNames) - 1; i >= 0; i-- {
+		t := tableNames[i]
+
+		// table sqlite_sequence may not be dropped
+		if t == "sqlite_sequence" {
+			continue
 		}
-		query := "VACUUM"
-		_, err = d.db.Query(query)
+
+		query := "DROP TABLE " + t
+		err = d.executeQuery(query)
 		if err != nil {
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
