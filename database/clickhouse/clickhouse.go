@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -25,6 +26,8 @@ var (
 	DefaultMultiStatementMaxSize = 10 * 1 << 20 // 10 MB
 
 	ErrNilConfig = fmt.Errorf("no config")
+
+	onClusterRegexp = regexp.MustCompile(`(?i)on(?:\s)+cluster(?:\s)+{cluster}`)
 )
 
 type Config struct {
@@ -155,6 +158,13 @@ func (ch *ClickHouse) Run(r io.Reader) error {
 	migration, err := io.ReadAll(r)
 	if err != nil {
 		return err
+	}
+
+	if len(ch.config.ClusterName) > 0 {
+		migration = onClusterRegexp.ReplaceAll(
+			migration,
+			[]byte(fmt.Sprintf("on cluster '%s'", ch.config.ClusterName)),
+		)
 	}
 
 	if _, err := ch.conn.Exec(string(migration)); err != nil {
