@@ -22,7 +22,7 @@ require (
 	github.com/jackc/pgconn v1.14.0
 	github.com/jackc/pgerrcode v0.0.0-20220416144525-469b46aa5efa
 	github.com/jackc/pgx/v4 v4.18.1
-	github.com/jackc/pgx/v5 v5.3.1
+	github.com/jackc/pgx/v5 v5.5.4
 	github.com/ktrysmt/go-bitbucket v0.6.4
 	github.com/lib/pq v1.10.9
 	github.com/markbates/pkger v0.15.1
@@ -42,6 +42,8 @@ require (
 	modernc.org/ql v1.0.0
 	modernc.org/sqlite v1.18.1
 )
+
+require github.com/jackc/puddle/v2 v2.2.1 // indirect
 
 require (
 	cloud.google.com/go v0.110.10 // indirect
