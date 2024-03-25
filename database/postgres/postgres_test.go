@@ -183,7 +183,14 @@ func TestMultipleStatementsInMultiStatementMode(t *testing.T) {
 				t.Error(err)
 			}
 		}()
-		if err := d.Run(strings.NewReader("CREATE TABLE foo (foo text); CREATE INDEX CONCURRENTLY idx_foo ON foo (foo);")); err != nil {
+		if err := d.Run(strings.NewReader(`CREATE TABLE foo (foo text);
+CREATE INDEX CONCURRENTLY idx_foo ON foo (foo);
+CREATE FUNCTION baz() RETURNS integer AS $$
+        BEGIN
+                RETURN 1;
+        END;
+$$ LANGUAGE plpgsql;
+`)); err != nil {
 			t.Fatalf("expected err to be nil, got %v", err)
 		}
 
@@ -194,6 +201,15 @@ func TestMultipleStatementsInMultiStatementMode(t *testing.T) {
 		}
 		if !exists {
 			t.Fatalf("expected table bar to exist")
+		}
+
+		// make sure procedure exists
+		var proc string
+		if err := d.(*Postgres).conn.QueryRowContext(context.Background(), "SELECT 'baz'::regproc;").Scan(&proc); err != nil {
+			t.Fatal(err)
+		}
+		if proc != "baz" {
+			t.Fatalf("expected procedure baz to exists")
 		}
 	})
 }
