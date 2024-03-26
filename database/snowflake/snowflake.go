@@ -12,6 +12,7 @@ import (
 	"go.uber.org/atomic"
 
 	"github.com/golang-migrate/migrate/v4/database"
+	"github.com/golang-migrate/migrate/v4/source"
 	"github.com/hashicorp/go-multierror"
 	"github.com/lib/pq"
 	sf "github.com/snowflakedb/gosnowflake"
@@ -92,7 +93,7 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	return px, nil
 }
 
-func (p *Snowflake) Open(url string) (database.Driver, error) {
+func (s *Snowflake) Open(url string) (database.Driver, error) {
 	purl, err := nurl.Parse(url)
 	if err != nil {
 		return nil, err
@@ -149,30 +150,30 @@ func (p *Snowflake) Open(url string) (database.Driver, error) {
 	return px, nil
 }
 
-func (p *Snowflake) Close() error {
-	connErr := p.conn.Close()
-	dbErr := p.db.Close()
+func (s *Snowflake) Close() error {
+	connErr := s.conn.Close()
+	dbErr := s.db.Close()
 	if connErr != nil || dbErr != nil {
 		return fmt.Errorf("conn: %v, db: %v", connErr, dbErr)
 	}
 	return nil
 }
 
-func (p *Snowflake) Lock() error {
-	if !p.isLocked.CAS(false, true) {
+func (s *Snowflake) Lock() error {
+	if !s.isLocked.CAS(false, true) {
 		return database.ErrLocked
 	}
 	return nil
 }
 
-func (p *Snowflake) Unlock() error {
-	if !p.isLocked.CAS(true, false) {
+func (s *Snowflake) Unlock() error {
+	if !s.isLocked.CAS(true, false) {
 		return database.ErrNotLocked
 	}
 	return nil
 }
 
-func (p *Snowflake) Run(migration io.Reader) error {
+func (s *Snowflake) Run(migration io.Reader) error {
 	migr, err := io.ReadAll(migration)
 	if err != nil {
 		return err
@@ -180,7 +181,7 @@ func (p *Snowflake) Run(migration io.Reader) error {
 
 	// run migration
 	query := string(migr[:])
-	if _, err := p.conn.ExecContext(context.Background(), query); err != nil {
+	if _, err := s.conn.ExecContext(context.Background(), query); err != nil {
 		if pgErr, ok := err.(*pq.Error); ok {
 			var line uint
 			var col uint
@@ -240,13 +241,13 @@ func runesLastIndex(input []rune, target rune) int {
 	return -1
 }
 
-func (p *Snowflake) SetVersion(version int, dirty bool) error {
-	tx, err := p.conn.BeginTx(context.Background(), &sql.TxOptions{})
+func (s *Snowflake) SetVersion(version int, dirty bool) error {
+	tx, err := s.conn.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
 	}
 
-	query := `DELETE FROM "` + p.config.MigrationsTable + `"`
+	query := `DELETE FROM "` + s.config.MigrationsTable + `"`
 	if _, err := tx.Exec(query); err != nil {
 		if errRollback := tx.Rollback(); errRollback != nil {
 			err = multierror.Append(err, errRollback)
@@ -258,7 +259,7 @@ func (p *Snowflake) SetVersion(version int, dirty bool) error {
 	// empty schema version for failed down migration on the first migration
 	// See: https://github.com/golang-migrate/migrate/issues/330
 	if version >= 0 || (version == database.NilVersion && dirty) {
-		query = `INSERT INTO "` + p.config.MigrationsTable + `" (version,
+		query = `INSERT INTO "` + s.config.MigrationsTable + `" (version,
 				dirty) VALUES (` + strconv.FormatInt(int64(version), 10) + `,
 				` + strconv.FormatBool(dirty) + `)`
 		if _, err := tx.Exec(query); err != nil {
@@ -276,9 +277,9 @@ func (p *Snowflake) SetVersion(version int, dirty bool) error {
 	return nil
 }
 
-func (p *Snowflake) Version() (version int, dirty bool, err error) {
-	query := `SELECT version, dirty FROM "` + p.config.MigrationsTable + `" LIMIT 1`
-	err = p.conn.QueryRowContext(context.Background(), query).Scan(&version, &dirty)
+func (s *Snowflake) Version() (version int, dirty bool, err error) {
+	query := `SELECT version, dirty FROM "` + s.config.MigrationsTable + `" LIMIT 1`
+	err = s.conn.QueryRowContext(context.Background(), query).Scan(&version, &dirty)
 	switch {
 	case err == sql.ErrNoRows:
 		return database.NilVersion, false, nil
@@ -296,10 +297,10 @@ func (p *Snowflake) Version() (version int, dirty bool, err error) {
 	}
 }
 
-func (p *Snowflake) Drop() (err error) {
+func (s *Snowflake) Drop() (err error) {
 	// select all tables in current schema
 	query := `SELECT table_name FROM information_schema.tables WHERE table_schema=(SELECT current_schema()) AND table_type='BASE TABLE'`
-	tables, err := p.conn.QueryContext(context.Background(), query)
+	tables, err := s.conn.QueryContext(context.Background(), query)
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
@@ -328,7 +329,7 @@ func (p *Snowflake) Drop() (err error) {
 		// delete one by one ...
 		for _, t := range tableNames {
 			query = `DROP TABLE IF EXISTS ` + t + ` CASCADE`
-			if _, err := p.conn.ExecContext(context.Background(), query); err != nil {
+			if _, err := s.conn.ExecContext(context.Background(), query); err != nil {
 				return &database.Error{OrigErr: err, Query: []byte(query)}
 			}
 		}
@@ -337,16 +338,20 @@ func (p *Snowflake) Drop() (err error) {
 	return nil
 }
 
+func (s *Snowflake) Exec(e source.Executor) error {
+	return e.Execute(s.db)
+}
+
 // ensureVersionTable checks if versions table exists and, if not, creates it.
 // Note that this function locks the database, which deviates from the usual
 // convention of "caller locks" in the Snowflake type.
-func (p *Snowflake) ensureVersionTable() (err error) {
-	if err = p.Lock(); err != nil {
+func (s *Snowflake) ensureVersionTable() (err error) {
+	if err = s.Lock(); err != nil {
 		return err
 	}
 
 	defer func() {
-		if e := p.Unlock(); e != nil {
+		if e := s.Unlock(); e != nil {
 			if err == nil {
 				err = e
 			} else {
@@ -358,7 +363,7 @@ func (p *Snowflake) ensureVersionTable() (err error) {
 	// check if migration table exists
 	var count int
 	query := `SELECT COUNT(1) FROM information_schema.tables WHERE table_name = $1 AND table_schema = (SELECT current_schema()) LIMIT 1`
-	if err := p.conn.QueryRowContext(context.Background(), query, p.config.MigrationsTable).Scan(&count); err != nil {
+	if err := s.conn.QueryRowContext(context.Background(), query, s.config.MigrationsTable).Scan(&count); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 	if count == 1 {
@@ -366,9 +371,9 @@ func (p *Snowflake) ensureVersionTable() (err error) {
 	}
 
 	// if not, create the empty migration table
-	query = `CREATE TABLE if not exists "` + p.config.MigrationsTable + `" (
+	query = `CREATE TABLE if not exists "` + s.config.MigrationsTable + `" (
 			version bigint not null primary key, dirty boolean not null)`
-	if _, err := p.conn.ExecContext(context.Background(), query); err != nil {
+	if _, err := s.conn.ExecContext(context.Background(), query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 
