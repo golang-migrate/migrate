@@ -602,6 +602,50 @@ func TestParallelSchema(t *testing.T) {
 	})
 }
 
+func TestPostgres_ConcurrentMigrations(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		// GIVEN - a set of concurrent processes running migrations
+		const concurrency = 3
+		var wg sync.WaitGroup
+
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
+		addr := pgConnectionString(ip, port, "x-lock-retry-max-interval=2000")
+
+		// WHEN
+		for i := 0; i < concurrency; i++ {
+			wg.Add(1)
+
+			go func() {
+				defer wg.Done()
+
+				p := &Postgres{}
+				d, err := p.Open(addr)
+				if err != nil {
+					t.Error(err)
+				}
+				defer func() {
+					if err := d.Close(); err != nil {
+						t.Error(err)
+					}
+				}()
+
+				m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "postgres", d)
+				if err != nil {
+					t.Error(err)
+				}
+				dt.TestMigrate(t, m)
+			}()
+		}
+
+		wg.Wait()
+
+		// THEN
+	})
+}
+
 func TestPostgres_Lock(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.FirstPort()
