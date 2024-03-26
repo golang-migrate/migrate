@@ -642,6 +642,57 @@ func TestPostgres_Lock(t *testing.T) {
 	})
 }
 
+func TestNoLockParamValidation(t *testing.T) {
+	ip := "127.0.0.1"
+	port := 5432
+	addr := fmt.Sprintf("postgres://root:root@%v:%v/public", ip, port)
+	p := &Postgres{}
+	_, err := p.Open(addr + "?x-no-lock=not-a-bool")
+	if !errors.Is(err, strconv.ErrSyntax) {
+		t.Fatal("Expected syntax error when passing a non-bool as x-no-lock parameter")
+	}
+}
+
+func TestNoLockWorks(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := pgConnectionString(ip, port)
+		p := &Postgres{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		lock := d.(*Postgres)
+
+		p = &Postgres{}
+		d, err = p.Open(addr + "&x-no-lock=true")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		noLock := d.(*Postgres)
+
+		// Should be possible to take real lock and no-lock at the same time
+		if err = lock.Lock(); err != nil {
+			t.Fatal(err)
+		}
+		if err = noLock.Lock(); err != nil {
+			t.Fatal(err)
+		}
+		if err = lock.Unlock(); err != nil {
+			t.Fatal(err)
+		}
+		if err = noLock.Unlock(); err != nil {
+			t.Fatal(err)
+		}
+	})
+}
+
 func TestWithInstance_Concurrent(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.FirstPort()
