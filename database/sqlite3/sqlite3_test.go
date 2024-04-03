@@ -8,10 +8,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	_ "github.com/glebarez/go-sqlite/compat"
 	"github.com/golang-migrate/migrate/v4"
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
-	_ "github.com/mattn/go-sqlite3"
 )
 
 func Test(t *testing.T) {
