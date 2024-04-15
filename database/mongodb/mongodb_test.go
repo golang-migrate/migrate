@@ -74,6 +74,22 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 }
 
 func Test(t *testing.T) {
+	t.Run("test", test)
+	t.Run("testMigrate", testMigrate)
+	t.Run("testWithAuth", testWithAuth)
+	t.Run("testLockWorks", testLockWorks)
+
+	t.Cleanup(func() {
+		for _, spec := range specs {
+			t.Log("Cleaning up ", spec.ImageName)
+			if err := spec.Cleanup(); err != nil {
+				t.Error("Error removing ", spec.ImageName, "error:", err)
+			}
+		}
+	})
+}
+
+func test(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.FirstPort()
 		if err != nil {
@@ -99,7 +115,7 @@ func Test(t *testing.T) {
 	})
 }
 
-func TestMigrate(t *testing.T) {
+func testMigrate(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.FirstPort()
 		if err != nil {
@@ -125,7 +141,7 @@ func TestMigrate(t *testing.T) {
 	})
 }
 
-func TestWithAuth(t *testing.T) {
+func testWithAuth(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.FirstPort()
 		if err != nil {
@@ -180,7 +196,7 @@ func TestWithAuth(t *testing.T) {
 	})
 }
 
-func TestLockWorks(t *testing.T) {
+func testLockWorks(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.FirstPort()
 		if err != nil {
@@ -241,6 +257,15 @@ func TestTransaction(t *testing.T) {
 		{ImageName: "mongo:4", Options: dktest.Options{PortRequired: true, ReadyFunc: isReady,
 			Cmd: []string{"mongod", "--bind_ip_all", "--replSet", "rs0"}}},
 	}
+	t.Cleanup(func() {
+		for _, spec := range transactionSpecs {
+			t.Log("Cleaning up ", spec.ImageName)
+			if err := spec.Cleanup(); err != nil {
+				t.Error("Error removing ", spec.ImageName, "error:", err)
+			}
+		}
+	})
+
 	dktesting.ParallelTest(t, transactionSpecs, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.FirstPort()
 		if err != nil {
