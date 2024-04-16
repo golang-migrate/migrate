@@ -91,6 +91,22 @@ func getConnectionString(ip, port string, options ...string) string {
 }
 
 func Test(t *testing.T) {
+	t.Run("test", test)
+	t.Run("testMigrate", testMigrate)
+	t.Run("testMultiStatement", testMultiStatement)
+	t.Run("testFilterCustomQuery", testFilterCustomQuery)
+
+	t.Cleanup(func() {
+		for _, spec := range specs {
+			t.Log("Cleaning up ", spec.ImageName)
+			if err := spec.Cleanup(); err != nil {
+				t.Error("Error removing ", spec.ImageName, "error:", err)
+			}
+		}
+	})
+}
+
+func test(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, ci dktest.ContainerInfo) {
 		createDB(t, ci)
 
@@ -109,7 +125,7 @@ func Test(t *testing.T) {
 	})
 }
 
-func TestMigrate(t *testing.T) {
+func testMigrate(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, ci dktest.ContainerInfo) {
 		createDB(t, ci)
 
@@ -133,7 +149,7 @@ func TestMigrate(t *testing.T) {
 	})
 }
 
-func TestMultiStatement(t *testing.T) {
+func testMultiStatement(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, ci dktest.ContainerInfo) {
 		createDB(t, ci)
 
@@ -163,7 +179,7 @@ func TestMultiStatement(t *testing.T) {
 	})
 }
 
-func TestFilterCustomQuery(t *testing.T) {
+func testFilterCustomQuery(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, ci dktest.ContainerInfo) {
 		createDB(t, ci)
 
