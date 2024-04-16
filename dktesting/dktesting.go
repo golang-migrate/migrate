@@ -30,7 +30,11 @@ func (s *ContainerSpec) Cleanup() (retErr error) {
 			retErr = fmt.Errorf("error closing Docker client: %w", err)
 		}
 	}()
-	ctx, timeoutCancelFunc := context.WithTimeout(context.Background(), s.Options.CleanupTimeout)
+	cleanupTimeout := s.Options.CleanupTimeout
+	if cleanupTimeout <= 0 {
+		cleanupTimeout = dktest.DefaultCleanupTimeout
+	}
+	ctx, timeoutCancelFunc := context.WithTimeout(context.Background(), cleanupTimeout)
 	defer timeoutCancelFunc()
 	if _, err := dc.ImageRemove(ctx, s.ImageName, types.ImageRemoveOptions{Force: true, PruneChildren: true}); err != nil {
 		return err
