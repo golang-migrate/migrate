@@ -85,6 +85,32 @@ func mustRun(t *testing.T, d database.Driver, statements []string) {
 }
 
 func Test(t *testing.T) {
+	t.Run("test", test)
+	t.Run("testMigrate", testMigrate)
+	t.Run("testMultipleStatements", testMultipleStatements)
+	t.Run("testMultipleStatementsInMultiStatementMode", testMultipleStatementsInMultiStatementMode)
+	t.Run("testErrorParsing", testErrorParsing)
+	t.Run("testFilterCustomQuery", testFilterCustomQuery)
+	t.Run("testWithSchema", testWithSchema)
+	t.Run("testMigrationTableOption", testMigrationTableOption)
+	t.Run("testFailToCreateTableWithoutPermissions", testFailToCreateTableWithoutPermissions)
+	t.Run("testCheckBeforeCreateTable", testCheckBeforeCreateTable)
+	t.Run("testParallelSchema", testParallelSchema)
+	t.Run("testPostgresLock", testPostgresLock)
+	t.Run("testWithInstanceConcurrent", testWithInstanceConcurrent)
+	t.Run("testWithConnection", testWithConnection)
+
+	t.Cleanup(func() {
+		for _, spec := range specs {
+			t.Log("Cleaning up ", spec.ImageName)
+			if err := spec.Cleanup(); err != nil {
+				t.Error("Error removing ", spec.ImageName, "error:", err)
+			}
+		}
+	})
+}
+
+func test(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.FirstPort()
 		if err != nil {
@@ -106,7 +132,7 @@ func Test(t *testing.T) {
 	})
 }
 
-func TestMigrate(t *testing.T) {
+func testMigrate(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.FirstPort()
 		if err != nil {
@@ -132,7 +158,7 @@ func TestMigrate(t *testing.T) {
 	})
 }
 
-func TestMultipleStatements(t *testing.T) {
+func testMultipleStatements(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.FirstPort()
 		if err != nil {
@@ -165,7 +191,7 @@ func TestMultipleStatements(t *testing.T) {
 	})
 }
 
-func TestMultipleStatementsInMultiStatementMode(t *testing.T) {
+func testMultipleStatementsInMultiStatementMode(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.FirstPort()
 		if err != nil {
@@ -198,7 +224,7 @@ func TestMultipleStatementsInMultiStatementMode(t *testing.T) {
 	})
 }
 
-func TestErrorParsing(t *testing.T) {
+func testErrorParsing(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.FirstPort()
 		if err != nil {
@@ -227,7 +253,7 @@ func TestErrorParsing(t *testing.T) {
 	})
 }
 
-func TestFilterCustomQuery(t *testing.T) {
+func testFilterCustomQuery(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.FirstPort()
 		if err != nil {
@@ -249,7 +275,7 @@ func TestFilterCustomQuery(t *testing.T) {
 	})
 }
 
-func TestWithSchema(t *testing.T) {
+func testWithSchema(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.FirstPort()
 		if err != nil {
@@ -319,7 +345,7 @@ func TestWithSchema(t *testing.T) {
 	})
 }
 
-func TestMigrationTableOption(t *testing.T) {
+func testMigrationTableOption(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.FirstPort()
 		if err != nil {
@@ -387,7 +413,7 @@ func TestMigrationTableOption(t *testing.T) {
 	})
 }
 
-func TestFailToCreateTableWithoutPermissions(t *testing.T) {
+func testFailToCreateTableWithoutPermissions(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.FirstPort()
 		if err != nil {
@@ -457,7 +483,7 @@ func TestFailToCreateTableWithoutPermissions(t *testing.T) {
 	})
 }
 
-func TestCheckBeforeCreateTable(t *testing.T) {
+func testCheckBeforeCreateTable(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.FirstPort()
 		if err != nil {
@@ -534,7 +560,7 @@ func TestCheckBeforeCreateTable(t *testing.T) {
 	})
 }
 
-func TestParallelSchema(t *testing.T) {
+func testParallelSchema(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.FirstPort()
 		if err != nil {
@@ -602,7 +628,7 @@ func TestParallelSchema(t *testing.T) {
 	})
 }
 
-func TestPostgres_Lock(t *testing.T) {
+func testPostgresLock(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.FirstPort()
 		if err != nil {
@@ -642,7 +668,7 @@ func TestPostgres_Lock(t *testing.T) {
 	})
 }
 
-func TestWithInstance_Concurrent(t *testing.T) {
+func testWithInstanceConcurrent(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.FirstPort()
 		if err != nil {
@@ -685,7 +711,7 @@ func TestWithInstance_Concurrent(t *testing.T) {
 	})
 }
 
-func TestWithConnection(t *testing.T) {
+func testWithConnection(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.FirstPort()
 		if err != nil {
