@@ -3,18 +3,21 @@ package cockroachdb
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"io"
 	nurl "net/url"
 	"regexp"
 	"strconv"
+	"time"
 
 	"github.com/cockroachdb/cockroach-go/v2/crdb"
-	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/hashicorp/go-multierror"
 	"github.com/lib/pq"
 	"go.uber.org/atomic"
+
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database"
 )
 
 func init() {
@@ -26,6 +29,8 @@ func init() {
 
 var DefaultMigrationsTable = "schema_migrations"
 var DefaultLockTable = "schema_lock"
+var DefaultLockWaitTimeout = 30 * time.Second
+var DefaultLockWaitPollInterval = 1 * time.Second
 
 var (
 	ErrNilConfig      = fmt.Errorf("no config")
@@ -37,6 +42,15 @@ type Config struct {
 	LockTable       string
 	ForceLock       bool
 	DatabaseName    string
+
+	// LockWait enables a blocking lock wait for the migration lock to mimic the behavior of advisory locks in pg.
+	LockWait bool
+	// LockWaitTimeout is the maximum time to wait for the lock to be acquired.
+	// Default value is controlled by the package-level DefaultLockWaitTimeout variable.
+	LockWaitTimeout time.Duration
+	// LockWaitPollInterval is the time to wait between attempts to acquire the lock.
+	// Default value is controlled by the package-level DefaultLockWaitPollInterval variable.
+	LockWaitPollInterval time.Duration
 }
 
 type CockroachDb struct {
@@ -76,6 +90,14 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 
 	if len(config.LockTable) == 0 {
 		config.LockTable = DefaultLockTable
+	}
+
+	if config.LockWaitTimeout == 0 {
+		config.LockWaitTimeout = DefaultLockWaitTimeout
+	}
+
+	if config.LockWaitPollInterval == 0 {
+		config.LockWaitPollInterval = DefaultLockWaitPollInterval
 	}
 
 	px := &CockroachDb{
@@ -127,11 +149,33 @@ func (c *CockroachDb) Open(url string) (database.Driver, error) {
 		forceLock = false
 	}
 
+	lockWaitQuery := purl.Query().Get("x-lock-wait")
+	lockWait, err := strconv.ParseBool(lockWaitQuery)
+	if err != nil {
+		lockWait = false
+	}
+
+	lockWaitTimeoutQuery := purl.Query().Get("x-lock-wait-timeout")
+	lockWaitTimeout, err := time.ParseDuration(lockWaitTimeoutQuery)
+	if err != nil {
+		lockWaitTimeout = 0
+	}
+
+	lockWaitPollIntervalQuery := purl.Query().Get("x-lock-wait-poll-interval")
+	lockWaitPollInterval, err := time.ParseDuration(lockWaitPollIntervalQuery)
+	if err != nil {
+		lockWaitPollInterval = 0
+	}
+
 	px, err := WithInstance(db, &Config{
 		DatabaseName:    purl.Path,
 		MigrationsTable: migrationsTable,
 		LockTable:       lockTable,
 		ForceLock:       forceLock,
+
+		LockWait:             lockWait,
+		LockWaitTimeout:      lockWaitTimeout,
+		LockWaitPollInterval: lockWaitPollInterval,
 	})
 	if err != nil {
 		return nil, err
@@ -147,6 +191,21 @@ func (c *CockroachDb) Close() error {
 // Locking is done manually with a separate lock table.  Implementing advisory locks in CRDB is being discussed
 // See: https://github.com/cockroachdb/cockroach/issues/13546
 func (c *CockroachDb) Lock() error {
+	startedAt := time.Now()
+
+	// CRDB is using SERIALIZABLE isolation level by default, that means we can not run a loop inside the transaction,
+	// because transaction started when the lock is acquired does not see it being released
+	for {
+		err := c.lock()
+		if err == nil || !errors.Is(err, database.ErrLocked) || !c.config.LockWait || time.Since(startedAt) >= c.config.LockWaitTimeout {
+			return err
+		}
+
+		time.Sleep(c.config.LockWaitPollInterval)
+	}
+}
+
+func (c *CockroachDb) lock() error {
 	return database.CasRestoreOnErr(&c.isLocked, false, true, database.ErrLocked, func() (err error) {
 		return crdb.ExecuteTx(context.Background(), c.db, nil, func(tx *sql.Tx) (err error) {
 			aid, err := database.GenerateAdvisoryLockId(c.config.DatabaseName)
@@ -249,11 +308,12 @@ func (c *CockroachDb) Version() (version int, dirty bool, err error) {
 	err = c.db.QueryRow(query).Scan(&version, &dirty)
 
 	switch {
-	case err == sql.ErrNoRows:
+	case errors.Is(err, sql.ErrNoRows):
 		return database.NilVersion, false, nil
 
 	case err != nil:
-		if e, ok := err.(*pq.Error); ok {
+		var e *pq.Error
+		if errors.As(err, &e) {
 			// 42P01 is "UndefinedTableError" in CockroachDB
 			// https://github.com/cockroachdb/cockroach/blob/master/pkg/sql/pgwire/pgerror/codes.go
 			if e.Code == "42P01" {
