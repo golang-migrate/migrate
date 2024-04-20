@@ -243,13 +243,14 @@ func TestLockWait(t *testing.T) {
 		// lock d2 in a goroutine to make it wait a bit
 		done := make(chan struct{})
 		waiting := make(chan struct{})
+		var d2LockErr error
 		go func() {
 			defer close(done)
 
 			close(waiting) // signal that the goroutine started and is waiting
-			if err := d2.Lock(); err != nil {
-				t.Fatal(err)
-			}
+
+			// we can not call t.Fatal(err) in the goroutine, so remember it and check it in the main thread
+			d2LockErr = d2.Lock()
 		}()
 
 		<-waiting // ensure the goroutine started and is waiting
@@ -260,6 +261,9 @@ func TestLockWait(t *testing.T) {
 
 		select {
 		case <-done: // we should get here once the d2 lock is acquired
+			if d2LockErr != nil {
+				t.Fatal(d2LockErr)
+			}
 			break
 		case <-time.After(DefaultMaxRetryInterval): // wait for at least one poll
 			t.Fatal("expected lock to be acquired by d2")
