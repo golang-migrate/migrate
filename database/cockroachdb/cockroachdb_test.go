@@ -224,7 +224,7 @@ func TestLockWait(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		addr := fmt.Sprintf("cockroach://root@%v:%v/migrate?sslmode=disable&x-lock-wait=true", ip, port)
+		addr := fmt.Sprintf("cockroach://root@%v:%v/migrate?sslmode=disable&x-max-retries=10", ip, port)
 		c := &CockroachDb{}
 		d1, err := c.Open(addr)
 		if err != nil {
@@ -261,7 +261,7 @@ func TestLockWait(t *testing.T) {
 		select {
 		case <-done: // we should get here once the d2 lock is acquired
 			break
-		case <-time.After(DefaultLockWaitPollInterval * 2): // wait for at least one poll
+		case <-time.After(DefaultMaxRetryInterval): // wait for at least one poll
 			t.Fatal("expected lock to be acquired by d2")
 		}
 	})

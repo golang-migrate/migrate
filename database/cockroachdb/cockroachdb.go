@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/cockroachdb/cockroach-go/v2/crdb"
 	"github.com/hashicorp/go-multierror"
 	"github.com/lib/pq"
@@ -27,10 +28,13 @@ func init() {
 	database.Register("crdb-postgres", &db)
 }
 
+const (
+	DefaultMaxRetryInterval    = time.Second * 15
+	DefaultMaxRetryElapsedTime = time.Second * 30
+)
+
 var DefaultMigrationsTable = "schema_migrations"
 var DefaultLockTable = "schema_lock"
-var DefaultLockWaitTimeout = 30 * time.Second
-var DefaultLockWaitPollInterval = 1 * time.Second
 
 var (
 	ErrNilConfig      = fmt.Errorf("no config")
@@ -43,14 +47,9 @@ type Config struct {
 	ForceLock       bool
 	DatabaseName    string
 
-	// LockWait enables a blocking lock wait for the migration lock to mimic the behavior of advisory locks in pg.
-	LockWait bool
-	// LockWaitTimeout is the maximum time to wait for the lock to be acquired.
-	// Default value is controlled by the package-level DefaultLockWaitTimeout variable.
-	LockWaitTimeout time.Duration
-	// LockWaitPollInterval is the time to wait between attempts to acquire the lock.
-	// Default value is controlled by the package-level DefaultLockWaitPollInterval variable.
-	LockWaitPollInterval time.Duration
+	MaxRetryInterval    time.Duration
+	MaxRetryElapsedTime time.Duration
+	MaxRetries          int
 }
 
 type CockroachDb struct {
@@ -92,12 +91,12 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		config.LockTable = DefaultLockTable
 	}
 
-	if config.LockWaitTimeout == 0 {
-		config.LockWaitTimeout = DefaultLockWaitTimeout
+	if config.MaxRetryInterval == 0 {
+		config.MaxRetryInterval = DefaultMaxRetryInterval
 	}
 
-	if config.LockWaitPollInterval == 0 {
-		config.LockWaitPollInterval = DefaultLockWaitPollInterval
+	if config.MaxRetryElapsedTime == 0 {
+		config.MaxRetryElapsedTime = DefaultMaxRetryElapsedTime
 	}
 
 	px := &CockroachDb{
@@ -149,22 +148,22 @@ func (c *CockroachDb) Open(url string) (database.Driver, error) {
 		forceLock = false
 	}
 
-	lockWaitQuery := purl.Query().Get("x-lock-wait")
-	lockWait, err := strconv.ParseBool(lockWaitQuery)
+	maxIntervalStr := purl.Query().Get("x-max-retry-interval")
+	maxInterval, err := time.ParseDuration(maxIntervalStr)
 	if err != nil {
-		lockWait = false
+		maxInterval = DefaultMaxRetryInterval
 	}
 
-	lockWaitTimeoutQuery := purl.Query().Get("x-lock-wait-timeout")
-	lockWaitTimeout, err := time.ParseDuration(lockWaitTimeoutQuery)
+	maxElapsedTimeStr := purl.Query().Get("x-max-retry-elapsed-time")
+	maxElapsedTime, err := time.ParseDuration(maxElapsedTimeStr)
 	if err != nil {
-		lockWaitTimeout = 0
+		maxElapsedTime = DefaultMaxRetryElapsedTime
 	}
 
-	lockWaitPollIntervalQuery := purl.Query().Get("x-lock-wait-poll-interval")
-	lockWaitPollInterval, err := time.ParseDuration(lockWaitPollIntervalQuery)
+	maxRetriesStr := purl.Query().Get("x-max-retries")
+	maxRetries, err := strconv.Atoi(maxRetriesStr)
 	if err != nil {
-		lockWaitPollInterval = 0
+		maxRetries = 0
 	}
 
 	px, err := WithInstance(db, &Config{
@@ -173,9 +172,9 @@ func (c *CockroachDb) Open(url string) (database.Driver, error) {
 		LockTable:       lockTable,
 		ForceLock:       forceLock,
 
-		LockWait:             lockWait,
-		LockWaitTimeout:      lockWaitTimeout,
-		LockWaitPollInterval: lockWaitPollInterval,
+		MaxRetryInterval:    maxInterval,
+		MaxRetryElapsedTime: maxElapsedTime,
+		MaxRetries:          maxRetries,
 	})
 	if err != nil {
 		return nil, err
@@ -191,18 +190,16 @@ func (c *CockroachDb) Close() error {
 // Locking is done manually with a separate lock table.  Implementing advisory locks in CRDB is being discussed
 // See: https://github.com/cockroachdb/cockroach/issues/13546
 func (c *CockroachDb) Lock() error {
-	startedAt := time.Now()
-
 	// CRDB is using SERIALIZABLE isolation level by default, that means we can not run a loop inside the transaction,
 	// because transaction started when the lock is acquired does not see it being released
-	for {
+	return backoff.Retry(func() error {
 		err := c.lock()
-		if err == nil || !errors.Is(err, database.ErrLocked) || !c.config.LockWait || time.Since(startedAt) >= c.config.LockWaitTimeout {
-			return err
+		if err != nil && !errors.Is(err, database.ErrLocked) {
+			return backoff.Permanent(err)
 		}
 
-		time.Sleep(c.config.LockWaitPollInterval)
-	}
+		return err
+	}, c.newBackoff())
 }
 
 func (c *CockroachDb) lock() error {
@@ -422,4 +419,20 @@ func (c *CockroachDb) ensureLockTable() error {
 	}
 
 	return nil
+}
+
+func (c *CockroachDb) newBackoff() backoff.BackOff {
+	retrier := backoff.WithMaxRetries(backoff.WithContext(&backoff.ExponentialBackOff{
+		InitialInterval:     backoff.DefaultInitialInterval,
+		RandomizationFactor: backoff.DefaultRandomizationFactor,
+		Multiplier:          backoff.DefaultMultiplier,
+		MaxInterval:         c.config.MaxRetryInterval,
+		MaxElapsedTime:      c.config.MaxRetryElapsedTime,
+		Stop:                backoff.Stop,
+		Clock:               backoff.SystemClock,
+	}, context.Background()), uint64(c.config.MaxRetries))
+
+	retrier.Reset()
+
+	return retrier
 }
