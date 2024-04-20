@@ -51,11 +51,12 @@ func ParallelTest(t *testing.T, specs []ContainerSpec,
 		// TODO: order is random, maybe always pick first version instead?
 		if i > 0 && testing.Short() {
 			t.Logf("Skipping %v in short mode", spec.ImageName)
-		} else {
-			t.Run(spec.ImageName, func(t *testing.T) {
-				t.Parallel()
-				dktest.Run(t, spec.ImageName, spec.Options, testFunc)
-			})
+			continue
 		}
+
+		t.Run(spec.ImageName, func(t *testing.T) {
+			t.Parallel()
+			dktest.Run(t, spec.ImageName, spec.Options, testFunc)
+		})
 	}
 }
