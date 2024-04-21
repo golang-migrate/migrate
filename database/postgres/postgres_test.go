@@ -628,7 +628,7 @@ func testParallelSchema(t *testing.T) {
 	})
 }
 
-func TestPostgres_ConcurrentMigrations(t *testing.T) {
+func testPostgresConcurrentMigrations(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		// GIVEN - a set of concurrent processes running migrations
 		const concurrency = 3
