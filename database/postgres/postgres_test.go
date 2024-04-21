@@ -96,6 +96,7 @@ func Test(t *testing.T) {
 	t.Run("testFailToCreateTableWithoutPermissions", testFailToCreateTableWithoutPermissions)
 	t.Run("testCheckBeforeCreateTable", testCheckBeforeCreateTable)
 	t.Run("testParallelSchema", testParallelSchema)
+	t.Run("testPostgresConcurrentMigrations", testPostgresConcurrentMigrations)
 	t.Run("testPostgresLock", testPostgresLock)
 	t.Run("testWithInstanceConcurrent", testWithInstanceConcurrent)
 	t.Run("testWithConnection", testWithConnection)
