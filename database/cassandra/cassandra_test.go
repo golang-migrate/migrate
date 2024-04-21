@@ -25,9 +25,11 @@ var (
 	// Although Cassandra 2.x is supported by the Apache Foundation,
 	// the migrate db driver only supports Cassandra 3.x since it uses
 	// the system_schema keyspace.
+	// last ScyllaDB version tested is 5.1.11
 	specs = []dktesting.ContainerSpec{
 		{ImageName: "cassandra:3.0", Options: opts},
 		{ImageName: "cassandra:3.11", Options: opts},
+		{ImageName: "scylladb/scylla:5.1.11", Options: opts},
 	}
 )
 
@@ -59,6 +61,20 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 }
 
 func Test(t *testing.T) {
+	t.Run("test", test)
+	t.Run("testMigrate", testMigrate)
+
+	t.Cleanup(func() {
+		for _, spec := range specs {
+			t.Log("Cleaning up ", spec.ImageName)
+			if err := spec.Cleanup(); err != nil {
+				t.Error("Error removing ", spec.ImageName, "error:", err)
+			}
+		}
+	})
+}
+
+func test(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.Port(9042)
 		if err != nil {
@@ -79,7 +95,7 @@ func Test(t *testing.T) {
 	})
 }
 
-func TestMigrate(t *testing.T) {
+func testMigrate(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.Port(9042)
 		if err != nil {

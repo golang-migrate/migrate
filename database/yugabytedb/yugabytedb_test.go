@@ -31,12 +31,10 @@ var (
 		ReadyFunc:    isReady,
 		Timeout:      time.Duration(60) * time.Second,
 	}
-	// Released versions: https://docs.yugabyte.com/latest/releases/#current-supported-releases
+	// Released versions: https://docs.yugabyte.com/preview/releases/release-notes/
 	specs = []dktesting.ContainerSpec{
-		{ImageName: "yugabytedb/yugabyte:2.6.16.0-b14", Options: opts},
-		{ImageName: "yugabytedb/yugabyte:2.8.4.0-b30", Options: opts},
-		{ImageName: "yugabytedb/yugabyte:2.12.2.0-b58", Options: opts},
-		{ImageName: "yugabytedb/yugabyte:2.13.0.1-b2", Options: opts},
+		{ImageName: "yugabytedb/yugabyte:2.14.15.0-b57", Options: opts},
+		{ImageName: "yugabytedb/yugabyte:2.20.2.1-b3", Options: opts},
 	}
 )
 
@@ -93,6 +91,22 @@ func getConnectionString(ip, port string, options ...string) string {
 }
 
 func Test(t *testing.T) {
+	t.Run("test", test)
+	t.Run("testMigrate", testMigrate)
+	t.Run("testMultiStatement", testMultiStatement)
+	t.Run("testFilterCustomQuery", testFilterCustomQuery)
+
+	t.Cleanup(func() {
+		for _, spec := range specs {
+			t.Log("Cleaning up ", spec.ImageName)
+			if err := spec.Cleanup(); err != nil {
+				t.Error("Error removing ", spec.ImageName, "error:", err)
+			}
+		}
+	})
+}
+
+func test(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, ci dktest.ContainerInfo) {
 		createDB(t, ci)
 
@@ -111,7 +125,7 @@ func Test(t *testing.T) {
 	})
 }
 
-func TestMigrate(t *testing.T) {
+func testMigrate(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, ci dktest.ContainerInfo) {
 		createDB(t, ci)
 
@@ -135,7 +149,7 @@ func TestMigrate(t *testing.T) {
 	})
 }
 
-func TestMultiStatement(t *testing.T) {
+func testMultiStatement(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, ci dktest.ContainerInfo) {
 		createDB(t, ci)
 
@@ -165,7 +179,7 @@ func TestMultiStatement(t *testing.T) {
 	})
 }
 
-func TestFilterCustomQuery(t *testing.T) {
+func testFilterCustomQuery(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, ci dktest.ContainerInfo) {
 		createDB(t, ci)
 

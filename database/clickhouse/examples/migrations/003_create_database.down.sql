@@ -1,0 +1,10 @@
+DROP TABLE IF EXISTS driver_ratings;
+DROP TABLE IF EXISTS user_ratings;
+DROP TABLE IF EXISTS orders;
+DROP TABLE IF EXISTS driver_ratings_queue;
+DROP TABLE IF EXISTS user_ratings_queue;
+DROP TABLE IF EXISTS orders_queue;
+DROP VIEW IF EXISTS user_ratings_queue_mv;
+DROP VIEW IF EXISTS driver_ratings_queue_mv;
+DROP VIEW IF EXISTS orders_queue_mv;
+DROP DATABASE IF EXISTS analytics;

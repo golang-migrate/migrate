@@ -391,7 +391,7 @@ func TestURLToMySQLConfig(t *testing.T) {
 		// Not supported yet: https://github.com/go-sql-driver/mysql/issues/591
 		// {name: "user/password - user with encoded :",
 		// 	urlStr:      "mysql://username%3A:password@tcp(127.0.0.1:3306)/myDB?multiStatements=true",
-		// 	expectedDSN: "username::pasword@tcp(127.0.0.1:3306)/myDB?multiStatements=true"},
+		// 	expectedDSN: "username::password@tcp(127.0.0.1:3306)/myDB?multiStatements=true"},
 		{name: "user/password - user with encoded @",
 			urlStr:      "mysql://username%40:password@tcp(127.0.0.1:3306)/myDB?multiStatements=true",
 			expectedDSN: "username@:password@tcp(127.0.0.1:3306)/myDB?multiStatements=true"},
