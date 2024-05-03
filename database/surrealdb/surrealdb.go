@@ -214,14 +214,24 @@ func (m *SurrealDB) Lock() error {
 		hostname = fmt.Sprintf("Could not determine hostname. Error: %s", err.Error())
 	}
 
-	_, err = m.db.Create(m.config.MigrationsTable, LockDoc{
-		ID:        "lock",
-		Pid:       pid,
-		Hostname:  hostname,
-		CreatedAt: time.Now().Format(time.RFC3339),
-	})
+	lock_doc_id := m.config.GetLockDocumentId()
+	query := `BEGIN; CREATE $lock_doc_id SET pid = $pid, hostname = $hostname, created_at = $created_at; RETURN AFTER; COMMIT;`
 
-	return err
+	// using m.db.Query looks to prevent a race condition that can occur when using m.db.Create
+	// if you use m.db.Create its possible for a second lock call shortly after first to not error as it should
+	_, err = surrealdb.SmartUnmarshal[[]LockDoc](
+		m.db.Query(query, map[string]interface{}{
+			"lock_doc_id": lock_doc_id,
+			"pid":         pid,
+			"hostname":    hostname,
+			"created_at":  time.Now().Format(time.RFC3339),
+		}),
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (m *SurrealDB) Unlock() error {
