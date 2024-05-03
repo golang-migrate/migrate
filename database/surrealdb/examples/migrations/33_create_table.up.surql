@@ -9,7 +9,7 @@ DEFINE FIELD firstName ON TABLE user TYPE string
 DEFINE FIELD lastName ON TABLE user TYPE string
   ASSERT $value != NONE;
 DEFINE FIELD email ON TABLE user TYPE string
-  ASSERT $value != NONE AND is::email($value);
+  ASSERT $value != NONE AND string::is::email($value);
 DEFINE INDEX userEmailIndex ON TABLE user COLUMNS email UNIQUE;
 
 COMMIT;

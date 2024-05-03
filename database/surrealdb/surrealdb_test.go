@@ -51,9 +51,11 @@ var (
 		Entrypoint:   []string{""},
 		Cmd:          []string{"/surreal", "start", "--user", user, "--pass", pass, "memory"},
 		PortBindings: getPortBindings(),
-		PortRequired: true, ReadyFunc: isReady}
+		PortRequired: true,
+		ReadyFunc:    isReady,
+	}
 	specs = []dktesting.ContainerSpec{
-		{ImageName: "surrealdb/surrealdb:v1.1.1", Options: opts},
+		{ImageName: "surrealdb/surrealdb:v1.4.2", Options: opts},
 	}
 )
 
