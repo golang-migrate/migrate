@@ -125,11 +125,14 @@ func TestErrorParsing(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		wantErr := `There was a problem with the database: Parse error on line 1 at character 0 when parsing 'DEFINE TABLEE user SCHEMALESS;'`
-		if err := d.Run(strings.NewReader("DEFINE TABLEE user SCHEMALESS;")); err == nil {
+		badQuery := "DEFINE TABLEE user SCHEMALESS;"
+		wantErr := `sending request failed for method 'query': There was a problem with the database: Parse error: Failed to parse query at line 1 column 8 expected query to end`
+		if err := d.Run(strings.NewReader(badQuery)); err == nil {
 			t.Fatal("expected err but got nil")
-		} else if err.Error() != wantErr {
-			t.Fatalf("expected '%s' but got '%s'", wantErr, err.Error())
+		} else if !strings.HasPrefix(err.Error(), wantErr) {
+			t.Fatalf("expected '%s' to start with '%s'", err.Error(), wantErr)
+		} else if !strings.Contains(err.Error(), badQuery) {
+			t.Fatalf("expected err to contain %s", badQuery)
 		}
 	})
 }
