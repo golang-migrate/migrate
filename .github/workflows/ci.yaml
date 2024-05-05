@@ -51,7 +51,7 @@ jobs:
 
   tv-build-and-push:
     name: Build and push to trackvision
-    # needs: [lint, test]
+    needs: [lint, test]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
