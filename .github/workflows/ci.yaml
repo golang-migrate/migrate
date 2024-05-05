@@ -49,6 +49,26 @@ jobs:
         with:
           parallel-finished: true
 
+  tv-build-and-push:
+    name: Build and push to trackvision
+    runs-on: ubuntu-latest
+    steps:
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ghcr.io/${{ github.repository }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+
   goreleaser:
     name: Release a new version
     needs: [lint, test]
