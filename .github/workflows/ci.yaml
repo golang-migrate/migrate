@@ -55,6 +55,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
@@ -63,7 +69,7 @@ jobs:
             ghcr.io/${{ github.repository }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
-            type=sha
+            type=raw,value={{sha}}
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
