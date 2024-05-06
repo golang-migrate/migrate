@@ -6,6 +6,9 @@ on:
       - master
   pull_request:
 
+env:
+  IMAGE_NAME: tv-migrate
+
 jobs:
   lint:
     name: lint
@@ -68,7 +71,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            ghcr.io/${{ github.repository }}
+            ghcr.io/${{ github.repository.owner }}/${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=raw,value={{sha}}
