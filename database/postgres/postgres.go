@@ -89,7 +89,7 @@ func WithConnection(ctx context.Context, conn *sql.Conn, config *Config) (*Postg
 	}
 
 	if config.SchemaName == "" {
-		query := `SELECT CURRENT_SCHEMA()`
+		query := `SELECT current_schema()`
 		var schemaName sql.NullString
 		if err := conn.QueryRowContext(ctx, query).Scan(&schemaName); err != nil {
 			return nil, &database.Error{OrigErr: err, Query: []byte(query)}
@@ -210,7 +210,6 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 		MultiStatementEnabled: multiStatementEnabled,
 		MultiStatementMaxSize: multiStatementMaxSize,
 	})
-
 	if err != nil {
 		return nil, err
 	}
