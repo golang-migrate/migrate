@@ -14,7 +14,7 @@ Once you create your files, you should fill them.
 Developers and Teams should keep an eye on such cases (especially during code review).
 [Here](https://github.com/golang-migrate/migrate/issues/179#issuecomment-475821264) is the issue summary if you would like to read more.
 
-Consider making your migrations idempotent - we can run the same sql code twice in a row with the same result. This makes our migrations more robust. On the other hand, it causes slightly less control over database schema - e.g. let's say you forgot to drop the table in down migration. You run down migration - the table is still there. When you run up migration again - `CREATE TABLE` would return an error, helping you find an issue in down migration, while `CREATE TABLE IF NOT EXISTS` would not. Use those conditions wisely.
+Consider making your migrations idempotent - we can run the same SQL code twice in a row with the same result. This makes our migrations more robust. On the other hand, it causes slightly less control over database schema - e.g. let's say you forgot to drop the table in down migration. You run down migration - the table is still there. When you run up migration again - `CREATE TABLE` would return an error, helping you find an issue in down migration, while `CREATE TABLE IF NOT EXISTS` would not. Use those conditions wisely.
 
 In case you would like to run several commands/queries in one migration, you should wrap them in a transaction (if your database supports it).
 This way if one of commands fails, our database will remain unchanged.
@@ -36,7 +36,7 @@ It's also worth checking your migrations in a separate, containerized environmen
 
 ## Forcing your database version
 In case you run a migration that contained an error, migrate will not let you run other migrations on the same database. You will see an error like `Dirty database version 1. Fix and force version`, even when you fix the erred migration. This means your database was marked as 'dirty'.
-You need to investigate the migration error - was your migration applied partially, or was it not applied at all? Once you know, you should force your database to a version reflecting it's real state. You can do so with `force` command:
+You need to investigate the migration error - was your migration applied partially, or was it not applied at all? Once you know, you should force your database to a version reflecting its real state. You can do so with `force` command:
 ```
 migrate -path PATH_TO_YOUR_MIGRATIONS -database YOUR_DATABASE_URL force VERSION
 ```

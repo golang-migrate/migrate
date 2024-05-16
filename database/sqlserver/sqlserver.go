@@ -190,7 +190,7 @@ func (ss *SQLServer) Close() error {
 	return nil
 }
 
-// Lock creates an advisory local on the database to prevent multiple migrations from running at the same time.
+// Lock creates an advisory lock on the database to prevent multiple migrations from running at the same time.
 func (ss *SQLServer) Lock() error {
 	return database.CasRestoreOnErr(&ss.isLocked, false, true, database.ErrLocked, func() error {
 		aid, err := database.GenerateAdvisoryLockId(ss.config.DatabaseName, ss.config.SchemaName)
@@ -214,7 +214,7 @@ func (ss *SQLServer) Lock() error {
 	})
 }
 
-// Unlock froms the migration lock from the database
+// Unlock the migration lock from the database
 func (ss *SQLServer) Unlock() error {
 	return database.CasRestoreOnErr(&ss.isLocked, true, false, database.ErrNotLocked, func() error {
 		aid, err := database.GenerateAdvisoryLockId(ss.config.DatabaseName, ss.config.SchemaName)

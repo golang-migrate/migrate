@@ -30,7 +30,7 @@ var DefaultMigrationsCollection = "schema_migrations"
 const DefaultLockingCollection = "migrate_advisory_lock" // the collection to use for advisory locking by default.
 const lockKeyUniqueValue = 0                             // the unique value to lock on. If multiple clients try to insert the same key, it will fail (locked).
 const DefaultLockTimeout = 15                            // the default maximum time to wait for a lock to be released.
-const DefaultLockTimeoutInterval = 10                    // the default maximum intervals time for the locking timout.
+const DefaultLockTimeoutInterval = 10                    // the default maximum intervals time for the locking timeout.
 const DefaultAdvisoryLockingFlag = true                  // the default value for the advisory locking feature flag. Default is true.
 const LockIndexName = "lock_unique_key"                  // the name of the index which adds unique constraint to the locking_key field.
 const contextWaitTimeout = 5 * time.Second               // how long to wait for the request to mongo to block/wait for.
@@ -38,7 +38,7 @@ const contextWaitTimeout = 5 * time.Second               // how long to wait for
 var (
 	ErrNoDatabaseName            = fmt.Errorf("no database name")
 	ErrNilConfig                 = fmt.Errorf("no config")
-	ErrLockTimeoutConfigConflict = fmt.Errorf("both x-advisory-lock-timeout-interval and x-advisory-lock-timout-interval were specified")
+	ErrLockTimeoutConfigConflict = fmt.Errorf("both x-advisory-lock-timeout-interval and x-advisory-lock-timeout-interval were specified")
 )
 
 type Mongo struct {
@@ -134,7 +134,7 @@ func (m *Mongo) Open(dsn string) (database.Driver, error) {
 	if err != nil {
 		return nil, err
 	}
-	lockingTimout, err := parseInt(unknown.Get("x-advisory-lock-timeout"), DefaultLockTimeout)
+	lockingTimeout, err := parseInt(unknown.Get("x-advisory-lock-timeout"), DefaultLockTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +142,7 @@ func (m *Mongo) Open(dsn string) (database.Driver, error) {
 	lockTimeoutIntervalValue := unknown.Get("x-advisory-lock-timeout-interval")
 	// The initial release had a typo for this argument but for backwards compatibility sake, we will keep supporting it
 	// and we will error out if both values are set.
-	lockTimeoutIntervalValueFromTypo := unknown.Get("x-advisory-lock-timout-interval")
+	lockTimeoutIntervalValueFromTypo := unknown.Get("x-advisory-lock-timeout-interval")
 
 	lockTimeout := lockTimeoutIntervalValue
 
@@ -171,7 +171,7 @@ func (m *Mongo) Open(dsn string) (database.Driver, error) {
 		TransactionMode:      transactionMode,
 		Locking: Locking{
 			CollectionName: lockCollection,
-			Timeout:        lockingTimout,
+			Timeout:        lockingTimeout,
 			Enabled:        advisoryLockingFlag,
 			Interval:       maxLockCheckInterval,
 		},
