@@ -12,6 +12,8 @@
 | `password` | The user's password |
 | `host` | The host to connect to. |
 | `port` | The port to bind to. |
+| `secure` | Establish secure connection (default is false) |
+| `skip_verify` | Skip certificate verification (default is false) |
 | `x-multi-statement` | false | Enable multiple statements to be ran in a single migration (See note below) |
 
 ## Notes
