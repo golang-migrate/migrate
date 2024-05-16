@@ -4,7 +4,6 @@ run:
 linters:
   enable:
     #- golint
-    - interfacer
     - unconvert
     #- dupl
     - goconst
