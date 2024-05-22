@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"regexp"
 	"time"
 
 	"go.uber.org/atomic"
@@ -248,7 +249,7 @@ func (ch *ClickHouse) ensureVersionTable() (err error) {
 			) Engine=%s`, ch.config.MigrationsTable, ch.config.MigrationsTableEngine)
 	}
 
-	if strings.HasSuffix(ch.config.MigrationsTableEngine, "Tree") {
+	if needsOrderBy(ch.config.MigrationsTableEngine) {
 		query = fmt.Sprintf(`%s ORDER BY sequence`, query)
 	}
 
@@ -313,4 +314,9 @@ func quoteIdentifier(name string) string {
 		name = name[:end]
 	}
 	return `"` + strings.Replace(name, `"`, `""`, -1) + `"`
+}
+
+func needsOrderBy(engine string) bool {
+	ok, _ := regexp.MatchString("(^[ ]*Replicated[A-Za-z]+Tree)|(Tree$)", engine)
+	return ok
 }
