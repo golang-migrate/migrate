@@ -1,0 +1,3 @@
+ALTER TABLE row_table ADD COLUMN is_deleted Bool;
+
+ALTER TABLE row_table ADD INDEX idx_c GLOBAL ON (c);

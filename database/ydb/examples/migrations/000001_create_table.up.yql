@@ -1,0 +1,20 @@
+CREATE TABLE row_table (
+    a Uint64,
+    b Bool,
+    c Utf8,
+    d Date,
+    INDEX idx_d GLOBAL ON (d),
+    INDEX idx_ba GLOBAL ASYNC ON (b, a) COVER (c),
+    PRIMARY KEY (a)
+);
+
+CREATE TABLE column_table (
+    a Uint64 NOT NULL,
+    b String NOT NULL,
+    c Float,
+    PRIMARY KEY (b, a)
+)
+PARTITION BY HASH (b)
+WITH (
+    STORE = COLUMN
+);
