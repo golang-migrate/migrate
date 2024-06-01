@@ -2,13 +2,13 @@ package ydb
 
 import (
 	"context"
+	"net/url"
 	"testing"
 	"time"
 
 	"github.com/dhui/dktest"
 	"github.com/docker/go-connections/nat"
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 
 	"github.com/golang-migrate/migrate/v4"
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
@@ -46,11 +46,13 @@ var (
 			}
 			defer d.Close(ctx)
 
-			err = d.Table().Do(ctx, func(ctx context.Context, s table.Session) error {
-				return s.ExecuteSchemeQuery(ctx, "CREATE TOPIC ready")
-			})
+			res, err := d.Scripting().Execute(ctx, "CREATE TOPIC ready", nil)
+			if err != nil {
+				return false
+			}
+			defer res.Close()
 
-			return err == nil
+			return true
 		},
 	}
 )
@@ -59,7 +61,11 @@ func Test(t *testing.T) {
 	dktest.Run(t, image, opts, func(t *testing.T, c dktest.ContainerInfo) {
 		ydb := &YDB{}
 
-		d, err := ydb.Open("ydb://localhost:2136/local?x-insecure=true&x-connect-timeout=5s")
+		query := url.Values{}
+		query.Set("x-insecure", "true")
+		query.Set("x-connect-timeout", "5s")
+
+		d, err := ydb.Open("ydb://localhost:2136/local?" + query.Encode())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -71,7 +77,7 @@ func Test(t *testing.T) {
 			}
 		}()
 
-		dt.Test(t, d, []byte("CREATE TABLE `Kek/test` (a Uint64 NOT NULL, PRIMARY KEY (a))"))
+		dt.Test(t, d, []byte("CREATE TABLE `nested/a/b/c/table` (x Uint64 NOT NULL, PRIMARY KEY (x))"))
 	})
 }
 
@@ -79,7 +85,11 @@ func TestMigrate(t *testing.T) {
 	dktest.Run(t, image, opts, func(t *testing.T, c dktest.ContainerInfo) {
 		ydb := &YDB{}
 
-		d, err := ydb.Open("ydb://localhost:2136/local?x-insecure=true&x-connect-timeout=5s")
+		query := url.Values{}
+		query.Set("x-insecure", "true")
+		query.Set("x-connect-timeout", "5s")
+
+		d, err := ydb.Open("ydb://localhost:2136/local?" + query.Encode())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -97,5 +107,30 @@ func TestMigrate(t *testing.T) {
 		}
 
 		dt.TestMigrate(t, m)
+	})
+}
+
+func TestCustomMigrationsTable(t *testing.T) {
+	dktest.Run(t, image, opts, func(t *testing.T, c dktest.ContainerInfo) {
+		ydb := &YDB{}
+
+		query := url.Values{}
+		query.Set("x-insecure", "true")
+		query.Set("x-connect-timeout", "5s")
+		query.Set("x-migrations-table", "custom/table")
+
+		d, err := ydb.Open("ydb://localhost:2136/local?" + query.Encode())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		defer func() {
+			err := d.Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+		}()
+
+		dt.Test(t, d, []byte("SELECT 1"))
 	})
 }

@@ -101,7 +101,8 @@ func (db *YDB) Open(url string) (database.Driver, error) {
 		defer cancel()
 	}
 
-	driver, err := ydb.Open(ctx, migrate.FilterCustomQuery(purl).String())
+	purl = migrate.FilterCustomQuery(purl)
+	driver, err := ydb.Open(ctx, purl.String(), withCredentials(query))
 	if err != nil {
 		return nil, err
 	}
@@ -136,17 +137,14 @@ func (db *YDB) Run(migration io.Reader) error {
 		return err
 	}
 
-	exec := func(ctx context.Context, s table.Session) error {
-		err := s.ExecuteSchemeQuery(ctx, string(query))
-		if err != nil {
-			return &database.Error{OrigErr: err, Query: []byte(query)}
-		}
+	ctx := context.Background()
 
-		return nil
+	res, err := db.driver.Scripting().Execute(ctx, string(query), nil)
+	if err != nil {
+		return err
 	}
 
-	ctx := context.Background()
-	return db.driver.Table().Do(ctx, exec)
+	return res.Close()
 }
 
 func (db *YDB) SetVersion(version int, dirty bool) error {
