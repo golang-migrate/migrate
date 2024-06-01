@@ -196,12 +196,20 @@ func (db *YDB) Version() (version int, dirty bool, err error) {
 		db.config.MigrationsTable,
 	)
 
-	exec := func(ctx context.Context, s table.Session) error {
+	exec := func(ctx context.Context, s table.Session) (err error) {
 		_, res, err := s.Execute(ctx, table.OnlineReadOnlyTxControl(), query, nil)
 		if err != nil {
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
-		defer res.Close()
+
+		defer func() {
+			cerr := res.Close()
+			if err != nil {
+				err = multierror.Append(err, cerr)
+			} else {
+				err = cerr
+			}
+		}()
 
 		err = res.NextResultSetErr(ctx)
 		if err != nil {

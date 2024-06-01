@@ -44,13 +44,13 @@ var (
 			if err != nil {
 				return false
 			}
-			defer d.Close(ctx)
+			defer func() { _ = d.Close(ctx) }()
 
 			res, err := d.Scripting().Execute(ctx, "CREATE TOPIC ready", nil)
 			if err != nil {
 				return false
 			}
-			defer res.Close()
+			defer func() { _ = res.Close() }()
 
 			return true
 		},
