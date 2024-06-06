@@ -275,7 +275,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 		if needsConfirm {
 			log.Println("Are you sure you want to apply all down migrations? [y/N]")
 			var response string
-			fmt.Scanln(&response)
+			_, _ = fmt.Scanln(&response)
 			response = strings.ToLower(strings.TrimSpace(response))
 
 			if response == "y" {
@@ -306,7 +306,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 		if !*forceDrop {
 			log.Println("Are you sure you want to drop the entire database schema? [y/N]")
 			var response string
-			fmt.Scanln(&response)
+			_, _ = fmt.Scanln(&response)
 			response = strings.ToLower(strings.TrimSpace(response))
 
 			if response == "y" {
