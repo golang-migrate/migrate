@@ -268,7 +268,6 @@ func (ss *SQLServer) Run(migration io.Reader) error {
 			}
 			return database.Error{OrigErr: err, Err: "migration failed", Query: []byte(script)}
 		}
-		return database.Error{OrigErr: err, Err: "migration failed", Query: migr}
 	}
 
 	return nil
