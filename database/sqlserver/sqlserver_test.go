@@ -21,8 +21,10 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
-const defaultPort = 1433
-const saPassword = "Root1234"
+const (
+	defaultPort = 1433
+	saPassword  = "Root1234"
+)
 
 var (
 	sqlEdgeOpts = dktest.Options{
@@ -59,6 +61,10 @@ func msConnectionStringMsiWithPassword(host, port string, useMsi bool) string {
 
 func msConnectionStringMsi(host, port string, useMsi bool) string {
 	return fmt.Sprintf("sqlserver://sa@%v:%v?database=master&useMsi=%t", host, port, useMsi)
+}
+
+func msConnectionStringWithOptions(host, port string, options ...string) string {
+	return fmt.Sprintf("sqlserver://sa:%v@%v:%v?%s", saPassword, host, port, strings.Join(options, "&"))
 }
 
 func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
@@ -336,6 +342,46 @@ func testMsiFalse(t *testing.T) {
 		_, err = p.Open(addr)
 		if err == nil {
 			t.Fatal("Open should fail since no password was passed and useMsi is false.")
+		}
+	})
+}
+
+func TestBatchedStatement(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.Port(defaultPort)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := msConnectionStringWithOptions(ip, port, "x-batch-enabled=true")
+		ms := &SQLServer{}
+		d, err := ms.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
+
+		batchedSQL := `CREATE VIEW v AS SELECT 1; 
+GO
+CREATE VIEW v2 AS SELECT 2;
+GO
+CREATE VIEW v3 AS SELECT 3;`
+
+		if err := d.Run(strings.NewReader(batchedSQL)); err != nil {
+			t.Fatalf("expected err to be nil, got %v", err)
+		}
+
+		// make sure second proc exists
+		var exists int
+		if err := d.(*SQLServer).conn.QueryRowContext(context.Background(), "Select COUNT(1) from sysobjects where type = 'V' and [NAME] = 'v2'").Scan(&exists); err != nil {
+			t.Fatal(err)
+		}
+		if exists != 1 {
+			t.Fatalf("expected proc uspB to exist")
 		}
 	})
 }

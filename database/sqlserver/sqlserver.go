@@ -16,6 +16,7 @@ import (
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/hashicorp/go-multierror"
 	mssql "github.com/microsoft/go-mssqldb" // mssql support
+	"github.com/microsoft/go-mssqldb/batch" // batch support
 )
 
 func init() {
@@ -45,6 +46,7 @@ type Config struct {
 	MigrationsTable string
 	DatabaseName    string
 	SchemaName      string
+	BatchEnabled    bool
 }
 
 // SQL Server connection
@@ -103,7 +105,6 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	}
 
 	conn, err := instance.Conn(context.Background())
-
 	if err != nil {
 		return nil, err
 	}
@@ -168,11 +169,19 @@ func (ss *SQLServer) Open(url string) (database.Driver, error) {
 
 	migrationsTable := purl.Query().Get("x-migrations-table")
 
+	batchEnabled := false
+	if bes := purl.Query().Get("x-batch-enabled"); len(bes) > 0 {
+		batchEnabled, err = strconv.ParseBool(bes)
+		if err != nil {
+			return nil, fmt.Errorf("Unacceptable value for option x-batch-enabled, unable to parse option : %w", err)
+		}
+	}
+
 	px, err := WithInstance(db, &Config{
 		DatabaseName:    purl.Path,
 		MigrationsTable: migrationsTable,
+		BatchEnabled:    batchEnabled,
 	})
-
 	if err != nil {
 		return nil, err
 	}
@@ -241,13 +250,23 @@ func (ss *SQLServer) Run(migration io.Reader) error {
 
 	// run migration
 	query := string(migr[:])
-	if _, err := ss.conn.ExecContext(context.Background(), query); err != nil {
-		if msErr, ok := err.(mssql.Error); ok {
-			message := fmt.Sprintf("migration failed: %s", msErr.Message)
-			if msErr.ProcName != "" {
-				message = fmt.Sprintf("%s (proc name %s)", msErr.Message, msErr.ProcName)
+
+	scripts := []string{query}
+
+	if ss.config.BatchEnabled {
+		scripts = batch.Split(query, "GO")
+	}
+
+	for _, script := range scripts {
+		if _, err := ss.conn.ExecContext(context.Background(), query); err != nil {
+			if msErr, ok := err.(mssql.Error); ok {
+				message := fmt.Sprintf("migration failed: %s", msErr.Message)
+				if msErr.ProcName != "" {
+					message = fmt.Sprintf("%s (proc name %s)", msErr.Message, msErr.ProcName)
+				}
+				return database.Error{OrigErr: err, Err: message, Query: []byte(script), Line: uint(msErr.LineNo)}
 			}
-			return database.Error{OrigErr: err, Err: message, Query: migr, Line: uint(msErr.LineNo)}
+			return database.Error{OrigErr: err, Err: "migration failed", Query: []byte(script)}
 		}
 		return database.Error{OrigErr: err, Err: "migration failed", Query: migr}
 	}
@@ -257,7 +276,6 @@ func (ss *SQLServer) Run(migration io.Reader) error {
 
 // SetVersion for the current database
 func (ss *SQLServer) SetVersion(version int, dirty bool) error {
-
 	tx, err := ss.conn.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
@@ -314,7 +332,6 @@ func (ss *SQLServer) Version() (version int, dirty bool, err error) {
 
 // Drop all tables from the database.
 func (ss *SQLServer) Drop() error {
-
 	// drop all referential integrity constraints
 	query := `
 	DECLARE @Sql NVARCHAR(500) DECLARE @Cursor CURSOR
