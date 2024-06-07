@@ -258,7 +258,7 @@ func (ss *SQLServer) Run(migration io.Reader) error {
 	}
 
 	for _, script := range scripts {
-		if _, err := ss.conn.ExecContext(context.Background(), query); err != nil {
+		if _, err := ss.conn.ExecContext(context.Background(), script); err != nil {
 			if msErr, ok := err.(mssql.Error); ok {
 				message := fmt.Sprintf("migration failed: %s", msErr.Message)
 				if msErr.ProcName != "" {
