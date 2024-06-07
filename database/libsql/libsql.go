@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 
 	_ "github.com/tursodatabase/libsql-client-go/libsql"
+	_ "modernc.org/sqlite"
 )
 
 func init() {
@@ -48,6 +49,11 @@ func (d *LibSQL) Open(url string) (database.Driver, error) {
 	}
 
 	dbfile := strings.Replace(migrate.FilterCustomQuery(purl).String(), "libsql://", "", 1)
+
+	if strings.HasPrefix(dbfile, "file://") {
+		return nil, fmt.Errorf("invalid URL: %s file:// is not supported", dbfile)
+	}
+
 	db, err := sql.Open("libsql", dbfile)
 	if err != nil {
 		return nil, err

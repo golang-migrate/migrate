@@ -7,7 +7,7 @@ To use with Turso, you can use the URL provided by Turso like this:
 The first `libsql://` is used by `migrate` to use the correct driver. The 2nd one is used by `libsql` internally to select either HTTP or HTTPS scheme (https://github.com/tursodatabase/libsql-client-go/blob/4ae0eb9d0898e03e96490c91c9a8c55d1167684d/libsql/sql.go#L109)
 
 You can also use any of these schemes as needed:
-`libsql://, file://, https://, http://, wss:// and ws://`
+`libsql://, https://, http://, wss:// and ws://`
 
 Unlike other migrate database drivers, the libsql driver will automatically wrap each migration in an implicit transaction by default. Migrations must not contain explicit `BEGIN` or `COMMIT` statements. This behavior may change in a future major release. (See below for a workaround.)
 
@@ -30,4 +30,4 @@ Refer to [upstream documentation](https://github.com/mattn/go-sqlite3/blob/maste
 
 ## Notes
 
-- Uses the `https://github.com/libsql/go-libsql` libsql db driver (cgo)
+- Uses the `github.com/tursodatabase/libsql-client-go/libsql` libsql db driver
