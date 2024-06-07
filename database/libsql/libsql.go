@@ -14,7 +14,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 
 	_ "github.com/tursodatabase/libsql-client-go/libsql"
-)gi
+)
 
 func init() {
 	database.Register("libsql", &LibSQL{})
