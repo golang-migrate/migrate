@@ -1,17 +1,45 @@
 package dktesting
 
 import (
+	"context"
+	"fmt"
 	"testing"
 )
 
 import (
 	"github.com/dhui/dktest"
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/client"
 )
 
 // ContainerSpec holds Docker testing setup specifications
 type ContainerSpec struct {
 	ImageName string
 	Options   dktest.Options
+}
+
+// Cleanup cleanups the ContainerSpec after a test run by removing the ContainerSpec's image
+func (s *ContainerSpec) Cleanup() (retErr error) {
+	// copied from dktest.RunContext()
+	dc, err := client.NewClientWithOpts(client.FromEnv, client.WithVersion("1.41"))
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err := dc.Close(); err != nil && retErr == nil {
+			retErr = fmt.Errorf("error closing Docker client: %w", err)
+		}
+	}()
+	cleanupTimeout := s.Options.CleanupTimeout
+	if cleanupTimeout <= 0 {
+		cleanupTimeout = dktest.DefaultCleanupTimeout
+	}
+	ctx, timeoutCancelFunc := context.WithTimeout(context.Background(), cleanupTimeout)
+	defer timeoutCancelFunc()
+	if _, err := dc.ImageRemove(ctx, s.ImageName, types.ImageRemoveOptions{Force: true, PruneChildren: true}); err != nil {
+		return err
+	}
+	return nil
 }
 
 // ParallelTest runs Docker tests in parallel

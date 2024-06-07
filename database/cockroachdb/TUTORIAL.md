@@ -15,7 +15,7 @@ CREATE USER IF NOT EXISTS cockroach;
 GRANT ALL ON DATABASE example TO cockroach;
 ```
 
-When using Migrate CLI we need to pass to database URL. Let's export it to a variable for convienience:
+When using Migrate CLI we need to pass to database URL. Let's export it to a variable for convenience:
 ```
 export COCKROACHDB_URL='cockroachdb://cockroach:@localhost:26257/example?sslmode=disable'
 ```

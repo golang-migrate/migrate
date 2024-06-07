@@ -10,8 +10,8 @@ require (
 	github.com/aws/aws-sdk-go v1.49.6
 	github.com/cenkalti/backoff/v4 v4.1.2
 	github.com/cockroachdb/cockroach-go/v2 v2.1.1
-	github.com/dhui/dktest v0.4.0
-	github.com/docker/docker v24.0.7+incompatible
+	github.com/dhui/dktest v0.4.1
+	github.com/docker/docker v24.0.9+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/fsouza/fake-gcs-server v1.17.0
 	github.com/go-sql-driver/mysql v1.5.0
@@ -19,10 +19,10 @@ require (
 	github.com/gocql/gocql v0.0.0-20210515062232-b7ef815b4556
 	github.com/google/go-github/v39 v39.2.0
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/jackc/pgconn v1.14.0
+	github.com/jackc/pgconn v1.14.3
 	github.com/jackc/pgerrcode v0.0.0-20220416144525-469b46aa5efa
-	github.com/jackc/pgx/v4 v4.18.1
-	github.com/jackc/pgx/v5 v5.3.1
+	github.com/jackc/pgx/v4 v4.18.2
+	github.com/jackc/pgx/v5 v5.5.4
 	github.com/ktrysmt/go-bitbucket v0.6.4
 	github.com/lib/pq v1.10.9
 	github.com/markbates/pkger v0.15.1
@@ -43,6 +43,8 @@ require (
 	modernc.org/ql v1.0.0
 	modernc.org/sqlite v1.18.1
 )
+
+require github.com/jackc/puddle/v2 v2.2.1 // indirect
 
 require (
 	github.com/antlr4-go/antlr/v4 v4.13.0 // indirect
@@ -123,7 +125,7 @@ require (
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
 	github.com/jackc/pgio v1.0.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
-	github.com/jackc/pgproto3/v2 v2.3.2 // indirect
+	github.com/jackc/pgproto3/v2 v2.3.3 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a // indirect
 	github.com/jackc/pgtype v1.14.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
@@ -175,7 +177,7 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20231016165738-49dd2c1f3d0b // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20231030173426-d783a09b4405 // indirect
 	google.golang.org/grpc v1.59.0 // indirect
-	google.golang.org/protobuf v1.31.0 // indirect
+	google.golang.org/protobuf v1.33.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/uint128 v1.2.0 // indirect
