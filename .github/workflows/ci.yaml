@@ -97,6 +97,9 @@ jobs:
       - run: package_cloud push golang-migrate/migrate/ubuntu/jammy dist/migrate.linux-amd64.deb
         env:
           PACKAGECLOUD_TOKEN: ${{ secrets.PACKAGECLOUD_TOKEN }}
+      - run: package_cloud push golang-migrate/migrate/ubuntu/mantic dist/migrate.linux-amd64.deb
+        env:
+          PACKAGECLOUD_TOKEN: ${{ secrets.PACKAGECLOUD_TOKEN }}
       - run: package_cloud push golang-migrate/migrate/debian/buster dist/migrate.linux-amd64.deb
         env:
           PACKAGECLOUD_TOKEN: ${{ secrets.PACKAGECLOUD_TOKEN }}
