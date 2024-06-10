@@ -1,0 +1,11 @@
+[default]
+locale = "en-us"
+
+[default.extend-words]
+FROMM ="FROMM" # this one is intentionally written with a typo
+unmarshaling ="unmarshaling" # this one is expected in golang
+
+[files]
+# excluded file
+# go.sum and go.mod contains URLs with hash, they can provide false positive
+extend-exclude = ["go.sum","go.mod"]
