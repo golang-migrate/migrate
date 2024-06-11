@@ -34,6 +34,7 @@ require (
 	github.com/snowflakedb/gosnowflake v1.6.19
 	github.com/stretchr/testify v1.8.3
 	github.com/xanzy/go-gitlab v0.15.0
+	github.com/ydb-platform/ydb-go-sdk/v3 v3.68.1
 	go.mongodb.org/mongo-driver v1.7.5
 	go.uber.org/atomic v1.7.0
 	golang.org/x/oauth2 v0.14.0
@@ -43,7 +44,11 @@ require (
 	modernc.org/sqlite v1.18.1
 )
 
-require github.com/jackc/puddle/v2 v2.2.1 // indirect
+require (
+	github.com/jackc/puddle/v2 v2.2.1 // indirect
+	github.com/jonboulle/clockwork v0.3.0 // indirect
+	github.com/ydb-platform/ydb-go-genproto v0.0.0-20240316140903-4a47abca1cca // indirect
+)
 
 require (
 	cloud.google.com/go v0.110.10 // indirect

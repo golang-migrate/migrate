@@ -1,0 +1,3 @@
+ALTER TABLE row_table DROP INDEX idx_c;
+
+ALTER TABLE row_table DROP COLUMN is_deleted;
