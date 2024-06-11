@@ -7,6 +7,7 @@ import (
 	"go.uber.org/atomic"
 
 	"github.com/golang-migrate/migrate/v4/database"
+	"github.com/golang-migrate/migrate/v4/source"
 )
 
 func init() {
@@ -94,4 +95,8 @@ func (s *Stub) Drop() error {
 
 func (s *Stub) EqualSequence(seq []string) bool {
 	return reflect.DeepEqual(seq, s.MigrationSequence)
+}
+
+func (s *Stub) Exec(e source.Executor) error {
+	return e.Execute(s.Instance)
 }
