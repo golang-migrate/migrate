@@ -68,6 +68,7 @@ func Main(version string) {
 	pathPtr := flag.String("path", "", "")
 	databasePtr := flag.String("database", "", "")
 	sourcePtr := flag.String("source", "", "")
+	noVersionExistCheck := flag.Bool("no-version-exist-checks", false, "")
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr,
@@ -75,14 +76,15 @@ func Main(version string) {
        migrate [ -version | -help ]
 
 Options:
-  -source          Location of the migrations (driver://url)
-  -path            Shorthand for -source=file://path
-  -database        Run migrations against this database (driver://url)
-  -prefetch N      Number of migrations to load in advance before executing (default 10)
-  -lock-timeout N  Allow N seconds to acquire database lock (default 15)
-  -verbose         Print verbose logging
-  -version         Print version
-  -help            Print usage
+  -source                   Location of the migrations (driver://url)
+  -path                     Shorthand for -source=file://path
+  -database                 Run migrations against this database (driver://url)
+  -prefetch N               Number of migrations to load in advance before executing (default 10)
+  -lock-timeout N           Allow N seconds to acquire database lock (default 15) 
+  -no-version-exist-checks  Don't check if the current version exists in the migration source 
+  -verbose                  Print verbose logging
+  -version                  Print version
+  -help                     Print usage
 
 Commands:
   %s
@@ -134,6 +136,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 		migrater.Log = log
 		migrater.PrefetchMigrations = *prefetchPtr
 		migrater.LockTimeout = time.Duration(int64(*lockTimeoutPtr)) * time.Second
+		migrater.NoVersionExistChecking = *noVersionExistCheck
 
 		// handle Ctrl+c
 		signals := make(chan os.Signal, 1)
