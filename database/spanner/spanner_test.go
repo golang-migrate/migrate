@@ -3,9 +3,11 @@ package spanner
 import (
 	"fmt"
 	"os"
+	"path"
 	"testing"
 
 	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database"
 
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
@@ -46,22 +48,86 @@ func Test(t *testing.T) {
 }
 
 func TestMigrate(t *testing.T) {
-	withSpannerEmulator(t, func(t *testing.T) {
-		s := &Spanner{}
-		uri := fmt.Sprintf("spanner://%s", db)
-		d, err := s.Open(uri)
-		if err != nil {
-			t.Fatal(err)
-		}
-		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", uri, d)
-		if err != nil {
-			t.Fatal(err)
-		}
-		dt.TestMigrate(t, m)
-	})
+	testCases := []struct {
+		name          string
+		dsnParameters string
+	}{
+		{
+			name: "clean statements disabled",
+		},
+		{
+			name:          "clean statements enabled",
+			dsnParameters: "x-clean-statements=true",
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			withSpannerEmulator(t, func(t *testing.T) {
+				s := &Spanner{}
+				uri := fmt.Sprintf("spanner://%s?%s", db, tc.dsnParameters)
+
+				d, err := s.Open(uri)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", uri, d)
+				if err != nil {
+					t.Fatal(err)
+				}
+				dt.TestMigrate(t, m)
+			})
+		})
+	}
 }
 
-func TestCleanStatements(t *testing.T) {
+func TestMigrateErrors(t *testing.T) {
+	testCases := []struct {
+		name          string
+		dsnParameters string
+		sql           string
+		err           error
+	}{
+		{
+			name: "impossible deletion",
+			sql:  "DELETE FROM Singers WHERE FirstName = 'Alice'",
+			err:  new(database.Error),
+		},
+		{
+			name: "invalid options",
+			sql:  "ALTER DATABASE `db` SET OPTIONS(foo=bar)",
+			err:  new(database.Error),
+		},
+		{
+			name:          "invalid DDL syntax",
+			dsnParameters: "x-clean-statements=true",
+			sql:           "This is not a DDL",
+			err:           new(database.Error),
+		},
+	}
+	for i, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			withSpannerEmulator(t, func(t *testing.T) {
+				s := &Spanner{}
+				uri := fmt.Sprintf("spanner://%s?%s", db, tc.dsnParameters)
+
+				d, err := s.Open(uri)
+				require.NoError(t, err)
+
+				sourceDir := t.TempDir()
+				require.NoError(t, os.WriteFile(path.Join(sourceDir, fmt.Sprintf("%d_%s.up.sql", i, tc.name)), []byte(tc.sql), 06444))
+
+				m, err := migrate.NewWithDatabaseInstance(fmt.Sprintf("file://%s", sourceDir), uri, d)
+				require.NoError(t, err)
+
+				err = m.Up()
+				require.ErrorAs(t, err, &tc.err)
+			})
+		})
+	}
+}
+
+func TestCleanDDLStatements(t *testing.T) {
 	testCases := []struct {
 		name           string
 		multiStatement string
@@ -163,9 +229,102 @@ func TestCleanStatements(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			stmts, err := cleanStatements([]byte(tc.multiStatement))
-			require.NoError(t, err, "Error cleaning statements")
+			stmts, err := cleanDDLStatements([]byte(tc.multiStatement))
+			require.NoError(t, err, "Error cleaning DDL statements")
 			assert.Equal(t, tc.expected, stmts)
 		})
 	}
+}
+
+func TestCleanDMLStatements(t *testing.T) {
+	const (
+		insertStmt       = `INSERT Singers (SingerId, FirstName, LastName) VALUES (1, 'Marc', 'Richards')`
+		insertParsedStmt = `INSERT INTO Singers (SingerId, FirstName, LastName) VALUES (1, "Marc", "Richards")`
+		updateStmt       = `UPDATE Singers SET FirstName = "Marcel" WHERE SingerId = 1`
+	)
+
+	testCases := []struct {
+		name           string
+		multiStatement string
+		expected       []string
+	}{
+		{
+			name:           "no statement",
+			multiStatement: "",
+			expected:       []string{},
+		},
+		{
+			name:           "single statement, single line, no semicolon, no comment",
+			multiStatement: updateStmt,
+			expected:       []string{updateStmt},
+		},
+		{
+			name: "single statement, multi line, no semicolon, no comment",
+			multiStatement: `UPDATE Singers
+			SET FirstName = "Marcel"
+			WHERE SingerId = 1
+			`,
+			expected: []string{updateStmt},
+		},
+		{
+			name:           "single statement, single line, with semicolon, no comment",
+			multiStatement: updateStmt + ";",
+			expected:       []string{updateStmt},
+		},
+		{
+			name: "single statement, multi line, with semicolon, no comment",
+			multiStatement: `UPDATE Singers
+			SET FirstName = "Marcel"
+			WHERE SingerId = 1
+			;`,
+			expected: []string{updateStmt},
+		},
+		{
+			name:           "multi statement, with trailing semicolon. no comment",
+			multiStatement: insertStmt + ";" + updateStmt + ";",
+			expected:       []string{insertParsedStmt, updateStmt},
+		},
+		{
+			name: "multi statement, no trailing semicolon, no comment",
+			// From https://github.com/mattes/migrate/pull/281
+			multiStatement: insertStmt + ";" + updateStmt,
+			expected:       []string{insertParsedStmt, updateStmt},
+		},
+		{
+			name: "multi statement, no trailing semicolon, standalone comment",
+			// From https://github.com/mattes/migrate/pull/281
+			multiStatement: `UPDATE Singers
+			-- standalone comment
+			SET FirstName = "Marcel"
+			WHERE SingerId = 1;` + insertStmt,
+			expected: []string{updateStmt, insertParsedStmt},
+		},
+		{
+			name: "multi statement, no trailing semicolon, inline comment",
+			multiStatement: `UPDATE Singers -- inline comment
+			SET FirstName = "Marcel"
+			WHERE SingerId = 1;` + insertStmt,
+			expected: []string{updateStmt, insertParsedStmt},
+		},
+		{
+			name:           "delete statement",
+			multiStatement: "DELETE FROM Singers WHERE FirstName = 'Alice'",
+			expected:       []string{`DELETE FROM Singers WHERE FirstName = "Alice"`},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			stmts, err := cleanDMLStatements([]byte(tc.multiStatement))
+			require.NoError(t, err, "Error cleaning DML statements")
+			assert.Equal(t, tc.expected, stmts)
+		})
+	}
+}
+
+func TestCleanDMLStatementsError(t *testing.T) {
+	stmts, err := cleanDMLStatements([]byte("ALTER DATABASE `db` SET OPTIONS(enable_key_visualizer=true)"))
+	assert.ErrorAs(t, err, new(*dmlCleanError))
+	assert.Equal(t, err.Error(), "Fail to clean DML migration statements, error: :1.0: unknown DML statement")
+	assert.Empty(t, stmts)
 }
