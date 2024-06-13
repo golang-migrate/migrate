@@ -56,6 +56,9 @@ type Config struct {
 	// Parsing outputs clean DDL statements such as reformatted
 	// and void of comments.
 	CleanStatements bool
+	// DoNotCloseSpannerClients turns Close() into a no-op so the
+	// provided spanner clients are not closed
+	DoNotCloseSpannerClients bool
 }
 
 // Spanner implements database.Driver for Google Cloud Spanner
@@ -146,6 +149,9 @@ func (s *Spanner) Open(url string) (database.Driver, error) {
 
 // Close implements database.Driver
 func (s *Spanner) Close() error {
+	if s.config.DoNotCloseSpannerClients {
+		return nil
+	}
 	s.db.data.Close()
 	return s.db.admin.Close()
 }
