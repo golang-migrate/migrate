@@ -1,0 +1,2 @@
+ALTER TABLE pets DROP COLUMN predator;
+DROP TABLE IF EXISTS pets_with_fk;
