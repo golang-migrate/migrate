@@ -1,6 +1,7 @@
 package url
 
 import (
+	"errors"
 	"testing"
 )
 
@@ -37,7 +38,7 @@ func TestSchemeFromUrl(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			s, err := SchemeFromURL(tc.urlStr)
-			if err != tc.expectErr {
+			if !errors.Is(err, tc.expectErr) {
 				t.Fatalf("expected %q, but received %q", tc.expectErr, err)
 			}
 			if s != tc.expected {
