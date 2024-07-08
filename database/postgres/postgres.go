@@ -277,7 +277,7 @@ func (p *Postgres) Lock() error {
 				return nil
 			}
 
-			return fmt.Errorf("could not acquire lock")
+			return fmt.Errorf("could not acquire lock") // causes retry
 		}, backOff)
 
 		return err
