@@ -226,7 +226,7 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 		if err != nil {
 			return nil, fmt.Errorf("unable to parse option x-lock-retry-max-interval: %w", err)
 		}
-		maxRetryInterval := time.Duration(maxRetryIntervalMillis)
+		maxRetryInterval := time.Duration(maxRetryIntervalMillis) * time.Millisecond
 		if maxRetryInterval > DefaultLockInitialRetryInterval {
 			lockConfig.MaxRetryInterval = maxRetryInterval
 		}
