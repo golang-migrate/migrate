@@ -47,7 +47,7 @@ func (e ErrorVersionNotFound) Error() string {
 	return fmt.Sprintf("no migration found for version %d: %s", e.Version, e.Err.Error())
 }
 
-// We need to keep the original error when unwrapping for compatibility in case someone if validating the error type
+// We need to keep the original error when unwrapping for compatibility in case someone is validating the error type
 func (e ErrorVersionNotFound) Unwrap() error {
 	return e.Err
 }
