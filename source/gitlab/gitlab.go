@@ -52,27 +52,30 @@ func (g *Gitlab) Open(url string) (source.Driver, error) {
 		return nil, ErrNoUserInfo
 	}
 
-	password, ok := u.User.Password()
+	accessToken, ok := u.User.Password()
 	if !ok {
 		return nil, ErrNoAccessToken
 	}
 
-	gn := &Gitlab{
-		client:     gitlab.NewClient(nil, password),
-		url:        url,
-		migrations: source.NewMigrations(),
+	if u.Host == "" {
+		return nil, ErrInvalidHost
 	}
 
-	if u.Host != "" {
-		uri := nurl.URL{
-			Scheme: "https",
-			Host:   u.Host,
-		}
+	uri := nurl.URL{
+		Scheme: "https",
+		Host:   u.Host,
+	}
 
-		err = gn.client.SetBaseURL(uri.String())
-		if err != nil {
-			return nil, ErrInvalidHost
-		}
+	gitlabClient, err := gitlab.NewClient(accessToken, gitlab.WithBaseURL(uri.String()))
+
+	if err != nil {
+		return nil, ErrInvalidHost
+	}
+
+	gn := &Gitlab{
+		client:     gitlabClient,
+		url:        url,
+		migrations: source.NewMigrations(),
 	}
 
 	pe := strings.Split(strings.Trim(u.Path, "/"), "/")
