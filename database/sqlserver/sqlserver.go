@@ -263,7 +263,7 @@ func (ss *SQLServer) SetVersion(version int, dirty bool) error {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
 	}
 
-	query := `TRUNCATE TABLE "` + ss.config.MigrationsTable + `"`
+	query := `TRUNCATE TABLE ` + ss.getMigrationTable()
 	if _, err := tx.Exec(query); err != nil {
 		if errRollback := tx.Rollback(); errRollback != nil {
 			err = multierror.Append(err, errRollback)
@@ -279,7 +279,7 @@ func (ss *SQLServer) SetVersion(version int, dirty bool) error {
 		if dirty {
 			dirtyBit = 1
 		}
-		query = `INSERT INTO "` + ss.config.MigrationsTable + `" (version, dirty) VALUES (@p1, @p2)`
+		query = `INSERT INTO ` + ss.getMigrationTable() + ` (version, dirty) VALUES (@p1, @p2)`
 		if _, err := tx.Exec(query, version, dirtyBit); err != nil {
 			if errRollback := tx.Rollback(); errRollback != nil {
 				err = multierror.Append(err, errRollback)
@@ -297,7 +297,7 @@ func (ss *SQLServer) SetVersion(version int, dirty bool) error {
 
 // Version of the current database state
 func (ss *SQLServer) Version() (version int, dirty bool, err error) {
-	query := `SELECT TOP 1 version, dirty FROM "` + ss.config.MigrationsTable + `"`
+	query := `SELECT TOP 1 version, dirty FROM ` + ss.getMigrationTable()
 	err = ss.conn.QueryRowContext(context.Background(), query).Scan(&version, &dirty)
 	switch {
 	case err == sql.ErrNoRows:
@@ -365,16 +365,20 @@ func (ss *SQLServer) ensureVersionTable() (err error) {
 	query := `IF NOT EXISTS
 	(SELECT *
 		 FROM sysobjects
-		WHERE id = object_id(N'[dbo].[` + ss.config.MigrationsTable + `]')
+		WHERE id = object_id(N'` + ss.getMigrationTable() + `')
 			AND OBJECTPROPERTY(id, N'IsUserTable') = 1
 	)
-	CREATE TABLE ` + ss.config.MigrationsTable + ` ( version BIGINT PRIMARY KEY NOT NULL, dirty BIT NOT NULL );`
+	CREATE TABLE ` + ss.getMigrationTable() + ` ( version BIGINT PRIMARY KEY NOT NULL, dirty BIT NOT NULL );`
 
 	if _, err = ss.conn.ExecContext(context.Background(), query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 
 	return nil
+}
+
+func (ss *SQLServer) getMigrationTable() string {
+	return fmt.Sprintf("[%s].[%s]", ss.config.SchemaName, ss.config.MigrationsTable)
 }
 
 func getMSITokenProvider(resource string) (func() (string, error), error) {
