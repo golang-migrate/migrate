@@ -198,10 +198,10 @@ func (ss *SQLServer) Lock() error {
 			return err
 		}
 
-		// This will either obtain the lock immediately and return true,
-		// or return false if the lock cannot be acquired immediately.
+		// This will either obtain the lock within 10 seconds and return true,
+		// or return false if the lock cannot be acquired within 10 seconds.
 		// MS Docs: sp_getapplock: https://docs.microsoft.com/en-us/sql/relational-databases/system-stored-procedures/sp-getapplock-transact-sql?view=sql-server-2017
-		query := `EXEC sp_getapplock @Resource = @p1, @LockMode = 'Update', @LockOwner = 'Session', @LockTimeout = 0`
+		query := `EXEC sp_getapplock @Resource = @p1, @LockMode = 'Update', @LockOwner = 'Session', @LockTimeout = 10000`
 
 		var status mssql.ReturnStatus
 		if _, err = ss.conn.ExecContext(context.Background(), query, aid, &status); err == nil && status > -1 {
