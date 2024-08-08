@@ -90,7 +90,7 @@ func WithConnection(ctx context.Context, conn *sql.Conn, config *Config) (*Mysql
 		config.MigrationsTable = DefaultMigrationsTable
 	}
 
-	if err := mx.ensureVersionTable(); err != nil {
+	if err := mx.ensureVersionTable(ctx); err != nil {
 		return nil, err
 	}
 
@@ -98,9 +98,7 @@ func WithConnection(ctx context.Context, conn *sql.Conn, config *Config) (*Mysql
 }
 
 // instance must have `multiStatements` set to true
-func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
-	ctx := context.Background()
-
+func WithInstance(ctx context.Context, instance *sql.DB, config *Config) (database.Driver, error) {
 	if err := instance.Ping(); err != nil {
 		return nil, err
 	}
@@ -225,7 +223,7 @@ func urlToMySQLConfig(url string) (*mysql.Config, error) {
 	return config, nil
 }
 
-func (m *Mysql) Open(url string) (database.Driver, error) {
+func (m *Mysql) Open(ctx context.Context, url string) (database.Driver, error) {
 	config, err := urlToMySQLConfig(url)
 	if err != nil {
 		return nil, err
@@ -258,7 +256,7 @@ func (m *Mysql) Open(url string) (database.Driver, error) {
 		return nil, err
 	}
 
-	mx, err := WithInstance(db, &Config{
+	mx, err := WithInstance(ctx, db, &Config{
 		DatabaseName:     config.DBName,
 		MigrationsTable:  customParams["x-migrations-table"],
 		NoLock:           noLock,
@@ -271,7 +269,7 @@ func (m *Mysql) Open(url string) (database.Driver, error) {
 	return mx, nil
 }
 
-func (m *Mysql) Close() error {
+func (m *Mysql) Close(ctx context.Context) error {
 	connErr := m.conn.Close()
 	var dbErr error
 	if m.db != nil {
@@ -284,7 +282,7 @@ func (m *Mysql) Close() error {
 	return nil
 }
 
-func (m *Mysql) Lock() error {
+func (m *Mysql) Lock(ctx context.Context) error {
 	return database.CasRestoreOnErr(&m.isLocked, false, true, database.ErrLocked, func() error {
 		if m.config.NoLock {
 			return nil
@@ -297,7 +295,7 @@ func (m *Mysql) Lock() error {
 
 		query := "SELECT GET_LOCK(?, 10)"
 		var success bool
-		if err := m.conn.QueryRowContext(context.Background(), query, aid).Scan(&success); err != nil {
+		if err := m.conn.QueryRowContext(ctx, query, aid).Scan(&success); err != nil {
 			return &database.Error{OrigErr: err, Err: "try lock failed", Query: []byte(query)}
 		}
 
@@ -309,7 +307,7 @@ func (m *Mysql) Lock() error {
 	})
 }
 
-func (m *Mysql) Unlock() error {
+func (m *Mysql) Unlock(ctx context.Context) error {
 	return database.CasRestoreOnErr(&m.isLocked, true, false, database.ErrNotLocked, func() error {
 		if m.config.NoLock {
 			return nil
@@ -322,7 +320,7 @@ func (m *Mysql) Unlock() error {
 		}
 
 		query := `SELECT RELEASE_LOCK(?)`
-		if _, err := m.conn.ExecContext(context.Background(), query, aid); err != nil {
+		if _, err := m.conn.ExecContext(ctx, query, aid); err != nil {
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
 
@@ -334,13 +332,12 @@ func (m *Mysql) Unlock() error {
 	})
 }
 
-func (m *Mysql) Run(migration io.Reader) error {
+func (m *Mysql) Run(ctx context.Context, migration io.Reader) error {
 	migr, err := io.ReadAll(migration)
 	if err != nil {
 		return err
 	}
 
-	ctx := context.Background()
 	if m.config.StatementTimeout != 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, m.config.StatementTimeout)
@@ -355,14 +352,14 @@ func (m *Mysql) Run(migration io.Reader) error {
 	return nil
 }
 
-func (m *Mysql) SetVersion(version int, dirty bool) error {
-	tx, err := m.conn.BeginTx(context.Background(), &sql.TxOptions{Isolation: sql.LevelSerializable})
+func (m *Mysql) SetVersion(ctx context.Context, version int, dirty bool) error {
+	tx, err := m.conn.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
 	if err != nil {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
 	}
 
 	query := "DELETE FROM `" + m.config.MigrationsTable + "` LIMIT 1"
-	if _, err := tx.ExecContext(context.Background(), query); err != nil {
+	if _, err := tx.ExecContext(ctx, query); err != nil {
 		if errRollback := tx.Rollback(); errRollback != nil {
 			err = multierror.Append(err, errRollback)
 		}
@@ -374,7 +371,7 @@ func (m *Mysql) SetVersion(version int, dirty bool) error {
 	// See: https://github.com/golang-migrate/migrate/issues/330
 	if version >= 0 || (version == database.NilVersion && dirty) {
 		query := "INSERT INTO `" + m.config.MigrationsTable + "` (version, dirty) VALUES (?, ?)"
-		if _, err := tx.ExecContext(context.Background(), query, version, dirty); err != nil {
+		if _, err := tx.ExecContext(ctx, query, version, dirty); err != nil {
 			if errRollback := tx.Rollback(); errRollback != nil {
 				err = multierror.Append(err, errRollback)
 			}
@@ -389,9 +386,9 @@ func (m *Mysql) SetVersion(version int, dirty bool) error {
 	return nil
 }
 
-func (m *Mysql) Version() (version int, dirty bool, err error) {
+func (m *Mysql) Version(ctx context.Context) (version int, dirty bool, err error) {
 	query := "SELECT version, dirty FROM `" + m.config.MigrationsTable + "` LIMIT 1"
-	err = m.conn.QueryRowContext(context.Background(), query).Scan(&version, &dirty)
+	err = m.conn.QueryRowContext(ctx, query).Scan(&version, &dirty)
 	switch {
 	case err == sql.ErrNoRows:
 		return database.NilVersion, false, nil
@@ -409,10 +406,10 @@ func (m *Mysql) Version() (version int, dirty bool, err error) {
 	}
 }
 
-func (m *Mysql) Drop() (err error) {
+func (m *Mysql) Drop(ctx context.Context) (err error) {
 	// select all tables
 	query := `SHOW TABLES LIKE '%'`
-	tables, err := m.conn.QueryContext(context.Background(), query)
+	tables, err := m.conn.QueryContext(ctx, query)
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
@@ -440,19 +437,19 @@ func (m *Mysql) Drop() (err error) {
 	if len(tableNames) > 0 {
 		// disable checking foreign key constraints until finished
 		query = `SET foreign_key_checks = 0`
-		if _, err := m.conn.ExecContext(context.Background(), query); err != nil {
+		if _, err := m.conn.ExecContext(ctx, query); err != nil {
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
 
 		defer func() {
 			// enable foreign key checks
-			_, _ = m.conn.ExecContext(context.Background(), `SET foreign_key_checks = 1`)
+			_, _ = m.conn.ExecContext(ctx, `SET foreign_key_checks = 1`)
 		}()
 
 		// delete one by one ...
 		for _, t := range tableNames {
 			query = "DROP TABLE IF EXISTS `" + t + "`"
-			if _, err := m.conn.ExecContext(context.Background(), query); err != nil {
+			if _, err := m.conn.ExecContext(ctx, query); err != nil {
 				return &database.Error{OrigErr: err, Query: []byte(query)}
 			}
 		}
@@ -464,13 +461,13 @@ func (m *Mysql) Drop() (err error) {
 // ensureVersionTable checks if versions table exists and, if not, creates it.
 // Note that this function locks the database, which deviates from the usual
 // convention of "caller locks" in the Mysql type.
-func (m *Mysql) ensureVersionTable() (err error) {
-	if err = m.Lock(); err != nil {
+func (m *Mysql) ensureVersionTable(ctx context.Context) (err error) {
+	if err = m.Lock(ctx); err != nil {
 		return err
 	}
 
 	defer func() {
-		if e := m.Unlock(); e != nil {
+		if e := m.Unlock(ctx); e != nil {
 			if err == nil {
 				err = e
 			} else {
@@ -482,7 +479,7 @@ func (m *Mysql) ensureVersionTable() (err error) {
 	// check if migration table exists
 	var result string
 	query := `SHOW TABLES LIKE '` + m.config.MigrationsTable + `'`
-	if err := m.conn.QueryRowContext(context.Background(), query).Scan(&result); err != nil {
+	if err := m.conn.QueryRowContext(ctx, query).Scan(&result); err != nil {
 		if err != sql.ErrNoRows {
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
@@ -492,7 +489,7 @@ func (m *Mysql) ensureVersionTable() (err error) {
 
 	// if not, create the empty migration table
 	query = "CREATE TABLE `" + m.config.MigrationsTable + "` (version bigint not null primary key, dirty boolean not null)"
-	if _, err := m.conn.ExecContext(context.Background(), query); err != nil {
+	if _, err := m.conn.ExecContext(ctx, query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 	return nil

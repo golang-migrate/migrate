@@ -1,6 +1,7 @@
 package stub
 
 import (
+	"context"
 	"testing"
 
 	"github.com/golang-migrate/migrate/v4/source"
@@ -9,7 +10,7 @@ import (
 
 func Test(t *testing.T) {
 	s := &Stub{}
-	d, err := s.Open("")
+	d, err := s.Open(context.Background(), "")
 	if err != nil {
 		t.Fatal(err)
 	}

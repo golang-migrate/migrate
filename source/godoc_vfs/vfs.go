@@ -7,6 +7,7 @@
 package godoc_vfs
 
 import (
+	"context"
 	"github.com/golang-migrate/migrate/v4/source"
 	"github.com/golang-migrate/migrate/v4/source/httpfs"
 
@@ -30,7 +31,7 @@ type VFS struct {
 //
 // Calling this function panics, instead use the WithInstance function.
 // See the package level documentation for an example.
-func (b *VFS) Open(url string) (source.Driver, error) {
+func (b *VFS) Open(ctx context.Context, url string) (source.Driver, error) {
 	panic("not implemented")
 }
 
@@ -38,7 +39,7 @@ func (b *VFS) Open(url string) (source.Driver, error) {
 // If a tree named searchPath exists in the virtual filesystem, WithInstance
 // searches for migration files there.
 // It defaults to "/".
-func WithInstance(fs vfs.FileSystem, searchPath string) (source.Driver, error) {
+func WithInstance(ctx context.Context, fs vfs.FileSystem, searchPath string) (source.Driver, error) {
 	if searchPath == "" {
 		searchPath = "/"
 	}

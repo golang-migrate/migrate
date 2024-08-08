@@ -44,7 +44,7 @@ type Firebird struct {
 	config *Config
 }
 
-func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
+func WithInstance(ctx context.Context, instance *sql.DB, config *Config) (database.Driver, error) {
 	if config == nil {
 		return nil, ErrNilConfig
 	}
@@ -57,7 +57,7 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		config.MigrationsTable = DefaultMigrationsTable
 	}
 
-	conn, err := instance.Conn(context.Background())
+	conn, err := instance.Conn(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -68,14 +68,14 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		config: config,
 	}
 
-	if err := fb.ensureVersionTable(); err != nil {
+	if err := fb.ensureVersionTable(ctx); err != nil {
 		return nil, err
 	}
 
 	return fb, nil
 }
 
-func (f *Firebird) Open(dsn string) (database.Driver, error) {
+func (f *Firebird) Open(ctx context.Context, dsn string) (database.Driver, error) {
 	purl, err := nurl.Parse(dsn)
 	if err != nil {
 		return nil, err
@@ -86,7 +86,7 @@ func (f *Firebird) Open(dsn string) (database.Driver, error) {
 		return nil, err
 	}
 
-	px, err := WithInstance(db, &Config{
+	px, err := WithInstance(ctx, db, &Config{
 		MigrationsTable: purl.Query().Get("x-migrations-table"),
 		DatabaseName:    purl.Path,
 	})
@@ -98,7 +98,7 @@ func (f *Firebird) Open(dsn string) (database.Driver, error) {
 	return px, nil
 }
 
-func (f *Firebird) Close() error {
+func (f *Firebird) Close(ctx context.Context) error {
 	connErr := f.conn.Close()
 	dbErr := f.db.Close()
 	if connErr != nil || dbErr != nil {
@@ -107,21 +107,21 @@ func (f *Firebird) Close() error {
 	return nil
 }
 
-func (f *Firebird) Lock() error {
+func (f *Firebird) Lock(ctx context.Context) error {
 	if !f.isLocked.CAS(false, true) {
 		return database.ErrLocked
 	}
 	return nil
 }
 
-func (f *Firebird) Unlock() error {
+func (f *Firebird) Unlock(ctx context.Context) error {
 	if !f.isLocked.CAS(true, false) {
 		return database.ErrNotLocked
 	}
 	return nil
 }
 
-func (f *Firebird) Run(migration io.Reader) error {
+func (f *Firebird) Run(ctx context.Context, migration io.Reader) error {
 	migr, err := io.ReadAll(migration)
 	if err != nil {
 		return err
@@ -129,14 +129,14 @@ func (f *Firebird) Run(migration io.Reader) error {
 
 	// run migration
 	query := string(migr[:])
-	if _, err := f.conn.ExecContext(context.Background(), query); err != nil {
+	if _, err := f.conn.ExecContext(ctx, query); err != nil {
 		return database.Error{OrigErr: err, Err: "migration failed", Query: migr}
 	}
 
 	return nil
 }
 
-func (f *Firebird) SetVersion(version int, dirty bool) error {
+func (f *Firebird) SetVersion(ctx context.Context, version int, dirty bool) error {
 	// Always re-write the schema version to prevent empty schema version
 	// for failed down migration on the first migration
 	// See: https://github.com/golang-migrate/migrate/issues/330
@@ -150,17 +150,17 @@ func (f *Firebird) SetVersion(version int, dirty bool) error {
 				END;`,
 		f.config.MigrationsTable, f.config.MigrationsTable, version, btoi(dirty))
 
-	if _, err := f.conn.ExecContext(context.Background(), query); err != nil {
+	if _, err := f.conn.ExecContext(ctx, query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 
 	return nil
 }
 
-func (f *Firebird) Version() (version int, dirty bool, err error) {
+func (f *Firebird) Version(ctx context.Context) (version int, dirty bool, err error) {
 	var d int
 	query := fmt.Sprintf(`SELECT FIRST 1 version, dirty FROM "%v"`, f.config.MigrationsTable)
-	err = f.conn.QueryRowContext(context.Background(), query).Scan(&version, &d)
+	err = f.conn.QueryRowContext(ctx, query).Scan(&version, &d)
 	switch {
 	case err == sql.ErrNoRows:
 		return database.NilVersion, false, nil
@@ -172,10 +172,10 @@ func (f *Firebird) Version() (version int, dirty bool, err error) {
 	}
 }
 
-func (f *Firebird) Drop() (err error) {
+func (f *Firebird) Drop(ctx context.Context) (err error) {
 	// select all tables
 	query := `SELECT rdb$relation_name FROM rdb$relations WHERE rdb$view_blr IS NULL AND (rdb$system_flag IS NULL OR rdb$system_flag = 0);`
-	tables, err := f.conn.QueryContext(context.Background(), query)
+	tables, err := f.conn.QueryContext(ctx, query)
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
@@ -208,7 +208,7 @@ func (f *Firebird) Drop() (err error) {
 					END;`,
 			t, t)
 
-		if _, err := f.conn.ExecContext(context.Background(), query); err != nil {
+		if _, err := f.conn.ExecContext(ctx, query); err != nil {
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
 	}
@@ -217,13 +217,13 @@ func (f *Firebird) Drop() (err error) {
 }
 
 // ensureVersionTable checks if versions table exists and, if not, creates it.
-func (f *Firebird) ensureVersionTable() (err error) {
-	if err = f.Lock(); err != nil {
+func (f *Firebird) ensureVersionTable(ctx context.Context) (err error) {
+	if err = f.Lock(ctx); err != nil {
 		return err
 	}
 
 	defer func() {
-		if e := f.Unlock(); e != nil {
+		if e := f.Unlock(ctx); e != nil {
 			if err == nil {
 				err = e
 			} else {
@@ -238,7 +238,7 @@ func (f *Firebird) ensureVersionTable() (err error) {
 		END;`,
 		f.config.MigrationsTable, f.config.MigrationsTable)
 
-	if _, err = f.conn.ExecContext(context.Background(), query); err != nil {
+	if _, err = f.conn.ExecContext(ctx, query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 

@@ -76,18 +76,19 @@ func Test(t *testing.T) {
 
 func test(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ctx := context.Background()
 		ip, port, err := c.Port(9042)
 		if err != nil {
 			t.Fatal("Unable to get mapped port:", err)
 		}
 		addr := fmt.Sprintf("cassandra://%v:%v/testks", ip, port)
 		p := &Cassandra{}
-		d, err := p.Open(addr)
+		d, err := p.Open(ctx, addr)
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer func() {
-			if err := d.Close(); err != nil {
+			if err := d.Close(ctx); err != nil {
 				t.Error(err)
 			}
 		}()
@@ -97,23 +98,24 @@ func test(t *testing.T) {
 
 func testMigrate(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ctx := context.Background()
 		ip, port, err := c.Port(9042)
 		if err != nil {
 			t.Fatal("Unable to get mapped port:", err)
 		}
 		addr := fmt.Sprintf("cassandra://%v:%v/testks", ip, port)
 		p := &Cassandra{}
-		d, err := p.Open(addr)
+		d, err := p.Open(ctx, addr)
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer func() {
-			if err := d.Close(); err != nil {
+			if err := d.Close(ctx); err != nil {
 				t.Error(err)
 			}
 		}()
 
-		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "testks", d)
+		m, err := migrate.NewWithDatabaseInstance(ctx, "file://./examples/migrations", "testks", d)
 		if err != nil {
 			t.Fatal(err)
 		}
