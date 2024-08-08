@@ -77,7 +77,7 @@ func createDB(t *testing.T, c dktest.ContainerInfo) {
 		}
 	}()
 
-	if _, err = db.Exec("CREATE DATABASE migrate"); err != nil {
+	if _, err = db.ExecContext(context.Background(), "CREATE DATABASE migrate"); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -86,6 +86,7 @@ func Test(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, ci dktest.ContainerInfo) {
 		createDB(t, ci)
 
+		ctx := context.Background()
 		ip, port, err := ci.Port(26257)
 		if err != nil {
 			t.Fatal(err)
@@ -93,7 +94,7 @@ func Test(t *testing.T) {
 
 		addr := fmt.Sprintf("cockroach://root@%v:%v/migrate?sslmode=disable", ip, port)
 		c := &CockroachDb{}
-		d, err := c.Open(addr)
+		d, err := c.Open(ctx, addr)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -105,6 +106,7 @@ func TestMigrate(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, ci dktest.ContainerInfo) {
 		createDB(t, ci)
 
+		ctx := context.Background()
 		ip, port, err := ci.Port(26257)
 		if err != nil {
 			t.Fatal(err)
@@ -112,12 +114,12 @@ func TestMigrate(t *testing.T) {
 
 		addr := fmt.Sprintf("cockroach://root@%v:%v/migrate?sslmode=disable", ip, port)
 		c := &CockroachDb{}
-		d, err := c.Open(addr)
+		d, err := c.Open(ctx, addr)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "migrate", d)
+		m, err := migrate.NewWithDatabaseInstance(ctx, "file://./examples/migrations", "migrate", d)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -129,6 +131,7 @@ func TestMultiStatement(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, ci dktest.ContainerInfo) {
 		createDB(t, ci)
 
+		ctx := context.Background()
 		ip, port, err := ci.Port(26257)
 		if err != nil {
 			t.Fatal(err)
@@ -136,11 +139,11 @@ func TestMultiStatement(t *testing.T) {
 
 		addr := fmt.Sprintf("cockroach://root@%v:%v/migrate?sslmode=disable", ip, port)
 		c := &CockroachDb{}
-		d, err := c.Open(addr)
+		d, err := c.Open(ctx, addr)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := d.Run(strings.NewReader("CREATE TABLE foo (foo text); CREATE TABLE bar (bar text);")); err != nil {
+		if err := d.Run(ctx, strings.NewReader("CREATE TABLE foo (foo text); CREATE TABLE bar (bar text);")); err != nil {
 			t.Fatalf("expected err to be nil, got %v", err)
 		}
 
@@ -159,6 +162,7 @@ func TestFilterCustomQuery(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, ci dktest.ContainerInfo) {
 		createDB(t, ci)
 
+		ctx := context.Background()
 		ip, port, err := ci.Port(26257)
 		if err != nil {
 			t.Fatal(err)
@@ -166,7 +170,7 @@ func TestFilterCustomQuery(t *testing.T) {
 
 		addr := fmt.Sprintf("cockroach://root@%v:%v/migrate?sslmode=disable&x-custom=foobar", ip, port)
 		c := &CockroachDb{}
-		_, err = c.Open(addr)
+		_, err = c.Open(ctx, addr)
 		if err != nil {
 			t.Fatal(err)
 		}

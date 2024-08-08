@@ -2,6 +2,7 @@ package stub
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -25,7 +26,7 @@ type Stub struct {
 	Config     *Config
 }
 
-func (s *Stub) Open(url string) (source.Driver, error) {
+func (s *Stub) Open(ctx context.Context, url string) (source.Driver, error) {
 	return &Stub{
 		Url:        url,
 		Migrations: source.NewMigrations(),
@@ -33,7 +34,7 @@ func (s *Stub) Open(url string) (source.Driver, error) {
 	}, nil
 }
 
-func WithInstance(instance interface{}, config *Config) (source.Driver, error) {
+func WithInstance(ctx context.Context, instance interface{}, config *Config) (source.Driver, error) {
 	return &Stub{
 		Instance:   instance,
 		Migrations: source.NewMigrations(),
@@ -41,42 +42,42 @@ func WithInstance(instance interface{}, config *Config) (source.Driver, error) {
 	}, nil
 }
 
-func (s *Stub) Close() error {
+func (s *Stub) Close(ctx context.Context) error {
 	return nil
 }
 
-func (s *Stub) First() (version uint, err error) {
-	if v, ok := s.Migrations.First(); !ok {
+func (s *Stub) First(ctx context.Context) (version uint, err error) {
+	if v, ok := s.Migrations.First(ctx); !ok {
 		return 0, &os.PathError{Op: "first", Path: s.Url, Err: os.ErrNotExist} // TODO: s.Url can be empty when called with WithInstance
 	} else {
 		return v, nil
 	}
 }
 
-func (s *Stub) Prev(version uint) (prevVersion uint, err error) {
-	if v, ok := s.Migrations.Prev(version); !ok {
+func (s *Stub) Prev(ctx context.Context, version uint) (prevVersion uint, err error) {
+	if v, ok := s.Migrations.Prev(ctx, version); !ok {
 		return 0, &os.PathError{Op: fmt.Sprintf("prev for version %v", version), Path: s.Url, Err: os.ErrNotExist}
 	} else {
 		return v, nil
 	}
 }
 
-func (s *Stub) Next(version uint) (nextVersion uint, err error) {
-	if v, ok := s.Migrations.Next(version); !ok {
+func (s *Stub) Next(ctx context.Context, version uint) (nextVersion uint, err error) {
+	if v, ok := s.Migrations.Next(ctx, version); !ok {
 		return 0, &os.PathError{Op: fmt.Sprintf("next for version %v", version), Path: s.Url, Err: os.ErrNotExist}
 	} else {
 		return v, nil
 	}
 }
 
-func (s *Stub) ReadUp(version uint) (r io.ReadCloser, identifier string, err error) {
+func (s *Stub) ReadUp(ctx context.Context, version uint) (r io.ReadCloser, identifier string, err error) {
 	if m, ok := s.Migrations.Up(version); ok {
 		return io.NopCloser(bytes.NewBufferString(m.Identifier)), fmt.Sprintf("%v.up.stub", version), nil
 	}
 	return nil, "", &os.PathError{Op: fmt.Sprintf("read up version %v", version), Path: s.Url, Err: os.ErrNotExist}
 }
 
-func (s *Stub) ReadDown(version uint) (r io.ReadCloser, identifier string, err error) {
+func (s *Stub) ReadDown(ctx context.Context, version uint) (r io.ReadCloser, identifier string, err error) {
 	if m, ok := s.Migrations.Down(version); ok {
 		return io.NopCloser(bytes.NewBufferString(m.Identifier)), fmt.Sprintf("%v.down.stub", version), nil
 	}

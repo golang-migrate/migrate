@@ -2,6 +2,7 @@ package neo4j
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	neturl "net/url"
@@ -61,7 +62,7 @@ func WithInstance(driver neo4j.Driver, config *Config) (database.Driver, error) 
 	return nDriver, nil
 }
 
-func (n *Neo4j) Open(url string) (database.Driver, error) {
+func (n *Neo4j) Open(ctx context.Context, url string) (database.Driver, error) {
 	uri, err := neturl.Parse(url)
 	if err != nil {
 		return nil, err
@@ -114,12 +115,12 @@ func (n *Neo4j) Open(url string) (database.Driver, error) {
 	})
 }
 
-func (n *Neo4j) Close() error {
+func (n *Neo4j) Close(ctx context.Context) error {
 	return n.driver.Close()
 }
 
 // local locking in order to pass tests, Neo doesn't support database locking
-func (n *Neo4j) Lock() error {
+func (n *Neo4j) Lock(ctx context.Context) error {
 	if !atomic.CompareAndSwapUint32(&n.lock, 0, 1) {
 		return database.ErrLocked
 	}
@@ -127,14 +128,14 @@ func (n *Neo4j) Lock() error {
 	return nil
 }
 
-func (n *Neo4j) Unlock() error {
+func (n *Neo4j) Unlock(ctx context.Context) error {
 	if !atomic.CompareAndSwapUint32(&n.lock, 1, 0) {
 		return database.ErrNotLocked
 	}
 	return nil
 }
 
-func (n *Neo4j) Run(migration io.Reader) (err error) {
+func (n *Neo4j) Run(ctx context.Context, migration io.Reader) (err error) {
 	session, err := n.driver.Session(neo4j.AccessModeWrite)
 	if err != nil {
 		return err
@@ -181,7 +182,7 @@ func (n *Neo4j) Run(migration io.Reader) (err error) {
 	return err
 }
 
-func (n *Neo4j) SetVersion(version int, dirty bool) (err error) {
+func (n *Neo4j) SetVersion(ctx context.Context, version int, dirty bool) (err error) {
 	session, err := n.driver.Session(neo4j.AccessModeWrite)
 	if err != nil {
 		return err
@@ -206,7 +207,7 @@ type MigrationRecord struct {
 	Dirty   bool
 }
 
-func (n *Neo4j) Version() (version int, dirty bool, err error) {
+func (n *Neo4j) Version(ctx context.Context) (version int, dirty bool, err error) {
 	session, err := n.driver.Session(neo4j.AccessModeRead)
 	if err != nil {
 		return database.NilVersion, false, err
@@ -254,7 +255,7 @@ ORDER BY COALESCE(sm.ts, datetime({year: 0})) DESC, sm.version DESC LIMIT 1`,
 	return mr.Version, mr.Dirty, err
 }
 
-func (n *Neo4j) Drop() (err error) {
+func (n *Neo4j) Drop(ctx context.Context) (err error) {
 	session, err := n.driver.Session(neo4j.AccessModeWrite)
 	if err != nil {
 		return err

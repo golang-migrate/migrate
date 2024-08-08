@@ -1,6 +1,7 @@
 package clickhouse
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"io"
@@ -40,7 +41,7 @@ func init() {
 	database.Register("clickhouse", &ClickHouse{})
 }
 
-func WithInstance(conn *sql.DB, config *Config) (database.Driver, error) {
+func WithInstance(ctx context.Context, conn *sql.DB, config *Config) (database.Driver, error) {
 	if config == nil {
 		return nil, ErrNilConfig
 	}
@@ -54,7 +55,7 @@ func WithInstance(conn *sql.DB, config *Config) (database.Driver, error) {
 		config: config,
 	}
 
-	if err := ch.init(); err != nil {
+	if err := ch.init(ctx); err != nil {
 		return nil, err
 	}
 
@@ -67,7 +68,7 @@ type ClickHouse struct {
 	isLocked atomic.Bool
 }
 
-func (ch *ClickHouse) Open(dsn string) (database.Driver, error) {
+func (ch *ClickHouse) Open(ctx context.Context, dsn string) (database.Driver, error) {
 	purl, err := url.Parse(dsn)
 	if err != nil {
 		return nil, err
@@ -104,14 +105,14 @@ func (ch *ClickHouse) Open(dsn string) (database.Driver, error) {
 		},
 	}
 
-	if err := ch.init(); err != nil {
+	if err := ch.init(ctx); err != nil {
 		return nil, err
 	}
 
 	return ch, nil
 }
 
-func (ch *ClickHouse) init() error {
+func (ch *ClickHouse) init(ctx context.Context) error {
 	if len(ch.config.DatabaseName) == 0 {
 		if err := ch.conn.QueryRow("SELECT currentDatabase()").Scan(&ch.config.DatabaseName); err != nil {
 			return err
@@ -130,10 +131,10 @@ func (ch *ClickHouse) init() error {
 		ch.config.MigrationsTableEngine = DefaultMigrationsTableEngine
 	}
 
-	return ch.ensureVersionTable()
+	return ch.ensureVersionTable(ctx)
 }
 
-func (ch *ClickHouse) Run(r io.Reader) error {
+func (ch *ClickHouse) Run(ctx context.Context, r io.Reader) error {
 	if ch.config.MultiStatementEnabled {
 		var err error
 		if e := multistmt.Parse(r, multiStmtDelimiter, ch.config.MultiStatementMaxSize, func(m []byte) bool {
@@ -141,7 +142,7 @@ func (ch *ClickHouse) Run(r io.Reader) error {
 			if tq == "" {
 				return true
 			}
-			if _, e := ch.conn.Exec(string(m)); e != nil {
+			if _, e := ch.conn.ExecContext(ctx, string(m)); e != nil {
 				err = database.Error{OrigErr: e, Err: "migration failed", Query: m}
 				return false
 			}
@@ -157,13 +158,13 @@ func (ch *ClickHouse) Run(r io.Reader) error {
 		return err
 	}
 
-	if _, err := ch.conn.Exec(string(migration)); err != nil {
+	if _, err := ch.conn.ExecContext(ctx, string(migration)); err != nil {
 		return database.Error{OrigErr: err, Err: "migration failed", Query: migration}
 	}
 
 	return nil
 }
-func (ch *ClickHouse) Version() (int, bool, error) {
+func (ch *ClickHouse) Version(ctx context.Context) (int, bool, error) {
 	var (
 		version int
 		dirty   uint8
@@ -178,7 +179,7 @@ func (ch *ClickHouse) Version() (int, bool, error) {
 	return version, dirty == 1, nil
 }
 
-func (ch *ClickHouse) SetVersion(version int, dirty bool) error {
+func (ch *ClickHouse) SetVersion(ctx context.Context, version int, dirty bool) error {
 	var (
 		bool = func(v bool) uint8 {
 			if v {
@@ -186,14 +187,14 @@ func (ch *ClickHouse) SetVersion(version int, dirty bool) error {
 			}
 			return 0
 		}
-		tx, err = ch.conn.Begin()
+		tx, err = ch.conn.BeginTx(ctx, nil)
 	)
 	if err != nil {
 		return err
 	}
 
 	query := "INSERT INTO " + ch.config.MigrationsTable + " (version, dirty, sequence) VALUES (?, ?, ?)"
-	if _, err := tx.Exec(query, version, bool(dirty), time.Now().UnixNano()); err != nil {
+	if _, err := tx.ExecContext(ctx, query, version, bool(dirty), time.Now().UnixNano()); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 
@@ -203,13 +204,13 @@ func (ch *ClickHouse) SetVersion(version int, dirty bool) error {
 // ensureVersionTable checks if versions table exists and, if not, creates it.
 // Note that this function locks the database, which deviates from the usual
 // convention of "caller locks" in the ClickHouse type.
-func (ch *ClickHouse) ensureVersionTable() (err error) {
-	if err = ch.Lock(); err != nil {
+func (ch *ClickHouse) ensureVersionTable(ctx context.Context) (err error) {
+	if err = ch.Lock(ctx); err != nil {
 		return err
 	}
 
 	defer func() {
-		if e := ch.Unlock(); e != nil {
+		if e := ch.Unlock(ctx); e != nil {
 			if err == nil {
 				err = e
 			} else {
@@ -252,15 +253,15 @@ func (ch *ClickHouse) ensureVersionTable() (err error) {
 		query = fmt.Sprintf(`%s ORDER BY sequence`, query)
 	}
 
-	if _, err := ch.conn.Exec(query); err != nil {
+	if _, err := ch.conn.ExecContext(ctx, query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 	return nil
 }
 
-func (ch *ClickHouse) Drop() (err error) {
+func (ch *ClickHouse) Drop(ctx context.Context) (err error) {
 	query := "SHOW TABLES FROM " + quoteIdentifier(ch.config.DatabaseName)
-	tables, err := ch.conn.Query(query)
+	tables, err := ch.conn.QueryContext(ctx, query)
 
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
@@ -279,7 +280,7 @@ func (ch *ClickHouse) Drop() (err error) {
 
 		query = "DROP TABLE IF EXISTS " + quoteIdentifier(ch.config.DatabaseName) + "." + quoteIdentifier(table)
 
-		if _, err := ch.conn.Exec(query); err != nil {
+		if _, err := ch.conn.ExecContext(ctx, query); err != nil {
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
 	}
@@ -290,21 +291,21 @@ func (ch *ClickHouse) Drop() (err error) {
 	return nil
 }
 
-func (ch *ClickHouse) Lock() error {
+func (ch *ClickHouse) Lock(ctx context.Context) error {
 	if !ch.isLocked.CAS(false, true) {
 		return database.ErrLocked
 	}
 
 	return nil
 }
-func (ch *ClickHouse) Unlock() error {
+func (ch *ClickHouse) Unlock(ctx context.Context) error {
 	if !ch.isLocked.CAS(true, false) {
 		return database.ErrNotLocked
 	}
 
 	return nil
 }
-func (ch *ClickHouse) Close() error { return ch.conn.Close() }
+func (ch *ClickHouse) Close(ctx context.Context) error { return ch.conn.Close() }
 
 // Copied from lib/pq implementation: https://github.com/lib/pq/blob/v1.9.0/conn.go#L1611
 func quoteIdentifier(name string) string {
