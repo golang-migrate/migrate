@@ -31,7 +31,7 @@ import (
 var (
 	opts  = dktest.Options{PortRequired: true, ReadyFunc: isReady}
 	specs = []dktesting.ContainerSpec{
-		{ImageName: "postgres:8", Options: opts},
+		{ImageName: "joschi/postgres8:8", Options: opts},
 	}
 )
 
