@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"sort"
 	"strconv"
 	"strings"
 	"syscall"
@@ -69,6 +70,9 @@ func Main(version string) {
 	databasePtr := flag.String("database", "", "")
 	sourcePtr := flag.String("source", "", "")
 
+	databases := database.List()
+	sort.Strings(databases)
+
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr,
 			`Usage: migrate OPTIONS COMMAND [arg...]
@@ -94,7 +98,7 @@ Commands:
   version      Print current migration version
 
 Source drivers: `+strings.Join(source.List(), ", ")+`
-Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoUsage, upUsage, downUsage, dropUsage, forceUsage)
+Database drivers: `+strings.Join(databases, ", ")+"\n", createUsage, gotoUsage, upUsage, downUsage, dropUsage, forceUsage)
 	}
 
 	flag.Parse()
