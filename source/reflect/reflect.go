@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/golang-migrate/migrate/source"
+	"github.com/golang-migrate/migrate/v4/source"
 )
 
 func init() {

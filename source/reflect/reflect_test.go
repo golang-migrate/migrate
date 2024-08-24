@@ -5,7 +5,7 @@ import (
 	"log"
 	"testing"
 
-	st "github.com/golang-migrate/migrate/source/testing"
+	st "github.com/golang-migrate/migrate/v4/source/testing"
 )
 
 func TestExample(t *testing.T) {
