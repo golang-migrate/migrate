@@ -9,17 +9,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	dockertypes "github.com/docker/docker/api/types"
-	dockercontainer "github.com/docker/docker/api/types/container"
-	dockernetwork "github.com/docker/docker/api/types/network"
-	dockerclient "github.com/docker/docker/client"
-	"github.com/hashicorp/go-multierror"
 	"io"
 	"math/rand"
 	"strconv"
 	"strings"
 	"testing"
-	"time"
+
+	dockertypes "github.com/docker/docker/api/types"
+	dockercontainer "github.com/docker/docker/api/types/container"
+	dockernetwork "github.com/docker/docker/api/types/network"
+	dockerclient "github.com/docker/docker/client"
+	"github.com/hashicorp/go-multierror"
 )
 
 func NewDockerContainer(t testing.TB, image string, env []string, cmd []string) (*DockerContainer, error) {
@@ -284,10 +284,6 @@ type dockerImagePullOutput struct {
 	} `json:"progressDetail"`
 	Id       string `json:"id"`
 	Progress string `json:"progress"`
-}
-
-func init() {
-	rand.Seed(time.Now().UnixNano())
 }
 
 func pseudoRandStr(n int) string {
