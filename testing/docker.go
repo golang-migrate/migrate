@@ -15,11 +15,10 @@ import (
 	dockerclient "github.com/docker/docker/client"
 	"github.com/hashicorp/go-multierror"
 	"io"
-	"math/rand"
+	"math/rand/v2"
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 )
 
 func NewDockerContainer(t testing.TB, image string, env []string, cmd []string) (*DockerContainer, error) {
@@ -286,15 +285,11 @@ type dockerImagePullOutput struct {
 	Progress string `json:"progress"`
 }
 
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
-
 func pseudoRandStr(n int) string {
 	var letterRunes = []rune("abcdefghijklmnopqrstuvwxyz0123456789")
 	b := make([]rune, n)
 	for i := range b {
-		b[i] = letterRunes[rand.Intn(len(letterRunes))]
+		b[i] = letterRunes[rand.IntN(len(letterRunes))]
 	}
 	return string(b)
 }
