@@ -19,7 +19,6 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 )
 
 func NewDockerContainer(t testing.TB, image string, env []string, cmd []string) (*DockerContainer, error) {
@@ -284,10 +283,6 @@ type dockerImagePullOutput struct {
 	} `json:"progressDetail"`
 	Id       string `json:"id"`
 	Progress string `json:"progress"`
-}
-
-func init() {
-	rand.Seed(time.Now().UnixNano())
 }
 
 func pseudoRandStr(n int) string {
