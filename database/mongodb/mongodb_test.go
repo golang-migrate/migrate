@@ -7,24 +7,21 @@ import (
 
 	"log"
 
-	"github.com/golang-migrate/migrate/v4"
 	"io"
 	"os"
 	"strconv"
 	"testing"
 	"time"
-)
 
-import (
 	"github.com/dhui/dktest"
+	"github.com/golang-migrate/migrate/v4"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-)
 
-import (
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
 	"github.com/golang-migrate/migrate/v4/dktesting"
+
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
@@ -32,7 +29,6 @@ var (
 	opts = dktest.Options{PortRequired: true, ReadyFunc: isReady}
 	// Supported versions: https://www.mongodb.com/support-policy
 	specs = []dktesting.ContainerSpec{
-		{ImageName: "mongo:3.4", Options: opts},
 		{ImageName: "mongo:3.6", Options: opts},
 		{ImageName: "mongo:4.0", Options: opts},
 		{ImageName: "mongo:4.2", Options: opts},
@@ -411,7 +407,7 @@ func waitForReplicaInit(client *mongo.Client) error {
 			//during replica set initialization, the first node first becomes a secondary and then becomes the primary
 			//should consider that initialization is completed only after the node has become the primary
 			result := client.Database("admin").RunCommand(context.TODO(), bson.D{bson.E{Key: "isMaster", Value: 1}})
-			r, err := result.DecodeBytes()
+			r, err := result.Raw()
 			if err != nil {
 				return err
 			}

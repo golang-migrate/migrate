@@ -10,28 +10,25 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/golang-migrate/migrate/v4"
 	"io"
 	"strconv"
 	"strings"
 	"testing"
-)
 
-import (
 	"github.com/dhui/dktest"
-)
-
-import (
+	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
+
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
 	"github.com/golang-migrate/migrate/v4/dktesting"
+
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
 var (
 	opts  = dktest.Options{PortRequired: true, ReadyFunc: isReady}
 	specs = []dktesting.ContainerSpec{
-		{ImageName: "postgres:8", Options: opts},
+		{ImageName: "joschi/postgres8:8", Options: opts},
 	}
 )
 
