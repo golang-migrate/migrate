@@ -217,10 +217,17 @@ func parseInt(urlParam string, defaultValue int) (int, error) {
 }
 func (m *Mongo) SetVersion(version int, dirty bool) error {
 	migrationsCollection := m.db.Collection(m.config.MigrationsCollection)
-	if err := migrationsCollection.Drop(context.TODO()); err != nil {
-		return &database.Error{OrigErr: err, Err: "drop migrations collection failed"}
+	count, err := migrationsCollection.CountDocuments(context.TODO(), bson.D{})
+	if err != nil {
+		return &database.Error{OrigErr: err, Err: "find migrations collection documents count failed"}
 	}
-	_, err := migrationsCollection.InsertOne(context.TODO(), bson.M{"version": version, "dirty": dirty})
+	if count > 0 {
+		_, err := migrationsCollection.DeleteMany(context.TODO(), bson.D{})
+		if err != nil {
+			return &database.Error{OrigErr: err, Err: "clean migrations collection documents failed"}
+		}
+	}
+	_, err = migrationsCollection.InsertOne(context.TODO(), bson.M{"version": version, "dirty": dirty})
 	if err != nil {
 		return &database.Error{OrigErr: err, Err: "save version failed"}
 	}
