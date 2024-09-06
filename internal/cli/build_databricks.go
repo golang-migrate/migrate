@@ -1,3 +1,6 @@
+//go:build databricks
+// +build databricks
+
 package cli
 
 import (
