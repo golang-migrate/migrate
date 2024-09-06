@@ -15,7 +15,7 @@ import (
 	dockerclient "github.com/docker/docker/client"
 	"github.com/hashicorp/go-multierror"
 	"io"
-	"math/rand"
+	"math/rand/v2"
 	"strconv"
 	"strings"
 	"testing"
@@ -289,7 +289,7 @@ func pseudoRandStr(n int) string {
 	var letterRunes = []rune("abcdefghijklmnopqrstuvwxyz0123456789")
 	b := make([]rune, n)
 	for i := range b {
-		b[i] = letterRunes[rand.Intn(len(letterRunes))]
+		b[i] = letterRunes[rand.IntN(len(letterRunes))]
 	}
 	return string(b)
 }
