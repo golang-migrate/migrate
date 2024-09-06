@@ -40,7 +40,7 @@ var (
 	}
 
 	specs = []dktesting.ContainerSpec{
-		{ImageName: "postgres:8", Options: opts},
+		{ImageName: "migrate/postgres8:8", Options: opts},
 	}
 )
 
