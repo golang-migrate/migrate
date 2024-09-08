@@ -43,13 +43,17 @@ var (
 		{ImageName: "mysql:5.5", Options: opts},
 		{ImageName: "mysql:5.6", Options: opts},
 		{ImageName: "mysql:5.7", Options: opts},
-		{ImageName: "mysql:8", Options: opts},
+		{ImageName: "mysql:8.0", Options: opts},
+		{ImageName: "mysql:8.4", Options: opts},
+		{ImageName: "mysql:9.0", Options: opts},
 	}
 	specsAnsiQuotes = []dktesting.ContainerSpec{
 		{ImageName: "mysql:5.5", Options: optsAnsiQuotes},
 		{ImageName: "mysql:5.6", Options: optsAnsiQuotes},
 		{ImageName: "mysql:5.7", Options: optsAnsiQuotes},
-		{ImageName: "mysql:8", Options: optsAnsiQuotes},
+		{ImageName: "mysql:8.0", Options: optsAnsiQuotes},
+		{ImageName: "mysql:8.4", Options: optsAnsiQuotes},
+		{ImageName: "mysql:9.0", Options: optsAnsiQuotes},
 	}
 )
 
