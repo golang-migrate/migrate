@@ -2,8 +2,6 @@ module github.com/golang-migrate/migrate/v4
 
 go 1.22.0
 
-toolchain go1.23.1
-
 require (
 	cloud.google.com/go/spanner v1.56.0
 	cloud.google.com/go/storage v1.38.0
