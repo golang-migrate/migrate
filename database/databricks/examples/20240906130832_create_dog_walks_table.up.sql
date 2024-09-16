@@ -5,4 +5,4 @@ CREATE EXTERNAL TABLE IF NOT EXISTS `dog-${env}-park-db`.default.dog_walks (
     checkpoint_id TIMESTAMP NOT NULL, -- ID given to the batch per checkpoint, assigned to many process runs.
     batch_id    TIMESTAMP NOT NULL,   -- ID given to each independent batch, assigned once per process run
     recorded_at TIMESTAMP NOT NULL    -- Timestamp indicating when the walk was recorded.
-) LOCATION 's3://dog-${env}-park-db-tables/dog_walks';
+) LOCATION 's3://dog-park-db-tables/dog_walks';
