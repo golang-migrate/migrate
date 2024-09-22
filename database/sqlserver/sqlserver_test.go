@@ -35,11 +35,11 @@ var (
 				},
 			},
 		},
-		PortRequired: true, ReadyFunc: isReady, PullTimeout: 2 * time.Minute,
+		PortRequired: true, ReadyFunc: isReady, PullTimeout: 3 * time.Minute,
 	}
 	sqlServerOpts = dktest.Options{
 		Env:          map[string]string{"ACCEPT_EULA": "Y", "MSSQL_SA_PASSWORD": saPassword, "MSSQL_PID": "Express"},
-		PortRequired: true, ReadyFunc: isReady, PullTimeout: 2 * time.Minute,
+		PortRequired: true, ReadyFunc: isReady, PullTimeout: 3 * time.Minute,
 	}
 	// Container versions: https://mcr.microsoft.com/v2/mssql/server/tags/list
 	specs = []dktesting.ContainerSpec{
