@@ -948,7 +948,7 @@ func TestVersion(t *testing.T) {
 func TestRun(t *testing.T) {
 	m, _ := New("stub://", "stub://")
 
-	mx, err := NewMigration(nil, "", 1, 2)
+	mx, err := NewMigration(nil, nil, "", 1, 2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -974,7 +974,7 @@ func TestRunDirty(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	migr, err := NewMigration(nil, "", 1, 2)
+	migr, err := NewMigration(nil, nil, "", 1, 2)
 	if err != nil {
 		t.Fatal(err)
 	}

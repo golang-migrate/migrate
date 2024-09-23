@@ -125,28 +125,28 @@ func (s *s3Driver) Next(version uint) (uint, error) {
 	return v, nil
 }
 
-func (s *s3Driver) ReadUp(version uint) (io.ReadCloser, string, error) {
+func (s *s3Driver) ReadUp(version uint) (io.ReadCloser, source.Executor, string, error) {
 	if m, ok := s.migrations.Up(version); ok {
 		return s.open(m)
 	}
-	return nil, "", os.ErrNotExist
+	return nil, nil, "", os.ErrNotExist
 }
 
-func (s *s3Driver) ReadDown(version uint) (io.ReadCloser, string, error) {
+func (s *s3Driver) ReadDown(version uint) (io.ReadCloser, source.Executor, string, error) {
 	if m, ok := s.migrations.Down(version); ok {
 		return s.open(m)
 	}
-	return nil, "", os.ErrNotExist
+	return nil, nil, "", os.ErrNotExist
 }
 
-func (s *s3Driver) open(m *source.Migration) (io.ReadCloser, string, error) {
+func (s *s3Driver) open(m *source.Migration) (io.ReadCloser, source.Executor, string, error) {
 	key := path.Join(s.config.Prefix, m.Raw)
 	object, err := s.s3client.GetObject(&s3.GetObjectInput{
 		Bucket: aws.String(s.config.Bucket),
 		Key:    aws.String(key),
 	})
 	if err != nil {
-		return nil, "", err
+		return nil, nil, "", err
 	}
-	return object.Body, m.Identifier, nil
+	return object.Body, nil, m.Identifier, nil
 }

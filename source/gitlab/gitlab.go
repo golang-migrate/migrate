@@ -192,46 +192,46 @@ func (g *Gitlab) Next(version uint) (nextVersion uint, err error) {
 	}
 }
 
-func (g *Gitlab) ReadUp(version uint) (r io.ReadCloser, identifier string, err error) {
+func (g *Gitlab) ReadUp(version uint) (r io.ReadCloser, e source.Executor, identifier string, err error) {
 	if m, ok := g.migrations.Up(version); ok {
 		f, response, err := g.client.RepositoryFiles.GetFile(g.projectID, m.Raw, g.getOptions)
 		if err != nil {
-			return nil, "", err
+			return nil, nil, "", err
 		}
 
 		if response.StatusCode != http.StatusOK {
-			return nil, "", ErrInvalidResponse
+			return nil, nil, "", ErrInvalidResponse
 		}
 
 		content, err := base64.StdEncoding.DecodeString(f.Content)
 		if err != nil {
-			return nil, "", err
+			return nil, nil, "", err
 		}
 
-		return io.NopCloser(strings.NewReader(string(content))), m.Identifier, nil
+		return io.NopCloser(strings.NewReader(string(content))), nil, m.Identifier, nil
 	}
 
-	return nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: g.path, Err: os.ErrNotExist}
+	return nil, nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: g.path, Err: os.ErrNotExist}
 }
 
-func (g *Gitlab) ReadDown(version uint) (r io.ReadCloser, identifier string, err error) {
+func (g *Gitlab) ReadDown(version uint) (r io.ReadCloser, e source.Executor, identifier string, err error) {
 	if m, ok := g.migrations.Down(version); ok {
 		f, response, err := g.client.RepositoryFiles.GetFile(g.projectID, m.Raw, g.getOptions)
 		if err != nil {
-			return nil, "", err
+			return nil, nil, "", err
 		}
 
 		if response.StatusCode != http.StatusOK {
-			return nil, "", ErrInvalidResponse
+			return nil, nil, "", ErrInvalidResponse
 		}
 
 		content, err := base64.StdEncoding.DecodeString(f.Content)
 		if err != nil {
-			return nil, "", err
+			return nil, nil, "", err
 		}
 
-		return io.NopCloser(strings.NewReader(string(content))), m.Identifier, nil
+		return io.NopCloser(strings.NewReader(string(content))), nil, m.Identifier, nil
 	}
 
-	return nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: g.path, Err: os.ErrNotExist}
+	return nil, nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: g.path, Err: os.ErrNotExist}
 }
