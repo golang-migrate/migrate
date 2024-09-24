@@ -5,7 +5,6 @@
 
 | URL Query  | WithInstance Config | Description |
 |------------|---------------------|-------------|
-| `x-migrations-table` | `MigrationsTable` | Name of the migrations table |
 | `username` | |  enter the SQL Server Authentication user id or the Windows Authentication user id in the DOMAIN\User format. On Windows, if user id is empty or missing Single-Sign-On is used. |
 | `password` | | The user's password. | 
 | `host` | | The host to connect to. |
@@ -17,6 +16,8 @@
 | `encrypt` | | `disable` - Data send between client and server is not encrypted. `false` - Data sent between client and server is not encrypted beyond the login packet (Default). `true` - Data sent between client and server is encrypted. |
 | `app+name` || The application name (default is go-mssqldb). |
 | `useMsi` | | `true` - Use Azure MSI Authentication for connecting to Sql Server. Must be running from an Azure VM/an instance with MSI enabled. `false` - Use password authentication (Default). See [here for Azure MSI Auth details](https://docs.microsoft.com/en-us/azure/app-service/app-service-web-tutorial-connect-msi). NOTE: Since this cannot be tested locally, this is not officially supported.
+| `x-migrations-table` | `MigrationsTable` | Name of the migrations table |
+| `x-batch-enabled` | | Process batch statements using the go-mssqldb "batch" processor to support the SSMS `GO` statement. |
 
 See https://github.com/microsoft/go-mssqldb for full parameter list.
 
