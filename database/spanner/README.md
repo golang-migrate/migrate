@@ -14,14 +14,14 @@ as described in [README.md#database-urls](../../README.md#database-urls)
 | Param | WithInstance Config | Description |
 | ----- | ------------------- | ----------- |
 | `x-migrations-table` | `MigrationsTable` | Name of the migrations table |
-| `x-clean-statements` | `CleanStatements` | Whether to parse and clean DDL statements before running migration towards Spanner (Required for comments and multiple statements) |
+| `x-clean-statements` | `CleanStatements` | Whether to parse and clean DDL or DML statements before running migration towards Spanner (Required for comments and multiple statements) |
 | `url` | `DatabaseName` | The full path to the Spanner database resource. If provided as part of `Config` it must not contain a scheme or query string to match the format `projects/{projectId}/instances/{instanceId}/databases/{databaseName}`|
 | `projectId` || The Google Cloud Platform project id
 | `instanceId` || The id of the instance running Spanner
 | `databaseName` || The name of the Spanner database
 
-> **Note:** Google Cloud Spanner migrations can take a considerable amount of 
-> time. The migrations provided as part of the example take about 6 minutes to 
+> **Note:** Google Cloud Spanner migrations can take a considerable amount of
+> time. The migrations provided as part of the example take about 6 minutes to
 > run on a small instance.
 >
 > ```log
