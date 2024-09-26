@@ -1,0 +1,1 @@
+DELETE FROM test_dataset_id.products WHERE TRUE
