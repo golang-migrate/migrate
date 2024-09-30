@@ -273,6 +273,7 @@ func (m *Migrate) Up() error {
 	if err != nil {
 		return m.unlockErr(err)
 	}
+	fmt.Println(fmt.Sprintf("Try to do up. curVersion:%+v dirty:%+v", curVersion, dirty))
 
 	if dirty {
 		return m.unlockErr(ErrDirty{curVersion})
@@ -534,9 +535,11 @@ func (m *Migrate) read(from int, to int, ret chan<- interface{}) {
 func (m *Migrate) readUp(from int, limit int, ret chan<- interface{}) {
 	defer close(ret)
 
+	fmt.Println(fmt.Sprintf("Try to read up. from:%+v limit:%+v", from, limit))
 	// check if from version exists
 	if from >= 0 {
 		if err := m.versionExists(suint(from)); err != nil {
+			fmt.Println(fmt.Errorf("version exists error:%+v", err))
 			ret <- err
 			return
 		}
@@ -549,20 +552,26 @@ func (m *Migrate) readUp(from int, limit int, ret chan<- interface{}) {
 
 	count := 0
 	for count < limit || limit == -1 {
+		fmt.Println(fmt.Sprintf("Try to loop read up. count:%+v from:%+v", count, from))
 		if m.stop() {
+			fmt.Println(fmt.Sprintf("Exit loop read up."))
 			return
 		}
 
 		// apply first migration if from is nil version
 		if from == -1 {
+			fmt.Println(fmt.Sprintf("Try to get first version."))
 			firstVersion, err := m.sourceDrv.First()
 			if err != nil {
+				fmt.Println(fmt.Errorf("get first version error:%+v", err))
 				ret <- err
 				return
 			}
 
+			fmt.Println(fmt.Sprintf("Try to new first migration. firstVersion: %+v", firstVersion))
 			migr, err := m.newMigration(firstVersion, int(firstVersion))
 			if err != nil {
+				fmt.Println(fmt.Errorf("new first migration error:%+v", err))
 				ret <- err
 				return
 			}
@@ -570,6 +579,7 @@ func (m *Migrate) readUp(from int, limit int, ret chan<- interface{}) {
 			ret <- migr
 			go func() {
 				if err := migr.Buffer(); err != nil {
+					fmt.Println(fmt.Errorf("buffer migr error:%+v", err))
 					m.logErr(err)
 				}
 			}()
@@ -578,6 +588,7 @@ func (m *Migrate) readUp(from int, limit int, ret chan<- interface{}) {
 			continue
 		}
 
+		fmt.Println(fmt.Sprintf("Try to get next version."))
 		// apply next migration
 		next, err := m.sourceDrv.Next(suint(from))
 		if errors.Is(err, os.ErrNotExist) {
@@ -605,12 +616,15 @@ func (m *Migrate) readUp(from int, limit int, ret chan<- interface{}) {
 			}
 		}
 		if err != nil {
+			fmt.Println(fmt.Errorf("get next version error:%+v", err))
 			ret <- err
 			return
 		}
 
+		fmt.Println(fmt.Sprintf("Try to new next migration. nextVersion: %+v", next))
 		migr, err := m.newMigration(next, int(next))
 		if err != nil {
+			fmt.Println(fmt.Errorf("new next migration error:%+v", err))
 			ret <- err
 			return
 		}
@@ -618,6 +632,7 @@ func (m *Migrate) readUp(from int, limit int, ret chan<- interface{}) {
 		ret <- migr
 		go func() {
 			if err := migr.Buffer(); err != nil {
+				fmt.Println(fmt.Errorf("buffer migr error:%+v", err))
 				m.logErr(err)
 			}
 		}()
@@ -723,39 +738,48 @@ func (m *Migrate) readDown(from int, limit int, ret chan<- interface{}) {
 // to stop execution because it might have received a stop signal on the
 // GracefulStop channel.
 func (m *Migrate) runMigrations(ret <-chan interface{}) error {
+	fmt.Println(fmt.Sprintf("Try to run migrations."))
 	for r := range ret {
-
 		if m.stop() {
+			fmt.Println(fmt.Sprintf("Exit loop run migration."))
 			return nil
 		}
 
 		switch r := r.(type) {
 		case error:
+			fmt.Println(fmt.Errorf("run migration error:%+v", r))
 			return r
 
 		case *Migration:
 			migr := r
 
+			fmt.Println(fmt.Sprintf("Try to set dirty version. TargetVersion:%+v", migr.TargetVersion))
 			// set version with dirty state
 			if err := m.databaseDrv.SetVersion(migr.TargetVersion, true); err != nil {
+				fmt.Println(fmt.Errorf("set dirty version error:%+v", err))
 				return err
 			}
 
 			if migr.Body != nil {
+				fmt.Println(fmt.Sprintf("Try to loop run migrations. LogString:%+v", migr.LogString()))
 				m.logVerbosePrintf("Read and execute %v\n", migr.LogString())
 				if err := m.databaseDrv.Run(migr.BufferedBody); err != nil {
+					fmt.Println(fmt.Errorf("run error:%+v", err))
 					return err
 				}
 			}
 
+			fmt.Println(fmt.Sprintf("Try to set clenn version. TargetVersion:%+v", migr.TargetVersion))
 			// set clean state
 			if err := m.databaseDrv.SetVersion(migr.TargetVersion, false); err != nil {
+				fmt.Println(fmt.Errorf("set clean version error:%+v", err))
 				return err
 			}
 
 			endTime := time.Now()
 			readTime := migr.FinishedReading.Sub(migr.StartedBuffering)
 			runTime := endTime.Sub(migr.FinishedReading)
+			fmt.Println(fmt.Sprintf("Finished %+v (read %+v, ran %+v)", migr.LogString(), readTime, runTime))
 
 			// log either verbose or normal
 			if m.Log != nil {

@@ -134,42 +134,53 @@ func (ch *ClickHouse) init() error {
 }
 
 func (ch *ClickHouse) Run(r io.Reader) error {
+	fmt.Println(fmt.Sprintf("Try to run clickhouse. MultiStatementEnabled:%+v", ch.config.MultiStatementEnabled))
 	if ch.config.MultiStatementEnabled {
 		var err error
 		if e := multistmt.Parse(r, multiStmtDelimiter, ch.config.MultiStatementMaxSize, func(m []byte) bool {
+			fmt.Println(fmt.Sprintf("Try to exec query clickhouse. query:%+v", string(m)))
 			tq := strings.TrimSpace(string(m))
 			if tq == "" {
 				return true
 			}
 			if _, e := ch.conn.Exec(string(m)); e != nil {
+				fmt.Println(fmt.Errorf("exec query clickhouse error:%+v", err))
 				err = database.Error{OrigErr: e, Err: "migration failed", Query: m}
 				return false
 			}
 			return true
 		}); e != nil {
+			fmt.Println(fmt.Errorf("multistmt parse error:%+v", err))
 			return e
 		}
 		return err
 	}
 
+	fmt.Println(fmt.Sprintf("Try to get clickhouse migration."))
 	migration, err := io.ReadAll(r)
 	if err != nil {
+		fmt.Println(fmt.Errorf("get clickhouse migration error:%+v", err))
 		return err
 	}
 
+	fmt.Println(fmt.Sprintf("Try to exec migration clickhouse. migration:%+v", string(migration)))
 	if _, err := ch.conn.Exec(string(migration)); err != nil {
+		fmt.Println(fmt.Errorf("exec migration clickhouse error:%+v", err))
 		return database.Error{OrigErr: err, Err: "migration failed", Query: migration}
 	}
 
 	return nil
 }
 func (ch *ClickHouse) Version() (int, bool, error) {
+
 	var (
 		version int
 		dirty   uint8
 		query   = "SELECT version, dirty FROM `" + ch.config.MigrationsTable + "` ORDER BY sequence DESC LIMIT 1"
 	)
+	fmt.Println(fmt.Sprintf("Try to get version clickhouse. query:%+v", query))
 	if err := ch.conn.QueryRow(query).Scan(&version, &dirty); err != nil {
+		fmt.Println(fmt.Errorf("get version clickhouse err:%+v", err))
 		if err == sql.ErrNoRows {
 			return database.NilVersion, false, nil
 		}
@@ -179,6 +190,7 @@ func (ch *ClickHouse) Version() (int, bool, error) {
 }
 
 func (ch *ClickHouse) SetVersion(version int, dirty bool) error {
+	fmt.Println(fmt.Sprintf("Try to set version clickhouse. version:%+v dirty:%+v", version, dirty))
 	var (
 		bool = func(v bool) uint8 {
 			if v {
@@ -189,11 +201,14 @@ func (ch *ClickHouse) SetVersion(version int, dirty bool) error {
 		tx, err = ch.conn.Begin()
 	)
 	if err != nil {
+		fmt.Println(fmt.Errorf("set version clickhouse begin error:%+v", err))
 		return err
 	}
 
 	query := "INSERT INTO " + ch.config.MigrationsTable + " (version, dirty, sequence) VALUES (?, ?, ?)"
+	fmt.Println(fmt.Sprintf("Try to set version clickhouse exec. query:%+v", query))
 	if _, err := tx.Exec(query, version, bool(dirty), time.Now().UnixNano()); err != nil {
+		fmt.Println(fmt.Errorf("set version clickhouse exec error:%+v", err))
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 
