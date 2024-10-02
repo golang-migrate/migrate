@@ -136,6 +136,7 @@ func (ch *ClickHouse) init() error {
 		return err
 	}
 	if ch.config.IsDistributed {
+		ch.config.MigrationsTableEngine = "ReplicatedMergeTree" // base table must be replicated to supported a distributed table
 		return ch.ensureDistributedTable()
 	}
 	return nil
@@ -200,8 +201,7 @@ func (ch *ClickHouse) SetVersion(version int, dirty bool) error {
 		return err
 	}
 
-	query := "INSERT INTO " + ch.config.DatabaseName + "." + ch.config.MigrationsTable + " (version, dirty, sequence) SETTINGS distributed_foreground_insert = 1
- VALUES (?, ?, ?)"
+	query := "INSERT INTO " + ch.config.DatabaseName + "." + ch.config.MigrationsTable + " (version, dirty, sequence) SETTINGS distributed_foreground_insert = 1 VALUES (?, ?, ?)"
 	if _, err := tx.Exec(query, version, bool(dirty), time.Now().UnixNano()); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
@@ -243,15 +243,15 @@ func (ch *ClickHouse) ensureVersionTable() (err error) {
 	// if not, create the empty migration table
 	if len(ch.config.ClusterName) > 0 {
 
-		if ch.config.IsDistributed { // for sharded clusters we want to create a distributed table
-			baseTableName := ch.config.MigrationsTable + "_base"
+		if ch.config.IsDistributed { // we will rename the underlying table
+			baseTableName := ch.config.MigrationsTable + "_local"
 			query = fmt.Sprintf(`
 			CREATE TABLE IF NOT EXISTS %s.%s ON CLUSTER %s (
 				version    Int64,
 				dirty      UInt8,
 				sequence   UInt64
 			) Engine=%s Primary Key (sequence)`, ch.config.DatabaseName, baseTableName, ch.config.ClusterName, ch.config.MigrationsTableEngine)
-		} else {
+		} else { // cluster mode without the distributed table
 			query = fmt.Sprintf(`
 			CREATE TABLE %s.%s ON CLUSTER %s (
 				version    Int64,
@@ -279,7 +279,7 @@ func (ch *ClickHouse) ensureVersionTable() (err error) {
 }
 
 func (ch *ClickHouse) ensureDistributedTable() error {
-	baseTableName := ch.config.MigrationsTable + "_base"
+	baseTableName := ch.config.MigrationsTable + "_local"
 	query := fmt.Sprintf(`
 	CREATE TABLE IF NOT EXISTS %s.%s ON CLUSTER %s AS %s.%s Engine=Distributed(%s, %s, %s, sequence) SETTINGS fsync_after_insert = 1`, ch.config.DatabaseName, ch.config.MigrationsTable, ch.config.ClusterName, ch.config.DatabaseName, baseTableName, ch.config.ClusterName, ch.config.DatabaseName, baseTableName)
 
