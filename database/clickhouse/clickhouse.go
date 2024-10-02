@@ -30,6 +30,7 @@ var (
 type Config struct {
 	DatabaseName          string
 	ClusterName           string
+	IsDistributed         bool
 	MigrationsTable       string
 	MigrationsTableEngine string
 	MultiStatementEnabled bool
@@ -99,6 +100,7 @@ func (ch *ClickHouse) Open(dsn string) (database.Driver, error) {
 			MigrationsTableEngine: migrationsTableEngine,
 			DatabaseName:          purl.Query().Get("database"),
 			ClusterName:           purl.Query().Get("x-cluster-name"),
+			IsDistributed:         purl.Query().Get("x-distributed") == "true",
 			MultiStatementEnabled: purl.Query().Get("x-multi-statement") == "true",
 			MultiStatementMaxSize: multiStatementMaxSize,
 		},
@@ -130,7 +132,13 @@ func (ch *ClickHouse) init() error {
 		ch.config.MigrationsTableEngine = DefaultMigrationsTableEngine
 	}
 
-	return ch.ensureVersionTable()
+	if err := ch.ensureVersionTable(); err != nil {
+		return err
+	}
+	if ch.config.IsDistributed {
+		return ch.ensureDistributedTable()
+	}
+	return nil
 }
 
 func (ch *ClickHouse) Run(r io.Reader) error {
@@ -192,7 +200,8 @@ func (ch *ClickHouse) SetVersion(version int, dirty bool) error {
 		return err
 	}
 
-	query := "INSERT INTO " + ch.config.MigrationsTable + " (version, dirty, sequence) VALUES (?, ?, ?)"
+	query := "INSERT INTO " + ch.config.DatabaseName + "." + ch.config.MigrationsTable + " (version, dirty, sequence) SETTINGS distributed_foreground_insert = 1
+ VALUES (?, ?, ?)"
 	if _, err := tx.Exec(query, version, bool(dirty), time.Now().UnixNano()); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
@@ -233,24 +242,46 @@ func (ch *ClickHouse) ensureVersionTable() (err error) {
 
 	// if not, create the empty migration table
 	if len(ch.config.ClusterName) > 0 {
-		query = fmt.Sprintf(`
-			CREATE TABLE %s ON CLUSTER %s (
+
+		if ch.config.IsDistributed { // for sharded clusters we want to create a distributed table
+			baseTableName := ch.config.MigrationsTable + "_base"
+			query = fmt.Sprintf(`
+			CREATE TABLE IF NOT EXISTS %s.%s ON CLUSTER %s (
 				version    Int64,
 				dirty      UInt8,
 				sequence   UInt64
-			) Engine=%s`, ch.config.MigrationsTable, ch.config.ClusterName, ch.config.MigrationsTableEngine)
+			) Engine=%s Primary Key (sequence)`, ch.config.DatabaseName, baseTableName, ch.config.ClusterName, ch.config.MigrationsTableEngine)
+		} else {
+			query = fmt.Sprintf(`
+			CREATE TABLE %s.%s ON CLUSTER %s (
+				version    Int64,
+				dirty      UInt8,
+				sequence   UInt64
+			) Engine=%s`, ch.config.DatabaseName, ch.config.MigrationsTable, ch.config.ClusterName, ch.config.MigrationsTableEngine)
+		}
 	} else {
 		query = fmt.Sprintf(`
-			CREATE TABLE %s (
+			CREATE TABLE %s.%s (
 				version    Int64,
 				dirty      UInt8,
 				sequence   UInt64
-			) Engine=%s`, ch.config.MigrationsTable, ch.config.MigrationsTableEngine)
+			) Engine=%s`, ch.config.DatabaseName, ch.config.MigrationsTable, ch.config.MigrationsTableEngine)
 	}
 
 	if strings.HasSuffix(ch.config.MigrationsTableEngine, "Tree") {
 		query = fmt.Sprintf(`%s ORDER BY sequence`, query)
 	}
+
+	if _, err := ch.conn.Exec(query); err != nil {
+		return &database.Error{OrigErr: err, Query: []byte(query)}
+	}
+	return nil
+}
+
+func (ch *ClickHouse) ensureDistributedTable() error {
+	baseTableName := ch.config.MigrationsTable + "_base"
+	query := fmt.Sprintf(`
+	CREATE TABLE IF NOT EXISTS %s.%s ON CLUSTER %s AS %s.%s Engine=Distributed(%s, %s, %s, sequence) SETTINGS fsync_after_insert = 1`, ch.config.DatabaseName, ch.config.MigrationsTable, ch.config.ClusterName, ch.config.DatabaseName, baseTableName, ch.config.ClusterName, ch.config.DatabaseName, baseTableName)
 
 	if _, err := ch.conn.Exec(query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
