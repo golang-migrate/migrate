@@ -201,7 +201,11 @@ func (ch *ClickHouse) SetVersion(version int, dirty bool) error {
 		return err
 	}
 
-	query := "INSERT INTO " + ch.config.DatabaseName + "." + ch.config.MigrationsTable + " (version, dirty, sequence) SETTINGS distributed_foreground_insert = 1 VALUES (?, ?, ?)"
+	query := "INSERT INTO " + ch.config.DatabaseName + "." + ch.config.MigrationsTable + " (version, dirty, sequence) "
+	if ch.config.IsDistributed {
+		query = query + "SETTINGS distributed_foreground_insert = 1 "
+	}
+	query = query + "VALUES (?, ?, ?)"
 	if _, err := tx.Exec(query, version, bool(dirty), time.Now().UnixNano()); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
