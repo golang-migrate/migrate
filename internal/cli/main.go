@@ -29,7 +29,9 @@ const (
 	   Use -format option to specify a Go time format string. Note: migrations with the same time cause "duplicate migration version" error.
            Use -tz option to specify the timezone that will be used when generating non-sequential migrations (defaults: UTC).
 `
-	gotoUsage = `goto V       Migrate to version V`
+	gotoUsage = `goto V [-force-dirty-handling] [-cache-dir P]      Migrate to version V
+	Use -force-dirty-handling to handle dirty database state
+	Use -cache-dir to specify the intermediate path P for storing migrations`
 	upUsage   = `up [N]       Apply all or N up migrations`
 	downUsage = `down [N] [-all]    Apply all or N down migrations
 	Use -all to apply all down migrations`
@@ -262,8 +264,19 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 		if err != nil {
 			log.fatal("error: can't read version argument V")
 		}
+		handleDirty := viper.GetBool("force-dirty-handling")
+		if handleDirty {
+			destPath := viper.GetString("cache-dir")
+			if destPath == "" {
+				log.fatal("error: cache-dir must be specified when force-dirty-handling is set")
+			}
 
-		if err := gotoCmd(migrater, uint(v)); err != nil {
+			if err = migrater.WithDirtyStateHandler(sourcePtr, destPath, handleDirty); err != nil {
+				log.fatalErr(err)
+			}
+		}
+
+		if err = gotoCmd(migrater, uint(v)); err != nil {
 			log.fatalErr(err)
 		}
 
