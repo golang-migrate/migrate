@@ -11,14 +11,15 @@ The DSN must be given in the following format.
 
 as described in [README.md#database-urls](../../README.md#database-urls)
 
-| Param | WithInstance Config | Description |
-| ----- | ------------------- | ----------- |
-| `x-migrations-table` | `MigrationsTable` | Name of the migrations table |
-| `x-clean-statements` | `CleanStatements` | Whether to parse and clean DDL statements before running migration towards Spanner (Required for comments and multiple statements) |
-| `url` | `DatabaseName` | The full path to the Spanner database resource. If provided as part of `Config` it must not contain a scheme or query string to match the format `projects/{projectId}/instances/{instanceId}/databases/{databaseName}`|
-| `projectId` || The Google Cloud Platform project id
-| `instanceId` || The id of the instance running Spanner
-| `databaseName` || The name of the Spanner database
+| Param                | WithInstance Config                    | Description                                                                                                                                                                                                             |
+|----------------------|----------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `x-migrations-table` | `MigrationsTable`                      | Name of the migrations table                                                                                                                                                                                            |
+| `x-clean-statements` | `CleanStatements`                      | Whether to parse and clean DDL statements before running migration towards Spanner (Required for comments and multiple statements)                                                                                      |
+| `x-dml-comment-flag` | `DmlFlag`                              | Comment flag to treat a migration file as DML                                                                                                                                                                           |
+| `url`                | `DatabaseName`                         | The full path to the Spanner database resource. If provided as part of `Config` it must not contain a scheme or query string to match the format `projects/{projectId}/instances/{instanceId}/databases/{databaseName}` |
+| `projectId`          || The Google Cloud Platform project id   
+| `instanceId`         || The id of the instance running Spanner 
+| `databaseName`       || The name of the Spanner database       
 
 > **Note:** Google Cloud Spanner migrations can take a considerable amount of 
 > time. The migrations provided as part of the example take about 6 minutes to 
@@ -38,6 +39,11 @@ so in order to be able to use migration with DDL containing comments `x-clean-st
 ## Multiple statements
 
 In order to be able to use more than 1 DDL statement in the same migration file, the file has to be parsed and therefore the `x-clean-statements` flag is required
+
+## DML
+
+In order to have a migration file with DML you need to start the migration file with a one line comment for example #DML 
+and use `x-dml-comment-flag=DML`
 
 ## Testing
 
