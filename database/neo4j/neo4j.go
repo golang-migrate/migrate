@@ -2,16 +2,19 @@ package neo4j
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	neturl "net/url"
 	"strconv"
 	"sync/atomic"
 
+	"golang.org/x/mod/semver"
+
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/golang-migrate/migrate/v4/database/multistmt"
 	"github.com/hashicorp/go-multierror"
-	"github.com/neo4j/neo4j-go-driver/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
 func init() {
@@ -37,14 +40,14 @@ type Config struct {
 }
 
 type Neo4j struct {
-	driver neo4j.Driver
+	driver neo4j.DriverWithContext
 	lock   uint32
 
 	// Open and WithInstance need to guarantee that config is never nil
 	config *Config
 }
 
-func WithInstance(driver neo4j.Driver, config *Config) (database.Driver, error) {
+func WithInstance(driver neo4j.DriverWithContext, config *Config) (database.Driver, error) {
 	if config == nil {
 		return nil, ErrNilConfig
 	}
@@ -69,22 +72,11 @@ func (n *Neo4j) Open(url string) (database.Driver, error) {
 	password, _ := uri.User.Password()
 	authToken := neo4j.BasicAuth(uri.User.Username(), password, "")
 	uri.User = nil
-	uri.Scheme = "bolt"
 	msQuery := uri.Query().Get("x-multi-statement")
 
-	// Whether to turn on/off TLS encryption.
-	tlsEncrypted := uri.Query().Get("x-tls-encrypted")
 	multi := false
-	encrypted := false
 	if msQuery != "" {
 		multi, err = strconv.ParseBool(uri.Query().Get("x-multi-statement"))
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if tlsEncrypted != "" {
-		encrypted, err = strconv.ParseBool(tlsEncrypted)
 		if err != nil {
 			return nil, err
 		}
@@ -100,10 +92,12 @@ func (n *Neo4j) Open(url string) (database.Driver, error) {
 
 	uri.RawQuery = ""
 
-	driver, err := neo4j.NewDriver(uri.String(), authToken, func(config *neo4j.Config) {
-		config.Encrypted = encrypted
-	})
+	driver, err := neo4j.NewDriverWithContext(uri.String(), authToken)
 	if err != nil {
+		return nil, err
+	}
+
+	if err = driver.VerifyConnectivity(context.Background()); err != nil {
 		return nil, err
 	}
 
@@ -115,7 +109,7 @@ func (n *Neo4j) Open(url string) (database.Driver, error) {
 }
 
 func (n *Neo4j) Close() error {
-	return n.driver.Close()
+	return n.driver.Close(context.Background())
 }
 
 // local locking in order to pass tests, Neo doesn't support database locking
@@ -135,41 +129,46 @@ func (n *Neo4j) Unlock() error {
 }
 
 func (n *Neo4j) Run(migration io.Reader) (err error) {
-	session, err := n.driver.Session(neo4j.AccessModeWrite)
-	if err != nil {
-		return err
-	}
+	ctx := context.Background()
+	session := n.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer func() {
-		if cerr := session.Close(); cerr != nil {
+		if cerr := session.Close(ctx); cerr != nil {
 			err = multierror.Append(err, cerr)
 		}
 	}()
 
 	if n.config.MultiStatement {
-		_, err = session.WriteTransaction(func(transaction neo4j.Transaction) (interface{}, error) {
-			var stmtRunErr error
-			if err := multistmt.Parse(migration, StatementSeparator, n.config.MultiStatementMaxSize, func(stmt []byte) bool {
-				trimStmt := bytes.TrimSpace(stmt)
-				if len(trimStmt) == 0 {
-					return true
-				}
-				trimStmt = bytes.TrimSuffix(trimStmt, StatementSeparator)
-				if len(trimStmt) == 0 {
-					return true
-				}
-
-				result, err := transaction.Run(string(trimStmt), nil)
-				if _, err := neo4j.Collect(result, err); err != nil {
-					stmtRunErr = err
-					return false
-				}
-				return true
-			}); err != nil {
-				return nil, err
+		tx, err := session.BeginTransaction(ctx)
+		if err != nil {
+			return err
+		}
+		defer func() {
+			if cerr := tx.Close(ctx); cerr != nil {
+				err = multierror.Append(err, cerr)
 			}
-			return nil, stmtRunErr
-		})
-		return err
+		}()
+
+		var stmtRunErr error
+		if err := multistmt.Parse(migration, StatementSeparator, n.config.MultiStatementMaxSize, func(stmt []byte) bool {
+			trimStmt := bytes.TrimSpace(stmt)
+			if len(trimStmt) == 0 {
+				return true
+			}
+			trimStmt = bytes.TrimSuffix(trimStmt, StatementSeparator)
+			if len(trimStmt) == 0 {
+				return true
+			}
+
+			result, err := tx.Run(ctx, string(trimStmt), nil)
+			if _, err := neo4j.CollectWithContext(ctx, result, err); err != nil {
+				stmtRunErr = err
+				return false
+			}
+			return true
+		}); err != nil {
+			return err
+		}
+		return stmtRunErr
 	}
 
 	body, err := io.ReadAll(migration)
@@ -177,24 +176,24 @@ func (n *Neo4j) Run(migration io.Reader) (err error) {
 		return err
 	}
 
-	_, err = neo4j.Collect(session.Run(string(body[:]), nil))
+	res, err := session.Run(ctx, string(body[:]), nil)
+	_, err = neo4j.CollectWithContext(ctx, res, err)
 	return err
 }
 
 func (n *Neo4j) SetVersion(version int, dirty bool) (err error) {
-	session, err := n.driver.Session(neo4j.AccessModeWrite)
-	if err != nil {
-		return err
-	}
+	ctx := context.Background()
+	session := n.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer func() {
-		if cerr := session.Close(); cerr != nil {
+		if cerr := session.Close(ctx); cerr != nil {
 			err = multierror.Append(err, cerr)
 		}
 	}()
 
 	query := fmt.Sprintf("MERGE (sm:%s {version: $version}) SET sm.dirty = $dirty, sm.ts = datetime()",
 		n.config.MigrationsLabel)
-	_, err = neo4j.Collect(session.Run(query, map[string]interface{}{"version": version, "dirty": dirty}))
+	res, err := session.Run(ctx, query, map[string]interface{}{"version": version, "dirty": dirty})
+	_, err = neo4j.CollectWithContext(ctx, res, err)
 	if err != nil {
 		return err
 	}
@@ -207,12 +206,10 @@ type MigrationRecord struct {
 }
 
 func (n *Neo4j) Version() (version int, dirty bool, err error) {
-	session, err := n.driver.Session(neo4j.AccessModeRead)
-	if err != nil {
-		return database.NilVersion, false, err
-	}
+	ctx := context.Background()
+	session := n.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer func() {
-		if cerr := session.Close(); cerr != nil {
+		if cerr := session.Close(ctx); cerr != nil {
 			err = multierror.Append(err, cerr)
 		}
 	}()
@@ -220,74 +217,78 @@ func (n *Neo4j) Version() (version int, dirty bool, err error) {
 	query := fmt.Sprintf(`MATCH (sm:%s) RETURN sm.version AS version, sm.dirty AS dirty
 ORDER BY COALESCE(sm.ts, datetime({year: 0})) DESC, sm.version DESC LIMIT 1`,
 		n.config.MigrationsLabel)
-	result, err := session.ReadTransaction(func(transaction neo4j.Transaction) (interface{}, error) {
-		result, err := transaction.Run(query, nil)
-		if err != nil {
-			return nil, err
-		}
-		if result.Next() {
-			record := result.Record()
-			mr := MigrationRecord{}
-			versionResult, ok := record.Get("version")
-			if !ok {
-				mr.Version = database.NilVersion
-			} else {
-				mr.Version = int(versionResult.(int64))
-			}
 
-			dirtyResult, ok := record.Get("dirty")
-			if ok {
-				mr.Dirty = dirtyResult.(bool)
-			}
+	tx, err := session.BeginTransaction(ctx)
 
-			return mr, nil
-		}
-		return nil, result.Err()
-	})
+	result, err := tx.Run(ctx, query, nil)
 	if err != nil {
 		return database.NilVersion, false, err
 	}
-	if result == nil {
-		return database.NilVersion, false, err
+	if result.Next(ctx) {
+		record := result.Record()
+		mr := MigrationRecord{}
+		versionResult, ok := record.Get("version")
+		if !ok {
+			mr.Version = database.NilVersion
+		} else {
+			mr.Version = int(versionResult.(int64))
+		}
+
+		dirtyResult, ok := record.Get("dirty")
+		if ok {
+			mr.Dirty = dirtyResult.(bool)
+		}
+
+		return mr.Version, mr.Dirty, nil
 	}
-	mr := result.(MigrationRecord)
-	return mr.Version, mr.Dirty, err
+
+	return database.NilVersion, false, err
 }
 
 func (n *Neo4j) Drop() (err error) {
-	session, err := n.driver.Session(neo4j.AccessModeWrite)
-	if err != nil {
-		return err
-	}
+	ctx := context.Background()
+	session := n.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer func() {
-		if cerr := session.Close(); cerr != nil {
+		if cerr := session.Close(ctx); cerr != nil {
 			err = multierror.Append(err, cerr)
 		}
 	}()
 
-	if _, err := neo4j.Collect(session.Run("MATCH (n) DETACH DELETE n", nil)); err != nil {
+	res, err := session.Run(ctx, "MATCH (n) DETACH DELETE n", nil)
+	if _, err := neo4j.CollectWithContext(ctx, res, err); err != nil {
 		return err
 	}
 	return nil
 }
 
 func (n *Neo4j) ensureVersionConstraint() (err error) {
-	session, err := n.driver.Session(neo4j.AccessModeWrite)
-	if err != nil {
-		return err
-	}
+	ctx := context.Background()
+	session := n.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer func() {
-		if cerr := session.Close(); cerr != nil {
+		if cerr := session.Close(ctx); cerr != nil {
 			err = multierror.Append(err, cerr)
 		}
 	}()
+
+	var neo4jVersion string
+	result, err := session.Run(ctx, "call dbms.components() yield versions unwind versions as version return version", nil)
+	res, err := neo4j.CollectWithContext(ctx, result, err)
+	if err != nil {
+		return err
+	}
+	if len(res) > 0 && len(res[0].Values) > 0 {
+		if v, ok := res[0].Values[0].(string); ok {
+			neo4jVersion = semver.Major("v" + v)
+		}
+	}
 
 	/**
 	Get constraint and check to avoid error duplicate
 	using db.labels() to support Neo4j 3 and 4.
 	Neo4J 3 doesn't support db.constraints() YIELD name
 	*/
-	res, err := neo4j.Collect(session.Run(fmt.Sprintf("CALL db.labels() YIELD label WHERE label=\"%s\" RETURN label", n.config.MigrationsLabel), nil))
+	result, err = session.Run(ctx, fmt.Sprintf("CALL db.labels() YIELD label WHERE label=\"%s\" RETURN label", n.config.MigrationsLabel), nil)
+	res, err = neo4j.CollectWithContext(ctx, result, err)
 	if err != nil {
 		return err
 	}
@@ -295,8 +296,18 @@ func (n *Neo4j) ensureVersionConstraint() (err error) {
 		return nil
 	}
 
-	query := fmt.Sprintf("CREATE CONSTRAINT ON (a:%s) ASSERT a.version IS UNIQUE", n.config.MigrationsLabel)
-	if _, err := neo4j.Collect(session.Run(query, nil)); err != nil {
+	var query string
+	switch neo4jVersion {
+	case "v5":
+		query = fmt.Sprintf("CREATE CONSTRAINT FOR (a:%s) REQUIRE a.version IS UNIQUE", n.config.MigrationsLabel)
+	case "v4":
+		query = fmt.Sprintf("CREATE CONSTRAINT ON (a:%s) ASSERT a.version IS UNIQUE", n.config.MigrationsLabel)
+	default:
+		return fmt.Errorf("unsupported neo4j version %v", neo4jVersion)
+	}
+
+	result, err = session.Run(ctx, query, nil)
+	if _, err := neo4j.CollectWithContext(ctx, result, err); err != nil {
 		return err
 	}
 	return nil
