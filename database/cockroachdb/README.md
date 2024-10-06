@@ -8,6 +8,7 @@
 | `x-lock-table` | `LockTable` | Name of the table which maintains the migration lock |
 | `x-force-lock` | `ForceLock` | Force lock acquisition to fix faulty migrations which may not have released the schema lock (Boolean, default is `false`) |
 | `dbname` | `DatabaseName` | The name of the database to connect to |
+| `x-role` | `Role` | The role to be set in case it differs from the user |
 | `user` | | The user to sign in as |
 | `password` | | The user's password |
 | `host` | | The host to connect to. Values that start with / are for unix domain sockets. (default is localhost) |
