@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/dhui/dktest"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 
 	"github.com/golang-migrate/migrate/v4"
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
@@ -24,8 +24,6 @@ var (
 		//{ImageName: "neo4j:5-enterprise", Options: opts},
 		{ImageName: "neo4j:4.4-community", Options: opts},
 		//{ImageName: "neo4j:4.4-enterprise", Options: opts},
-		//{ImageName: "neo4j:3.5-community", Options: opts},
-		//{ImageName: "neo4j:3.5-enterprise", Options: opts},
 	}
 )
 
@@ -39,31 +37,19 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 		return false
 	}
 
-	driver, err := neo4j.NewDriver(
+	driver, err := neo4j.NewDriverWithContext(
 		neoConnectionString(ip, port),
-		neo4j.BasicAuth("neo4j", "migratetest", ""),
-		func(config *neo4j.Config) {
-		})
+		neo4j.BasicAuth("neo4j", "migratetest", ""))
 	if err != nil {
 		return false
 	}
 	defer func() {
-		if err := driver.Close(); err != nil {
+		if err := driver.Close(ctx); err != nil {
 			log.Println("close error:", err)
 		}
 	}()
-	session := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
-	if err != nil {
-		return false
-	}
-	result, err := session.Run("RETURN 1", nil)
-	if err != nil {
-		return false
-	} else if result.Err() != nil {
-		return false
-	}
-
-	return true
+	err = driver.VerifyConnectivity(ctx)
+	return err == nil
 }
 
 func Test(t *testing.T) {
