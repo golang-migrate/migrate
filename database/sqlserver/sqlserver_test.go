@@ -44,8 +44,8 @@ var (
 	// Container versions: https://mcr.microsoft.com/v2/mssql/server/tags/list
 	specs = []dktesting.ContainerSpec{
 		{ImageName: "mcr.microsoft.com/azure-sql-edge:latest", Options: sqlEdgeOpts},
-		{ImageName: "mcr.microsoft.com/mssql/server:2017-latest", Options: sqlServerOpts},
 		{ImageName: "mcr.microsoft.com/mssql/server:2019-latest", Options: sqlServerOpts},
+		{ImageName: "mcr.microsoft.com/mssql/server:2022-latest", Options: sqlServerOpts},
 	}
 )
 
