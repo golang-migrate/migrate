@@ -59,7 +59,7 @@ type YugabyteDB struct {
 	config *Config
 }
 
-func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
+func WithInstance(ctx context.Context, instance *sql.DB, config *Config) (database.Driver, error) {
 	if config == nil {
 		return nil, ErrNilConfig
 	}
@@ -112,14 +112,14 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		return nil, err
 	}
 
-	if err := px.ensureVersionTable(); err != nil {
+	if err := px.ensureVersionTable(ctx); err != nil {
 		return nil, err
 	}
 
 	return px, nil
 }
 
-func (c *YugabyteDB) Open(dbURL string) (database.Driver, error) {
+func (c *YugabyteDB) Open(ctx context.Context, dbURL string) (database.Driver, error) {
 	purl, err := url.Parse(dbURL)
 	if err != nil {
 		return nil, err
@@ -169,7 +169,7 @@ func (c *YugabyteDB) Open(dbURL string) (database.Driver, error) {
 		maxRetries = DefaultMaxRetries
 	}
 
-	px, err := WithInstance(db, &Config{
+	px, err := WithInstance(ctx, db, &Config{
 		DatabaseName:        purl.Path,
 		MigrationsTable:     migrationsTable,
 		LockTable:           lockTable,
@@ -185,13 +185,13 @@ func (c *YugabyteDB) Open(dbURL string) (database.Driver, error) {
 	return px, nil
 }
 
-func (c *YugabyteDB) Close() error {
+func (c *YugabyteDB) Close(ctx context.Context) error {
 	return c.db.Close()
 }
 
 // Locking is done manually with a separate lock table. Implementing advisory locks in YugabyteDB is being discussed
 // See: https://github.com/yugabyte/yugabyte-db/issues/3642
-func (c *YugabyteDB) Lock() error {
+func (c *YugabyteDB) Lock(ctx context.Context) error {
 	return database.CasRestoreOnErr(&c.isLocked, false, true, database.ErrLocked, func() (err error) {
 		return c.doTxWithRetry(context.Background(), &sql.TxOptions{Isolation: sql.LevelSerializable}, func(tx *sql.Tx) (err error) {
 			aid, err := database.GenerateAdvisoryLockId(c.config.DatabaseName)
@@ -228,7 +228,7 @@ func (c *YugabyteDB) Lock() error {
 
 // Locking is done manually with a separate lock table. Implementing advisory locks in YugabyteDB is being discussed
 // See: https://github.com/yugabyte/yugabyte-db/issues/3642
-func (c *YugabyteDB) Unlock() error {
+func (c *YugabyteDB) Unlock(ctx context.Context) error {
 	return database.CasRestoreOnErr(&c.isLocked, true, false, database.ErrNotLocked, func() (err error) {
 		aid, err := database.GenerateAdvisoryLockId(c.config.DatabaseName)
 		if err != nil {
@@ -255,7 +255,7 @@ func (c *YugabyteDB) Unlock() error {
 	})
 }
 
-func (c *YugabyteDB) Run(migration io.Reader) error {
+func (c *YugabyteDB) Run(ctx context.Context, migration io.Reader) error {
 	migr, err := io.ReadAll(migration)
 	if err != nil {
 		return err
@@ -270,7 +270,7 @@ func (c *YugabyteDB) Run(migration io.Reader) error {
 	return nil
 }
 
-func (c *YugabyteDB) SetVersion(version int, dirty bool) error {
+func (c *YugabyteDB) SetVersion(ctx context.Context, version int, dirty bool) error {
 	return c.doTxWithRetry(context.Background(), &sql.TxOptions{Isolation: sql.LevelSerializable}, func(tx *sql.Tx) error {
 		if _, err := tx.Exec(`DELETE FROM "` + c.config.MigrationsTable + `"`); err != nil {
 			return err
@@ -289,7 +289,7 @@ func (c *YugabyteDB) SetVersion(version int, dirty bool) error {
 	})
 }
 
-func (c *YugabyteDB) Version() (version int, dirty bool, err error) {
+func (c *YugabyteDB) Version(ctx context.Context) (version int, dirty bool, err error) {
 	query := `SELECT version, dirty FROM "` + c.config.MigrationsTable + `" LIMIT 1`
 	err = c.db.QueryRow(query).Scan(&version, &dirty)
 
@@ -312,7 +312,7 @@ func (c *YugabyteDB) Version() (version int, dirty bool, err error) {
 	}
 }
 
-func (c *YugabyteDB) Drop() (err error) {
+func (c *YugabyteDB) Drop(ctx context.Context) (err error) {
 	query := `SELECT table_name FROM information_schema.tables WHERE table_schema=(SELECT current_schema()) AND table_type='BASE TABLE'`
 	tables, err := c.db.Query(query)
 	if err != nil {
@@ -353,13 +353,13 @@ func (c *YugabyteDB) Drop() (err error) {
 
 // ensureVersionTable checks if versions table exists and, if not, creates it.
 // Note that this function locks the database
-func (c *YugabyteDB) ensureVersionTable() (err error) {
-	if err = c.Lock(); err != nil {
+func (c *YugabyteDB) ensureVersionTable(ctx context.Context) (err error) {
+	if err = c.Lock(ctx); err != nil {
 		return err
 	}
 
 	defer func() {
-		if e := c.Unlock(); e != nil {
+		if e := c.Unlock(ctx); e != nil {
 			if err == nil {
 				err = e
 			} else {

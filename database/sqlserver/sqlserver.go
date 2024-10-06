@@ -61,7 +61,7 @@ type SQLServer struct {
 // WithInstance returns a database instance from an already created database connection.
 //
 // Note that the deprecated `mssql` driver is not supported. Please use the newer `sqlserver` driver.
-func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
+func WithInstance(ctx context.Context, instance *sql.DB, config *Config) (database.Driver, error) {
 	if config == nil {
 		return nil, ErrNilConfig
 	}
@@ -114,7 +114,7 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		config: config,
 	}
 
-	if err := ss.ensureVersionTable(); err != nil {
+	if err := ss.ensureVersionTable(ctx); err != nil {
 		return nil, err
 	}
 
@@ -122,7 +122,7 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 }
 
 // Open a connection to the database.
-func (ss *SQLServer) Open(url string) (database.Driver, error) {
+func (ss *SQLServer) Open(ctx context.Context, url string) (database.Driver, error) {
 	purl, err := nurl.Parse(url)
 	if err != nil {
 		return nil, err
@@ -168,7 +168,7 @@ func (ss *SQLServer) Open(url string) (database.Driver, error) {
 
 	migrationsTable := purl.Query().Get("x-migrations-table")
 
-	px, err := WithInstance(db, &Config{
+	px, err := WithInstance(ctx, db, &Config{
 		DatabaseName:    purl.Path,
 		MigrationsTable: migrationsTable,
 	})
@@ -181,7 +181,7 @@ func (ss *SQLServer) Open(url string) (database.Driver, error) {
 }
 
 // Close the database connection
-func (ss *SQLServer) Close() error {
+func (ss *SQLServer) Close(ctx context.Context) error {
 	connErr := ss.conn.Close()
 	dbErr := ss.db.Close()
 	if connErr != nil || dbErr != nil {
@@ -191,7 +191,7 @@ func (ss *SQLServer) Close() error {
 }
 
 // Lock creates an advisory local on the database to prevent multiple migrations from running at the same time.
-func (ss *SQLServer) Lock() error {
+func (ss *SQLServer) Lock(ctx context.Context) error {
 	return database.CasRestoreOnErr(&ss.isLocked, false, true, database.ErrLocked, func() error {
 		aid, err := database.GenerateAdvisoryLockId(ss.config.DatabaseName, ss.config.SchemaName)
 		if err != nil {
@@ -215,7 +215,7 @@ func (ss *SQLServer) Lock() error {
 }
 
 // Unlock froms the migration lock from the database
-func (ss *SQLServer) Unlock() error {
+func (ss *SQLServer) Unlock(ctx context.Context) error {
 	return database.CasRestoreOnErr(&ss.isLocked, true, false, database.ErrNotLocked, func() error {
 		aid, err := database.GenerateAdvisoryLockId(ss.config.DatabaseName, ss.config.SchemaName)
 		if err != nil {
@@ -233,7 +233,7 @@ func (ss *SQLServer) Unlock() error {
 }
 
 // Run the migrations for the database
-func (ss *SQLServer) Run(migration io.Reader) error {
+func (ss *SQLServer) Run(ctx context.Context, migration io.Reader) error {
 	migr, err := io.ReadAll(migration)
 	if err != nil {
 		return err
@@ -256,7 +256,7 @@ func (ss *SQLServer) Run(migration io.Reader) error {
 }
 
 // SetVersion for the current database
-func (ss *SQLServer) SetVersion(version int, dirty bool) error {
+func (ss *SQLServer) SetVersion(ctx context.Context, version int, dirty bool) error {
 
 	tx, err := ss.conn.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
@@ -296,7 +296,7 @@ func (ss *SQLServer) SetVersion(version int, dirty bool) error {
 }
 
 // Version of the current database state
-func (ss *SQLServer) Version() (version int, dirty bool, err error) {
+func (ss *SQLServer) Version(ctx context.Context) (version int, dirty bool, err error) {
 	query := `SELECT TOP 1 version, dirty FROM ` + ss.getMigrationTable()
 	err = ss.conn.QueryRowContext(context.Background(), query).Scan(&version, &dirty)
 	switch {
@@ -313,7 +313,7 @@ func (ss *SQLServer) Version() (version int, dirty bool, err error) {
 }
 
 // Drop all tables from the database.
-func (ss *SQLServer) Drop() error {
+func (ss *SQLServer) Drop(ctx context.Context) error {
 
 	// drop all referential integrity constraints
 	query := `
@@ -347,13 +347,13 @@ func (ss *SQLServer) Drop() error {
 	return nil
 }
 
-func (ss *SQLServer) ensureVersionTable() (err error) {
-	if err = ss.Lock(); err != nil {
+func (ss *SQLServer) ensureVersionTable(ctx context.Context) (err error) {
+	if err = ss.Lock(ctx); err != nil {
 		return err
 	}
 
 	defer func() {
-		if e := ss.Unlock(); e != nil {
+		if e := ss.Unlock(ctx); e != nil {
 			if err == nil {
 				err = e
 			} else {

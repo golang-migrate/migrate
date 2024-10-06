@@ -47,7 +47,7 @@ type CockroachDb struct {
 	config *Config
 }
 
-func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
+func WithInstance(ctx context.Context, instance *sql.DB, config *Config) (database.Driver, error) {
 	if config == nil {
 		return nil, ErrNilConfig
 	}
@@ -88,14 +88,14 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		return nil, err
 	}
 
-	if err := px.ensureVersionTable(); err != nil {
+	if err := px.ensureVersionTable(ctx); err != nil {
 		return nil, err
 	}
 
 	return px, nil
 }
 
-func (c *CockroachDb) Open(url string) (database.Driver, error) {
+func (c *CockroachDb) Open(ctx context.Context, url string) (database.Driver, error) {
 	purl, err := nurl.Parse(url)
 	if err != nil {
 		return nil, err
@@ -127,7 +127,7 @@ func (c *CockroachDb) Open(url string) (database.Driver, error) {
 		forceLock = false
 	}
 
-	px, err := WithInstance(db, &Config{
+	px, err := WithInstance(ctx, db, &Config{
 		DatabaseName:    purl.Path,
 		MigrationsTable: migrationsTable,
 		LockTable:       lockTable,
@@ -140,13 +140,13 @@ func (c *CockroachDb) Open(url string) (database.Driver, error) {
 	return px, nil
 }
 
-func (c *CockroachDb) Close() error {
+func (c *CockroachDb) Close(ctx context.Context) error {
 	return c.db.Close()
 }
 
 // Locking is done manually with a separate lock table.  Implementing advisory locks in CRDB is being discussed
 // See: https://github.com/cockroachdb/cockroach/issues/13546
-func (c *CockroachDb) Lock() error {
+func (c *CockroachDb) Lock(ctx context.Context) error {
 	return database.CasRestoreOnErr(&c.isLocked, false, true, database.ErrLocked, func() (err error) {
 		return crdb.ExecuteTx(context.Background(), c.db, nil, func(tx *sql.Tx) (err error) {
 			aid, err := database.GenerateAdvisoryLockId(c.config.DatabaseName)
@@ -183,7 +183,7 @@ func (c *CockroachDb) Lock() error {
 
 // Locking is done manually with a separate lock table.  Implementing advisory locks in CRDB is being discussed
 // See: https://github.com/cockroachdb/cockroach/issues/13546
-func (c *CockroachDb) Unlock() error {
+func (c *CockroachDb) Unlock(ctx context.Context) error {
 	return database.CasRestoreOnErr(&c.isLocked, true, false, database.ErrNotLocked, func() (err error) {
 		aid, err := database.GenerateAdvisoryLockId(c.config.DatabaseName)
 		if err != nil {
@@ -210,7 +210,7 @@ func (c *CockroachDb) Unlock() error {
 	})
 }
 
-func (c *CockroachDb) Run(migration io.Reader) error {
+func (c *CockroachDb) Run(ctx context.Context, migration io.Reader) error {
 	migr, err := io.ReadAll(migration)
 	if err != nil {
 		return err
@@ -225,7 +225,7 @@ func (c *CockroachDb) Run(migration io.Reader) error {
 	return nil
 }
 
-func (c *CockroachDb) SetVersion(version int, dirty bool) error {
+func (c *CockroachDb) SetVersion(ctx context.Context, version int, dirty bool) error {
 	return crdb.ExecuteTx(context.Background(), c.db, nil, func(tx *sql.Tx) error {
 		if _, err := tx.Exec(`DELETE FROM "` + c.config.MigrationsTable + `"`); err != nil {
 			return err
@@ -244,7 +244,7 @@ func (c *CockroachDb) SetVersion(version int, dirty bool) error {
 	})
 }
 
-func (c *CockroachDb) Version() (version int, dirty bool, err error) {
+func (c *CockroachDb) Version(ctx context.Context) (version int, dirty bool, err error) {
 	query := `SELECT version, dirty FROM "` + c.config.MigrationsTable + `" LIMIT 1`
 	err = c.db.QueryRow(query).Scan(&version, &dirty)
 
@@ -267,7 +267,7 @@ func (c *CockroachDb) Version() (version int, dirty bool, err error) {
 	}
 }
 
-func (c *CockroachDb) Drop() (err error) {
+func (c *CockroachDb) Drop(ctx context.Context) (err error) {
 	// select all tables in current schema
 	query := `SELECT table_name FROM information_schema.tables WHERE table_schema=(SELECT current_schema())`
 	tables, err := c.db.Query(query)
@@ -311,13 +311,13 @@ func (c *CockroachDb) Drop() (err error) {
 // ensureVersionTable checks if versions table exists and, if not, creates it.
 // Note that this function locks the database, which deviates from the usual
 // convention of "caller locks" in the CockroachDb type.
-func (c *CockroachDb) ensureVersionTable() (err error) {
-	if err = c.Lock(); err != nil {
+func (c *CockroachDb) ensureVersionTable(ctx context.Context) (err error) {
+	if err = c.Lock(ctx); err != nil {
 		return err
 	}
 
 	defer func() {
-		if e := c.Unlock(); e != nil {
+		if e := c.Unlock(ctx); e != nil {
 			if err == nil {
 				err = e
 			} else {

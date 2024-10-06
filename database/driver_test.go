@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"io"
 	"testing"
 )
@@ -18,37 +19,37 @@ type mockDriver struct {
 	url string
 }
 
-func (m *mockDriver) Open(url string) (Driver, error) {
+func (m *mockDriver) Open(ctx context.Context, url string) (Driver, error) {
 	return &mockDriver{
 		url: url,
 	}, nil
 }
 
-func (m *mockDriver) Close() error {
+func (m *mockDriver) Close(ctx context.Context) error {
 	return nil
 }
 
-func (m *mockDriver) Lock() error {
+func (m *mockDriver) Lock(ctx context.Context) error {
 	return nil
 }
 
-func (m *mockDriver) Unlock() error {
+func (m *mockDriver) Unlock(ctx context.Context) error {
 	return nil
 }
 
-func (m *mockDriver) Run(migration io.Reader) error {
+func (m *mockDriver) Run(ctx context.Context, migration io.Reader) error {
 	return nil
 }
 
-func (m *mockDriver) SetVersion(version int, dirty bool) error {
+func (m *mockDriver) SetVersion(ctx context.Context, version int, dirty bool) error {
 	return nil
 }
 
-func (m *mockDriver) Version() (version int, dirty bool, err error) {
+func (m *mockDriver) Version(ctx context.Context) (version int, dirty bool, err error) {
 	return 0, false, nil
 }
 
-func (m *mockDriver) Drop() error {
+func (m *mockDriver) Drop(ctx context.Context) error {
 	return nil
 }
 
@@ -95,7 +96,7 @@ func TestOpen(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.url, func(t *testing.T) {
-			d, err := Open(c.url)
+			d, err := Open(context.Background(), c.url)
 
 			if err == nil {
 				if c.err {

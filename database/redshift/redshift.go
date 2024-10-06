@@ -46,7 +46,7 @@ type Redshift struct {
 	config *Config
 }
 
-func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
+func WithInstance(ctx context.Context, instance *sql.DB, config *Config) (database.Driver, error) {
 	if config == nil {
 		return nil, ErrNilConfig
 	}
@@ -85,14 +85,14 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		config: config,
 	}
 
-	if err := px.ensureVersionTable(); err != nil {
+	if err := px.ensureVersionTable(ctx); err != nil {
 		return nil, err
 	}
 
 	return px, nil
 }
 
-func (p *Redshift) Open(url string) (database.Driver, error) {
+func (p *Redshift) Open(ctx context.Context, url string) (database.Driver, error) {
 	purl, err := nurl.Parse(url)
 	if err != nil {
 		return nil, err
@@ -106,7 +106,7 @@ func (p *Redshift) Open(url string) (database.Driver, error) {
 
 	migrationsTable := purl.Query().Get("x-migrations-table")
 
-	px, err := WithInstance(db, &Config{
+	px, err := WithInstance(ctx, db, &Config{
 		DatabaseName:    purl.Path,
 		MigrationsTable: migrationsTable,
 	})
@@ -117,7 +117,7 @@ func (p *Redshift) Open(url string) (database.Driver, error) {
 	return px, nil
 }
 
-func (p *Redshift) Close() error {
+func (p *Redshift) Close(ctx context.Context) error {
 	connErr := p.conn.Close()
 	dbErr := p.db.Close()
 	if connErr != nil || dbErr != nil {
@@ -127,21 +127,21 @@ func (p *Redshift) Close() error {
 }
 
 // Redshift does not support advisory lock functions: https://docs.aws.amazon.com/redshift/latest/dg/c_unsupported-postgresql-functions.html
-func (p *Redshift) Lock() error {
+func (p *Redshift) Lock(ctx context.Context) error {
 	if !p.isLocked.CAS(false, true) {
 		return database.ErrLocked
 	}
 	return nil
 }
 
-func (p *Redshift) Unlock() error {
+func (p *Redshift) Unlock(ctx context.Context) error {
 	if !p.isLocked.CAS(true, false) {
 		return database.ErrNotLocked
 	}
 	return nil
 }
 
-func (p *Redshift) Run(migration io.Reader) error {
+func (p *Redshift) Run(ctx context.Context, migration io.Reader) error {
 	migr, err := io.ReadAll(migration)
 	if err != nil {
 		return err
@@ -209,7 +209,7 @@ func runesLastIndex(input []rune, target rune) int {
 	return -1
 }
 
-func (p *Redshift) SetVersion(version int, dirty bool) error {
+func (p *Redshift) SetVersion(ctx context.Context, version int, dirty bool) error {
 	tx, err := p.conn.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
@@ -243,7 +243,7 @@ func (p *Redshift) SetVersion(version int, dirty bool) error {
 	return nil
 }
 
-func (p *Redshift) Version() (version int, dirty bool, err error) {
+func (p *Redshift) Version(ctx context.Context) (version int, dirty bool, err error) {
 	query := `SELECT version, dirty FROM "` + p.config.MigrationsTable + `" LIMIT 1`
 	err = p.conn.QueryRowContext(context.Background(), query).Scan(&version, &dirty)
 	switch {
@@ -263,7 +263,7 @@ func (p *Redshift) Version() (version int, dirty bool, err error) {
 	}
 }
 
-func (p *Redshift) Drop() (err error) {
+func (p *Redshift) Drop(ctx context.Context) (err error) {
 	// select all tables in current schema
 	query := `SELECT table_name FROM information_schema.tables WHERE table_schema=(SELECT current_schema()) AND table_type='BASE TABLE'`
 	tables, err := p.conn.QueryContext(context.Background(), query)
@@ -307,13 +307,13 @@ func (p *Redshift) Drop() (err error) {
 // ensureVersionTable checks if versions table exists and, if not, creates it.
 // Note that this function locks the database, which deviates from the usual
 // convention of "caller locks" in the Redshift type.
-func (p *Redshift) ensureVersionTable() (err error) {
-	if err = p.Lock(); err != nil {
+func (p *Redshift) ensureVersionTable(ctx context.Context) (err error) {
+	if err = p.Lock(ctx); err != nil {
 		return err
 	}
 
 	defer func() {
-		if e := p.Unlock(); e != nil {
+		if e := p.Unlock(ctx); e != nil {
 			if err == nil {
 				err = e
 			} else {

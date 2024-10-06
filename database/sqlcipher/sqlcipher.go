@@ -1,6 +1,7 @@
 package sqlcipher
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"io"
@@ -40,7 +41,7 @@ type Sqlite struct {
 	config *Config
 }
 
-func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
+func WithInstance(ctx context.Context, instance *sql.DB, config *Config) (database.Driver, error) {
 	if config == nil {
 		return nil, ErrNilConfig
 	}
@@ -57,7 +58,7 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		db:     instance,
 		config: config,
 	}
-	if err := mx.ensureVersionTable(); err != nil {
+	if err := mx.ensureVersionTable(ctx); err != nil {
 		return nil, err
 	}
 	return mx, nil
@@ -66,13 +67,13 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 // ensureVersionTable checks if versions table exists and, if not, creates it.
 // Note that this function locks the database, which deviates from the usual
 // convention of "caller locks" in the Sqlite type.
-func (m *Sqlite) ensureVersionTable() (err error) {
-	if err = m.Lock(); err != nil {
+func (m *Sqlite) ensureVersionTable(ctx context.Context) (err error) {
+	if err = m.Lock(ctx); err != nil {
 		return err
 	}
 
 	defer func() {
-		if e := m.Unlock(); e != nil {
+		if e := m.Unlock(ctx); e != nil {
 			if err == nil {
 				err = e
 			} else {
@@ -92,7 +93,7 @@ func (m *Sqlite) ensureVersionTable() (err error) {
 	return nil
 }
 
-func (m *Sqlite) Open(url string) (database.Driver, error) {
+func (m *Sqlite) Open(ctx context.Context, url string) (database.Driver, error) {
 	purl, err := nurl.Parse(url)
 	if err != nil {
 		return nil, err
@@ -118,7 +119,7 @@ func (m *Sqlite) Open(url string) (database.Driver, error) {
 		}
 	}
 
-	mx, err := WithInstance(db, &Config{
+	mx, err := WithInstance(ctx, db, &Config{
 		DatabaseName:    purl.Path,
 		MigrationsTable: migrationsTable,
 		NoTxWrap:        noTxWrap,
@@ -129,11 +130,11 @@ func (m *Sqlite) Open(url string) (database.Driver, error) {
 	return mx, nil
 }
 
-func (m *Sqlite) Close() error {
+func (m *Sqlite) Close(ctx context.Context) error {
 	return m.db.Close()
 }
 
-func (m *Sqlite) Drop() (err error) {
+func (m *Sqlite) Drop(ctx context.Context) (err error) {
 	query := `SELECT name FROM sqlite_master WHERE type = 'table';`
 	tables, err := m.db.Query(query)
 	if err != nil {
@@ -177,21 +178,21 @@ func (m *Sqlite) Drop() (err error) {
 	return nil
 }
 
-func (m *Sqlite) Lock() error {
+func (m *Sqlite) Lock(ctx context.Context) error {
 	if !m.isLocked.CAS(false, true) {
 		return database.ErrLocked
 	}
 	return nil
 }
 
-func (m *Sqlite) Unlock() error {
+func (m *Sqlite) Unlock(ctx context.Context) error {
 	if !m.isLocked.CAS(true, false) {
 		return database.ErrNotLocked
 	}
 	return nil
 }
 
-func (m *Sqlite) Run(migration io.Reader) error {
+func (m *Sqlite) Run(ctx context.Context, migration io.Reader) error {
 	migr, err := io.ReadAll(migration)
 	if err != nil {
 		return err
@@ -228,7 +229,7 @@ func (m *Sqlite) executeQueryNoTx(query string) error {
 	return nil
 }
 
-func (m *Sqlite) SetVersion(version int, dirty bool) error {
+func (m *Sqlite) SetVersion(ctx context.Context, version int, dirty bool) error {
 	tx, err := m.db.Begin()
 	if err != nil {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
@@ -259,7 +260,7 @@ func (m *Sqlite) SetVersion(version int, dirty bool) error {
 	return nil
 }
 
-func (m *Sqlite) Version() (version int, dirty bool, err error) {
+func (m *Sqlite) Version(ctx context.Context) (version int, dirty bool, err error) {
 	query := "SELECT version, dirty FROM " + m.config.MigrationsTable + " LIMIT 1"
 	err = m.db.QueryRow(query).Scan(&version, &dirty)
 	if err != nil {

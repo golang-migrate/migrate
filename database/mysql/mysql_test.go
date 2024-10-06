@@ -89,6 +89,7 @@ func Test(t *testing.T) {
 	// mysql.SetLogger(mysql.Logger(log.New(io.Discard, "", log.Ltime)))
 
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ctx := context.Background()
 		ip, port, err := c.Port(defaultPort)
 		if err != nil {
 			t.Fatal(err)
@@ -96,23 +97,23 @@ func Test(t *testing.T) {
 
 		addr := fmt.Sprintf("mysql://root:root@tcp(%v:%v)/public", ip, port)
 		p := &Mysql{}
-		d, err := p.Open(addr)
+		d, err := p.Open(ctx, addr)
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer func() {
-			if err := d.Close(); err != nil {
+			if err := d.Close(ctx); err != nil {
 				t.Error(err)
 			}
 		}()
 		dt.Test(t, d, []byte("SELECT 1"))
 
 		// check ensureVersionTable
-		if err := d.(*Mysql).ensureVersionTable(); err != nil {
+		if err := d.(*Mysql).ensureVersionTable(ctx); err != nil {
 			t.Fatal(err)
 		}
 		// check again
-		if err := d.(*Mysql).ensureVersionTable(); err != nil {
+		if err := d.(*Mysql).ensureVersionTable(ctx); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -122,6 +123,7 @@ func TestMigrate(t *testing.T) {
 	// mysql.SetLogger(mysql.Logger(log.New(io.Discard, "", log.Ltime)))
 
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ctx := context.Background()
 		ip, port, err := c.Port(defaultPort)
 		if err != nil {
 			t.Fatal(err)
@@ -129,28 +131,28 @@ func TestMigrate(t *testing.T) {
 
 		addr := fmt.Sprintf("mysql://root:root@tcp(%v:%v)/public", ip, port)
 		p := &Mysql{}
-		d, err := p.Open(addr)
+		d, err := p.Open(ctx, addr)
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer func() {
-			if err := d.Close(); err != nil {
+			if err := d.Close(ctx); err != nil {
 				t.Error(err)
 			}
 		}()
 
-		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "public", d)
+		m, err := migrate.NewWithDatabaseInstance(ctx, "file://./examples/migrations", "public", d)
 		if err != nil {
 			t.Fatal(err)
 		}
 		dt.TestMigrate(t, m)
 
 		// check ensureVersionTable
-		if err := d.(*Mysql).ensureVersionTable(); err != nil {
+		if err := d.(*Mysql).ensureVersionTable(ctx); err != nil {
 			t.Fatal(err)
 		}
 		// check again
-		if err := d.(*Mysql).ensureVersionTable(); err != nil {
+		if err := d.(*Mysql).ensureVersionTable(ctx); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -160,6 +162,7 @@ func TestMigrateAnsiQuotes(t *testing.T) {
 	// mysql.SetLogger(mysql.Logger(log.New(io.Discard, "", log.Ltime)))
 
 	dktesting.ParallelTest(t, specsAnsiQuotes, func(t *testing.T, c dktest.ContainerInfo) {
+		ctx := context.Background()
 		ip, port, err := c.Port(defaultPort)
 		if err != nil {
 			t.Fatal(err)
@@ -167,28 +170,28 @@ func TestMigrateAnsiQuotes(t *testing.T) {
 
 		addr := fmt.Sprintf("mysql://root:root@tcp(%v:%v)/public", ip, port)
 		p := &Mysql{}
-		d, err := p.Open(addr)
+		d, err := p.Open(ctx, addr)
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer func() {
-			if err := d.Close(); err != nil {
+			if err := d.Close(ctx); err != nil {
 				t.Error(err)
 			}
 		}()
 
-		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "public", d)
+		m, err := migrate.NewWithDatabaseInstance(ctx, "file://./examples/migrations", "public", d)
 		if err != nil {
 			t.Fatal(err)
 		}
 		dt.TestMigrate(t, m)
 
 		// check ensureVersionTable
-		if err := d.(*Mysql).ensureVersionTable(); err != nil {
+		if err := d.(*Mysql).ensureVersionTable(ctx); err != nil {
 			t.Fatal(err)
 		}
 		// check again
-		if err := d.(*Mysql).ensureVersionTable(); err != nil {
+		if err := d.(*Mysql).ensureVersionTable(ctx); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -196,6 +199,7 @@ func TestMigrateAnsiQuotes(t *testing.T) {
 
 func TestLockWorks(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ctx := context.Background()
 		ip, port, err := c.Port(defaultPort)
 		if err != nil {
 			t.Fatal(err)
@@ -203,7 +207,7 @@ func TestLockWorks(t *testing.T) {
 
 		addr := fmt.Sprintf("mysql://root:root@tcp(%v:%v)/public", ip, port)
 		p := &Mysql{}
-		d, err := p.Open(addr)
+		d, err := p.Open(ctx, addr)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -211,21 +215,21 @@ func TestLockWorks(t *testing.T) {
 
 		ms := d.(*Mysql)
 
-		err = ms.Lock()
+		err = ms.Lock(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = ms.Unlock()
+		err = ms.Unlock(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		// make sure the 2nd lock works (RELEASE_LOCK is very finicky)
-		err = ms.Lock()
+		err = ms.Lock(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = ms.Unlock()
+		err = ms.Unlock(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -233,11 +237,12 @@ func TestLockWorks(t *testing.T) {
 }
 
 func TestNoLockParamValidation(t *testing.T) {
+	ctx := context.Background()
 	ip := "127.0.0.1"
 	port := 3306
 	addr := fmt.Sprintf("mysql://root:root@tcp(%v:%v)/public", ip, port)
 	p := &Mysql{}
-	_, err := p.Open(addr + "?x-no-lock=not-a-bool")
+	_, err := p.Open(ctx, addr+"?x-no-lock=not-a-bool")
 	if !errors.Is(err, strconv.ErrSyntax) {
 		t.Fatal("Expected syntax error when passing a non-bool as x-no-lock parameter")
 	}
@@ -245,6 +250,7 @@ func TestNoLockParamValidation(t *testing.T) {
 
 func TestNoLockWorks(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ctx := context.Background()
 		ip, port, err := c.Port(defaultPort)
 		if err != nil {
 			t.Fatal(err)
@@ -252,7 +258,7 @@ func TestNoLockWorks(t *testing.T) {
 
 		addr := fmt.Sprintf("mysql://root:root@tcp(%v:%v)/public", ip, port)
 		p := &Mysql{}
-		d, err := p.Open(addr)
+		d, err := p.Open(ctx, addr)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -260,7 +266,7 @@ func TestNoLockWorks(t *testing.T) {
 		lock := d.(*Mysql)
 
 		p = &Mysql{}
-		d, err = p.Open(addr + "?x-no-lock=true")
+		d, err = p.Open(ctx, addr+"?x-no-lock=true")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -268,16 +274,16 @@ func TestNoLockWorks(t *testing.T) {
 		noLock := d.(*Mysql)
 
 		// Should be possible to take real lock and no-lock at the same time
-		if err = lock.Lock(); err != nil {
+		if err = lock.Lock(ctx); err != nil {
 			t.Fatal(err)
 		}
-		if err = noLock.Lock(); err != nil {
+		if err = noLock.Lock(ctx); err != nil {
 			t.Fatal(err)
 		}
-		if err = lock.Unlock(); err != nil {
+		if err = lock.Unlock(ctx); err != nil {
 			t.Fatal(err)
 		}
-		if err = noLock.Unlock(); err != nil {
+		if err = noLock.Unlock(ctx); err != nil {
 			t.Fatal(err)
 		}
 	})

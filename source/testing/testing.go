@@ -4,6 +4,7 @@
 package testing
 
 import (
+	"context"
 	"errors"
 	"os"
 	"testing"
@@ -21,15 +22,16 @@ import (
 //
 // See source/stub/stub_test.go or source/file/file_test.go for an example.
 func Test(t *testing.T, d source.Driver) {
-	TestFirst(t, d)
-	TestPrev(t, d)
-	TestNext(t, d)
-	TestReadUp(t, d)
-	TestReadDown(t, d)
+	ctx := context.Background()
+	TestFirst(t, ctx, d)
+	TestPrev(t, ctx, d)
+	TestNext(t, ctx, d)
+	TestReadUp(t, ctx, d)
+	TestReadDown(t, ctx, d)
 }
 
-func TestFirst(t *testing.T, d source.Driver) {
-	version, err := d.First()
+func TestFirst(t *testing.T, ctx context.Context, d source.Driver) {
+	version, err := d.First(ctx)
 	if err != nil {
 		t.Fatalf("First: expected err to be nil, got %v", err)
 	}
@@ -38,7 +40,7 @@ func TestFirst(t *testing.T, d source.Driver) {
 	}
 }
 
-func TestPrev(t *testing.T, d source.Driver) {
+func TestPrev(t *testing.T, ctx context.Context, d source.Driver) {
 	tt := []struct {
 		version           uint
 		expectErr         error
@@ -57,7 +59,7 @@ func TestPrev(t *testing.T, d source.Driver) {
 	}
 
 	for i, v := range tt {
-		pv, err := d.Prev(v.version)
+		pv, err := d.Prev(ctx, v.version)
 		if (v.expectErr == os.ErrNotExist && !errors.Is(err, os.ErrNotExist)) && v.expectErr != err {
 			t.Errorf("Prev: expected %v, got %v, in %v", v.expectErr, err, i)
 		}
@@ -67,7 +69,7 @@ func TestPrev(t *testing.T, d source.Driver) {
 	}
 }
 
-func TestNext(t *testing.T, d source.Driver) {
+func TestNext(t *testing.T, ctx context.Context, d source.Driver) {
 	tt := []struct {
 		version           uint
 		expectErr         error
@@ -86,7 +88,7 @@ func TestNext(t *testing.T, d source.Driver) {
 	}
 
 	for i, v := range tt {
-		nv, err := d.Next(v.version)
+		nv, err := d.Next(ctx, v.version)
 		if (v.expectErr == os.ErrNotExist && !errors.Is(err, os.ErrNotExist)) && v.expectErr != err {
 			t.Errorf("Next: expected %v, got %v, in %v", v.expectErr, err, i)
 		}
@@ -96,7 +98,7 @@ func TestNext(t *testing.T, d source.Driver) {
 	}
 }
 
-func TestReadUp(t *testing.T, d source.Driver) {
+func TestReadUp(t *testing.T, ctx context.Context, d source.Driver) {
 	tt := []struct {
 		version   uint
 		expectErr error
@@ -114,7 +116,7 @@ func TestReadUp(t *testing.T, d source.Driver) {
 	}
 
 	for i, v := range tt {
-		up, identifier, err := d.ReadUp(v.version)
+		up, identifier, err := d.ReadUp(ctx, v.version)
 		if (v.expectErr == os.ErrNotExist && !errors.Is(err, os.ErrNotExist)) ||
 			(v.expectErr != os.ErrNotExist && err != v.expectErr) {
 			t.Errorf("expected %v, got %v, in %v", v.expectErr, err, i)
@@ -138,7 +140,7 @@ func TestReadUp(t *testing.T, d source.Driver) {
 	}
 }
 
-func TestReadDown(t *testing.T, d source.Driver) {
+func TestReadDown(t *testing.T, ctx context.Context, d source.Driver) {
 	tt := []struct {
 		version    uint
 		expectErr  error
@@ -156,7 +158,7 @@ func TestReadDown(t *testing.T, d source.Driver) {
 	}
 
 	for i, v := range tt {
-		down, identifier, err := d.ReadDown(v.version)
+		down, identifier, err := d.ReadDown(ctx, v.version)
 		if (v.expectErr == os.ErrNotExist && !errors.Is(err, os.ErrNotExist)) ||
 			(v.expectErr != os.ErrNotExist && err != v.expectErr) {
 			t.Errorf("expected %v, got %v, in %v", v.expectErr, err, i)

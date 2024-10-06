@@ -65,7 +65,7 @@ type Postgres struct {
 	config *Config
 }
 
-func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
+func WithInstance(ctx context.Context, instance *sql.DB, config *Config) (database.Driver, error) {
 	if config == nil {
 		return nil, ErrNilConfig
 	}
@@ -131,14 +131,14 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		config: config,
 	}
 
-	if err := px.ensureVersionTable(); err != nil {
+	if err := px.ensureVersionTable(ctx); err != nil {
 		return nil, err
 	}
 
 	return px, nil
 }
 
-func (p *Postgres) Open(url string) (database.Driver, error) {
+func (p *Postgres) Open(ctx context.Context, url string) (database.Driver, error) {
 	purl, err := nurl.Parse(url)
 	if err != nil {
 		return nil, err
@@ -194,7 +194,7 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 		}
 	}
 
-	px, err := WithInstance(db, &Config{
+	px, err := WithInstance(ctx, db, &Config{
 		DatabaseName:          purl.Path,
 		MigrationsTable:       migrationsTable,
 		MigrationsTableQuoted: migrationsTableQuoted,
@@ -210,7 +210,7 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 	return px, nil
 }
 
-func (p *Postgres) Close() error {
+func (p *Postgres) Close(ctx context.Context) error {
 	connErr := p.conn.Close()
 	dbErr := p.db.Close()
 	if connErr != nil || dbErr != nil {
@@ -220,7 +220,7 @@ func (p *Postgres) Close() error {
 }
 
 // https://www.postgresql.org/docs/9.6/static/explicit-locking.html#ADVISORY-LOCKS
-func (p *Postgres) Lock() error {
+func (p *Postgres) Lock(ctx context.Context) error {
 	return database.CasRestoreOnErr(&p.isLocked, false, true, database.ErrLocked, func() error {
 		aid, err := database.GenerateAdvisoryLockId(p.config.DatabaseName, p.config.migrationsSchemaName, p.config.migrationsTableName)
 		if err != nil {
@@ -236,7 +236,7 @@ func (p *Postgres) Lock() error {
 	})
 }
 
-func (p *Postgres) Unlock() error {
+func (p *Postgres) Unlock(ctx context.Context) error {
 	return database.CasRestoreOnErr(&p.isLocked, true, false, database.ErrNotLocked, func() error {
 		aid, err := database.GenerateAdvisoryLockId(p.config.DatabaseName, p.config.migrationsSchemaName, p.config.migrationsTableName)
 		if err != nil {
@@ -251,7 +251,7 @@ func (p *Postgres) Unlock() error {
 	})
 }
 
-func (p *Postgres) Run(migration io.Reader) error {
+func (p *Postgres) Run(ctx context.Context, migration io.Reader) error {
 	if p.config.MultiStatementEnabled {
 		var err error
 		if e := multistmt.Parse(migration, multiStmtDelimiter, p.config.MultiStatementMaxSize, func(m []byte) bool {
@@ -338,7 +338,7 @@ func runesLastIndex(input []rune, target rune) int {
 	return -1
 }
 
-func (p *Postgres) SetVersion(version int, dirty bool) error {
+func (p *Postgres) SetVersion(ctx context.Context, version int, dirty bool) error {
 	tx, err := p.conn.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
@@ -372,7 +372,7 @@ func (p *Postgres) SetVersion(version int, dirty bool) error {
 	return nil
 }
 
-func (p *Postgres) Version() (version int, dirty bool, err error) {
+func (p *Postgres) Version(ctx context.Context) (version int, dirty bool, err error) {
 	query := `SELECT version, dirty FROM ` + quoteIdentifier(p.config.migrationsSchemaName) + `.` + quoteIdentifier(p.config.migrationsTableName) + ` LIMIT 1`
 	err = p.conn.QueryRowContext(context.Background(), query).Scan(&version, &dirty)
 	switch {
@@ -392,7 +392,7 @@ func (p *Postgres) Version() (version int, dirty bool, err error) {
 	}
 }
 
-func (p *Postgres) Drop() (err error) {
+func (p *Postgres) Drop(ctx context.Context) (err error) {
 	// select all tables in current schema
 	query := `SELECT table_name FROM information_schema.tables WHERE table_schema=(SELECT current_schema()) AND table_type='BASE TABLE'`
 	tables, err := p.conn.QueryContext(context.Background(), query)
@@ -436,13 +436,13 @@ func (p *Postgres) Drop() (err error) {
 // ensureVersionTable checks if versions table exists and, if not, creates it.
 // Note that this function locks the database, which deviates from the usual
 // convention of "caller locks" in the Postgres type.
-func (p *Postgres) ensureVersionTable() (err error) {
-	if err = p.Lock(); err != nil {
+func (p *Postgres) ensureVersionTable(ctx context.Context) (err error) {
+	if err = p.Lock(ctx); err != nil {
 		return err
 	}
 
 	defer func() {
-		if e := p.Unlock(); e != nil {
+		if e := p.Unlock(ctx); e != nil {
 			if err == nil {
 				err = e
 			} else {

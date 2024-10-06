@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -147,8 +148,8 @@ func createFile(filename string) error {
 	return f.Close()
 }
 
-func gotoCmd(m *migrate.Migrate, v uint) error {
-	if err := m.Migrate(v); err != nil {
+func gotoCmd(ctx context.Context, m *migrate.Migrate, v uint) error {
+	if err := m.Migrate(ctx, v); err != nil {
 		if err != migrate.ErrNoChange {
 			return err
 		}
@@ -157,16 +158,16 @@ func gotoCmd(m *migrate.Migrate, v uint) error {
 	return nil
 }
 
-func upCmd(m *migrate.Migrate, limit int) error {
+func upCmd(ctx context.Context, m *migrate.Migrate, limit int) error {
 	if limit >= 0 {
-		if err := m.Steps(limit); err != nil {
+		if err := m.Steps(ctx, limit); err != nil {
 			if err != migrate.ErrNoChange {
 				return err
 			}
 			log.Println(err)
 		}
 	} else {
-		if err := m.Up(); err != nil {
+		if err := m.Up(ctx); err != nil {
 			if err != migrate.ErrNoChange {
 				return err
 			}
@@ -176,16 +177,16 @@ func upCmd(m *migrate.Migrate, limit int) error {
 	return nil
 }
 
-func downCmd(m *migrate.Migrate, limit int) error {
+func downCmd(ctx context.Context, m *migrate.Migrate, limit int) error {
 	if limit >= 0 {
-		if err := m.Steps(-limit); err != nil {
+		if err := m.Steps(ctx, -limit); err != nil {
 			if err != migrate.ErrNoChange {
 				return err
 			}
 			log.Println(err)
 		}
 	} else {
-		if err := m.Down(); err != nil {
+		if err := m.Down(ctx); err != nil {
 			if err != migrate.ErrNoChange {
 				return err
 			}
@@ -195,22 +196,22 @@ func downCmd(m *migrate.Migrate, limit int) error {
 	return nil
 }
 
-func dropCmd(m *migrate.Migrate) error {
-	if err := m.Drop(); err != nil {
+func dropCmd(ctx context.Context, m *migrate.Migrate) error {
+	if err := m.Drop(ctx); err != nil {
 		return err
 	}
 	return nil
 }
 
-func forceCmd(m *migrate.Migrate, v int) error {
-	if err := m.Force(v); err != nil {
+func forceCmd(ctx context.Context, m *migrate.Migrate, v int) error {
+	if err := m.Force(ctx, v); err != nil {
 		return err
 	}
 	return nil
 }
 
-func versionCmd(m *migrate.Migrate) error {
-	v, dirty, err := m.Version()
+func versionCmd(ctx context.Context, m *migrate.Migrate) error {
+	v, dirty, err := m.Version(ctx)
 	if err != nil {
 		return err
 	}
