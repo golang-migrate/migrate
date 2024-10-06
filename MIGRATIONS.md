@@ -18,7 +18,7 @@ the `extension` of the migration files is not checked by the library, and should
 be an appropriate format for the database in use (`.sql` for SQL variants, for
 instance).
 
-Versions of migrations may be represented as any 64 bit unsigned integer.
+Versions of migrations may be represented as any 64-bit unsigned integer.
 All migrations are applied upward in order of increasing version number, and
 downward by decreasing version number.
 
