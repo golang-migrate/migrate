@@ -314,6 +314,10 @@ func (ch *ClickHouse) Drop() (err error) {
 
 		query = "DROP TABLE IF EXISTS " + quoteIdentifier(ch.config.DatabaseName) + "." + quoteIdentifier(table)
 
+		if len(ch.config.ClusterName) > 0 {
+			query = query + " ON CLUSTER " + ch.config.ClusterName
+		}
+
 		if _, err := ch.conn.Exec(query); err != nil {
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
