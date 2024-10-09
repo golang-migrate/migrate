@@ -44,6 +44,7 @@ Database drivers run migrations. [Add a new database?](database/driver.go)
 * [Firebird](database/firebird)
 * [MS SQL Server](database/sqlserver)
 * [rqlite](database/rqlite)
+* [Big Query](database/bigquery)
 
 ### Database URLs
 
@@ -194,3 +195,4 @@ Also have a look at the [FAQ](FAQ.md).
 ---
 
 Looking for alternatives? [https://awesome-go.com/#database](https://awesome-go.com/#database).
+
