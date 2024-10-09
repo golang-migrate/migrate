@@ -1418,23 +1418,10 @@ func equalDbSeq(t *testing.T, i int, expected migrationSequence, got *dStub.Stub
 	}
 }
 
-// Setting up temp directory to be used as the volume mount
-func setupTempDir(t *testing.T) (string, func()) {
-	tempDir, err := os.MkdirTemp("", "migrate_test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	return tempDir, func() {
-		if err = os.RemoveAll(tempDir); err != nil {
-			t.Fatal(err)
-		}
-	}
-}
-
 func setupMigrateInstance(tempDir string) (*Migrate, *dStub.Stub) {
 	scheme := "stub://"
 	m, _ := New(scheme, scheme)
-	m.dirtyStateConf = &dirtyStateHandler{
+	m.dirtyStateConf = &dirtyStateConfig{
 		destScheme: scheme,
 		destPath:   tempDir,
 		enable:     true,
@@ -1443,8 +1430,7 @@ func setupMigrateInstance(tempDir string) (*Migrate, *dStub.Stub) {
 }
 
 func TestHandleDirtyState(t *testing.T) {
-	tempDir, cleanup := setupTempDir(t)
-	defer cleanup()
+	tempDir := t.TempDir()
 
 	m, dbDrv := setupMigrateInstance(tempDir)
 	m.sourceDrv.(*sStub.Stub).Migrations = sourceStubMigrations
@@ -1521,8 +1507,7 @@ func TestHandleDirtyState(t *testing.T) {
 }
 
 func TestHandleMigrationFailure(t *testing.T) {
-	tempDir, cleanup := setupTempDir(t)
-	defer cleanup()
+	tempDir := t.TempDir()
 
 	m, _ := setupMigrateInstance(tempDir)
 
@@ -1559,8 +1544,7 @@ func TestHandleMigrationFailure(t *testing.T) {
 }
 
 func TestCleanupFiles(t *testing.T) {
-	tempDir, cleanup := setupTempDir(t)
-	defer cleanup()
+	tempDir := t.TempDir()
 
 	m, _ := setupMigrateInstance(tempDir)
 	m.sourceDrv.(*sStub.Stub).Migrations = sourceStubMigrations
@@ -1624,11 +1608,8 @@ func TestCleanupFiles(t *testing.T) {
 }
 
 func TestCopyFiles(t *testing.T) {
-	srcDir, cleanupSrc := setupTempDir(t)
-	defer cleanupSrc()
-
-	destDir, cleanupDest := setupTempDir(t)
-	defer cleanupDest()
+	srcDir := t.TempDir()
+	destDir := t.TempDir()
 
 	m, _ := setupMigrateInstance(destDir)
 	m.dirtyStateConf.srcPath = srcDir
@@ -1647,7 +1628,7 @@ func TestCopyFiles(t *testing.T) {
 			copiedFiles:    []string{"1_name.up.sql", "2_name.up.sql", "3_name.up.sql", "4_name.up.sql"},
 		},
 		{
-			emptyDestPath: true,
+			emptyDestPath: true, // copyFiles should not do anything
 		},
 	}
 
@@ -1670,6 +1651,88 @@ func TestCopyFiles(t *testing.T) {
 				if _, err := os.Stat(filepath.Join(destDir, file)); os.IsNotExist(err) {
 					t.Fatalf("expected file %s to be copied, but it does not exist", file)
 				}
+			}
+		})
+	}
+}
+
+func TestWithDirtyStateConfig(t *testing.T) {
+	tests := []struct {
+		name     string
+		srcPath  string
+		destPath string
+		isDirty  bool
+		wantErr  bool
+		wantConf *dirtyStateConfig
+	}{
+		{
+			name:     "Valid file paths",
+			srcPath:  "file:///src/path",
+			destPath: "file:///dest/path",
+			isDirty:  true,
+			wantErr:  false,
+			wantConf: &dirtyStateConfig{
+				srcScheme:  "file://",
+				destScheme: "file://",
+				srcPath:    "/src/path",
+				destPath:   "/dest/path",
+				enable:     true,
+			},
+		},
+		{
+			name:     "Invalid source scheme",
+			srcPath:  "s3:///src/path",
+			destPath: "file:///dest/path",
+			isDirty:  true,
+			wantErr:  true,
+		},
+		{
+			name:     "Invalid destination scheme",
+			srcPath:  "file:///src/path",
+			destPath: "s3:///dest/path",
+			isDirty:  true,
+			wantErr:  true,
+		},
+		{
+			name:     "Empty source scheme",
+			srcPath:  "/src/path",
+			destPath: "file:///dest/path",
+			isDirty:  true,
+			wantErr:  false,
+			wantConf: &dirtyStateConfig{
+				srcScheme:  "file://",
+				destScheme: "file://",
+				srcPath:    "/src/path",
+				destPath:   "/dest/path",
+				enable:     true,
+			},
+		},
+		{
+			name:     "Empty destination scheme",
+			srcPath:  "file:///src/path",
+			destPath: "/dest/path",
+			isDirty:  true,
+			wantErr:  false,
+			wantConf: &dirtyStateConfig{
+				srcScheme:  "file://",
+				destScheme: "file://",
+				srcPath:    "/src/path",
+				destPath:   "/dest/path",
+				enable:     true,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := &Migrate{}
+			err := m.WithDirtyStateConfig(tt.srcPath, tt.destPath, tt.isDirty)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr && m.dirtyStateConf == tt.wantConf {
+				t.Errorf("dirtyStateConf = %v, want %v", m.dirtyStateConf, tt.wantConf)
 			}
 		})
 	}

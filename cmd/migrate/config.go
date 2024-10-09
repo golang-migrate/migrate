@@ -38,5 +38,5 @@ var (
 
 	// goto command flags
 	flagDirty     = pflag.Bool("force-dirty-handling", false, "force the handling of dirty database state")
-	flagMountPath = pflag.String("cache-dir", "", "path to the mounted volume which is used to copy the migration files")
+	flagMountPath = pflag.String("cache-dir", "", "path to the cache-dir which is used to copy the migration files")
 )

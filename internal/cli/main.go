@@ -271,7 +271,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 				log.fatal("error: cache-dir must be specified when force-dirty-handling is set")
 			}
 
-			if err = migrater.WithDirtyStateHandler(sourcePtr, destPath, handleDirty); err != nil {
+			if err = migrater.WithDirtyStateConfig(sourcePtr, destPath, handleDirty); err != nil {
 				log.fatalErr(err)
 			}
 		}
