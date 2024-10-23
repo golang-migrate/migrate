@@ -157,10 +157,11 @@ func (db *YDB) Version() (version int, dirty bool, err error) {
 		return 0, false, err
 	}
 
-	if err = row.Scan(&version, &dirty); err != nil {
+	var v uint64
+	if err = row.Scan(&v, &dirty); err != nil {
 		return 0, false, &database.Error{OrigErr: err, Query: []byte(getQuery)}
 	}
-	return version, dirty, err
+	return int(v), dirty, err
 }
 
 func (db *YDB) Drop() (err error) {
@@ -225,10 +226,10 @@ func (db *YDB) ensureVersionTable() (err error) {
 
 	createQuery := fmt.Sprintf(`
 		CREATE TABLE IF NOT EXISTS %s (
-			version_id Uint64,
-			is_applied Bool,
+			version Uint64,
+			dirty Bool,
 			created Timestamp,
-			PRIMARY KEY(version_id)
+			PRIMARY KEY(version)
 		)
 	`, db.config.MigrationsTable)
 	err = db.driver.Query().Exec(context.TODO(), createQuery)
