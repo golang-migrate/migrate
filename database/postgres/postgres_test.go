@@ -668,7 +668,6 @@ func testPostgresConcurrentMigrations(t *testing.T) {
 		}
 
 		wg.Wait()
-
 		// THEN
 	})
 }
