@@ -21,7 +21,13 @@ func init() {
 	database.Register("ydb", &db)
 }
 
-const DefaultMigrationsTable = "schema_migrations"
+const (
+	defaultMigrationsTable = "schema_migrations"
+
+	queryParamAuthToken       = "x-auth-token"
+	queryParamMigrationsTable = "x-migrations-table"
+	queryParamUseGRPCS        = "x-use-grpcs"
+)
 
 var (
 	ErrDatabaseDirty  = fmt.Errorf("database is dirty")
@@ -46,7 +52,7 @@ func WithInstance(driver *ydb.Driver, config *Config) (database.Driver, error) {
 	}
 
 	if len(config.MigrationsTable) == 0 {
-		config.MigrationsTable = DefaultMigrationsTable
+		config.MigrationsTable = defaultMigrationsTable
 	}
 
 	db := &YDB{
@@ -65,31 +71,51 @@ func (db *YDB) Open(dsn string) (database.Driver, error) {
 		return nil, err
 	}
 
+	if len(purl.Path) == 0 {
+		return nil, ErrNoDatabaseName
+	}
+
 	pquery, err := url.ParseQuery(purl.RawQuery)
 	if err != nil {
 		return nil, err
 	}
 
-	purl.Scheme = "grpc"
-	if pquery.Has("x-use-grpcs") {
+	switch {
+	case pquery.Has(queryParamUseGRPCS):
 		purl.Scheme = "grpcs"
+	default:
+		purl.Scheme = "grpc"
 	}
 
 	purl = migrate.FilterCustomQuery(purl)
-	fmt.Println(purl, pquery)
-
-	driver, err := ydb.Open(context.TODO(), purl.String(), ydb.With())
+	credentials := db.parseCredentials(purl, pquery)
+	driver, err := ydb.Open(context.TODO(), purl.String(), credentials)
 	if err != nil {
 		return nil, err
 	}
 
 	px, err := WithInstance(driver, &Config{
-		MigrationsTable: pquery.Get("x-migrations-table"),
+		MigrationsTable: pquery.Get(queryParamMigrationsTable),
 	})
 	if err != nil {
 		return nil, err
 	}
 	return px, nil
+}
+
+func (db *YDB) parseCredentials(url *url.URL, query url.Values) (credentials ydb.Option) {
+	switch {
+	case query.Has(queryParamAuthToken):
+		credentials = ydb.WithAccessTokenCredentials(query.Get(queryParamAuthToken))
+	case url.User != nil:
+		user := url.User.Username()
+		password, _ := url.User.Password()
+		credentials = ydb.WithStaticCredentials(user, password)
+	default:
+		credentials = ydb.WithAnonymousCredentials()
+	}
+	url.User = nil
+	return credentials
 }
 
 func (db *YDB) Close() error {
