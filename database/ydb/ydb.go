@@ -137,16 +137,23 @@ func (db *YDB) SetVersion(version int, dirty bool) error {
 }
 
 func (db *YDB) Version() (version int, dirty bool, err error) {
+	ctx := context.TODO()
+
 	getVersionQuery := fmt.Sprintf(`
 		SELECT version, dirty FROM %s ORDER BY version DESC LIMIT 1
 	`, db.config.MigrationsTable)
 
-	rs, err := db.driver.Query().QueryResultSet(context.TODO(), getVersionQuery)
+	rs, err := db.driver.Query().QueryResultSet(ctx, getVersionQuery)
 	if err != nil {
 		return 0, false, &database.Error{OrigErr: err, Query: []byte(getVersionQuery)}
 	}
+	defer func() {
+		if closeErr := rs.Close(ctx); closeErr != nil {
+			err = multierror.Append(err, closeErr)
+		}
+	}()
 
-	row, err := rs.NextRow(context.TODO())
+	row, err := rs.NextRow(ctx)
 	if err != nil {
 		if errors.Is(err, io.EOF) {
 			return database.NilVersion, false, nil
@@ -169,11 +176,17 @@ func (db *YDB) Drop() (err error) {
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(listQuery)}
 	}
+	defer func() {
+		if closeErr := rs.Close(ctx); closeErr != nil {
+			err = multierror.Append(err, closeErr)
+		}
+	}()
 
 	for {
 		var row query.Row
 		if row, err = rs.NextRow(ctx); err != nil {
 			if errors.Is(err, io.EOF) {
+				err = nil
 				break
 			}
 			return err
@@ -184,11 +197,12 @@ func (db *YDB) Drop() (err error) {
 			return err
 		}
 
-		dropQuery := fmt.Sprintf("DROP TABLE %s", table)
+		dropQuery := fmt.Sprintf("DROP TABLE `%s`", table)
 		if err = db.driver.Query().Exec(ctx, dropQuery); err != nil {
 			return &database.Error{OrigErr: err, Query: []byte(dropQuery)}
 		}
 	}
+
 	return err
 }
 func (db *YDB) Lock() error {
