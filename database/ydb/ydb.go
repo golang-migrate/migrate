@@ -30,7 +30,6 @@ const (
 )
 
 var (
-	ErrDatabaseDirty  = fmt.Errorf("database is dirty")
 	ErrNilConfig      = fmt.Errorf("no config")
 	ErrNoDatabaseName = fmt.Errorf("no database name")
 )
