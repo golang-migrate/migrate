@@ -53,8 +53,7 @@ func WithInstance(driver *ydb.Driver, config *Config) (database.Driver, error) {
 		driver: driver,
 		config: config,
 	}
-	err := db.ensureVersionTable()
-	if err != nil {
+	if err := db.ensureVersionTable(); err != nil {
 		return nil, err
 	}
 	return db, nil
@@ -66,20 +65,18 @@ func (db *YDB) Open(dsn string) (database.Driver, error) {
 		return nil, err
 	}
 
-	query, err := url.ParseQuery(purl.RawQuery)
+	pquery, err := url.ParseQuery(purl.RawQuery)
 	if err != nil {
 		return nil, err
 	}
 
 	purl.Scheme = "grpc"
-	if query.Has("x-use-grpcs") {
+	if pquery.Has("x-use-grpcs") {
 		purl.Scheme = "grpcs"
 	}
 
 	purl = migrate.FilterCustomQuery(purl)
-
-	fmt.Println(purl)
-	fmt.Println(query)
+	fmt.Println(purl, pquery)
 
 	driver, err := ydb.Open(context.TODO(), purl.String(), ydb.With())
 	if err != nil {
@@ -87,7 +84,7 @@ func (db *YDB) Open(dsn string) (database.Driver, error) {
 	}
 
 	px, err := WithInstance(driver, &Config{
-		MigrationsTable: query.Get("x-migrations-table"),
+		MigrationsTable: pquery.Get("x-migrations-table"),
 	})
 	if err != nil {
 		return nil, err
@@ -100,12 +97,12 @@ func (db *YDB) Close() error {
 }
 
 func (db *YDB) Run(migration io.Reader) error {
-	query, err := io.ReadAll(migration)
+	rawMigrations, err := io.ReadAll(migration)
 	if err != nil {
 		return err
 	}
 
-	res, err := db.driver.Scripting().Execute(context.TODO(), string(query), nil)
+	res, err := db.driver.Scripting().Execute(context.TODO(), string(rawMigrations), nil)
 	if err != nil {
 		return err
 	}
@@ -113,24 +110,24 @@ func (db *YDB) Run(migration io.Reader) error {
 }
 
 func (db *YDB) SetVersion(version int, dirty bool) error {
-	deleteQuery := fmt.Sprintf(`
+	deleteVersionQuery := fmt.Sprintf(`
 		DELETE FROM %s 
 	`, db.config.MigrationsTable)
 
-	insertQuery := fmt.Sprintf(`
+	insertVersionQuery := fmt.Sprintf(`
 		INSERT INTO %s (version, dirty, created) VALUES (%d, %t, CurrentUtcTimestamp())
 	`, db.config.MigrationsTable, version, dirty)
 
 	ctx := context.TODO()
 	err := db.driver.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
-		if err := tx.Exec(ctx, deleteQuery); err != nil {
+		if err := tx.Exec(ctx, deleteVersionQuery); err != nil {
 			return err
 		}
 		// Also re-write the schema version for nil dirty versions to prevent
 		// empty schema version for failed down migration on the first migration
 		// See: https://github.com/golang-migrate/migrate/issues/330
 		if version >= 0 || (version == database.NilVersion && dirty) {
-			if err := tx.Exec(ctx, insertQuery); err != nil {
+			if err := tx.Exec(ctx, insertVersionQuery); err != nil {
 				return err
 			}
 		}
@@ -140,13 +137,13 @@ func (db *YDB) SetVersion(version int, dirty bool) error {
 }
 
 func (db *YDB) Version() (version int, dirty bool, err error) {
-	getQuery := fmt.Sprintf(`
+	getVersionQuery := fmt.Sprintf(`
 		SELECT version, dirty FROM %s ORDER BY version DESC LIMIT 1
 	`, db.config.MigrationsTable)
 
-	rs, err := db.driver.Query().QueryResultSet(context.TODO(), getQuery)
+	rs, err := db.driver.Query().QueryResultSet(context.TODO(), getVersionQuery)
 	if err != nil {
-		return 0, false, &database.Error{OrigErr: err, Query: []byte(getQuery)}
+		return 0, false, &database.Error{OrigErr: err, Query: []byte(getVersionQuery)}
 	}
 
 	row, err := rs.NextRow(context.TODO())
@@ -159,7 +156,7 @@ func (db *YDB) Version() (version int, dirty bool, err error) {
 
 	var v uint64
 	if err = row.Scan(&v, &dirty); err != nil {
-		return 0, false, &database.Error{OrigErr: err, Query: []byte(getQuery)}
+		return 0, false, &database.Error{OrigErr: err, Query: []byte(getVersionQuery)}
 	}
 	return int(v), dirty, err
 }
@@ -224,7 +221,7 @@ func (db *YDB) ensureVersionTable() (err error) {
 		}
 	}()
 
-	createQuery := fmt.Sprintf(`
+	createVersionTableQuery := fmt.Sprintf(`
 		CREATE TABLE IF NOT EXISTS %s (
 			version Uint64,
 			dirty Bool,
@@ -232,7 +229,7 @@ func (db *YDB) ensureVersionTable() (err error) {
 			PRIMARY KEY(version)
 		)
 	`, db.config.MigrationsTable)
-	err = db.driver.Query().Exec(context.TODO(), createQuery)
+	err = db.driver.Query().Exec(context.TODO(), createVersionTableQuery)
 	if err != nil {
 		return err
 	}
