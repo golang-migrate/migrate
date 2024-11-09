@@ -17,17 +17,16 @@ import (
 )
 
 const (
-	image = "cr.yandex/yc/yandex-docker-local-ydb:latest"
-	host  = "localhost"
-	port  = "2136"
+	image        = "cr.yandex/yc/yandex-docker-local-ydb:latest"
+	host         = "localhost"
+	port         = "2136"
+	databaseName = "local"
 )
 
 var (
 	opts = dktest.Options{
 		Env: map[string]string{
-			"YDB_USE_IN_MEMORY_PDISKS":  "true",
-			"YDB_LOCAL_SURVIVE_RESTART": "true",
-			"GRPC_PORT":                 port,
+			"YDB_USE_IN_MEMORY_PDISKS": "true",
 		},
 
 		PortBindings: nat.PortMap{
@@ -46,22 +45,23 @@ var (
 )
 
 func connectionString(options ...string) string {
-	return fmt.Sprintf("grpc://%s:%s/local?%s", host, port, strings.Join(options, "&"))
+	return fmt.Sprintf("ydb://%s:%s/%s?%s", host, port, databaseName, strings.Join(options, "&"))
 }
 
 func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
-	fmt.Println("1 connect")
-	d, err := ydb.Open(ctx, connectionString())
+	d, err := ydb.Open(ctx, fmt.Sprintf("grpc://%s:%s/%s", host, port, databaseName))
 	if err != nil {
-		fmt.Println("2 err connect", err)
 		return false
 	}
 	defer func() { _ = d.Close(ctx) }()
 
-	fmt.Println("3 execute")
-	res, err := d.Scripting().Execute(ctx, "SELECT 1", nil)
+	res, err := d.Scripting().Execute(ctx, `
+		CREATE TABLE test (
+		id Int,
+		PRIMARY KEY(id)
+	);
+	DROP TABLE test;`, nil)
 	if err != nil {
-		fmt.Println("4 err execute", err)
 		return false
 	}
 	defer func() { _ = res.Close() }()
