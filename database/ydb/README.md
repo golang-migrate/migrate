@@ -21,11 +21,9 @@
 ### Secure connection
 
 Query param `x-use-grpcs` enables secure TLS connection that requires certificates.
-You should declare root certificate using ENV
+You can declare root certificate using ENV
 variable: `export YDB_SSL_ROOT_CERTIFICATES_FILE=/path/to/ydb/certs/CA.pem` or
 by using `x-tls-ca` query param: `?x-tls-ca=/path/to/ydb/certs/CA.pem`.
-
-If `x-tls-ca` is set, goose-migrate will not use ENV variable.
 
 ### Authentication
 
