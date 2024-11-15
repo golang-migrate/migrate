@@ -7,14 +7,25 @@
 |   `user`   |         The user to sign in as.         |
 | `password` |          The user's password.           | 
 |   `host`   |         The host to connect to.         |
-|   `port`   |          The port to bind to.           |                                     |
+|   `port`   |          The port to bind to.           |                                     
 | `database` | The name of the database to connect to. |
 
-|   URL Query Params   |                         Description                         |
-|:--------------------:|:-----------------------------------------------------------:|
-|    `x-auth-token`    |                    Authentication token.                    |
-| `x-migrations-table` | Name of the migrations table (default `schema_migrations`). |
-|    `x-use-grpcs`     | Enables gRPCS protocol for YDB connections (default grpc).  |
+|       URL Query Params       |                                   Description                                    |
+|:----------------------------:|:--------------------------------------------------------------------------------:|
+|        `x-auth-token`        |                              Authentication token.                               |
+|     `x-migrations-table`     |           Name of the migrations table (default `schema_migrations`).            |
+|        `x-use-grpcs`         |            Enables gRPCS protocol for YDB connections (default grpc).            |
+|          `x-tls-ca`          |               The location of the CA (certificate authority) file.               |
+| `x-tls-insecure-skip-verify` | Controls whether a client verifies the server's certificate chain and host name. |
+
+### Secure connection
+
+Query param `x-use-grpcs` enables secure TLS connection that requires certificates.
+You should declare root certificate using ENV
+variable: `export YDB_SSL_ROOT_CERTIFICATES_FILE=/path/to/ydb/certs/CA.pem` or
+by using `x-tls-ca` query param: `?x-tls-ca=/path/to/ydb/certs/CA.pem`.
+
+If `x-tls-ca` is set, goose-migrate will not use ENV variable.
 
 ### Authentication
 
