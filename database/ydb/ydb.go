@@ -24,9 +24,11 @@ func init() {
 const (
 	defaultMigrationsTable = "schema_migrations"
 
-	queryParamAuthToken       = "x-auth-token"
-	queryParamMigrationsTable = "x-migrations-table"
-	queryParamUseGRPCS        = "x-use-grpcs"
+	queryParamAuthToken                 = "x-auth-token"
+	queryParamMigrationsTable           = "x-migrations-table"
+	queryParamUseGRPCS                  = "x-use-grpcs"
+	queryParamTLSCertificateAuthorities = "x-tls-ca"
+	queryParamTLSInsecureSkipVerify     = "x-tls-insecure-skip-verify"
 )
 
 var (
@@ -87,8 +89,10 @@ func (db *YDB) Open(dsn string) (database.Driver, error) {
 	}
 
 	purl = migrate.FilterCustomQuery(purl)
+
 	credentials := db.parseCredentials(purl, pquery)
-	driver, err := ydb.Open(context.TODO(), purl.String(), credentials)
+	tlsOptions := db.parseTLS(purl, pquery)
+	driver, err := ydb.Open(context.TODO(), purl.String(), append(tlsOptions, credentials)...)
 	if err != nil {
 		return nil, err
 	}
@@ -115,6 +119,16 @@ func (db *YDB) parseCredentials(url *url.URL, query url.Values) (credentials ydb
 	}
 	url.User = nil
 	return credentials
+}
+
+func (db *YDB) parseTLS(_ *url.URL, query url.Values) (options []ydb.Option) {
+	if query.Has(queryParamTLSCertificateAuthorities) {
+		options = append(options, ydb.WithCertificatesFromFile(query.Get(queryParamTLSCertificateAuthorities)))
+	}
+	if query.Has(queryParamTLSInsecureSkipVerify) {
+		options = append(options, ydb.WithTLSSInsecureSkipVerify())
+	}
+	return options
 }
 
 func (db *YDB) Close() error {
