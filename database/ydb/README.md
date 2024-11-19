@@ -10,13 +10,14 @@
 |   `port`   |          The port to bind to.           |                                     
 | `database` | The name of the database to connect to. |
 
-|       URL Query Params       |                                   Description                                    |
-|:----------------------------:|:--------------------------------------------------------------------------------:|
-|        `x-auth-token`        |                              Authentication token.                               |
-|     `x-migrations-table`     |           Name of the migrations table (default `schema_migrations`).            |
-|        `x-use-grpcs`         |            Enables gRPCS protocol for YDB connections (default grpc).            |
-|          `x-tls-ca`          |               The location of the CA (certificate authority) file.               |
-| `x-tls-insecure-skip-verify` | Controls whether a client verifies the server's certificate chain and host name. |
+|       URL Query Params       |                                         Description                                          |
+|:----------------------------:|:--------------------------------------------------------------------------------------------:|
+|        `x-auth-token`        |                                    Authentication token.                                     |
+|     `x-migrations-table`     |                 Name of the migrations table (default `schema_migrations`).                  |
+|        `x-use-grpcs`         |                  Enables gRPCS protocol for YDB connections (default grpc).                  |
+|          `x-tls-ca`          |                     The location of the CA (certificate authority) file.                     |
+| `x-tls-insecure-skip-verify` |       Controls whether a client verifies the server's certificate chain and host name.       |
+|     `x-tls-min-version`      | Controls the minimum TLS version that is acceptable, use 1.0, 1.1, 1.2 or 1.3 (default 1.2). |
 
 ### Secure connection
 
