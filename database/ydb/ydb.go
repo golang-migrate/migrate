@@ -2,6 +2,7 @@ package ydb
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -29,11 +30,13 @@ const (
 	queryParamUseGRPCS                  = "x-use-grpcs"
 	queryParamTLSCertificateAuthorities = "x-tls-ca"
 	queryParamTLSInsecureSkipVerify     = "x-tls-insecure-skip-verify"
+	queryParamTLSMinVersion             = "x-tls-min-version"
 )
 
 var (
-	ErrNilConfig      = fmt.Errorf("no config")
-	ErrNoDatabaseName = fmt.Errorf("no database name")
+	ErrNilConfig             = fmt.Errorf("no config")
+	ErrNoDatabaseName        = fmt.Errorf("no database name")
+	ErrUnsupportedTLSVersion = fmt.Errorf("unsupported tls version: use 1.0, 1.1, 1,2 or 1.3")
 )
 
 type Config struct {
@@ -90,8 +93,12 @@ func (db *YDB) Open(dsn string) (database.Driver, error) {
 
 	purl = migrate.FilterCustomQuery(purl)
 
-	credentials := db.parseCredentials(purl, pquery)
-	tlsOptions := db.parseTLS(purl, pquery)
+	credentials := db.parseCredentialsOptions(purl, pquery)
+	tlsOptions, err := db.parseTLSOptions(purl, pquery)
+	if err != nil {
+		return nil, err
+	}
+
 	driver, err := ydb.Open(context.TODO(), purl.String(), append(tlsOptions, credentials)...)
 	if err != nil {
 		return nil, err
@@ -106,7 +113,7 @@ func (db *YDB) Open(dsn string) (database.Driver, error) {
 	return px, nil
 }
 
-func (db *YDB) parseCredentials(url *url.URL, query url.Values) (credentials ydb.Option) {
+func (db *YDB) parseCredentialsOptions(url *url.URL, query url.Values) (credentials ydb.Option) {
 	switch {
 	case query.Has(queryParamAuthToken):
 		credentials = ydb.WithAccessTokenCredentials(query.Get(queryParamAuthToken))
@@ -121,14 +128,28 @@ func (db *YDB) parseCredentials(url *url.URL, query url.Values) (credentials ydb
 	return credentials
 }
 
-func (db *YDB) parseTLS(_ *url.URL, query url.Values) (options []ydb.Option) {
+func (db *YDB) parseTLSOptions(_ *url.URL, query url.Values) (options []ydb.Option, err error) {
 	if query.Has(queryParamTLSCertificateAuthorities) {
 		options = append(options, ydb.WithCertificatesFromFile(query.Get(queryParamTLSCertificateAuthorities)))
 	}
 	if query.Has(queryParamTLSInsecureSkipVerify) {
 		options = append(options, ydb.WithTLSSInsecureSkipVerify())
 	}
-	return options
+	if query.Has(queryParamTLSMinVersion) {
+		switch query.Get(queryParamTLSMinVersion) {
+		case "1.0":
+			options = append(options, ydb.WithMinTLSVersion(tls.VersionTLS10))
+		case "1.1":
+			options = append(options, ydb.WithMinTLSVersion(tls.VersionTLS11))
+		case "1.2":
+			options = append(options, ydb.WithMinTLSVersion(tls.VersionTLS12))
+		case "1.3":
+			options = append(options, ydb.WithMinTLSVersion(tls.VersionTLS13))
+		default:
+			return nil, ErrUnsupportedTLSVersion
+		}
+	}
+	return options, nil
 }
 
 func (db *YDB) Close() error {
