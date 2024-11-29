@@ -313,6 +313,34 @@ func Test_statementGroups(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "ALTER with DEFAULT",
+			// From https://github.com/golang-migrate/migrate/issues/918
+			multiStatement: "ALTER TABLE t1 ADD COLUMN c1 STRING(MAX) DEFAULT ('');ALTER TABLE t1 ADD COLUMN c1 STRING(MAX) NOT NULL DEFAULT ('');",
+			expected: []*statementGroup{
+				{
+					typ: statementTypeDDL,
+					stmts: []string{
+						"ALTER TABLE t1 ADD COLUMN c1 STRING(MAX) DEFAULT ('')",
+						"ALTER TABLE t1 ADD COLUMN c1 STRING(MAX) NOT NULL DEFAULT ('')",
+					},
+				},
+			},
+		},
+		{
+			name: "Change Streams",
+			multiStatement: `CREATE CHANGE STREAM NamesAndAlbums
+FOR Singers(FirstName, LastName), Albums
+OPTIONS ( retention_period = '36h' );`,
+			expected: []*statementGroup{
+				{
+					typ: statementTypeDDL,
+					stmts: []string{
+						"CREATE CHANGE STREAM NamesAndAlbums\nFOR Singers(FirstName, LastName), Albums\nOPTIONS ( retention_period = '36h' )",
+					},
+				},
+			},
+		},
 	}
 
 	for _, tc := range testCases {
