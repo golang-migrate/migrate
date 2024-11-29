@@ -430,8 +430,8 @@ func statementGroups(migr []byte) (groups []*statementGroup, err error) {
 			continue
 		}
 
-		if len(lex.Token.Comments) > 0 {
-			// preserve newline where comments are removed
+		if len(lex.Token.Comments) > 0 && strings.HasPrefix(lex.Token.Comments[0].Raw, "--") {
+			// standard comment Token consumes a \n, so we need to add it back
 			if _, err := stmt.WriteString("\n"); err != nil {
 				return nil, err
 			}

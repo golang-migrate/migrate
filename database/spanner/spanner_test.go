@@ -117,7 +117,7 @@ func Test_statementGroups(t *testing.T) {
 				{
 					typ: statementTypeDDL,
 					stmts: []string{
-						"CREATE TABLE table_name (\n			id STRING(255) NOT NULL,\n		) PRIMARY KEY (id)",
+						"CREATE TABLE table_name (\n\t\t\tid STRING(255) NOT NULL,\n\t\t) PRIMARY KEY (id)",
 					},
 				},
 			},
@@ -143,7 +143,7 @@ func Test_statementGroups(t *testing.T) {
 				{
 					typ: statementTypeDDL,
 					stmts: []string{
-						"CREATE TABLE table_name (\n			id STRING(255) NOT NULL,\n		) PRIMARY KEY (id)",
+						"CREATE TABLE table_name (\n\t\t\tid STRING(255) NOT NULL,\n\t\t) PRIMARY KEY (id)",
 					},
 				},
 			},
@@ -160,7 +160,7 @@ func Test_statementGroups(t *testing.T) {
 				{
 					typ: statementTypeDDL,
 					stmts: []string{
-						"CREATE TABLE table_name (\n			id STRING(255) NOT NULL,\n		) PRIMARY KEY(id)",
+						"CREATE TABLE table_name (\n\t\t\tid STRING(255) NOT NULL,\n\t\t) PRIMARY KEY(id)",
 						"CREATE INDEX table_name_id_idx ON table_name (id)",
 					},
 				},
@@ -178,7 +178,7 @@ func Test_statementGroups(t *testing.T) {
 				{
 					typ: statementTypeDDL,
 					stmts: []string{
-						"CREATE TABLE table_name (\n			id STRING(255) NOT NULL,\n		) PRIMARY KEY(id)",
+						"CREATE TABLE table_name (\n\t\t\tid STRING(255) NOT NULL,\n\t\t) PRIMARY KEY(id)",
 						"CREATE INDEX table_name_id_idx ON table_name (id)",
 					},
 				},
@@ -197,17 +197,17 @@ func Test_statementGroups(t *testing.T) {
 				{
 					typ: statementTypeDDL,
 					stmts: []string{
-						"CREATE TABLE table_name (\n			id STRING(255) NOT NULL,\n		) PRIMARY KEY(id)",
+						"CREATE TABLE table_name (\n\t\t\tid STRING(255) NOT NULL,\n\t\t) PRIMARY KEY(id)",
 						"CREATE INDEX table_name_id_idx ON table_name (id)",
 					},
 				},
 			},
 		},
 		{
-			name: "multi statement, no trailing semicolon, inline comment",
+			name: "multi statement, no trailing semicolon, end-of-line comment",
 			// From https://github.com/mattes/migrate/pull/281
 			multiStatement: `CREATE TABLE table_name (
-			id STRING(255) NOT NULL, -- inline comment
+			id STRING(255) NOT NULL, -- end-of-line comment
 		) PRIMARY KEY(id);
 
 		CREATE INDEX table_name_id_idx ON table_name (id)`,
@@ -215,7 +215,41 @@ func Test_statementGroups(t *testing.T) {
 				{
 					typ: statementTypeDDL,
 					stmts: []string{
-						"CREATE TABLE table_name (\n			id STRING(255) NOT NULL,\n		) PRIMARY KEY(id)",
+						"CREATE TABLE table_name (\n\t\t\tid STRING(255) NOT NULL,\n\t\t) PRIMARY KEY(id)",
+						"CREATE INDEX table_name_id_idx ON table_name (id)",
+					},
+				},
+			},
+		},
+		{
+			name: "multi statement, inline comment",
+			multiStatement: `CREATE TABLE table_name (
+			id STRING(255) NOT NULL, /* inline comment */
+		) PRIMARY KEY(id);
+
+		CREATE INDEX table_name_id_idx ON table_name (id);`,
+			expected: []*statementGroup{
+				{
+					typ: statementTypeDDL,
+					stmts: []string{
+						"CREATE TABLE table_name (\n\t\t\tid STRING(255) NOT NULL,\n\t\t) PRIMARY KEY(id)",
+						"CREATE INDEX table_name_id_idx ON table_name (id)",
+					},
+				},
+			},
+		},
+		{
+			name: "multi statement, inline comment inside DML",
+			multiStatement: `CREATE TABLE table_name (
+			id STRING(255 /* inline comment */) NOT NULL,
+		) PRIMARY KEY(id);
+
+		CREATE INDEX table_name_id_idx ON table_name (id);`,
+			expected: []*statementGroup{
+				{
+					typ: statementTypeDDL,
+					stmts: []string{
+						"CREATE TABLE table_name (\n\t\t\tid STRING(255) NOT NULL,\n\t\t) PRIMARY KEY(id)",
 						"CREATE INDEX table_name_id_idx ON table_name (id)",
 					},
 				},
@@ -229,7 +263,7 @@ func Test_statementGroups(t *testing.T) {
 				{
 					typ: statementTypeDDL,
 					stmts: []string{
-						"ALTER TABLE users ALTER COLUMN created\n			SET OPTIONS (allow_commit_timestamp=true)",
+						"ALTER TABLE users ALTER COLUMN created\n\t\t\tSET OPTIONS (allow_commit_timestamp=true)",
 					},
 				},
 			},
@@ -244,7 +278,7 @@ func Test_statementGroups(t *testing.T) {
 				{
 					typ: statementTypeDDL,
 					stmts: []string{
-						"CREATE TABLE table_name (\n				id STRING(255) NOT NULL,\n				sum NUMERIC,\n			) PRIMARY KEY (id)",
+						"CREATE TABLE table_name (\n\t\t\t\tid STRING(255) NOT NULL,\n\t\t\t\tsum NUMERIC,\n\t\t\t) PRIMARY KEY (id)",
 					},
 				},
 			},
