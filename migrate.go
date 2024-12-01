@@ -107,7 +107,7 @@ func New(sourceURL, databaseURL string) (*Migrate, error) {
 
 	databaseDrv, err := database.Open(databaseURL)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open database, %q: %w", databaseURL, err)
+		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 	m.databaseDrv = databaseDrv
 
@@ -157,7 +157,7 @@ func NewWithSourceInstance(sourceName string, sourceInstance source.Driver, data
 
 	databaseDrv, err := database.Open(databaseURL)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open database, %q: %w", databaseURL, err)
+		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 	m.databaseDrv = databaseDrv
 
