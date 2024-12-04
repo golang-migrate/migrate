@@ -27,6 +27,8 @@ func init() {
 	database.Register("mysql", &Mysql{})
 }
 
+const DefaultTryLockTimeoutSec = 10
+
 var DefaultMigrationsTable = "schema_migrations"
 
 var (
@@ -38,10 +40,11 @@ var (
 )
 
 type Config struct {
-	MigrationsTable  string
-	DatabaseName     string
-	NoLock           bool
-	StatementTimeout time.Duration
+	MigrationsTable   string
+	DatabaseName      string
+	NoLock            bool
+	StatementTimeout  time.Duration
+	TryLockTimeoutSec int
 }
 
 type Mysql struct {
@@ -251,16 +254,26 @@ func (m *Mysql) Open(url string) (database.Driver, error) {
 		}
 	}
 
+	tryLockTimeoutParam := customParams["x-try-lock-timeout"]
+	tryLockTimeout := DefaultTryLockTimeoutSec
+	if tryLockTimeoutParam != "" {
+		tryLockTimeout, err = strconv.Atoi(tryLockTimeoutParam)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse x-try-lock-timeout as int: %w", err)
+		}
+	}
+
 	db, err := sql.Open("mysql", config.FormatDSN())
 	if err != nil {
 		return nil, err
 	}
 
 	mx, err := WithInstance(db, &Config{
-		DatabaseName:     config.DBName,
-		MigrationsTable:  customParams["x-migrations-table"],
-		NoLock:           noLock,
-		StatementTimeout: time.Duration(statementTimeout) * time.Millisecond,
+		DatabaseName:      config.DBName,
+		MigrationsTable:   customParams["x-migrations-table"],
+		NoLock:            noLock,
+		StatementTimeout:  time.Duration(statementTimeout) * time.Millisecond,
+		TryLockTimeoutSec: tryLockTimeout,
 	})
 	if err != nil {
 		return nil, err
@@ -293,9 +306,14 @@ func (m *Mysql) Lock() error {
 			return err
 		}
 
-		query := "SELECT GET_LOCK(?, 10)"
+		tryLockTimeout := DefaultTryLockTimeoutSec
+		if m.config.TryLockTimeoutSec != 0 {
+			tryLockTimeout = m.config.TryLockTimeoutSec
+		}
+
+		query := "SELECT GET_LOCK(?, ?)"
 		var success bool
-		if err := m.conn.QueryRowContext(context.Background(), query, aid).Scan(&success); err != nil {
+		if err := m.conn.QueryRowContext(context.Background(), query, aid, tryLockTimeout).Scan(&success); err != nil {
 			return &database.Error{OrigErr: err, Err: "try lock failed", Query: []byte(query)}
 		}
 
