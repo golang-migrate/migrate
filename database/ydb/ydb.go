@@ -197,7 +197,7 @@ func (db *YDB) Version() (version int, dirty bool, err error) {
 	ctx := context.TODO()
 
 	getVersionQuery := fmt.Sprintf(`
-		SELECT version, dirty FROM %s ORDER BY version DESC LIMIT 1
+		SELECT version, dirty FROM %s LIMIT 1
 	`, db.config.MigrationsTable)
 
 	rs, err := db.driver.Query().QueryResultSet(ctx, getVersionQuery)
@@ -254,7 +254,7 @@ func (db *YDB) Drop() (err error) {
 			return err
 		}
 
-		dropQuery := fmt.Sprintf("DROP TABLE `%s`", table)
+		dropQuery := fmt.Sprintf("DROP TABLE IF EXISTS `%s`", table)
 		if err = db.driver.Query().Exec(ctx, dropQuery); err != nil {
 			return &database.Error{OrigErr: err, Query: []byte(dropQuery)}
 		}
