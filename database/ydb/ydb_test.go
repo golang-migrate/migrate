@@ -55,17 +55,13 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 	}
 	defer func() { _ = d.Close(ctx) }()
 
-	res, err := d.Scripting().Execute(ctx, `
+	err = d.Query().Exec(ctx, `
 		CREATE TABLE test (
 		id Int,
 		PRIMARY KEY(id)
 	);
 	DROP TABLE test;`, nil)
-	if err != nil {
-		return false
-	}
-	defer func() { _ = res.Close() }()
-	return true
+	return err == nil
 }
 
 func Test(t *testing.T) {

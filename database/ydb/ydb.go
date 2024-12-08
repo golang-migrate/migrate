@@ -162,11 +162,8 @@ func (db *YDB) Run(migration io.Reader) error {
 		return err
 	}
 
-	res, err := db.driver.Scripting().Execute(context.TODO(), string(rawMigrations), nil)
-	if err != nil {
-		return err
-	}
-	return res.Close()
+	err = db.driver.Query().Exec(context.TODO(), string(rawMigrations), nil)
+	return err
 }
 
 func (db *YDB) SetVersion(version int, dirty bool) error {
@@ -297,9 +294,9 @@ func (db *YDB) ensureVersionTable() (err error) {
 
 	createVersionTableQuery := fmt.Sprintf(`
 		CREATE TABLE IF NOT EXISTS %s (
-			version Uint64,
-			dirty Bool,
-			created Timestamp,
+			version Uint64 NOT NULL,
+			dirty Bool NOT NULL,
+			created Timestamp NOT NULL,
 			PRIMARY KEY(version)
 		)
 	`, db.config.MigrationsTable)
