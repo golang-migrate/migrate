@@ -23,7 +23,6 @@ type s3Driver struct {
 	s3client   S3Client
 	config     *Config
 	migrations *source.Migrations
-	ctx        context.Context
 }
 
 type Config struct {
@@ -56,10 +55,9 @@ func WithInstance(ctx context.Context, s3client S3Client, config *Config) (sourc
 		config:     config,
 		s3client:   s3client,
 		migrations: source.NewMigrations(),
-		ctx:        ctx,
 	}
 
-	if err := driver.loadMigrations(); err != nil {
+	if err := driver.loadMigrations(ctx); err != nil {
 		return nil, err
 	}
 
@@ -83,8 +81,8 @@ func parseURI(uri string) (*Config, error) {
 	}, nil
 }
 
-func (s *s3Driver) loadMigrations() error {
-	output, err := s.s3client.ListObjects(s.ctx, &s3.ListObjectsInput{
+func (s *s3Driver) loadMigrations(ctx context.Context) error {
+	output, err := s.s3client.ListObjects(ctx, &s3.ListObjectsInput{
 		Bucket:    aws.String(s.config.Bucket),
 		Prefix:    aws.String(s.config.Prefix),
 		Delimiter: aws.String("/"),
@@ -152,7 +150,8 @@ func (s *s3Driver) ReadDown(version uint) (io.ReadCloser, string, error) {
 
 func (s *s3Driver) open(m *source.Migration) (io.ReadCloser, string, error) {
 	key := path.Join(s.config.Prefix, m.Raw)
-	object, err := s.s3client.GetObject(s.ctx, &s3.GetObjectInput{
+	ctx := context.Background()
+	object, err := s.s3client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(s.config.Bucket),
 		Key:    aws.String(key),
 	})
