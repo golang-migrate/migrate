@@ -3,7 +3,7 @@ package ydb
 import (
 	"context"
 	"crypto/tls"
-	"errors"
+	"database/sql"
 	"fmt"
 	"io"
 	"net/url"
@@ -11,15 +11,13 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 )
 
 func init() {
-	db := YDB{}
-	database.Register("ydb", &db)
+	database.Register("ydb", &YDB{})
 }
 
 const (
@@ -44,32 +42,44 @@ type Config struct {
 }
 
 type YDB struct {
-	driver *ydb.Driver
-	config *Config
-
+	// locking and unlocking need to use the same connection
+	conn     *sql.Conn
+	db       *sql.DB
 	isLocked atomic.Bool
+
+	config *Config
 }
 
-func WithInstance(driver *ydb.Driver, config *Config) (database.Driver, error) {
+func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	if config == nil {
 		return nil, ErrNilConfig
+	}
+
+	if err := instance.Ping(); err != nil {
+		return nil, err
 	}
 
 	if len(config.MigrationsTable) == 0 {
 		config.MigrationsTable = defaultMigrationsTable
 	}
 
+	conn, err := instance.Conn(context.TODO())
+	if err != nil {
+		return nil, err
+	}
+
 	db := &YDB{
-		driver: driver,
+		conn:   conn,
+		db:     instance,
 		config: config,
 	}
-	if err := db.ensureVersionTable(); err != nil {
+	if err = db.ensureVersionTable(); err != nil {
 		return nil, err
 	}
 	return db, nil
 }
 
-func (db *YDB) Open(dsn string) (database.Driver, error) {
+func (y *YDB) Open(dsn string) (database.Driver, error) {
 	purl, err := url.Parse(dsn)
 	if err != nil {
 		return nil, err
@@ -93,18 +103,23 @@ func (db *YDB) Open(dsn string) (database.Driver, error) {
 
 	purl = migrate.FilterCustomQuery(purl)
 
-	credentials := db.parseCredentialsOptions(purl, pquery)
-	tlsOptions, err := db.parseTLSOptions(purl, pquery)
+	credentials := y.parseCredentialsOptions(purl, pquery)
+	tlsOptions, err := y.parseTLSOptions(purl, pquery)
 	if err != nil {
 		return nil, err
 	}
 
-	driver, err := ydb.Open(context.TODO(), purl.String(), append(tlsOptions, credentials)...)
+	nativeDriver, err := ydb.Open(context.TODO(), purl.String(), append(tlsOptions, credentials)...)
 	if err != nil {
 		return nil, err
 	}
 
-	px, err := WithInstance(driver, &Config{
+	connector, err := ydb.Connector(nativeDriver)
+	if err != nil {
+		return nil, err
+	}
+
+	px, err := WithInstance(sql.OpenDB(connector), &Config{
 		MigrationsTable: pquery.Get(queryParamMigrationsTable),
 	})
 	if err != nil {
@@ -113,7 +128,7 @@ func (db *YDB) Open(dsn string) (database.Driver, error) {
 	return px, nil
 }
 
-func (db *YDB) parseCredentialsOptions(url *url.URL, query url.Values) (credentials ydb.Option) {
+func (y *YDB) parseCredentialsOptions(url *url.URL, query url.Values) (credentials ydb.Option) {
 	switch {
 	case query.Has(queryParamAuthToken):
 		credentials = ydb.WithAccessTokenCredentials(query.Get(queryParamAuthToken))
@@ -128,7 +143,7 @@ func (db *YDB) parseCredentialsOptions(url *url.URL, query url.Values) (credenti
 	return credentials
 }
 
-func (db *YDB) parseTLSOptions(_ *url.URL, query url.Values) (options []ydb.Option, err error) {
+func (y *YDB) parseTLSOptions(_ *url.URL, query url.Values) (options []ydb.Option, err error) {
 	if query.Has(queryParamTLSCertificateAuthorities) {
 		options = append(options, ydb.WithCertificatesFromFile(query.Get(queryParamTLSCertificateAuthorities)))
 	}
@@ -152,138 +167,143 @@ func (db *YDB) parseTLSOptions(_ *url.URL, query url.Values) (options []ydb.Opti
 	return options, nil
 }
 
-func (db *YDB) Close() error {
-	return db.driver.Close(context.TODO())
+func (y *YDB) Close() error {
+	connErr := y.conn.Close()
+	var dbErr error
+	if y.db != nil {
+		dbErr = y.db.Close()
+	}
+	if connErr != nil || dbErr != nil {
+		return fmt.Errorf("conn: %v, db: %v", connErr, dbErr)
+	}
+	return nil
 }
 
-func (db *YDB) Run(migration io.Reader) error {
+func (y *YDB) Run(migration io.Reader) error {
 	rawMigrations, err := io.ReadAll(migration)
 	if err != nil {
 		return err
 	}
 
-	err = db.driver.Query().Exec(context.TODO(), string(rawMigrations), nil)
-	return err
+	if _, err = y.conn.ExecContext(ydb.WithQueryMode(context.TODO(), ydb.SchemeQueryMode), string(rawMigrations)); err != nil {
+		return database.Error{OrigErr: err, Err: "migration failed", Query: rawMigrations}
+	}
+	return nil
 }
 
-func (db *YDB) SetVersion(version int, dirty bool) error {
+func (y *YDB) SetVersion(version int, dirty bool) error {
 	deleteVersionQuery := fmt.Sprintf(`
 		DELETE FROM %s 
-	`, db.config.MigrationsTable)
+	`, y.config.MigrationsTable)
 
 	insertVersionQuery := fmt.Sprintf(`
 		INSERT INTO %s (version, dirty, created) VALUES (%d, %t, CurrentUtcTimestamp())
-	`, db.config.MigrationsTable, version, dirty)
+	`, y.config.MigrationsTable, version, dirty)
 
-	ctx := context.TODO()
-	err := db.driver.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
-		if err := tx.Exec(ctx, deleteVersionQuery); err != nil {
-			return err
+	tx, err := y.conn.BeginTx(context.TODO(), &sql.TxOptions{})
+	if err != nil {
+		return &database.Error{OrigErr: err, Err: "transaction start failed"}
+	}
+
+	if _, err := tx.Exec(deleteVersionQuery); err != nil {
+		if errRollback := tx.Rollback(); errRollback != nil {
+			err = multierror.Append(err, errRollback)
 		}
-		// Also re-write the schema version for nil dirty versions to prevent
-		// empty schema version for failed down migration on the first migration
-		// See: https://github.com/golang-migrate/migrate/issues/330
-		if version >= 0 || (version == database.NilVersion && dirty) {
-			if err := tx.Exec(ctx, insertVersionQuery); err != nil {
-				return err
+		return &database.Error{OrigErr: err, Query: []byte(deleteVersionQuery)}
+	}
+
+	// Also re-write the schema version for nil dirty versions to prevent
+	// empty schema version for failed down migration on the first migration
+	// See: https://github.com/golang-migrate/migrate/issues/330
+	if version >= 0 || (version == database.NilVersion && dirty) {
+		if _, err := tx.Exec(insertVersionQuery, version, dirty); err != nil {
+			if errRollback := tx.Rollback(); errRollback != nil {
+				err = multierror.Append(err, errRollback)
 			}
+			return &database.Error{OrigErr: err, Query: []byte(insertVersionQuery)}
 		}
-		return nil
-	}, query.WithTxSettings(query.TxSettings(query.WithSerializableReadWrite())))
+	}
+
+	if err := tx.Commit(); err != nil {
+		return &database.Error{OrigErr: err, Err: "transaction commit failed"}
+	}
 	return err
 }
 
-func (db *YDB) Version() (version int, dirty bool, err error) {
-	ctx := context.TODO()
-
+func (y *YDB) Version() (version int, dirty bool, err error) {
 	getVersionQuery := fmt.Sprintf(`
 		SELECT version, dirty FROM %s LIMIT 1
-	`, db.config.MigrationsTable)
-
-	rs, err := db.driver.Query().QueryResultSet(ctx, getVersionQuery)
-	if err != nil {
-		return 0, false, &database.Error{OrigErr: err, Query: []byte(getVersionQuery)}
-	}
-	defer func() {
-		if closeErr := rs.Close(ctx); closeErr != nil {
-			err = multierror.Append(err, closeErr)
-		}
-	}()
-
-	row, err := rs.NextRow(ctx)
-	if err != nil {
-		if errors.Is(err, io.EOF) {
-			return database.NilVersion, false, nil
-		}
-		return 0, false, err
-	}
+	`, y.config.MigrationsTable)
 
 	var v uint64
-	if err = row.Scan(&v, &dirty); err != nil {
+	err = y.conn.QueryRowContext(context.TODO(), getVersionQuery).Scan(&v, &dirty)
+	switch {
+	case err == sql.ErrNoRows:
+		return database.NilVersion, false, nil
+	case err != nil:
 		return 0, false, &database.Error{OrigErr: err, Query: []byte(getVersionQuery)}
+	default:
+		return int(v), dirty, err
 	}
-	return int(v), dirty, err
 }
 
-func (db *YDB) Drop() (err error) {
-	ctx := context.TODO()
-
+func (y *YDB) Drop() (err error) {
 	listQuery := "SELECT DISTINCT Path FROM `.sys/partition_stats` WHERE Path NOT LIKE '%/.sys%'"
-	rs, err := db.driver.Query().QueryResultSet(context.TODO(), listQuery)
+	rs, err := y.conn.QueryContext(context.TODO(), listQuery)
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(listQuery)}
 	}
 	defer func() {
-		if closeErr := rs.Close(ctx); closeErr != nil {
+		if closeErr := rs.Close(); closeErr != nil {
 			err = multierror.Append(err, closeErr)
 		}
 	}()
 
-	for {
-		var row query.Row
-		if row, err = rs.NextRow(ctx); err != nil {
-			if errors.Is(err, io.EOF) {
-				err = nil
-				break
-			}
+	paths := make([]string, 0)
+	for rs.Next() {
+		var path string
+		if err = rs.Scan(&path); err != nil {
 			return err
 		}
-
-		var table string
-		if err = row.Scan(&table); err != nil {
-			return err
+		if len(path) != 0 {
+			paths = append(paths, path)
 		}
+	}
+	if err = rs.Err(); err != nil {
+		return &database.Error{OrigErr: err, Query: []byte(listQuery)}
+	}
 
-		dropQuery := fmt.Sprintf("DROP TABLE IF EXISTS `%s`", table)
-		if err = db.driver.Query().Exec(ctx, dropQuery); err != nil {
+	for _, path := range paths {
+		dropQuery := fmt.Sprintf("DROP TABLE IF EXISTS `%s`", path)
+		if _, err = y.conn.ExecContext(ydb.WithQueryMode(context.TODO(), ydb.SchemeQueryMode), dropQuery); err != nil {
 			return &database.Error{OrigErr: err, Query: []byte(dropQuery)}
 		}
 	}
-
-	return err
+	return nil
 }
-func (db *YDB) Lock() error {
-	if !db.isLocked.CompareAndSwap(false, true) {
+
+func (y *YDB) Lock() error {
+	if !y.isLocked.CompareAndSwap(false, true) {
 		return database.ErrLocked
 	}
 	return nil
 }
 
-func (db *YDB) Unlock() error {
-	if !db.isLocked.CompareAndSwap(true, false) {
+func (y *YDB) Unlock() error {
+	if !y.isLocked.CompareAndSwap(true, false) {
 		return database.ErrNotLocked
 	}
 	return nil
 }
 
 // ensureVersionTable checks if versions table exists and, if not, creates it.
-func (db *YDB) ensureVersionTable() (err error) {
-	if err = db.Lock(); err != nil {
+func (y *YDB) ensureVersionTable() (err error) {
+	if err = y.Lock(); err != nil {
 		return err
 	}
 
 	defer func() {
-		if unlockErr := db.Unlock(); unlockErr != nil {
+		if unlockErr := y.Unlock(); unlockErr != nil {
 			if err == nil {
 				err = unlockErr
 			} else {
@@ -299,10 +319,9 @@ func (db *YDB) ensureVersionTable() (err error) {
 			created Timestamp NOT NULL,
 			PRIMARY KEY(version)
 		)
-	`, db.config.MigrationsTable)
-	err = db.driver.Query().Exec(context.TODO(), createVersionTableQuery)
-	if err != nil {
-		return err
+	`, y.config.MigrationsTable)
+	if _, err = y.conn.ExecContext(ydb.WithQueryMode(context.TODO(), ydb.SchemeQueryMode), createVersionTableQuery); err != nil {
+		return &database.Error{OrigErr: err, Query: []byte(createVersionTableQuery)}
 	}
-	return err
+	return nil
 }
