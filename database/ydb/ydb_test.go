@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	image        = "cr.yandex/yc/yandex-docker-local-ydb:latest"
+	image        = "ydbplatform/local-ydb:latest"
 	host         = "localhost"
 	port         = "2136"
 	databaseName = "local"
