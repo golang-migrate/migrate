@@ -4,5 +4,4 @@ CREATE TABLE `test/cities` (
     PRIMARY KEY (id)
 );
 
-ALTER TABLE `test/users`
-    ADD COLUMN city Uint64;
+ALTER TABLE `test/users` ADD COLUMN city Uint64;
