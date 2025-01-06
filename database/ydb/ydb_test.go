@@ -26,7 +26,9 @@ const (
 var (
 	opts = dktest.Options{
 		Env: map[string]string{
-			"YDB_USE_IN_MEMORY_PDISKS": "true",
+			"GRPC_TLS_PORT": "2135",
+			"GRPC_PORT":     "2136",
+			"MON_PORT":      "8765",
 		},
 
 		PortBindings: nat.PortMap{
