@@ -114,18 +114,21 @@ func (y *YDB) Open(dsn string) (database.Driver, error) {
 		return nil, err
 	}
 
-	connector, err := ydb.Connector(nativeDriver)
+	connector, err := ydb.Connector(nativeDriver,
+		ydb.WithQueryService(true),
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	px, err := WithInstance(sql.OpenDB(connector), &Config{
+	db, err := WithInstance(sql.OpenDB(connector), &Config{
 		MigrationsTable: pquery.Get(queryParamMigrationsTable),
 	})
 	if err != nil {
 		return nil, err
 	}
-	return px, nil
+
+	return db, nil
 }
 
 func (y *YDB) parseCredentialsOptions(url *url.URL, query url.Values) (credentials ydb.Option) {
