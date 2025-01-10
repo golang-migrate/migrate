@@ -248,7 +248,8 @@ func (ch *ClickHouse) ensureVersionTable() (err error) {
 			) Engine=%s`, ch.config.MigrationsTable, ch.config.MigrationsTableEngine)
 	}
 
-	if strings.HasSuffix(ch.config.MigrationsTableEngine, "Tree") {
+	if strings.HasSuffix(ch.config.MigrationsTableEngine, "Tree") ||
+		strings.Contains(ch.config.MigrationsTableEngine, "MergeTree") {
 		query = fmt.Sprintf(`%s ORDER BY sequence`, query)
 	}
 
