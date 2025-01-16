@@ -14,6 +14,7 @@
 |:----------------------------:|:--------------------------------------------------------------------------------------------:|
 |        `x-auth-token`        |                                    Authentication token.                                     |
 |     `x-migrations-table`     |                 Name of the migrations table (default `schema_migrations`).                  |
+|        `x-lock-table`        |        Name of the table which maintains the migration lock (default `schema_lock`).         |
 |        `x-use-grpcs`         |                  Enables gRPCS protocol for YDB connections (default grpc).                  |
 |          `x-tls-ca`          |                     The location of the CA (certificate authority) file.                     |
 | `x-tls-insecure-skip-verify` |       Controls whether a client verifies the server's certificate chain and host name.       |

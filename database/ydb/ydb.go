@@ -22,9 +22,11 @@ func init() {
 
 const (
 	defaultMigrationsTable = "schema_migrations"
+	defaultLockTable       = "schema_lock"
 
 	queryParamAuthToken                 = "x-auth-token"
 	queryParamMigrationsTable           = "x-migrations-table"
+	queryParamLockTable                 = "x-lock-table"
 	queryParamUseGRPCS                  = "x-use-grpcs"
 	queryParamTLSCertificateAuthorities = "x-tls-ca"
 	queryParamTLSInsecureSkipVerify     = "x-tls-insecure-skip-verify"
@@ -39,6 +41,7 @@ var (
 
 type Config struct {
 	MigrationsTable string
+	LockTable       string
 }
 
 type YDB struct {
@@ -63,6 +66,10 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		config.MigrationsTable = defaultMigrationsTable
 	}
 
+	if len(config.LockTable) == 0 {
+		config.LockTable = defaultLockTable
+	}
+
 	conn, err := instance.Conn(context.TODO())
 	if err != nil {
 		return nil, err
@@ -72,6 +79,9 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		conn:   conn,
 		db:     instance,
 		config: config,
+	}
+	if err = db.ensureLockTable(); err != nil {
+		return nil, err
 	}
 	if err = db.ensureVersionTable(); err != nil {
 		return nil, err
@@ -123,6 +133,7 @@ func (y *YDB) Open(dsn string) (database.Driver, error) {
 
 	db, err := WithInstance(sql.OpenDB(connector), &Config{
 		MigrationsTable: pquery.Get(queryParamMigrationsTable),
+		LockTable:       pquery.Get(queryParamLockTable),
 	})
 	if err != nil {
 		return nil, err
@@ -295,6 +306,20 @@ func (y *YDB) Lock() error {
 func (y *YDB) Unlock() error {
 	if !y.isLocked.CompareAndSwap(true, false) {
 		return database.ErrNotLocked
+	}
+	return nil
+}
+
+// ensureLockTable checks if lock table exists and, if not, creates it.
+func (y *YDB) ensureLockTable() (err error) {
+	createLockTableQuery := fmt.Sprintf(`
+		CREATE TABLE IF NOT EXISTS %s (
+			lock_id String NOT NULL,
+			PRIMARY KEY(lock_id)
+		)
+	`, y.config.LockTable)
+	if _, err = y.conn.ExecContext(ydb.WithQueryMode(context.TODO(), ydb.SchemeQueryMode), createLockTableQuery); err != nil {
+		return &database.Error{OrigErr: err, Query: []byte(createLockTableQuery)}
 	}
 	return nil
 }
