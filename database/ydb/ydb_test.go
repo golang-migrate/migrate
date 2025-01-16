@@ -13,11 +13,11 @@ import (
 
 	"github.com/golang-migrate/migrate/v4"
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
+	"github.com/golang-migrate/migrate/v4/dktesting"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
 const (
-	image        = "ydbplatform/local-ydb:latest"
 	host         = "localhost"
 	port         = "2136"
 	databaseName = "local"
@@ -44,6 +44,13 @@ var (
 		ReadyTimeout: 15 * time.Second,
 		ReadyFunc:    isReady,
 	}
+
+	// Released version: https://ydb.tech/docs/downloads/#ydb-server
+	specs = []dktesting.ContainerSpec{
+		{ImageName: "ydbplatform/local-ydb:latest", Options: opts},
+		{ImageName: "ydbplatform/local-ydb:24.3", Options: opts},
+		{ImageName: "ydbplatform/local-ydb:24.2", Options: opts},
+	}
 )
 
 func connectionString(options ...string) string {
@@ -67,7 +74,7 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 }
 
 func Test(t *testing.T) {
-	dktest.Run(t, image, opts, func(t *testing.T, c dktest.ContainerInfo) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		db := &YDB{}
 		d, err := db.Open(connectionString())
 		if err != nil {
@@ -86,7 +93,7 @@ func Test(t *testing.T) {
 }
 
 func TestMigrate(t *testing.T) {
-	dktest.Run(t, image, opts, func(t *testing.T, c dktest.ContainerInfo) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		db := &YDB{}
 		d, err := db.Open(connectionString())
 		if err != nil {
