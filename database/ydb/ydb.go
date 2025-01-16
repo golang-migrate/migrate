@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"io"
 	"net/url"
-	"sync/atomic"
+
+	"go.uber.org/atomic"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
@@ -27,6 +29,7 @@ const (
 	queryParamAuthToken                 = "x-auth-token"
 	queryParamMigrationsTable           = "x-migrations-table"
 	queryParamLockTable                 = "x-lock-table"
+	queryParamForceLock                 = "x-force-lock"
 	queryParamUseGRPCS                  = "x-use-grpcs"
 	queryParamTLSCertificateAuthorities = "x-tls-ca"
 	queryParamTLSInsecureSkipVerify     = "x-tls-insecure-skip-verify"
@@ -42,6 +45,8 @@ var (
 type Config struct {
 	MigrationsTable string
 	LockTable       string
+	DatabaseName    string
+	ForceLock       bool
 }
 
 type YDB struct {
@@ -134,6 +139,8 @@ func (y *YDB) Open(dsn string) (database.Driver, error) {
 	db, err := WithInstance(sql.OpenDB(connector), &Config{
 		MigrationsTable: pquery.Get(queryParamMigrationsTable),
 		LockTable:       pquery.Get(queryParamLockTable),
+		DatabaseName:    purl.Path,
+		ForceLock:       pquery.Has(queryParamForceLock),
 	})
 	if err != nil {
 		return nil, err
@@ -297,17 +304,60 @@ func (y *YDB) Drop() (err error) {
 }
 
 func (y *YDB) Lock() error {
-	if !y.isLocked.CompareAndSwap(false, true) {
-		return database.ErrLocked
-	}
-	return nil
+	return database.CasRestoreOnErr(&y.isLocked, false, true, database.ErrLocked, func() (err error) {
+		return retry.DoTx(context.TODO(), y.db, func(ctx context.Context, tx *sql.Tx) (err error) {
+			aid, err := database.GenerateAdvisoryLockId(y.config.DatabaseName)
+			if err != nil {
+				return err
+			}
+
+			getLockQuery := fmt.Sprintf("SELECT * FROM %s WHERE lock_id = '%s'", y.config.LockTable, aid)
+			rows, err := tx.Query(getLockQuery, aid)
+			if err != nil {
+				return database.Error{OrigErr: err, Err: "failed to fetch migration lock", Query: []byte(getLockQuery)}
+			}
+			defer func() {
+				if errClose := rows.Close(); errClose != nil {
+					err = multierror.Append(err, errClose)
+				}
+			}()
+
+			// If row exists at all, lock is present
+			locked := rows.Next()
+			if locked && !y.config.ForceLock {
+				return database.ErrLocked
+			}
+			if locked && y.config.ForceLock {
+				return nil
+			}
+
+			setLockQuery := fmt.Sprintf("INSERT INTO %s (lock_id) VALUES ('%s')", y.config.LockTable, aid)
+			if _, err = tx.Exec(setLockQuery); err != nil {
+				return database.Error{OrigErr: err, Err: "failed to set migration lock", Query: []byte(setLockQuery)}
+			}
+			return nil
+		}, retry.WithTxOptions(&sql.TxOptions{Isolation: sql.LevelSerializable}))
+	})
 }
 
 func (y *YDB) Unlock() error {
-	if !y.isLocked.CompareAndSwap(true, false) {
-		return database.ErrNotLocked
-	}
-	return nil
+	return database.CasRestoreOnErr(&y.isLocked, true, false, database.ErrNotLocked, func() (err error) {
+		aid, err := database.GenerateAdvisoryLockId(y.config.DatabaseName)
+		if err != nil {
+			return err
+		}
+
+		releaseLockQuery := fmt.Sprintf("DELETE FROM %s WHERE lock_id = '%s'", y.config.LockTable, aid)
+		if _, err = y.conn.ExecContext(context.TODO(), releaseLockQuery); err != nil {
+			// On drops, the lock table is fully removed; This is fine, and is a valid "unlocked" state for the schema.
+			if ydb.IsOperationErrorSchemeError(err) {
+				return nil
+			}
+			return database.Error{OrigErr: err, Err: "failed to release migration lock", Query: []byte(releaseLockQuery)}
+		}
+
+		return nil
+	})
 }
 
 // ensureLockTable checks if lock table exists and, if not, creates it.
