@@ -3,12 +3,12 @@ package ydb
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/dhui/dktest"
-	"github.com/docker/go-connections/nat"
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -18,8 +18,7 @@ import (
 )
 
 const (
-	host         = "localhost"
-	port         = "2136"
+	defaultPort  = 2136
 	databaseName = "local"
 )
 
@@ -31,16 +30,7 @@ var (
 			"MON_PORT":      "8765",
 		},
 
-		PortBindings: nat.PortMap{
-			nat.Port("2136/tcp"): []nat.PortBinding{
-				{
-					HostIP:   "0.0.0.0",
-					HostPort: port,
-				},
-			},
-		},
-
-		Hostname:     host,
+		PortRequired: true,
 		ReadyTimeout: 15 * time.Second,
 		ReadyFunc:    isReady,
 	}
@@ -53,12 +43,18 @@ var (
 	}
 )
 
-func connectionString(options ...string) string {
+func connectionString(host, port string, options ...string) string {
 	return fmt.Sprintf("ydb://%s:%s/%s?%s", host, port, databaseName, strings.Join(options, "&"))
 }
 
 func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
-	d, err := ydb.Open(ctx, fmt.Sprintf("grpc://%s:%s/%s", host, port, databaseName))
+	ip, port, err := c.Port(defaultPort)
+	if err != nil {
+		log.Println("port error:", err)
+		return false
+	}
+
+	d, err := ydb.Open(ctx, fmt.Sprintf("grpc://%s:%s/%s", ip, port, databaseName))
 	if err != nil {
 		return false
 	}
@@ -75,8 +71,13 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 
 func Test(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.Port(defaultPort)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		db := &YDB{}
-		d, err := db.Open(connectionString())
+		d, err := db.Open(connectionString(ip, port))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -94,8 +95,13 @@ func Test(t *testing.T) {
 
 func TestMigrate(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.Port(defaultPort)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		db := &YDB{}
-		d, err := db.Open(connectionString())
+		d, err := db.Open(connectionString(ip, port))
 		if err != nil {
 			t.Fatal(err)
 		}
