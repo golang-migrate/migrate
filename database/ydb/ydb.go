@@ -206,7 +206,7 @@ func (y *YDB) Run(migration io.Reader) error {
 		return err
 	}
 
-	if _, err = y.conn.ExecContext(ydb.WithQueryMode(context.TODO(), ydb.SchemeQueryMode), string(rawMigrations)); err != nil {
+	if _, err = y.conn.ExecContext(context.Background(), string(rawMigrations)); err != nil {
 		return database.Error{OrigErr: err, Err: "migration failed", Query: rawMigrations}
 	}
 	return nil
@@ -296,7 +296,7 @@ func (y *YDB) Drop() (err error) {
 
 	for _, path := range paths {
 		dropQuery := fmt.Sprintf("DROP TABLE IF EXISTS `%s`", path)
-		if _, err = y.conn.ExecContext(ydb.WithQueryMode(context.TODO(), ydb.SchemeQueryMode), dropQuery); err != nil {
+		if _, err = y.conn.ExecContext(context.Background(), dropQuery); err != nil {
 			return &database.Error{OrigErr: err, Query: []byte(dropQuery)}
 		}
 	}
@@ -368,7 +368,7 @@ func (y *YDB) ensureLockTable() (err error) {
 			PRIMARY KEY(lock_id)
 		)
 	`, y.config.LockTable)
-	if _, err = y.conn.ExecContext(ydb.WithQueryMode(context.TODO(), ydb.SchemeQueryMode), createLockTableQuery); err != nil {
+	if _, err = y.conn.ExecContext(context.Background(), createLockTableQuery); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(createLockTableQuery)}
 	}
 	return nil
@@ -398,7 +398,7 @@ func (y *YDB) ensureVersionTable() (err error) {
 			PRIMARY KEY(version)
 		)
 	`, y.config.MigrationsTable)
-	if _, err = y.conn.ExecContext(ydb.WithQueryMode(context.TODO(), ydb.SchemeQueryMode), createVersionTableQuery); err != nil {
+	if _, err = y.conn.ExecContext(context.Background(), createVersionTableQuery); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(createVersionTableQuery)}
 	}
 	return nil
