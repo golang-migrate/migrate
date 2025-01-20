@@ -29,7 +29,6 @@ const (
 	queryParamAuthToken                 = "x-auth-token"
 	queryParamMigrationsTable           = "x-migrations-table"
 	queryParamLockTable                 = "x-lock-table"
-	queryParamForceLock                 = "x-force-lock"
 	queryParamUseGRPCS                  = "x-use-grpcs"
 	queryParamTLSCertificateAuthorities = "x-tls-ca"
 	queryParamTLSInsecureSkipVerify     = "x-tls-insecure-skip-verify"
@@ -46,7 +45,6 @@ type Config struct {
 	MigrationsTable string
 	LockTable       string
 	DatabaseName    string
-	ForceLock       bool
 }
 
 type YDB struct {
@@ -144,7 +142,6 @@ func (y *YDB) Open(dsn string) (database.Driver, error) {
 		MigrationsTable: pquery.Get(queryParamMigrationsTable),
 		LockTable:       pquery.Get(queryParamLockTable),
 		DatabaseName:    purl.Path,
-		ForceLock:       pquery.Has(queryParamForceLock),
 	})
 	if err != nil {
 		return nil, err
@@ -328,11 +325,8 @@ func (y *YDB) Lock() error {
 
 			// If row exists at all, lock is present
 			locked := rows.Next()
-			if locked && !y.config.ForceLock {
+			if locked {
 				return database.ErrLocked
-			}
-			if locked && y.config.ForceLock {
-				return nil
 			}
 
 			setLockQuery := fmt.Sprintf("INSERT INTO %s (lock_id) VALUES ('%s')", y.config.LockTable, aid)
