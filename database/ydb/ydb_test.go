@@ -9,7 +9,9 @@ import (
 	"time"
 
 	"github.com/dhui/dktest"
+	"github.com/docker/go-connections/nat"
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 
 	"github.com/golang-migrate/migrate/v4"
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
@@ -23,23 +25,33 @@ const (
 )
 
 var (
-	opts = dktest.Options{
-		Env: map[string]string{
-			"GRPC_TLS_PORT": "2135",
-			"GRPC_PORT":     "2136",
-			"MON_PORT":      "8765",
-		},
-
-		PortRequired: true,
-		ReadyTimeout: 15 * time.Second,
-		ReadyFunc:    isReady,
+	getOptions = func(port string) dktest.Options {
+		return dktest.Options{
+			Env: map[string]string{
+				"GRPC_TLS_PORT": "2135",
+				"GRPC_PORT":     "2136",
+				"MON_PORT":      "8765",
+			},
+			PortBindings: nat.PortMap{
+				nat.Port(fmt.Sprintf("%d/tcp", defaultPort)): []nat.PortBinding{
+					{
+						HostIP:   "0.0.0.0",
+						HostPort: port,
+					},
+				},
+			},
+			PortRequired: true,
+			Hostname:     "127.0.0.1",
+			ReadyTimeout: 15 * time.Second,
+			ReadyFunc:    isReady,
+		}
 	}
 
 	// Released version: https://ydb.tech/docs/downloads/#ydb-server
 	specs = []dktesting.ContainerSpec{
-		{ImageName: "ydbplatform/local-ydb:latest", Options: opts},
-		{ImageName: "ydbplatform/local-ydb:24.3", Options: opts},
-		{ImageName: "ydbplatform/local-ydb:24.2", Options: opts},
+		{ImageName: "ydbplatform/local-ydb:latest", Options: getOptions("22000")},
+		{ImageName: "ydbplatform/local-ydb:24.3", Options: getOptions("22001")},
+		{ImageName: "ydbplatform/local-ydb:24.2", Options: getOptions("22002")},
 	}
 )
 
@@ -54,7 +66,7 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 		return false
 	}
 
-	d, err := ydb.Open(ctx, fmt.Sprintf("grpc://%s:%s/%s", ip, port, databaseName))
+	d, err := ydb.Open(ctx, fmt.Sprintf("grpc://%s:%s/%s", ip, port, databaseName), ydb.WithBalancer(balancers.SingleConn()))
 	if err != nil {
 		return false
 	}
