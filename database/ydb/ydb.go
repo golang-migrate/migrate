@@ -8,11 +8,11 @@ import (
 	"io"
 	"net/url"
 
-	"go.uber.org/atomic"
-
 	"github.com/hashicorp/go-multierror"
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
+	"go.uber.org/atomic"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
@@ -124,7 +124,11 @@ func (y *YDB) Open(dsn string) (database.Driver, error) {
 		return nil, err
 	}
 
-	nativeDriver, err := ydb.Open(context.TODO(), purl.String(), append(tlsOptions, credentials)...)
+	nativeDriver, err := ydb.Open(
+		context.TODO(),
+		purl.String(),
+		append(tlsOptions, credentials, ydb.WithBalancer(balancers.SingleConn()))...,
+	)
 	if err != nil {
 		return nil, err
 	}
