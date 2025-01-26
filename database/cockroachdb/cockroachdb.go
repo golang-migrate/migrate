@@ -37,6 +37,7 @@ type Config struct {
 	LockTable       string
 	ForceLock       bool
 	DatabaseName    string
+	Role            string
 }
 
 type CockroachDb struct {
@@ -76,6 +77,12 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 
 	if len(config.LockTable) == 0 {
 		config.LockTable = DefaultLockTable
+	}
+	if len(config.Role) > 0 {
+		query := fmt.Sprintf("SET ROLE %s", database.QuoteString(config.Role))
+		if _, err := instance.Exec(query); err != nil {
+			return nil, &database.Error{OrigErr: err, Query: []byte(query)}
+		}
 	}
 
 	px := &CockroachDb{
@@ -127,11 +134,17 @@ func (c *CockroachDb) Open(url string) (database.Driver, error) {
 		forceLock = false
 	}
 
+	var role string
+	if s := purl.Query().Get("x-role"); len(s) > 0 {
+		role = s
+	}
+
 	px, err := WithInstance(db, &Config{
 		DatabaseName:    purl.Path,
 		MigrationsTable: migrationsTable,
 		LockTable:       lockTable,
 		ForceLock:       forceLock,
+		Role:            role,
 	})
 	if err != nil {
 		return nil, err

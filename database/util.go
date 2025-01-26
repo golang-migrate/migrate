@@ -31,3 +31,7 @@ func CasRestoreOnErr(lock *atomic.Bool, o, n bool, casErr error, f func() error)
 	}
 	return nil
 }
+
+func QuoteString(str string) string {
+	return "'" + strings.ReplaceAll(str, "'", "''") + "'"
+}

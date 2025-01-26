@@ -827,3 +827,72 @@ func Test_computeLineFromPos(t *testing.T) {
 		})
 	}
 }
+
+func TestRole(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := pgConnectionString(ip, port)
+
+		// Check that opening the postgres connection returns NilVersion
+		p := &Postgres{}
+
+		d, err := p.Open(addr)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
+
+		mustRun(t, d, []string{
+			"CREATE USER _fa",
+			"GRANT CONNECT, CREATE, TEMPORARY ON DATABASE postgres TO _fa",
+			"CREATE USER deploy WITH ENCRYPTED PASSWORD '" + pgPassword + "'",
+			"GRANT _fa TO deploy",
+		})
+
+		// positive: connecting with deploy user and setting role to _fa
+		d2, err := p.Open(fmt.Sprintf("postgres://deploy:%s@%v:%v/postgres?sslmode=disable&x-role=_fa", pgPassword, ip, port))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := d2.Run(strings.NewReader("CREATE TABLE foo (foo text);")); err != nil {
+			t.Fatal(err)
+		}
+		var exists bool
+		if err := d2.(*Postgres).conn.QueryRowContext(context.Background(), "SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'foo' AND tableowner = '_fa');").Scan(&exists); err != nil {
+			t.Fatal(err)
+		}
+		if !exists {
+			t.Fatalf("expected table foo owned by _fa role to exist")
+		}
+
+		// negative: connecting with deploy user and trying to set not existing role
+		_, err = p.Open(fmt.Sprintf("postgres://deploy:%s@%v:%v/postgres?sslmode=disable&x-role=not_existing_role", pgPassword, ip, port))
+		if err != ErrNoSuchRole {
+			t.Fatal(fmt.Errorf("expected %w, but got %w", ErrNoSuchRole, err))
+		}
+
+		// negative: connecting with deploy user and trying to set not granted role
+		d3, err := p.Open(fmt.Sprintf("postgres://deploy:%s@%v:%v/postgres?sslmode=disable&x-role=postgres", pgPassword, ip, port))
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = d3.Run(strings.NewReader("CREATE TABLE imdasuperuser (foo text);"))
+		var e database.Error
+		if !errors.As(err, &e) || err == nil {
+			t.Fatal(fmt.Errorf("unexpected success, wanted permission denied error, got: %w", err))
+		}
+		if !strings.Contains(e.OrigErr.Error(), "permission denied to set role") {
+			t.Fatal(fmt.Errorf("unexpected error, wanted permission denied error, got: %w", err))
+		}
+	})
+}
