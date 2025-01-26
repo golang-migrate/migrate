@@ -26,7 +26,7 @@ import (
 const defaultPort = 26257
 
 var (
-	opts = dktest.Options{Cmd: []string{"start", "--insecure"}, PortRequired: true, ReadyFunc: isReady}
+	opts = dktest.Options{Cmd: []string{"start-single-node", "--insecure"}, PortRequired: true, ReadyFunc: isReady}
 	// Supported versions: https://www.cockroachlabs.com/docs/releases/release-support-policy#supported-versions
 	specs = []dktesting.ContainerSpec{
 		{ImageName: "cockroachdb/cockroach:latest-v24.3", Options: opts},
