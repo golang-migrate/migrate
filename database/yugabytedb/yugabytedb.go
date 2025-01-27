@@ -13,6 +13,7 @@ import (
 	"github.com/cenkalti/backoff/v4"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
+	"github.com/golang-migrate/migrate/v4/source"
 	"github.com/hashicorp/go-multierror"
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgerrcode"
@@ -349,6 +350,10 @@ func (c *YugabyteDB) Drop() (err error) {
 	}
 
 	return nil
+}
+
+func (c *YugabyteDB) Exec(e source.Executor) error {
+	return e.Execute(c.db)
 }
 
 // ensureVersionTable checks if versions table exists and, if not, creates it.

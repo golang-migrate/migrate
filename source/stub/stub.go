@@ -69,16 +69,16 @@ func (s *Stub) Next(version uint) (nextVersion uint, err error) {
 	}
 }
 
-func (s *Stub) ReadUp(version uint) (r io.ReadCloser, identifier string, err error) {
+func (s *Stub) ReadUp(version uint) (r io.ReadCloser, e source.Executor, identifier string, err error) {
 	if m, ok := s.Migrations.Up(version); ok {
-		return io.NopCloser(bytes.NewBufferString(m.Identifier)), fmt.Sprintf("%v.up.stub", version), nil
+		return io.NopCloser(bytes.NewBufferString(m.Identifier)), nil, fmt.Sprintf("%v.up.stub", version), nil
 	}
-	return nil, "", &os.PathError{Op: fmt.Sprintf("read up version %v", version), Path: s.Url, Err: os.ErrNotExist}
+	return nil, nil, "", &os.PathError{Op: fmt.Sprintf("read up version %v", version), Path: s.Url, Err: os.ErrNotExist}
 }
 
-func (s *Stub) ReadDown(version uint) (r io.ReadCloser, identifier string, err error) {
+func (s *Stub) ReadDown(version uint) (r io.ReadCloser, e source.Executor, identifier string, err error) {
 	if m, ok := s.Migrations.Down(version); ok {
-		return io.NopCloser(bytes.NewBufferString(m.Identifier)), fmt.Sprintf("%v.down.stub", version), nil
+		return io.NopCloser(bytes.NewBufferString(m.Identifier)), nil, fmt.Sprintf("%v.down.stub", version), nil
 	}
-	return nil, "", &os.PathError{Op: fmt.Sprintf("read down version %v", version), Path: s.Url, Err: os.ErrNotExist}
+	return nil, nil, "", &os.PathError{Op: fmt.Sprintf("read down version %v", version), Path: s.Url, Err: os.ErrNotExist}
 }
