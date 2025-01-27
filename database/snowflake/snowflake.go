@@ -118,12 +118,15 @@ func (p *Snowflake) Open(url string) (database.Driver, error) {
 		return nil, ErrNoSchema
 	}
 
+	warehouse := purl.Query().Get("warehouse")
+
 	cfg := &sf.Config{
-		Account:  purl.Host,
-		User:     purl.User.Username(),
-		Password: password,
-		Database: database,
-		Schema:   schema,
+		Account:   purl.Host,
+		User:      purl.User.Username(),
+		Password:  password,
+		Database:  database,
+		Schema:    schema,
+		Warehouse: warehouse,
 	}
 
 	dsn, err := sf.DSN(cfg)
@@ -180,7 +183,12 @@ func (p *Snowflake) Run(migration io.Reader) error {
 
 	// run migration
 	query := string(migr[:])
-	if _, err := p.conn.ExecContext(context.Background(), query); err != nil {
+	stmtCount := countStatements(query)
+	context, err := sf.WithMultiStatement(context.Background(), stmtCount)
+	if err != nil {
+		return err
+	}
+	if _, err := p.conn.ExecContext(context, query); err != nil {
 		if pgErr, ok := err.(*pq.Error); ok {
 			var line uint
 			var col uint
@@ -203,6 +211,11 @@ func (p *Snowflake) Run(migration io.Reader) error {
 	}
 
 	return nil
+}
+
+func countStatements(query string) int {
+	semicolonCount := strings.Count(query, ";")
+	return semicolonCount
 }
 
 func computeLineFromPos(s string, pos int) (line uint, col uint, ok bool) {
