@@ -1,6 +1,7 @@
 package file
 
 import (
+	"context"
 	nurl "net/url"
 	"os"
 	"path/filepath"
@@ -19,7 +20,7 @@ type File struct {
 	path string
 }
 
-func (f *File) Open(url string) (source.Driver, error) {
+func (f *File) Open(ctx context.Context, url string) (source.Driver, error) {
 	p, err := parseURL(url)
 	if err != nil {
 		return nil, err

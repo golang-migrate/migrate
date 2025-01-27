@@ -112,14 +112,15 @@ func test(t *testing.T) {
 		}
 
 		addr := msConnectionString(ip, port)
+		ctx := context.Background()
 		p := &SQLServer{}
-		d, err := p.Open(addr)
+		d, err := p.Open(ctx, addr)
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
 
 		defer func() {
-			if err := d.Close(); err != nil {
+			if err := d.Close(ctx); err != nil {
 				t.Error(err)
 			}
 		}()
@@ -137,19 +138,20 @@ func testMigrate(t *testing.T) {
 		}
 
 		addr := msConnectionString(ip, port)
+		ctx := context.Background()
 		p := &SQLServer{}
-		d, err := p.Open(addr)
+		d, err := p.Open(ctx, addr)
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
 
 		defer func() {
-			if err := d.Close(); err != nil {
+			if err := d.Close(ctx); err != nil {
 				t.Error(err)
 			}
 		}()
 
-		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "master", d)
+		m, err := migrate.NewWithDatabaseInstance(ctx, "file://./examples/migrations", "master", d)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -166,17 +168,18 @@ func testMultiStatement(t *testing.T) {
 		}
 
 		addr := msConnectionString(ip, port)
+		ctx := context.Background()
 		ms := &SQLServer{}
-		d, err := ms.Open(addr)
+		d, err := ms.Open(ctx, addr)
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer func() {
-			if err := d.Close(); err != nil {
+			if err := d.Close(ctx); err != nil {
 				t.Error(err)
 			}
 		}()
-		if err := d.Run(strings.NewReader("CREATE TABLE foo (foo text); CREATE TABLE bar (bar text);")); err != nil {
+		if err := d.Run(ctx, strings.NewReader("CREATE TABLE foo (foo text); CREATE TABLE bar (bar text);")); err != nil {
 			t.Fatalf("expected err to be nil, got %v", err)
 		}
 
@@ -201,13 +204,14 @@ func testErrorParsing(t *testing.T) {
 
 		addr := msConnectionString(ip, port)
 
+		ctx := context.Background()
 		p := &SQLServer{}
-		d, err := p.Open(addr)
+		d, err := p.Open(ctx, addr)
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer func() {
-			if err := d.Close(); err != nil {
+			if err := d.Close(ctx); err != nil {
 				t.Error(err)
 			}
 		}()
@@ -215,7 +219,7 @@ func testErrorParsing(t *testing.T) {
 		wantErr := `migration failed: Unknown object type 'TABLEE' used in a CREATE, DROP, or ALTER statement. in line 1:` +
 			` CREATE TABLE foo (foo text); CREATE TABLEE bar (bar text); (details: mssql: Unknown object type ` +
 			`'TABLEE' used in a CREATE, DROP, or ALTER statement.)`
-		if err := d.Run(strings.NewReader("CREATE TABLE foo (foo text); CREATE TABLEE bar (bar text);")); err == nil {
+		if err := d.Run(ctx, strings.NewReader("CREATE TABLE foo (foo text); CREATE TABLEE bar (bar text);")); err == nil {
 			t.Fatal("expected err but got nil")
 		} else if err.Error() != wantErr {
 			t.Fatalf("expected '%s' but got '%s'", wantErr, err.Error())
@@ -232,8 +236,9 @@ func testLockWorks(t *testing.T) {
 		}
 
 		addr := fmt.Sprintf("sqlserver://sa:%v@%v:%v?master", saPassword, ip, port)
+		ctx := context.Background()
 		p := &SQLServer{}
-		d, err := p.Open(addr)
+		d, err := p.Open(ctx, addr)
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
@@ -241,21 +246,21 @@ func testLockWorks(t *testing.T) {
 
 		ms := d.(*SQLServer)
 
-		err = ms.Lock()
+		err = ms.Lock(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = ms.Unlock()
+		err = ms.Unlock(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		// make sure the 2nd lock works (RELEASE_LOCK is very finicky)
-		err = ms.Lock()
+		err = ms.Lock(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = ms.Unlock()
+		err = ms.Unlock(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -271,8 +276,9 @@ func testMsiTrue(t *testing.T) {
 		}
 
 		addr := msConnectionStringMsi(ip, port, true)
+		ctx := context.Background()
 		p := &SQLServer{}
-		_, err = p.Open(addr)
+		_, err = p.Open(ctx, addr)
 		if err == nil {
 			t.Fatal("MSI should fail when not running in an Azure context.")
 		}
@@ -288,21 +294,22 @@ func testOpenWithPasswordAndMSI(t *testing.T) {
 		}
 
 		addr := msConnectionStringMsiWithPassword(ip, port, true)
+		ctx := context.Background()
 		p := &SQLServer{}
-		_, err = p.Open(addr)
+		_, err = p.Open(ctx, addr)
 		if err == nil {
 			t.Fatal("Open should fail when both password and useMsi=true are passed.")
 		}
 
 		addr = msConnectionStringMsiWithPassword(ip, port, false)
 		p = &SQLServer{}
-		d, err := p.Open(addr)
+		d, err := p.Open(ctx, addr)
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		defer func() {
-			if err := d.Close(); err != nil {
+			if err := d.Close(ctx); err != nil {
 				t.Error(err)
 			}
 		}()
@@ -320,8 +327,9 @@ func testMsiFalse(t *testing.T) {
 		}
 
 		addr := msConnectionStringMsi(ip, port, false)
+		ctx := context.Background()
 		p := &SQLServer{}
-		_, err = p.Open(addr)
+		_, err = p.Open(ctx, addr)
 		if err == nil {
 			t.Fatal("Open should fail since no password was passed and useMsi is false.")
 		}

@@ -1,6 +1,7 @@
 package spanner
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"testing"
@@ -35,9 +36,10 @@ const db = "projects/abc/instances/def/databases/testdb"
 
 func Test(t *testing.T) {
 	withSpannerEmulator(t, func(t *testing.T) {
+		ctx := context.Background()
 		uri := fmt.Sprintf("spanner://%s", db)
 		s := &Spanner{}
-		d, err := s.Open(uri)
+		d, err := s.Open(ctx, uri)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -47,13 +49,14 @@ func Test(t *testing.T) {
 
 func TestMigrate(t *testing.T) {
 	withSpannerEmulator(t, func(t *testing.T) {
+		ctx := context.Background()
 		s := &Spanner{}
 		uri := fmt.Sprintf("spanner://%s", db)
-		d, err := s.Open(uri)
+		d, err := s.Open(ctx, uri)
 		if err != nil {
 			t.Fatal(err)
 		}
-		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", uri, d)
+		m, err := migrate.NewWithDatabaseInstance(ctx, "file://./examples/migrations", uri, d)
 		if err != nil {
 			t.Fatal(err)
 		}
