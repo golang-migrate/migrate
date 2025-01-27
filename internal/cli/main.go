@@ -159,6 +159,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 
 		seq := false
 		seqDigits := 6
+		onlyUp := false
 
 		createFlagSet, help := newFlagSetWithHelp("create")
 		extPtr := createFlagSet.String("ext", "", "File extension")
@@ -167,6 +168,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 		timezoneName := createFlagSet.String("tz", defaultTimezone, `The timezone that will be used for generating timestamps (default: utc)`)
 		createFlagSet.BoolVar(&seq, "seq", seq, "Use sequential numbers instead of timestamps (default: false)")
 		createFlagSet.IntVar(&seqDigits, "digits", seqDigits, "The number of digits to use in sequences (default: 6)")
+		createFlagSet.BoolVar(&onlyUp, "only-up", onlyUp, "Skip down migration (default: false)")
 
 		if err := createFlagSet.Parse(args); err != nil {
 			log.fatalErr(err)
@@ -188,7 +190,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 			log.fatal(err)
 		}
 
-		if err := createCmd(*dirPtr, startTime.In(timezone), *formatPtr, name, *extPtr, seq, seqDigits, true); err != nil {
+		if err := createCmd(*dirPtr, startTime.In(timezone), *formatPtr, name, *extPtr, seq, seqDigits, onlyUp, true); err != nil {
 			log.fatalErr(err)
 		}
 
