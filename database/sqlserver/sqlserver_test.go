@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/dhui/dktest"
-	"github.com/docker/go-connections/nat"
 	"github.com/golang-migrate/migrate/v4"
 
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
@@ -25,18 +24,6 @@ const defaultPort = 1433
 const saPassword = "Root1234"
 
 var (
-	sqlEdgeOpts = dktest.Options{
-		Env: map[string]string{"ACCEPT_EULA": "Y", "MSSQL_SA_PASSWORD": saPassword},
-		PortBindings: map[nat.Port][]nat.PortBinding{
-			nat.Port(fmt.Sprintf("%d/tcp", defaultPort)): {
-				nat.PortBinding{
-					HostIP:   "0.0.0.0",
-					HostPort: "0/tcp",
-				},
-			},
-		},
-		PortRequired: true, ReadyFunc: isReady, PullTimeout: 2 * time.Minute,
-	}
 	sqlServerOpts = dktest.Options{
 		Env:          map[string]string{"ACCEPT_EULA": "Y", "MSSQL_SA_PASSWORD": saPassword, "MSSQL_PID": "Express"},
 		PortRequired: true, ReadyFunc: isReady, PullTimeout: 2 * time.Minute,
