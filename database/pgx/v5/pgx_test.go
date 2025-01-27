@@ -35,11 +35,11 @@ var (
 		PortRequired: true, ReadyFunc: isReady}
 	// Supported versions: https://www.postgresql.org/support/versioning/
 	specs = []dktesting.ContainerSpec{
-		{ImageName: "postgres:12", Options: opts},
 		{ImageName: "postgres:13", Options: opts},
 		{ImageName: "postgres:14", Options: opts},
 		{ImageName: "postgres:15", Options: opts},
 		{ImageName: "postgres:16", Options: opts},
+		{ImageName: "postgres:17", Options: opts},
 	}
 )
 
