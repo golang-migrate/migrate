@@ -33,7 +33,7 @@ var (
 	ErrMultipleAuthOptionsPassed = fmt.Errorf("both password and useMsi=true were passed.")
 )
 
-var lockErrorMap = map[mssql.ReturnStatus]string{
+var lockErrorMap = map[int]string{
 	-1:   "The lock request timed out.",
 	-2:   "The lock request was canceled.",
 	-3:   "The lock request was chosen as a deadlock victim.",
@@ -198,18 +198,24 @@ func (ss *SQLServer) Lock() error {
 			return err
 		}
 
-		// This will either obtain the lock immediately and return true,
-		// or return false if the lock cannot be acquired immediately.
+		// This will block until the lock is acquired.
 		// MS Docs: sp_getapplock: https://docs.microsoft.com/en-us/sql/relational-databases/system-stored-procedures/sp-getapplock-transact-sql?view=sql-server-2017
-		query := `EXEC sp_getapplock @Resource = @p1, @LockMode = 'Update', @LockOwner = 'Session', @LockTimeout = 0`
+		query := `
+		DECLARE @lockResult int;
+		EXEC @lockResult = sp_getapplock @Resource = @p1, @LockMode = 'Exclusive', @LockOwner = 'Session', @LockTimeout = -1;
+		SELECT @lockResult;`
 
-		var status mssql.ReturnStatus
-		if _, err = ss.conn.ExecContext(context.Background(), query, aid, &status); err == nil && status > -1 {
+		var status int
+		if err = ss.conn.QueryRowContext(context.Background(), query, aid).Scan(&status); err == nil && status > -1 {
 			return nil
 		} else if err != nil {
 			return &database.Error{OrigErr: err, Err: "try lock failed", Query: []byte(query)}
 		} else {
-			return &database.Error{Err: fmt.Sprintf("try lock failed with error %v: %v", status, lockErrorMap[status]), Query: []byte(query)}
+			errorDescription, ok := lockErrorMap[status]
+			if !ok {
+				errorDescription = "Unknown error"
+			}
+			return &database.Error{Err: fmt.Sprintf("try lock failed with error %v: %v", status, errorDescription), Query: []byte(query)}
 		}
 	})
 }
