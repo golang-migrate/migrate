@@ -246,8 +246,8 @@ func (c *Cassandra) Run(migration io.Reader) error {
 func (c *Cassandra) SetVersion(version int, dirty bool) error {
 	// DELETE instead of TRUNCATE because AWS Keyspaces does not support it
 	// see: https://docs.aws.amazon.com/keyspaces/latest/devguide/cassandra-apis.html
-	squery := `SELECT version FROM "` + c.config.MigrationsTable + `"`
-	dquery := `DELETE FROM "` + c.config.MigrationsTable + `" WHERE version = ?`
+	squery := `SELECT version FROM ` + c.config.MigrationsTable
+	dquery := `DELETE FROM ` + c.config.MigrationsTable + ` WHERE version = ?`
 	iter := c.session.Query(squery).Iter()
 	var previous int
 	for iter.Scan(&previous) {
@@ -263,7 +263,7 @@ func (c *Cassandra) SetVersion(version int, dirty bool) error {
 	// empty schema version for failed down migration on the first migration
 	// See: https://github.com/golang-migrate/migrate/issues/330
 	if version >= 0 || (version == database.NilVersion && dirty) {
-		query := `INSERT INTO "` + c.config.MigrationsTable + `" (version, dirty) VALUES (?, ?)`
+		query := `INSERT INTO ` + c.config.MigrationsTable + ` (version, dirty) VALUES (?, ?)`
 		if err := c.session.Query(query, version, dirty).Exec(); err != nil {
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
@@ -274,7 +274,7 @@ func (c *Cassandra) SetVersion(version int, dirty bool) error {
 
 // Return current keyspace version
 func (c *Cassandra) Version() (version int, dirty bool, err error) {
-	query := `SELECT version, dirty FROM "` + c.config.MigrationsTable + `" LIMIT 1`
+	query := `SELECT version, dirty FROM ` + c.config.MigrationsTable + ` LIMIT 1`
 	err = c.session.Query(query).Scan(&version, &dirty)
 	switch {
 	case err == gocql.ErrNotFound:
