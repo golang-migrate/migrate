@@ -165,8 +165,8 @@ func (c *Cassandra) Open(url string) (database.Driver, error) {
 	}
 
 	if len(u.Query().Get("disable-host-lookup")) > 0 {
-		if flag, err := strconv.ParseBool(u.Query().Get("disable-host-lookup")); err != nil && flag {
-			cluster.DisableInitialHostLookup = true
+		if flag, err := strconv.ParseBool(u.Query().Get("disable-host-lookup")); err == nil {
+			cluster.DisableInitialHostLookup = flag
 		} else if err != nil {
 			return nil, err
 		}
