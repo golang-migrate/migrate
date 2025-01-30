@@ -14,6 +14,7 @@ require (
 	github.com/cockroachdb/cockroach-go/v2 v2.1.1
 	github.com/dhui/dktest v0.4.4
 	github.com/docker/docker v27.2.0+incompatible
+	github.com/docker/go-connections v0.5.0
 	github.com/fsouza/fake-gcs-server v1.17.0
 	github.com/go-sql-driver/mysql v1.5.0
 	github.com/gobuffalo/here v0.6.0
@@ -35,7 +36,7 @@ require (
 	github.com/snowflakedb/gosnowflake v1.6.19
 	github.com/stretchr/testify v1.9.0
 	github.com/xanzy/go-gitlab v0.15.0
-	github.com/ydb-platform/ydb-go-sdk/v3 v3.95.5
+	github.com/ydb-platform/ydb-go-sdk/v3 v3.99.1
 	go.mongodb.org/mongo-driver v1.7.5
 	go.uber.org/atomic v1.7.0
 	golang.org/x/oauth2 v0.18.0
@@ -47,7 +48,6 @@ require (
 
 require (
 	github.com/distribution/reference v0.6.0 // indirect
-	github.com/docker/go-connections v0.5.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
