@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"io"
 	"net/url"
-	"sync/atomic"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
+	"go.uber.org/atomic"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
@@ -22,9 +24,11 @@ func init() {
 
 const (
 	defaultMigrationsTable = "schema_migrations"
+	defaultLockTable       = "schema_lock"
 
 	queryParamAuthToken                 = "x-auth-token"
 	queryParamMigrationsTable           = "x-migrations-table"
+	queryParamLockTable                 = "x-lock-table"
 	queryParamUseGRPCS                  = "x-use-grpcs"
 	queryParamTLSCertificateAuthorities = "x-tls-ca"
 	queryParamTLSInsecureSkipVerify     = "x-tls-insecure-skip-verify"
@@ -39,6 +43,8 @@ var (
 
 type Config struct {
 	MigrationsTable string
+	LockTable       string
+	DatabaseName    string
 }
 
 type YDB struct {
@@ -63,6 +69,10 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		config.MigrationsTable = defaultMigrationsTable
 	}
 
+	if len(config.LockTable) == 0 {
+		config.LockTable = defaultLockTable
+	}
+
 	conn, err := instance.Conn(context.TODO())
 	if err != nil {
 		return nil, err
@@ -72,6 +82,9 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		conn:   conn,
 		db:     instance,
 		config: config,
+	}
+	if err = db.ensureLockTable(); err != nil {
+		return nil, err
 	}
 	if err = db.ensureVersionTable(); err != nil {
 		return nil, err
@@ -109,7 +122,11 @@ func (y *YDB) Open(dsn string) (database.Driver, error) {
 		return nil, err
 	}
 
-	nativeDriver, err := ydb.Open(context.TODO(), purl.String(), append(tlsOptions, credentials)...)
+	nativeDriver, err := ydb.Open(
+		context.TODO(),
+		purl.String(),
+		append(tlsOptions, credentials, ydb.WithBalancer(balancers.SingleConn()))...,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -123,6 +140,8 @@ func (y *YDB) Open(dsn string) (database.Driver, error) {
 
 	db, err := WithInstance(sql.OpenDB(connector), &Config{
 		MigrationsTable: pquery.Get(queryParamMigrationsTable),
+		LockTable:       pquery.Get(queryParamLockTable),
+		DatabaseName:    purl.Path,
 	})
 	if err != nil {
 		return nil, err
@@ -188,7 +207,7 @@ func (y *YDB) Run(migration io.Reader) error {
 		return err
 	}
 
-	if _, err = y.conn.ExecContext(ydb.WithQueryMode(context.TODO(), ydb.SchemeQueryMode), string(rawMigrations)); err != nil {
+	if _, err = y.conn.ExecContext(context.Background(), string(rawMigrations)); err != nil {
 		return database.Error{OrigErr: err, Err: "migration failed", Query: rawMigrations}
 	}
 	return nil
@@ -278,7 +297,7 @@ func (y *YDB) Drop() (err error) {
 
 	for _, path := range paths {
 		dropQuery := fmt.Sprintf("DROP TABLE IF EXISTS `%s`", path)
-		if _, err = y.conn.ExecContext(ydb.WithQueryMode(context.TODO(), ydb.SchemeQueryMode), dropQuery); err != nil {
+		if _, err = y.conn.ExecContext(context.Background(), dropQuery); err != nil {
 			return &database.Error{OrigErr: err, Query: []byte(dropQuery)}
 		}
 	}
@@ -286,15 +305,69 @@ func (y *YDB) Drop() (err error) {
 }
 
 func (y *YDB) Lock() error {
-	if !y.isLocked.CompareAndSwap(false, true) {
-		return database.ErrLocked
-	}
-	return nil
+	return database.CasRestoreOnErr(&y.isLocked, false, true, database.ErrLocked, func() (err error) {
+		return retry.DoTx(context.TODO(), y.db, func(ctx context.Context, tx *sql.Tx) (err error) {
+			aid, err := database.GenerateAdvisoryLockId(y.config.DatabaseName)
+			if err != nil {
+				return err
+			}
+
+			getLockQuery := fmt.Sprintf("SELECT * FROM %s WHERE lock_id = '%s'", y.config.LockTable, aid)
+			rows, err := tx.Query(getLockQuery, aid)
+			if err != nil {
+				return database.Error{OrigErr: err, Err: "failed to fetch migration lock", Query: []byte(getLockQuery)}
+			}
+			defer func() {
+				if errClose := rows.Close(); errClose != nil {
+					err = multierror.Append(err, errClose)
+				}
+			}()
+
+			// If row exists at all, lock is present
+			locked := rows.Next()
+			if locked {
+				return database.ErrLocked
+			}
+
+			setLockQuery := fmt.Sprintf("INSERT INTO %s (lock_id) VALUES ('%s')", y.config.LockTable, aid)
+			if _, err = tx.Exec(setLockQuery); err != nil {
+				return database.Error{OrigErr: err, Err: "failed to set migration lock", Query: []byte(setLockQuery)}
+			}
+			return nil
+		}, retry.WithTxOptions(&sql.TxOptions{Isolation: sql.LevelSerializable}))
+	})
 }
 
 func (y *YDB) Unlock() error {
-	if !y.isLocked.CompareAndSwap(true, false) {
-		return database.ErrNotLocked
+	return database.CasRestoreOnErr(&y.isLocked, true, false, database.ErrNotLocked, func() (err error) {
+		aid, err := database.GenerateAdvisoryLockId(y.config.DatabaseName)
+		if err != nil {
+			return err
+		}
+
+		releaseLockQuery := fmt.Sprintf("DELETE FROM %s WHERE lock_id = '%s'", y.config.LockTable, aid)
+		if _, err = y.conn.ExecContext(context.TODO(), releaseLockQuery); err != nil {
+			// On drops, the lock table is fully removed; This is fine, and is a valid "unlocked" state for the schema.
+			if ydb.IsOperationErrorSchemeError(err) {
+				return nil
+			}
+			return database.Error{OrigErr: err, Err: "failed to release migration lock", Query: []byte(releaseLockQuery)}
+		}
+
+		return nil
+	})
+}
+
+// ensureLockTable checks if lock table exists and, if not, creates it.
+func (y *YDB) ensureLockTable() (err error) {
+	createLockTableQuery := fmt.Sprintf(`
+		CREATE TABLE IF NOT EXISTS %s (
+			lock_id String NOT NULL,
+			PRIMARY KEY(lock_id)
+		)
+	`, y.config.LockTable)
+	if _, err = y.conn.ExecContext(context.Background(), createLockTableQuery); err != nil {
+		return &database.Error{OrigErr: err, Query: []byte(createLockTableQuery)}
 	}
 	return nil
 }
@@ -323,7 +396,7 @@ func (y *YDB) ensureVersionTable() (err error) {
 			PRIMARY KEY(version)
 		)
 	`, y.config.MigrationsTable)
-	if _, err = y.conn.ExecContext(ydb.WithQueryMode(context.TODO(), ydb.SchemeQueryMode), createVersionTableQuery); err != nil {
+	if _, err = y.conn.ExecContext(context.Background(), createVersionTableQuery); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(createVersionTableQuery)}
 	}
 	return nil
