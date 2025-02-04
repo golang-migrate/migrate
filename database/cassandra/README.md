@@ -1,4 +1,4 @@
-# Cassandra / ScyllaDB
+# Cassandra / ScyllaDB / AstraDB
 
 * `Drop()` method will not work on Cassandra 2.X because it rely on
 system_schema table which comes with 3.X
@@ -12,6 +12,10 @@ system_schema table which comes with 3.X
 * No additional configuration is required since it is a drop-in replacement for Cassandra.
 * The `Drop()` method` works for ScyllaDB 5.1
 
+
+**AstraDB**
+
+* Astra uses different parameters for authentication. See below.
 
 ## Usage
 `cassandra://host:port/keyspace?param1=value&param2=value2`
@@ -36,6 +40,23 @@ system_schema table which comes with 3.X
 
 `timeout` is parsed using [time.ParseDuration(s string)](https://golang.org/pkg/time/#ParseDuration)
 
+### [AstraDB](https://docs.datastax.com/)
+
+`astra:///keyspace?bundle=bundle.zip&token=token` or
+`astra:///keyspace?token=token&database_id=database_id`. *Note the triple slash.*
+
+Astra supports two authentication schemes;
+[bundle](https://pkg.go.dev/github.com/datastax/gocql-astra#NewClusterFromURL) and
+[token](https://pkg.go.dev/github.com/datastax/gocql-astra#NewClusterFromURL).
+The additional parameters are:
+
+
+| URL Query  | Default value | Description |
+|------------|-------------|-----------|
+| `token` | |  Astra Bearer Token (beginning with AstraCS) |
+| `database_id` | | Database ID |
+| `bundle` | | Path to secure connect bundle |
+| `api_url` | `https://api.astra.datastax.com` | Custom Astra Endpoint |
 
 ## Upgrading from v1
 

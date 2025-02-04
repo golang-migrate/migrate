@@ -11,6 +11,7 @@ import (
 
 	"go.uber.org/atomic"
 
+	gocqlastra "github.com/datastax/gocql-astra"
 	"github.com/gocql/gocql"
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/golang-migrate/migrate/v4/database/multistmt"
@@ -35,6 +36,7 @@ var (
 	ErrNoKeyspace    = errors.New("no keyspace provided")
 	ErrDatabaseDirty = errors.New("database is dirty")
 	ErrClosedSession = errors.New("session is closed")
+	ErrAstraMissing  = errors.New("missing required parameters for Astra connection")
 )
 
 type Config struct {
@@ -84,9 +86,21 @@ func WithInstance(session *gocql.Session, config *Config) (database.Driver, erro
 }
 
 func (c *Cassandra) Open(url string) (database.Driver, error) {
+	const (
+		timeout = 1 * time.Minute
+	)
 	u, err := nurl.Parse(url)
 	if err != nil {
 		return nil, err
+	}
+
+	isAstra := u.Scheme == "astra"
+
+	username := u.Query().Get("username")
+	password := u.Query().Get("password")
+
+	if isAstra {
+		username = "token"
 	}
 
 	// Check for missing mandatory attributes
@@ -94,15 +108,42 @@ func (c *Cassandra) Open(url string) (database.Driver, error) {
 		return nil, ErrNoKeyspace
 	}
 
-	cluster := gocql.NewCluster(u.Host)
+	var cluster *gocql.ClusterConfig
+
+	if isAstra {
+		bundle := u.Query().Get("bundle")
+		databaseID := u.Query().Get("database_id")
+		token := u.Query().Get("token")
+		apiUrl := u.Query().Get("api_url")
+		if apiUrl == "" {
+			apiUrl = gocqlastra.AstraAPIURL
+		}
+
+		if bundle == "" && databaseID != "" && token != "" {
+			cluster, err = GocqlastraNewClusterFromURL(apiUrl, databaseID, token, timeout)
+			if err != nil {
+				return nil, err
+			}
+		} else if bundle != "" && token != "" {
+			cluster, err = GocqlastraNewClusterFromBundle(bundle, username, token, timeout)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			return nil, ErrAstraMissing
+		}
+	} else {
+		cluster = gocql.NewCluster(u.Host)
+	}
+
 	cluster.Keyspace = strings.TrimPrefix(u.Path, "/")
 	cluster.Consistency = gocql.All
-	cluster.Timeout = 1 * time.Minute
+	cluster.Timeout = timeout
 
-	if len(u.Query().Get("username")) > 0 && len(u.Query().Get("password")) > 0 {
+	if !isAstra && len(username) > 0 && len(password) > 0 {
 		authenticator := gocql.PasswordAuthenticator{
-			Username: u.Query().Get("username"),
-			Password: u.Query().Get("password"),
+			Username: username,
+			Password: password,
 		}
 		cluster.Authenticator = authenticator
 	}
