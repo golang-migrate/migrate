@@ -2,7 +2,7 @@ module github.com/golang-migrate/migrate/v4
 
 go 1.22.0
 
-toolchain go1.23.5
+toolchain go1.23.6
 
 require (
 	cloud.google.com/go/spanner v1.56.0
@@ -36,7 +36,7 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/xanzy/go-gitlab v0.15.0
 	go.mongodb.org/mongo-driver v1.7.5
-	go.uber.org/atomic v1.7.0
+	go.uber.org/atomic v1.11.0
 	golang.org/x/oauth2 v0.18.0
 	golang.org/x/tools v0.24.0
 	google.golang.org/api v0.169.0
