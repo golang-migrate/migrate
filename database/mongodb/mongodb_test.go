@@ -7,24 +7,21 @@ import (
 
 	"log"
 
-	"github.com/golang-migrate/migrate/v4"
 	"io"
 	"os"
 	"strconv"
 	"testing"
 	"time"
-)
 
-import (
 	"github.com/dhui/dktest"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
-)
+	"github.com/golang-migrate/migrate/v4"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
-import (
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
 	"github.com/golang-migrate/migrate/v4/dktesting"
+
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
@@ -272,7 +269,7 @@ func TestTransaction(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(mongoConnectionString(ip, port)))
+		client, err := mongo.Connect(options.Client().ApplyURI(mongoConnectionString(ip, port)))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -352,7 +349,7 @@ func TestTransaction(t *testing.T) {
 		}
 		for _, tcase := range testcases {
 			t.Run(tcase.name, func(t *testing.T) {
-				client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(mongoConnectionString(ip, port)))
+				client, err := mongo.Connect(options.Client().ApplyURI(mongoConnectionString(ip, port)))
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -411,7 +408,7 @@ func waitForReplicaInit(client *mongo.Client) error {
 			//during replica set initialization, the first node first becomes a secondary and then becomes the primary
 			//should consider that initialization is completed only after the node has become the primary
 			result := client.Database("admin").RunCommand(context.TODO(), bson.D{bson.E{Key: "isMaster", Value: 1}})
-			r, err := result.DecodeBytes()
+			r, err := result.Raw()
 			if err != nil {
 				return err
 			}
