@@ -48,7 +48,7 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 		return false
 	}
 
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoConnectionString(ip, port)))
+	client, err := mongo.Connect(options.Client().ApplyURI(mongoConnectionString(ip, port)))
 	if err != nil {
 		return false
 	}
