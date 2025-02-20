@@ -8,8 +8,9 @@ import (
 	"path"
 	"strings"
 
-	"cloud.google.com/go/storage"
 	"context"
+
+	"cloud.google.com/go/storage"
 	"github.com/golang-migrate/migrate/v4/source"
 	"google.golang.org/api/iterator"
 )
@@ -95,25 +96,25 @@ func (g *gcs) Next(version uint) (uint, error) {
 	return v, nil
 }
 
-func (g *gcs) ReadUp(version uint) (io.ReadCloser, string, error) {
+func (g *gcs) ReadUp(version uint) (io.ReadCloser, source.Executor, string, error) {
 	if m, ok := g.migrations.Up(version); ok {
 		return g.open(m)
 	}
-	return nil, "", os.ErrNotExist
+	return nil, nil, "", os.ErrNotExist
 }
 
-func (g *gcs) ReadDown(version uint) (io.ReadCloser, string, error) {
+func (g *gcs) ReadDown(version uint) (io.ReadCloser, source.Executor, string, error) {
 	if m, ok := g.migrations.Down(version); ok {
 		return g.open(m)
 	}
-	return nil, "", os.ErrNotExist
+	return nil, nil, "", os.ErrNotExist
 }
 
-func (g *gcs) open(m *source.Migration) (io.ReadCloser, string, error) {
+func (g *gcs) open(m *source.Migration) (io.ReadCloser, source.Executor, string, error) {
 	objectPath := path.Join(g.prefix, m.Raw)
 	reader, err := g.bucket.Object(objectPath).NewReader(context.Background())
 	if err != nil {
-		return nil, "", err
+		return nil, nil, "", err
 	}
-	return reader, m.Identifier, nil
+	return reader, nil, m.Identifier, nil
 }

@@ -10,6 +10,7 @@ import (
 
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/golang-migrate/migrate/v4/database/multistmt"
+	"github.com/golang-migrate/migrate/v4/source"
 	"github.com/hashicorp/go-multierror"
 	"github.com/neo4j/neo4j-go-driver/neo4j"
 )
@@ -269,6 +270,10 @@ func (n *Neo4j) Drop() (err error) {
 		return err
 	}
 	return nil
+}
+
+func (n *Neo4j) Exec(e source.Executor) error {
+	return e.Execute(n.driver)
 }
 
 func (n *Neo4j) ensureVersionConstraint() (err error) {

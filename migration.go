@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"time"
+
+	"github.com/golang-migrate/migrate/v4/source"
 )
 
 // DefaultBufferSize sets the in memory buffer size (in Bytes) for every
@@ -54,6 +56,9 @@ type Migration struct {
 
 	// BytesRead holds the number of Bytes read from the migration source.
 	BytesRead int64
+
+	// Executor
+	Executor source.Executor
 }
 
 // NewMigration returns a new Migration and sets the body, identifier,
@@ -73,7 +78,7 @@ type Migration struct {
 // NilVersion is a const(-1). When running down migrations and we are at the
 // last down migration, there is no next down migration, the targetVersion should
 // be nil. Nil in this case is represented by -1 (because type int).
-func NewMigration(body io.ReadCloser, identifier string,
+func NewMigration(body io.ReadCloser, e source.Executor, identifier string,
 	version uint, targetVersion int) (*Migration, error) {
 	tnow := time.Now()
 	m := &Migration{
@@ -83,7 +88,8 @@ func NewMigration(body io.ReadCloser, identifier string,
 		Scheduled:     tnow,
 	}
 
-	if body == nil {
+	switch {
+	case body == nil && e == nil:
 		if len(identifier) == 0 {
 			m.Identifier = "<empty>"
 		}
@@ -91,14 +97,20 @@ func NewMigration(body io.ReadCloser, identifier string,
 		m.StartedBuffering = tnow
 		m.FinishedBuffering = tnow
 		m.FinishedReading = tnow
-		return m, nil
+	case body != nil:
+		br, bw := io.Pipe()
+		m.Body = body // want to simulate low latency? newSlowReader(body)
+		m.BufferSize = DefaultBufferSize
+		m.BufferedBody = br
+		m.bufferWriter = bw
+	case e != nil:
+		m.Executor = e
+
+		m.StartedBuffering = tnow
+		m.FinishedBuffering = tnow
+		m.FinishedReading = tnow
 	}
 
-	br, bw := io.Pipe()
-	m.Body = body // want to simulate low latency? newSlowReader(body)
-	m.BufferSize = DefaultBufferSize
-	m.BufferedBody = br
-	m.bufferWriter = bw
 	return m, nil
 }
 

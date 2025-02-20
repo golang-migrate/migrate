@@ -3,6 +3,8 @@ package database
 import (
 	"io"
 	"testing"
+
+	"github.com/golang-migrate/migrate/v4/source"
 )
 
 func ExampleDriver() {
@@ -49,6 +51,10 @@ func (m *mockDriver) Version() (version int, dirty bool, err error) {
 }
 
 func (m *mockDriver) Drop() error {
+	return nil
+}
+
+func (m *mockDriver) Exec(source.Executor) error {
 	return nil
 }
 

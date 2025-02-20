@@ -95,24 +95,24 @@ func (b *Bindata) Next(version uint) (nextVersion uint, err error) {
 	}
 }
 
-func (b *Bindata) ReadUp(version uint) (r io.ReadCloser, identifier string, err error) {
+func (b *Bindata) ReadUp(version uint) (r io.ReadCloser, e source.Executor, identifier string, err error) {
 	if m, ok := b.migrations.Up(version); ok {
 		body, err := b.assetSource.AssetFunc(m.Raw)
 		if err != nil {
-			return nil, "", err
+			return nil, nil, "", err
 		}
-		return io.NopCloser(bytes.NewReader(body)), m.Identifier, nil
+		return io.NopCloser(bytes.NewReader(body)), nil, m.Identifier, nil
 	}
-	return nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: b.path, Err: os.ErrNotExist}
+	return nil, nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: b.path, Err: os.ErrNotExist}
 }
 
-func (b *Bindata) ReadDown(version uint) (r io.ReadCloser, identifier string, err error) {
+func (b *Bindata) ReadDown(version uint) (r io.ReadCloser, e source.Executor, identifier string, err error) {
 	if m, ok := b.migrations.Down(version); ok {
 		body, err := b.assetSource.AssetFunc(m.Raw)
 		if err != nil {
-			return nil, "", err
+			return nil, nil, "", err
 		}
-		return io.NopCloser(bytes.NewReader(body)), m.Identifier, nil
+		return io.NopCloser(bytes.NewReader(body)), nil, m.Identifier, nil
 	}
-	return nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: b.path, Err: os.ErrNotExist}
+	return nil, nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: b.path, Err: os.ErrNotExist}
 }
