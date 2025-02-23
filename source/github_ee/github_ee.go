@@ -1,6 +1,7 @@
 package github_ee
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"net/http"
@@ -22,7 +23,7 @@ type GithubEE struct {
 	source.Driver
 }
 
-func (g *GithubEE) Open(url string) (source.Driver, error) {
+func (g *GithubEE) Open(ctx context.Context, url string) (source.Driver, error) {
 	verifyTLS := true
 
 	u, err := nurl.Parse(url)
@@ -64,7 +65,7 @@ func (g *GithubEE) Open(url string) (source.Driver, error) {
 		cfg.Path = strings.Join(pe[2:], "/")
 	}
 
-	i, err := gh.WithInstance(ghc, cfg)
+	i, err := gh.WithInstance(ctx, ghc, cfg)
 	if err != nil {
 		return nil, err
 	}

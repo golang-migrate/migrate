@@ -80,6 +80,7 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 
 func Test(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ctx := context.Background()
 		ip, port, err := c.FirstPort()
 		if err != nil {
 			t.Fatal(err)
@@ -87,12 +88,12 @@ func Test(t *testing.T) {
 
 		addr := fbConnectionString(ip, port)
 		p := &Firebird{}
-		d, err := p.Open(addr)
+		d, err := p.Open(ctx, addr)
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer func() {
-			if err := d.Close(); err != nil {
+			if err := d.Close(ctx); err != nil {
 				t.Error(err)
 			}
 		}()
@@ -102,6 +103,7 @@ func Test(t *testing.T) {
 
 func TestMigrate(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ctx := context.Background()
 		ip, port, err := c.FirstPort()
 		if err != nil {
 			t.Fatal(err)
@@ -109,16 +111,16 @@ func TestMigrate(t *testing.T) {
 
 		addr := fbConnectionString(ip, port)
 		p := &Firebird{}
-		d, err := p.Open(addr)
+		d, err := p.Open(ctx, addr)
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer func() {
-			if err := d.Close(); err != nil {
+			if err := d.Close(ctx); err != nil {
 				t.Error(err)
 			}
 		}()
-		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "firebirdsql", d)
+		m, err := migrate.NewWithDatabaseInstance(ctx, "file://./examples/migrations", "firebirdsql", d)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -128,6 +130,7 @@ func TestMigrate(t *testing.T) {
 
 func TestErrorParsing(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ctx := context.Background()
 		ip, port, err := c.FirstPort()
 		if err != nil {
 			t.Fatal(err)
@@ -135,12 +138,12 @@ func TestErrorParsing(t *testing.T) {
 
 		addr := fbConnectionString(ip, port)
 		p := &Firebird{}
-		d, err := p.Open(addr)
+		d, err := p.Open(ctx, addr)
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer func() {
-			if err := d.Close(); err != nil {
+			if err := d.Close(ctx); err != nil {
 				t.Error(err)
 			}
 		}()
@@ -151,7 +154,7 @@ Token unknown - line 1, column 8
 TABLEE
 )`
 
-		if err := d.Run(strings.NewReader("CREATE TABLEE foo (foo varchar(40));")); err == nil {
+		if err := d.Run(ctx, strings.NewReader("CREATE TABLEE foo (foo varchar(40));")); err == nil {
 			t.Fatal("expected err but got nil")
 		} else if err.Error() != wantErr {
 			msg := err.Error()
@@ -162,6 +165,7 @@ TABLEE
 
 func TestFilterCustomQuery(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ctx := context.Background()
 		ip, port, err := c.FirstPort()
 		if err != nil {
 			t.Fatal(err)
@@ -169,12 +173,12 @@ func TestFilterCustomQuery(t *testing.T) {
 
 		addr := fbConnectionString(ip, port) + "?sslmode=disable&x-custom=foobar"
 		p := &Firebird{}
-		d, err := p.Open(addr)
+		d, err := p.Open(ctx, addr)
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer func() {
-			if err := d.Close(); err != nil {
+			if err := d.Close(ctx); err != nil {
 				t.Error(err)
 			}
 		}()
@@ -183,6 +187,7 @@ func TestFilterCustomQuery(t *testing.T) {
 
 func Test_Lock(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ctx := context.Background()
 		ip, port, err := c.FirstPort()
 		if err != nil {
 			t.Fatal(err)
@@ -190,12 +195,12 @@ func Test_Lock(t *testing.T) {
 
 		addr := fbConnectionString(ip, port)
 		p := &Firebird{}
-		d, err := p.Open(addr)
+		d, err := p.Open(ctx, addr)
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer func() {
-			if err := d.Close(); err != nil {
+			if err := d.Close(ctx); err != nil {
 				t.Error(err)
 			}
 		}()
@@ -204,22 +209,22 @@ func Test_Lock(t *testing.T) {
 
 		ps := d.(*Firebird)
 
-		err = ps.Lock()
+		err = ps.Lock(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		err = ps.Unlock()
+		err = ps.Unlock(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		err = ps.Lock()
+		err = ps.Lock(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		err = ps.Unlock()
+		err = ps.Unlock(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}

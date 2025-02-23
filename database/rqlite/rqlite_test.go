@@ -75,6 +75,7 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 
 func Test(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ctx := context.Background()
 		ip, port, err := c.Port(defaultPort)
 		assert.NoError(t, err)
 
@@ -82,7 +83,7 @@ func Test(t *testing.T) {
 		t.Logf("DB connect string : %s\n", connectString)
 
 		r := &Rqlite{}
-		d, err := r.Open(connectString)
+		d, err := r.Open(ctx, connectString)
 		assert.NoError(t, err)
 
 		dt.Test(t, d, []byte("CREATE TABLE t (Qty int, Name string);"))
@@ -91,21 +92,22 @@ func Test(t *testing.T) {
 
 func TestMigrate(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ctx := context.Background()
 		ip, port, err := c.Port(defaultPort)
 		assert.NoError(t, err)
 
 		connectString := fmt.Sprintf("rqlite://%s:%s?level=strong&disableClusterDiscovery=true&x-connect-insecure=true", ip, port)
 		t.Logf("DB connect string : %s\n", connectString)
 
-		driver, err := OpenURL(connectString)
+		driver, err := OpenURL(ctx, connectString)
 		assert.NoError(t, err)
 		defer func() {
-			if err := driver.Close(); err != nil {
+			if err := driver.Close(ctx); err != nil {
 				return
 			}
 		}()
 
-		m, err := migrate.NewWithDatabaseInstance(
+		m, err := migrate.NewWithDatabaseInstance(ctx,
 			"file://./examples/migrations",
 			"ql", driver)
 		assert.NoError(t, err)
@@ -116,32 +118,35 @@ func TestMigrate(t *testing.T) {
 
 func TestBadConnectInsecureParam(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ctx := context.Background()
 		ip, port, err := c.Port(defaultPort)
 		assert.NoError(t, err)
 
 		connectString := fmt.Sprintf("rqlite://%s:%s?x-connect-insecure=foo", ip, port)
 		t.Logf("DB connect string : %s\n", connectString)
 
-		_, err = OpenURL(connectString)
+		_, err = OpenURL(ctx, connectString)
 		assert.ErrorIs(t, err, ErrBadConfig)
 	})
 }
 
 func TestBadProtocol(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ctx := context.Background()
 		ip, port, err := c.Port(defaultPort)
 		assert.NoError(t, err)
 
 		connectString := fmt.Sprintf("postgres://%s:%s/database", ip, port)
 		t.Logf("DB connect string : %s\n", connectString)
 
-		_, err = OpenURL(connectString)
+		_, err = OpenURL(ctx, connectString)
 		assert.ErrorIs(t, err, ErrBadConfig)
 	})
 }
 
 func TestNoConfig(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ctx := context.Background()
 		ip, port, err := c.Port(defaultPort)
 		assert.NoError(t, err)
 
@@ -151,13 +156,14 @@ func TestNoConfig(t *testing.T) {
 		db, err := gorqlite.Open(connectString)
 		assert.NoError(t, err)
 
-		_, err = WithInstance(db, nil)
+		_, err = WithInstance(ctx, db, nil)
 		assert.ErrorIs(t, err, ErrNilConfig)
 	})
 }
 
 func TestWithInstanceEmptyConfig(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ctx := context.Background()
 		ip, port, err := c.Port(defaultPort)
 		assert.NoError(t, err)
 
@@ -167,35 +173,36 @@ func TestWithInstanceEmptyConfig(t *testing.T) {
 		db, err := gorqlite.Open(connectString)
 		assert.NoError(t, err)
 
-		driver, err := WithInstance(db, &Config{})
+		driver, err := WithInstance(ctx, db, &Config{})
 		assert.NoError(t, err)
 
 		defer func() {
-			if err := driver.Close(); err != nil {
+			if err := driver.Close(ctx); err != nil {
 				t.Fatal(err)
 			}
 		}()
 
-		m, err := migrate.NewWithDatabaseInstance(
+		m, err := migrate.NewWithDatabaseInstance(ctx,
 			"file://./examples/migrations",
 			"ql", driver)
 		assert.NoError(t, err)
 
 		t.Log("UP")
-		err = m.Up()
+		err = m.Up(ctx)
 		assert.NoError(t, err)
 
 		_, err = db.QueryOne(fmt.Sprintf("SELECT * FROM %s", DefaultMigrationsTable))
 		assert.NoError(t, err)
 
 		t.Log("DOWN")
-		err = m.Down()
+		err = m.Down(ctx)
 		assert.NoError(t, err)
 	})
 }
 
 func TestMigrationTable(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ctx := context.Background()
 		ip, port, err := c.Port(defaultPort)
 		assert.NoError(t, err)
 
@@ -206,22 +213,22 @@ func TestMigrationTable(t *testing.T) {
 		assert.NoError(t, err)
 
 		config := Config{MigrationsTable: "my_migration_table"}
-		driver, err := WithInstance(db, &config)
+		driver, err := WithInstance(ctx, db, &config)
 		assert.NoError(t, err)
 
 		defer func() {
-			if err := driver.Close(); err != nil {
+			if err := driver.Close(ctx); err != nil {
 				t.Fatal(err)
 			}
 		}()
 
-		m, err := migrate.NewWithDatabaseInstance(
+		m, err := migrate.NewWithDatabaseInstance(ctx,
 			"file://./examples/migrations",
 			"ql", driver)
 		assert.NoError(t, err)
 
 		t.Log("UP")
-		err = m.Up()
+		err = m.Up(ctx)
 		assert.NoError(t, err)
 
 		_, err = db.QueryOne(fmt.Sprintf("SELECT * FROM %s", config.MigrationsTable))
@@ -244,7 +251,7 @@ func TestMigrationTable(t *testing.T) {
 		assert.Equal(t, petPredator, 1)
 
 		t.Log("DOWN")
-		err = m.Down()
+		err = m.Down(ctx)
 		assert.NoError(t, err)
 
 		_, err = db.QueryOne(fmt.Sprintf("SELECT * FROM %s", config.MigrationsTable))

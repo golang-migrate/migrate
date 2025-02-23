@@ -4,6 +4,7 @@
 package iofs
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -29,7 +30,7 @@ func New(fsys fs.FS, path string) (source.Driver, error) {
 
 // Open is part of source.Driver interface implementation.
 // Open cannot be called on the iofs passthrough driver.
-func (d *driver) Open(url string) (source.Driver, error) {
+func (d *driver) Open(ctx context.Context, url string) (source.Driver, error) {
 	return nil, errors.New("Open() cannot be called on the iofs passthrough driver")
 }
 
@@ -82,7 +83,7 @@ func (d *PartialDriver) Init(fsys fs.FS, path string) error {
 
 // Close is part of source.Driver interface implementation.
 // Closes the file system if possible.
-func (d *PartialDriver) Close() error {
+func (d *PartialDriver) Close(ctx context.Context) error {
 	c, ok := d.fsys.(io.Closer)
 	if !ok {
 		return nil
@@ -91,8 +92,8 @@ func (d *PartialDriver) Close() error {
 }
 
 // First is part of source.Driver interface implementation.
-func (d *PartialDriver) First() (version uint, err error) {
-	if version, ok := d.migrations.First(); ok {
+func (d *PartialDriver) First(ctx context.Context) (version uint, err error) {
+	if version, ok := d.migrations.First(ctx); ok {
 		return version, nil
 	}
 	return 0, &fs.PathError{
@@ -103,8 +104,8 @@ func (d *PartialDriver) First() (version uint, err error) {
 }
 
 // Prev is part of source.Driver interface implementation.
-func (d *PartialDriver) Prev(version uint) (prevVersion uint, err error) {
-	if version, ok := d.migrations.Prev(version); ok {
+func (d *PartialDriver) Prev(ctx context.Context, version uint) (prevVersion uint, err error) {
+	if version, ok := d.migrations.Prev(ctx, version); ok {
 		return version, nil
 	}
 	return 0, &fs.PathError{
@@ -115,8 +116,8 @@ func (d *PartialDriver) Prev(version uint) (prevVersion uint, err error) {
 }
 
 // Next is part of source.Driver interface implementation.
-func (d *PartialDriver) Next(version uint) (nextVersion uint, err error) {
-	if version, ok := d.migrations.Next(version); ok {
+func (d *PartialDriver) Next(ctx context.Context, version uint) (nextVersion uint, err error) {
+	if version, ok := d.migrations.Next(ctx, version); ok {
 		return version, nil
 	}
 	return 0, &fs.PathError{
@@ -127,7 +128,7 @@ func (d *PartialDriver) Next(version uint) (nextVersion uint, err error) {
 }
 
 // ReadUp is part of source.Driver interface implementation.
-func (d *PartialDriver) ReadUp(version uint) (r io.ReadCloser, identifier string, err error) {
+func (d *PartialDriver) ReadUp(ctx context.Context, version uint) (r io.ReadCloser, identifier string, err error) {
 	if m, ok := d.migrations.Up(version); ok {
 		body, err := d.open(path.Join(d.path, m.Raw))
 		if err != nil {
@@ -143,7 +144,7 @@ func (d *PartialDriver) ReadUp(version uint) (r io.ReadCloser, identifier string
 }
 
 // ReadDown is part of source.Driver interface implementation.
-func (d *PartialDriver) ReadDown(version uint) (r io.ReadCloser, identifier string, err error) {
+func (d *PartialDriver) ReadDown(ctx context.Context, version uint) (r io.ReadCloser, identifier string, err error) {
 	if m, ok := d.migrations.Down(version); ok {
 		body, err := d.open(path.Join(d.path, m.Raw))
 		if err != nil {

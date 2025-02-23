@@ -42,7 +42,7 @@ type Config struct {
 	Ref   string
 }
 
-func (g *Github) Open(url string) (source.Driver, error) {
+func (g *Github) Open(ctx context.Context, url string) (source.Driver, error) {
 	u, err := nurl.Parse(url)
 	if err != nil {
 		return nil, err
@@ -58,7 +58,7 @@ func (g *Github) Open(url string) (source.Driver, error) {
 		ts := oauth2.StaticTokenSource(
 			&oauth2.Token{AccessToken: password},
 		)
-		client = oauth2.NewClient(context.Background(), ts)
+		client = oauth2.NewClient(ctx, ts)
 
 	}
 
@@ -81,14 +81,14 @@ func (g *Github) Open(url string) (source.Driver, error) {
 		gn.config.Path = strings.Join(pe[1:], "/")
 	}
 
-	if err := gn.readDirectory(); err != nil {
+	if err := gn.readDirectory(ctx); err != nil {
 		return nil, err
 	}
 
 	return gn, nil
 }
 
-func WithInstance(client *github.Client, config *Config) (source.Driver, error) {
+func WithInstance(ctx context.Context, client *github.Client, config *Config) (source.Driver, error) {
 	gn := &Github{
 		client:     client,
 		config:     config,
@@ -96,18 +96,18 @@ func WithInstance(client *github.Client, config *Config) (source.Driver, error) 
 		options:    &github.RepositoryContentGetOptions{Ref: config.Ref},
 	}
 
-	if err := gn.readDirectory(); err != nil {
+	if err := gn.readDirectory(ctx); err != nil {
 		return nil, err
 	}
 
 	return gn, nil
 }
 
-func (g *Github) readDirectory() error {
+func (g *Github) readDirectory(ctx context.Context) error {
 	g.ensureFields()
 
 	fileContent, dirContents, _, err := g.client.Repositories.GetContents(
-		context.Background(),
+		ctx,
 		g.config.Owner,
 		g.config.Repo,
 		g.config.Path,
@@ -140,46 +140,46 @@ func (g *Github) ensureFields() {
 	}
 }
 
-func (g *Github) Close() error {
+func (g *Github) Close(ctx context.Context) error {
 	return nil
 }
 
-func (g *Github) First() (version uint, err error) {
+func (g *Github) First(ctx context.Context) (version uint, err error) {
 	g.ensureFields()
 
-	if v, ok := g.migrations.First(); !ok {
+	if v, ok := g.migrations.First(ctx); !ok {
 		return 0, &os.PathError{Op: "first", Path: g.config.Path, Err: os.ErrNotExist}
 	} else {
 		return v, nil
 	}
 }
 
-func (g *Github) Prev(version uint) (prevVersion uint, err error) {
+func (g *Github) Prev(ctx context.Context, version uint) (prevVersion uint, err error) {
 	g.ensureFields()
 
-	if v, ok := g.migrations.Prev(version); !ok {
+	if v, ok := g.migrations.Prev(ctx, version); !ok {
 		return 0, &os.PathError{Op: fmt.Sprintf("prev for version %v", version), Path: g.config.Path, Err: os.ErrNotExist}
 	} else {
 		return v, nil
 	}
 }
 
-func (g *Github) Next(version uint) (nextVersion uint, err error) {
+func (g *Github) Next(ctx context.Context, version uint) (nextVersion uint, err error) {
 	g.ensureFields()
 
-	if v, ok := g.migrations.Next(version); !ok {
+	if v, ok := g.migrations.Next(ctx, version); !ok {
 		return 0, &os.PathError{Op: fmt.Sprintf("next for version %v", version), Path: g.config.Path, Err: os.ErrNotExist}
 	} else {
 		return v, nil
 	}
 }
 
-func (g *Github) ReadUp(version uint) (r io.ReadCloser, identifier string, err error) {
+func (g *Github) ReadUp(ctx context.Context, version uint) (r io.ReadCloser, identifier string, err error) {
 	g.ensureFields()
 
 	if m, ok := g.migrations.Up(version); ok {
 		r, _, err := g.client.Repositories.DownloadContents(
-			context.Background(),
+			ctx,
 			g.config.Owner,
 			g.config.Repo,
 			path.Join(g.config.Path, m.Raw),
@@ -194,12 +194,12 @@ func (g *Github) ReadUp(version uint) (r io.ReadCloser, identifier string, err e
 	return nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: g.config.Path, Err: os.ErrNotExist}
 }
 
-func (g *Github) ReadDown(version uint) (r io.ReadCloser, identifier string, err error) {
+func (g *Github) ReadDown(ctx context.Context, version uint) (r io.ReadCloser, identifier string, err error) {
 	g.ensureFields()
 
 	if m, ok := g.migrations.Down(version); ok {
 		r, _, err := g.client.Repositories.DownloadContents(
-			context.Background(),
+			ctx,
 			g.config.Owner,
 			g.config.Repo,
 			path.Join(g.config.Path, m.Raw),
