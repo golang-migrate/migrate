@@ -15,6 +15,7 @@ as described in [README.md#database-urls](../../README.md#database-urls)
 | ----- | ------------------- | ----------- |
 | `x-migrations-table` | `MigrationsTable` | Name of the migrations table |
 | `x-clean-statements` | `CleanStatements` | Whether to parse and clean DDL statements before running migration towards Spanner (Required for comments and multiple statements) |
+| `x-proto-descriptors-file` | `ProtoDescriptorsFile` | File containing proto descriptors to use for `PROTO BUNDLE` statements |
 | `url` | `DatabaseName` | The full path to the Spanner database resource. If provided as part of `Config` it must not contain a scheme or query string to match the format `projects/{projectId}/instances/{instanceId}/databases/{databaseName}`|
 | `projectId` || The Google Cloud Platform project id
 | `instanceId` || The id of the instance running Spanner
