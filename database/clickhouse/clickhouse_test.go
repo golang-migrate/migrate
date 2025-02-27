@@ -26,7 +26,7 @@ var (
 		PortRequired: true, ReadyFunc: isReady,
 	}
 	specs = []dktesting.ContainerSpec{
-		{ImageName: "yandex/clickhouse-server:21.3", Options: opts},
+		{ImageName: "clickhouse:24.8", Options: opts},
 	}
 )
 
