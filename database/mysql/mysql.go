@@ -411,7 +411,7 @@ func (m *Mysql) Version() (version int, dirty bool, err error) {
 
 func (m *Mysql) Drop() (err error) {
 	// select all tables
-	query := fmt.Sprintf("SHOW TABLES FROM `%s` LIKE '%'", m.config.DatabaseName)
+	query := fmt.Sprintf("SHOW TABLES FROM `%s`", m.config.DatabaseName)
 	tables, err := m.conn.QueryContext(context.Background(), query)
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
