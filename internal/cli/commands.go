@@ -72,7 +72,7 @@ func timeVersion(startTime time.Time, format string) (version string, err error)
 }
 
 // createCmd (meant to be called via a CLI command) creates a new migration
-func createCmd(dir string, startTime time.Time, format string, name string, ext string, seq bool, seqDigits int, print bool) error {
+func createCmd(dir string, startTime time.Time, format string, name string, ext string, seq bool, seqDigits int, onlyUp bool, print bool) error {
 	if seq && format != defaultTimeFormat {
 		return errIncompatibleSeqAndFormat
 	}
@@ -119,6 +119,10 @@ func createCmd(dir string, startTime time.Time, format string, name string, ext 
 	}
 
 	for _, direction := range []string{"up", "down"} {
+		if direction == "down" && onlyUp {
+			continue
+		}
+
 		basename := fmt.Sprintf("%s_%s.%s%s", version, name, direction, ext)
 		filename := filepath.Join(dir, basename)
 
