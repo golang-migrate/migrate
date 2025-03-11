@@ -945,6 +945,43 @@ func TestVersion(t *testing.T) {
 	}
 }
 
+func TestCheck(t *testing.T) {
+	m, _ := New("stub://", "stub://")
+	m.sourceDrv.(*sStub.Stub).Migrations = sourceStubMigrations
+
+	pending, err := m.Check()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pending != 5 {
+		t.Fatalf("expected 5 pending, got %v", pending)
+	}
+
+	if err := m.Steps(3); err != nil {
+		t.Fatal(err)
+	}
+
+	pending, err = m.Check()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pending != 2 {
+		t.Fatalf("expected 2 pending, got %v", pending)
+	}
+
+	if err := m.Up(); err != nil {
+		t.Fatal(err)
+	}
+
+	pending, err = m.Check()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pending != 0 {
+		t.Fatalf("expected 0 pending, got %v", pending)
+	}
+}
+
 func TestRun(t *testing.T) {
 	m, _ := New("stub://", "stub://")
 
