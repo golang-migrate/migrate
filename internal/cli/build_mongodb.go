@@ -1,5 +1,4 @@
 //go:build mongodb
-// +build mongodb
 
 package cli
 
