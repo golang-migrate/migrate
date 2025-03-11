@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ClickHouse/clickhouse-go/v2"
 	"go.uber.org/atomic"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -73,11 +74,12 @@ func (ch *ClickHouse) Open(dsn string) (database.Driver, error) {
 		return nil, err
 	}
 	q := migrate.FilterCustomQuery(purl)
-	q.Scheme = "tcp"
-	conn, err := sql.Open("clickhouse", q.String())
+	q.Scheme = "clickhouse"
+	opt, err := clickhouse.ParseDSN(purl.String())
 	if err != nil {
 		return nil, err
 	}
+	conn := clickhouse.OpenDB(opt)
 
 	multiStatementMaxSize := DefaultMultiStatementMaxSize
 	if s := purl.Query().Get("x-multi-statement-max-size"); len(s) > 0 {
