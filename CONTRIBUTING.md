@@ -22,3 +22,6 @@ Some more helpful commands:
   * `make docs && make open-docs` opens godoc in your browser, `make kill-docs` kills the godoc server.
     Repeatedly call `make docs` to refresh the server.
   * Set the `DOCKER_API_VERSION` environment variable to the latest supported version if you get errors regarding the docker client API version being too new.
+
+
+Minor update to documentation.
