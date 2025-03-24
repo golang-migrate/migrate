@@ -243,7 +243,7 @@ func TestMigrate(t *testing.T) {
 		expectVersion uint
 		expectSeq     migrationSequence
 	}{
-		// migrate all the way Up in single steps
+		// // migrate all the way Up in single steps
 		{
 			version:   0,
 			expectErr: os.ErrNotExist,
@@ -731,7 +731,7 @@ func TestSteps(t *testing.T) {
 
 	for i, v := range tt {
 		err := m.Steps(v.steps)
-		if (v.expectErr == os.ErrNotExist && !errors.Is(err, os.ErrNotExist)) ||
+		if (v.expectErr == os.ErrNotExist && !errors.Is(err, os.ErrNotExist)) && isVersionNotFoundError(err) ||
 			(v.expectErr != os.ErrNotExist && err != v.expectErr) {
 			t.Errorf("expected err %v, got %v, in %v", v.expectErr, err, i)
 
@@ -1413,4 +1413,9 @@ func equalDbSeq(t *testing.T, i int, expected migrationSequence, got *dStub.Stub
 	if !got.EqualSequence(bs) {
 		t.Fatalf("\nexpected sequence %v,\ngot               %v, in %v", bs, got.MigrationSequence, i)
 	}
+}
+
+func isVersionNotFoundError(err error) bool {
+	var errV ErrorVersionNotFound
+	return !errors.As(err, &errV)
 }
