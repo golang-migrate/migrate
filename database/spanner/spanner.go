@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	nurl "net/url"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -55,7 +56,8 @@ type Config struct {
 	// running them towards Spanner.
 	// Parsing outputs clean DDL statements such as reformatted
 	// and void of comments.
-	CleanStatements bool
+	CleanStatements      bool
+	ProtoDescriptorsFile string
 }
 
 // Spanner implements database.Driver for Google Cloud Spanner
@@ -136,11 +138,14 @@ func (s *Spanner) Open(url string) (database.Driver, error) {
 		}
 	}
 
+	protoDescriptorsFile := purl.Query().Get("x-proto-descriptors-file")
+
 	db := &DB{admin: adminClient, data: dataClient}
 	return WithInstance(db, &Config{
-		DatabaseName:    dbname,
-		MigrationsTable: migrationsTable,
-		CleanStatements: clean,
+		DatabaseName:         dbname,
+		MigrationsTable:      migrationsTable,
+		CleanStatements:      clean,
+		ProtoDescriptorsFile: protoDescriptorsFile,
 	})
 }
 
@@ -182,10 +187,19 @@ func (s *Spanner) Run(migration io.Reader) error {
 		}
 	}
 
+	var protoDescriptors []byte
+	if s.config.ProtoDescriptorsFile != "" {
+		protoDescriptors, err = os.ReadFile(s.config.ProtoDescriptorsFile)
+		if err != nil {
+			return err
+		}
+	}
+
 	ctx := context.Background()
 	op, err := s.db.admin.UpdateDatabaseDdl(ctx, &adminpb.UpdateDatabaseDdlRequest{
-		Database:   s.config.DatabaseName,
-		Statements: stmts,
+		Database:         s.config.DatabaseName,
+		Statements:       stmts,
+		ProtoDescriptors: protoDescriptors,
 	})
 
 	if err != nil {
