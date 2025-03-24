@@ -1,5 +1,4 @@
 //go:build godoc_vfs
-// +build godoc_vfs
 
 package cli
 

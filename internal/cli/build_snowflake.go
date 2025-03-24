@@ -1,5 +1,4 @@
 //go:build snowflake
-// +build snowflake
 
 package cli
 

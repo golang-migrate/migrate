@@ -13,10 +13,14 @@ linters:
     - unparam
     - nakedret
     - prealloc
+    - revive
     #- gosec
 linters-settings:
   misspell:
     locale: US
+  revive:
+    rules:
+      - name: redundant-build-tag
 issues:
   max-same-issues: 0
   max-issues-per-linter: 0

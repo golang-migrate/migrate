@@ -1,5 +1,4 @@
 //go:build sqlserver
-// +build sqlserver
 
 package cli
 
