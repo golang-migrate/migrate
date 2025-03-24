@@ -12,7 +12,6 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/hashicorp/go-multierror"
-	"github.com/pkg/errors"
 	"github.com/rqlite/gorqlite"
 )
 
@@ -292,7 +291,7 @@ func parseUrl(url string) (*nurl.URL, *Config, error) {
 	}
 
 	if parsedUrl.Scheme != "rqlite" {
-		return nil, nil, errors.Wrap(ErrBadConfig, "bad scheme")
+		return nil, nil, fmt.Errorf("bad scheme: %w", ErrBadConfig)
 	}
 
 	// adapt from rqlite to http/https schemes
@@ -316,7 +315,7 @@ func parseConfigFromQuery(queryVals nurl.Values) (*Config, error) {
 	migrationsTable := queryVals.Get("x-migrations-table")
 	if migrationsTable != "" {
 		if strings.HasPrefix(migrationsTable, "sqlite_") {
-			return nil, errors.Wrap(ErrBadConfig, "invalid value for x-migrations-table")
+			return nil, fmt.Errorf("invalid value for x-migrations-table: %w", ErrBadConfig)
 		}
 		c.MigrationsTable = migrationsTable
 	}
@@ -325,7 +324,7 @@ func parseConfigFromQuery(queryVals nurl.Values) (*Config, error) {
 	if connectInsecureStr != "" {
 		connectInsecure, err := strconv.ParseBool(connectInsecureStr)
 		if err != nil {
-			return nil, errors.Wrap(ErrBadConfig, "invalid value for x-connect-insecure")
+			return nil, fmt.Errorf("invalid value for x-connect-insecure: %w", ErrBadConfig)
 		}
 		c.ConnectInsecure = connectInsecure
 	}
