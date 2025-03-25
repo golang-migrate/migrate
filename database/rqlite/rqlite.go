@@ -1,6 +1,7 @@
 package rqlite
 
 import (
+	"context"
 	"fmt"
 	"io"
 	nurl "net/url"
@@ -51,7 +52,7 @@ type Rqlite struct {
 
 // WithInstance creates a rqlite database driver with an existing gorqlite database connection
 // and a Config struct
-func WithInstance(instance *gorqlite.Connection, config *Config) (database.Driver, error) {
+func WithInstance(ctx context.Context, instance *gorqlite.Connection, config *Config) (database.Driver, error) {
 	if config == nil {
 		return nil, ErrNilConfig
 	}
@@ -70,7 +71,7 @@ func WithInstance(instance *gorqlite.Connection, config *Config) (database.Drive
 		config: config,
 	}
 
-	if err := driver.ensureVersionTable(); err != nil {
+	if err := driver.ensureVersionTable(ctx); err != nil {
 		return nil, err
 	}
 
@@ -78,18 +79,18 @@ func WithInstance(instance *gorqlite.Connection, config *Config) (database.Drive
 }
 
 // OpenURL creates a rqlite database driver from a connect URL
-func OpenURL(url string) (database.Driver, error) {
+func OpenURL(ctx context.Context, url string) (database.Driver, error) {
 	d := &Rqlite{}
-	return d.Open(url)
+	return d.Open(ctx, url)
 }
 
-func (r *Rqlite) ensureVersionTable() (err error) {
-	if err = r.Lock(); err != nil {
+func (r *Rqlite) ensureVersionTable(ctx context.Context) (err error) {
+	if err = r.Lock(ctx); err != nil {
 		return err
 	}
 
 	defer func() {
-		if e := r.Unlock(); e != nil {
+		if e := r.Unlock(ctx); e != nil {
 			if err == nil {
 				err = e
 			} else {
@@ -113,7 +114,7 @@ func (r *Rqlite) ensureVersionTable() (err error) {
 // Open returns a new driver instance configured with parameters
 // coming from the URL string. Migrate will call this function
 // only once per instance.
-func (r *Rqlite) Open(url string) (database.Driver, error) {
+func (r *Rqlite) Open(ctx context.Context, url string) (database.Driver, error) {
 	dburl, config, err := parseUrl(url)
 	if err != nil {
 		return nil, err
@@ -125,7 +126,7 @@ func (r *Rqlite) Open(url string) (database.Driver, error) {
 		return nil, err
 	}
 
-	if err := r.ensureVersionTable(); err != nil {
+	if err := r.ensureVersionTable(ctx); err != nil {
 		return nil, err
 	}
 
@@ -134,7 +135,7 @@ func (r *Rqlite) Open(url string) (database.Driver, error) {
 
 // Close closes the underlying database instance managed by the driver.
 // Migrate will call this function only once per instance.
-func (r *Rqlite) Close() error {
+func (r *Rqlite) Close(ctx context.Context) error {
 	r.db.Close()
 	return nil
 }
@@ -143,7 +144,7 @@ func (r *Rqlite) Close() error {
 // can run at a time. Migrate will call this function before Run is called.
 // If the implementation can't provide this functionality, return nil.
 // Return database.ErrLocked if database is already locked.
-func (r *Rqlite) Lock() error {
+func (r *Rqlite) Lock(ctx context.Context) error {
 	if !r.isLocked.CAS(false, true) {
 		return database.ErrLocked
 	}
@@ -152,7 +153,7 @@ func (r *Rqlite) Lock() error {
 
 // Unlock should release the lock. Migrate will call this function after
 // all migrations have been run.
-func (r *Rqlite) Unlock() error {
+func (r *Rqlite) Unlock(ctx context.Context) error {
 	if !r.isLocked.CAS(true, false) {
 		return database.ErrNotLocked
 	}
@@ -160,7 +161,7 @@ func (r *Rqlite) Unlock() error {
 }
 
 // Run applies a migration to the database. migration is guaranteed to be not nil.
-func (r *Rqlite) Run(migration io.Reader) error {
+func (r *Rqlite) Run(ctx context.Context, migration io.Reader) error {
 	migr, err := io.ReadAll(migration)
 	if err != nil {
 		return err
@@ -177,7 +178,7 @@ func (r *Rqlite) Run(migration io.Reader) error {
 // SetVersion saves version and dirty state.
 // Migrate will call this function before and after each call to Run.
 // version must be >= -1. -1 means NilVersion.
-func (r *Rqlite) SetVersion(version int, dirty bool) error {
+func (r *Rqlite) SetVersion(ctx context.Context, version int, dirty bool) error {
 	deleteQuery := fmt.Sprintf(`DELETE FROM %s`, r.config.MigrationsTable)
 	statements := []gorqlite.ParameterizedStatement{
 		{
@@ -217,7 +218,7 @@ func (r *Rqlite) SetVersion(version int, dirty bool) error {
 // Version returns the currently active version and if the database is dirty.
 // When no migration has been applied, it must return version -1.
 // Dirty means, a previous migration failed and user interaction is required.
-func (r *Rqlite) Version() (version int, dirty bool, err error) {
+func (r *Rqlite) Version(ctx context.Context) (version int, dirty bool, err error) {
 	query := "SELECT version, dirty FROM " + r.config.MigrationsTable + " LIMIT 1"
 
 	qr, err := r.db.QueryOne(query)
@@ -239,7 +240,7 @@ func (r *Rqlite) Version() (version int, dirty bool, err error) {
 // Drop deletes everything in the database.
 // Note that this is a breaking action, a new call to Open() is necessary to
 // ensure subsequent calls work as expected.
-func (r *Rqlite) Drop() error {
+func (r *Rqlite) Drop(ctx context.Context) error {
 	query := `SELECT name FROM sqlite_master WHERE type = 'table'`
 
 	tables, err := r.db.QueryOne(query)

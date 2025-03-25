@@ -1,6 +1,7 @@
 package ql
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"path/filepath"
@@ -15,9 +16,10 @@ import (
 func Test(t *testing.T) {
 	dir := t.TempDir()
 	t.Logf("DB path : %s\n", filepath.Join(dir, "ql.db"))
+	ctx := context.Background()
 	p := &Ql{}
 	addr := fmt.Sprintf("ql://%s", filepath.Join(dir, "ql.db"))
-	d, err := p.Open(addr)
+	d, err := p.Open(ctx, addr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,6 +40,7 @@ func TestMigrate(t *testing.T) {
 	dir := t.TempDir()
 	t.Logf("DB path : %s\n", filepath.Join(dir, "ql.db"))
 
+	ctx := context.Background()
 	db, err := sql.Open("ql", filepath.Join(dir, "ql.db"))
 	if err != nil {
 		return
@@ -48,12 +51,12 @@ func TestMigrate(t *testing.T) {
 		}
 	}()
 
-	driver, err := WithInstance(db, &Config{})
+	driver, err := WithInstance(ctx, db, &Config{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	m, err := migrate.NewWithDatabaseInstance(
+	m, err := migrate.NewWithDatabaseInstance(ctx,
 		"file://./examples/migrations",
 		"ql", driver)
 	if err != nil {

@@ -1,6 +1,7 @@
 package httpfs_test
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strings"
@@ -13,13 +14,15 @@ import (
 
 type driver struct{ httpfs.PartialDriver }
 
-func (d *driver) Open(url string) (source.Driver, error) { return nil, errors.New("X") }
+func (d *driver) Open(ctx context.Context, url string) (source.Driver, error) {
+	return nil, errors.New("X")
+}
 
 type driverExample struct {
 	httpfs.PartialDriver
 }
 
-func (d *driverExample) Open(url string) (source.Driver, error) {
+func (d *driverExample) Open(ctx context.Context, url string) (source.Driver, error) {
 	parts := strings.Split(url, ":")
 	dir := parts[0]
 	path := ""
@@ -32,7 +35,7 @@ func (d *driverExample) Open(url string) (source.Driver, error) {
 }
 
 func TestDriverExample(t *testing.T) {
-	d, err := (*driverExample)(nil).Open("testdata:sql")
+	d, err := (*driverExample)(nil).Open(context.Background(), "testdata:sql")
 	if err != nil {
 		t.Errorf("Open() returned error: %s", err)
 	}
@@ -80,7 +83,7 @@ func TestPartialDriverInit(t *testing.T) {
 					t.Errorf("Init() returned error %s", err)
 				}
 				st.Test(t, &d)
-				if err = d.Close(); err != nil {
+				if err = d.Close(context.Background()); err != nil {
 					t.Errorf("Init().Close() returned error %s", err)
 				}
 			} else {
@@ -101,7 +104,7 @@ func TestFirstWithNoMigrations(t *testing.T) {
 		t.Errorf("No error on Init() expected, got: %v", err)
 	}
 
-	if _, err := d.First(); err == nil {
+	if _, err := d.First(context.Background()); err == nil {
 		t.Errorf("Expected error on First(), got: %v", err)
 	}
 }

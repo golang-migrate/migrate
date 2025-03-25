@@ -1,6 +1,7 @@
 package source
 
 import (
+	"context"
 	"sort"
 )
 
@@ -75,14 +76,14 @@ func (i *Migrations) buildIndex() {
 	})
 }
 
-func (i *Migrations) First() (version uint, ok bool) {
+func (i *Migrations) First(ctx context.Context) (version uint, ok bool) {
 	if len(i.index) == 0 {
 		return 0, false
 	}
 	return i.index[0], true
 }
 
-func (i *Migrations) Prev(version uint) (prevVersion uint, ok bool) {
+func (i *Migrations) Prev(ctx context.Context, version uint) (prevVersion uint, ok bool) {
 	pos := i.findPos(version)
 	if pos >= 1 && len(i.index) > pos-1 {
 		return i.index[pos-1], true
@@ -90,7 +91,7 @@ func (i *Migrations) Prev(version uint) (prevVersion uint, ok bool) {
 	return 0, false
 }
 
-func (i *Migrations) Next(version uint) (nextVersion uint, ok bool) {
+func (i *Migrations) Next(ctx context.Context, version uint) (nextVersion uint, ok bool) {
 	pos := i.findPos(version)
 	if pos >= 0 && len(i.index) > pos+1 {
 		return i.index[pos+1], true
