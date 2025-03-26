@@ -12,6 +12,7 @@ import (
 	"github.com/cockroachdb/cockroach-go/v2/crdb"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
+	"github.com/golang-migrate/migrate/v4/source"
 	"github.com/hashicorp/go-multierror"
 	"github.com/lib/pq"
 	"go.uber.org/atomic"
@@ -306,6 +307,10 @@ func (c *CockroachDb) Drop() (err error) {
 	}
 
 	return nil
+}
+
+func (c *CockroachDb) Exec(e source.Executor) error {
+	return e.Execute(c.db)
 }
 
 // ensureVersionTable checks if versions table exists and, if not, creates it.
