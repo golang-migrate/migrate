@@ -55,11 +55,70 @@ func (e ErrDirty) Error() string {
 	return fmt.Sprintf("Dirty database version %v. Fix and force version.", e.Version)
 }
 
+// PostStepCallback is a callback function type that can be used to execute a
+// Golang based migration step after a SQL based migration step has been
+// executed. The callback function receives the migration and the database
+// driver as arguments.
+type PostStepCallback func(migr *Migration, driver database.Driver) error
+
+// options is a set of optional options that can be set when a Migrate instance
+// is created.
+type options struct {
+	// postStepCallbacks is a map of PostStepCallback functions that can be
+	// used to execute a Golang based migration step after a SQL based
+	// migration step has been executed. The key is the migration version
+	// and the value is the callback function that should be run _after_ the
+	// step was executed (but within the same database transaction).
+	postStepCallbacks map[uint]PostStepCallback
+}
+
+// defaultOptions returns a new options struct with default values.
+func defaultOptions() options {
+	return options{
+		postStepCallbacks: make(map[uint]PostStepCallback),
+	}
+}
+
+// Option is a function that can be used to set options on a Migrate instance.
+type Option func(*options)
+
+// WithPostStepCallbacks is an option that can be used to set a map of
+// PostStepCallback functions that can be used to execute a Golang based
+// migration step after a SQL based migration step has been executed. The key is
+// the migration version and the value is the callback function that should be
+// run _after_ the step was executed (but before the version is marked as
+// cleanly executed). An error returned from the callback will cause the
+// migration to fail and the step to be marked as dirty.
+func WithPostStepCallbacks(
+	postStepCallbacks map[uint]PostStepCallback) Option {
+
+	return func(o *options) {
+		o.postStepCallbacks = postStepCallbacks
+	}
+}
+
+// WithPostStepCallback is an option that can be used to set a PostStepCallback
+// function that can be used to execute a Golang based migration step after the
+// SQL based migration step with the given version number has been executed. The
+// callback is the function that should be run _after_ the step was executed
+// (but before the version is marked as cleanly executed). An error returned
+// from the callback will cause the migration to fail and the step to be marked
+// as dirty.
+func WithPostStepCallback(version uint, callback PostStepCallback) Option {
+	return func(o *options) {
+		o.postStepCallbacks[version] = callback
+	}
+}
+
 type Migrate struct {
 	sourceName   string
 	sourceDrv    source.Driver
 	databaseName string
 	databaseDrv  database.Driver
+
+	// opts is a set of options that can be used to modify the behavior
+	// of the Migrate instance.
+	opts options
 
 	// Log accepts a Logger interface
 	Log Logger
@@ -84,8 +143,8 @@ type Migrate struct {
 
 // New returns a new Migrate instance from a source URL and a database URL.
 // The URL scheme is defined by each driver.
-func New(sourceURL, databaseURL string) (*Migrate, error) {
-	m := newCommon()
+func New(sourceURL, databaseURL string, opts ...Option) (*Migrate, error) {
+	m := newCommon(opts)
 
 	sourceName, err := iurl.SchemeFromURL(sourceURL)
 	if err != nil {
@@ -118,8 +177,10 @@ func New(sourceURL, databaseURL string) (*Migrate, error) {
 // and an existing database instance. The source URL scheme is defined by each driver.
 // Use any string that can serve as an identifier during logging as databaseName.
 // You are responsible for closing the underlying database client if necessary.
-func NewWithDatabaseInstance(sourceURL string, databaseName string, databaseInstance database.Driver) (*Migrate, error) {
-	m := newCommon()
+func NewWithDatabaseInstance(sourceURL string, databaseName string,
+	databaseInstance database.Driver, opts ...Option) (*Migrate, error) {
+
+	m := newCommon(opts)
 
 	sourceName, err := iurl.SchemeFromURL(sourceURL)
 	if err != nil {
@@ -144,8 +205,10 @@ func NewWithDatabaseInstance(sourceURL string, databaseName string, databaseInst
 // and a database URL. The database URL scheme is defined by each driver.
 // Use any string that can serve as an identifier during logging as sourceName.
 // You are responsible for closing the underlying source client if necessary.
-func NewWithSourceInstance(sourceName string, sourceInstance source.Driver, databaseURL string) (*Migrate, error) {
-	m := newCommon()
+func NewWithSourceInstance(sourceName string, sourceInstance source.Driver,
+	databaseURL string, opts ...Option) (*Migrate, error) {
+
+	m := newCommon(opts)
 
 	databaseName, err := iurl.SchemeFromURL(databaseURL)
 	if err != nil {
@@ -170,8 +233,11 @@ func NewWithSourceInstance(sourceName string, sourceInstance source.Driver, data
 // database instance. Use any string that can serve as an identifier during logging
 // as sourceName and databaseName. You are responsible for closing down
 // the underlying source and database client if necessary.
-func NewWithInstance(sourceName string, sourceInstance source.Driver, databaseName string, databaseInstance database.Driver) (*Migrate, error) {
-	m := newCommon()
+func NewWithInstance(sourceName string, sourceInstance source.Driver,
+	databaseName string, databaseInstance database.Driver,
+	opts ...Option) (*Migrate, error) {
+
+	m := newCommon(opts)
 
 	m.sourceName = sourceName
 	m.databaseName = databaseName
@@ -182,8 +248,13 @@ func NewWithInstance(sourceName string, sourceInstance source.Driver, databaseNa
 	return m, nil
 }
 
-func newCommon() *Migrate {
+func newCommon(optFunctions []Option) *Migrate {
+	opts := defaultOptions()
+	for _, opt := range optFunctions {
+		opt(&opts)
+	}
 	return &Migrate{
+		opts:               opts,
 		GracefulStop:       make(chan bool, 1),
 		PrefetchMigrations: DefaultPrefetchMigrations,
 		LockTimeout:        DefaultLockTimeout,
@@ -745,6 +816,22 @@ func (m *Migrate) runMigrations(ret <-chan interface{}) error {
 				m.logVerbosePrintf("Read and execute %v\n", migr.LogString())
 				if err := m.databaseDrv.Run(migr.BufferedBody); err != nil {
 					return err
+				}
+
+				// If there is a post execution function for
+				// this migration, run it now.
+				cb, ok := m.opts.postStepCallbacks[migr.Version]
+				if ok {
+					m.logVerbosePrintf("Running post step "+
+						"callback for %v\n", migr.LogString())
+
+					err := cb(migr, m.databaseDrv)
+					if err != nil {
+						return err
+					}
+
+					m.logVerbosePrintf("Post step callback "+
+						"finished for %v\n", migr.LogString())
 				}
 			}
 
