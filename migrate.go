@@ -55,11 +55,28 @@ func (e ErrDirty) Error() string {
 	return fmt.Sprintf("Dirty database version %v. Fix and force version.", e.Version)
 }
 
+// options is a set of optional options that can be set when a Migrate instance
+// is created.
+type options struct {
+}
+
+// defaultOptions returns a new options struct with default values.
+func defaultOptions() options {
+	return options{}
+}
+
+// Option is a function that can be used to set options on a Migrate instance.
+type Option func(*options)
+
 type Migrate struct {
 	sourceName   string
 	sourceDrv    source.Driver
 	databaseName string
 	databaseDrv  database.Driver
+
+	// opts is a set of options that can be used to modify the behavior
+	// of the Migrate instance.
+	opts options
 
 	// Log accepts a Logger interface
 	Log Logger
@@ -84,8 +101,8 @@ type Migrate struct {
 
 // New returns a new Migrate instance from a source URL and a database URL.
 // The URL scheme is defined by each driver.
-func New(sourceURL, databaseURL string) (*Migrate, error) {
-	m := newCommon()
+func New(sourceURL, databaseURL string, opts ...Option) (*Migrate, error) {
+	m := newMigrateWithOptions(opts)
 
 	sourceName, err := iurl.SchemeFromURL(sourceURL)
 	if err != nil {
@@ -118,8 +135,10 @@ func New(sourceURL, databaseURL string) (*Migrate, error) {
 // and an existing database instance. The source URL scheme is defined by each driver.
 // Use any string that can serve as an identifier during logging as databaseName.
 // You are responsible for closing the underlying database client if necessary.
-func NewWithDatabaseInstance(sourceURL string, databaseName string, databaseInstance database.Driver) (*Migrate, error) {
-	m := newCommon()
+func NewWithDatabaseInstance(sourceURL string, databaseName string,
+	databaseInstance database.Driver, opts ...Option) (*Migrate, error) {
+
+	m := newMigrateWithOptions(opts)
 
 	sourceName, err := iurl.SchemeFromURL(sourceURL)
 	if err != nil {
@@ -144,8 +163,10 @@ func NewWithDatabaseInstance(sourceURL string, databaseName string, databaseInst
 // and a database URL. The database URL scheme is defined by each driver.
 // Use any string that can serve as an identifier during logging as sourceName.
 // You are responsible for closing the underlying source client if necessary.
-func NewWithSourceInstance(sourceName string, sourceInstance source.Driver, databaseURL string) (*Migrate, error) {
-	m := newCommon()
+func NewWithSourceInstance(sourceName string, sourceInstance source.Driver,
+	databaseURL string, opts ...Option) (*Migrate, error) {
+
+	m := newMigrateWithOptions(opts)
 
 	databaseName, err := iurl.SchemeFromURL(databaseURL)
 	if err != nil {
@@ -170,8 +191,11 @@ func NewWithSourceInstance(sourceName string, sourceInstance source.Driver, data
 // database instance. Use any string that can serve as an identifier during logging
 // as sourceName and databaseName. You are responsible for closing down
 // the underlying source and database client if necessary.
-func NewWithInstance(sourceName string, sourceInstance source.Driver, databaseName string, databaseInstance database.Driver) (*Migrate, error) {
-	m := newCommon()
+func NewWithInstance(sourceName string, sourceInstance source.Driver,
+	databaseName string, databaseInstance database.Driver,
+	opts ...Option) (*Migrate, error) {
+
+	m := newMigrateWithOptions(opts)
 
 	m.sourceName = sourceName
 	m.databaseName = databaseName
@@ -182,8 +206,13 @@ func NewWithInstance(sourceName string, sourceInstance source.Driver, databaseNa
 	return m, nil
 }
 
-func newCommon() *Migrate {
+func newMigrateWithOptions(optFunctions []Option) *Migrate {
+	opts := defaultOptions()
+	for _, opt := range optFunctions {
+		opt(&opts)
+	}
 	return &Migrate{
+		opts:               opts,
 		GracefulStop:       make(chan bool, 1),
 		PrefetchMigrations: DefaultPrefetchMigrations,
 		LockTimeout:        DefaultLockTimeout,
