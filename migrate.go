@@ -55,18 +55,60 @@ func (e ErrDirty) Error() string {
 	return fmt.Sprintf("Dirty database version %v. Fix and force version.", e.Version)
 }
 
+// PostStepCallback is a callback function type that can be used to execute a
+// Golang based migration step after a SQL based migration step has been
+// executed. The callback function receives the migration and the database
+// driver as arguments.
+type PostStepCallback func(migr *Migration, driver database.Driver) error
+
 // options is a set of optional options that can be set when a Migrate instance
 // is created.
 type options struct {
+	// postStepCallbacks is a map of PostStepCallback functions that can be
+	// used to execute a Golang based migration step after a SQL based
+	// migration step has been executed. The key is the migration version
+	// and the value is the callback function that should be run _after_ the
+	// step was executed (but within the same database transaction).
+	postStepCallbacks map[uint]PostStepCallback
 }
 
 // defaultOptions returns a new options struct with default values.
 func defaultOptions() options {
-	return options{}
+	return options{
+		postStepCallbacks: make(map[uint]PostStepCallback),
+	}
 }
 
 // Option is a function that can be used to set options on a Migrate instance.
 type Option func(*options)
+
+// WithPostStepCallbacks is an option that can be used to set a map of
+// PostStepCallback functions that can be used to execute a Golang based
+// migration step after a SQL based migration step has been executed. The key is
+// the migration version and the value is the callback function that should be
+// run _after_ the step was executed (but before the version is marked as
+// cleanly executed). An error returned from the callback will cause the
+// migration to fail and the step to be marked as dirty.
+func WithPostStepCallbacks(
+	postStepCallbacks map[uint]PostStepCallback) Option {
+
+	return func(o *options) {
+		o.postStepCallbacks = postStepCallbacks
+	}
+}
+
+// WithPostStepCallback is an option that can be used to set a PostStepCallback
+// function that can be used to execute a Golang based migration step after the
+// SQL based migration step with the given version number has been executed. The
+// callback is the function that should be run _after_ the step was executed
+// (but before the version is marked as cleanly executed). An error returned
+// from the callback will cause the migration to fail and the step to be marked
+// as dirty.
+func WithPostStepCallback(version uint, callback PostStepCallback) Option {
+	return func(o *options) {
+		o.postStepCallbacks[version] = callback
+	}
+}
 
 type Migrate struct {
 	sourceName   string
@@ -774,6 +816,25 @@ func (m *Migrate) runMigrations(ret <-chan interface{}) error {
 				m.logVerbosePrintf("Read and execute %v\n", migr.LogString())
 				if err := m.databaseDrv.Run(migr.BufferedBody); err != nil {
 					return err
+				}
+
+				// If there is a post execution function for
+				// this migration, run it now.
+				cb, ok := m.opts.postStepCallbacks[migr.Version]
+				if ok {
+					m.logVerbosePrintf("Running post step "+
+						"callback for %v\n", migr.LogString())
+
+					err := cb(migr, m.databaseDrv)
+					if err != nil {
+						return fmt.Errorf("failed to "+
+							"execute post "+
+							"step callback: %w",
+							err)
+					}
+
+					m.logVerbosePrintf("Post step callback "+
+						"finished for %v\n", migr.LogString())
 				}
 			}
 

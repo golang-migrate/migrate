@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/golang-migrate/migrate/v4/database"
 	dStub "github.com/golang-migrate/migrate/v4/database/stub"
 	"github.com/golang-migrate/migrate/v4/source"
 	sStub "github.com/golang-migrate/migrate/v4/source/stub"
@@ -876,6 +877,116 @@ func TestUpAndDown(t *testing.T) {
 		mr("DROP 1"),
 	}
 	equalDbSeq(t, 1, expectedSequence, dbDrv)
+}
+
+func TestPostStepCallback(t *testing.T) {
+	m, _ := New("stub://", "stub://", WithPostStepCallbacks(
+		map[uint]PostStepCallback{
+			1: func(m *Migration, driver database.Driver) error {
+				return driver.Run(
+					strings.NewReader("CALLBACK 1"),
+				)
+			},
+			7: func(m *Migration, driver database.Driver) error {
+				return driver.Run(
+					strings.NewReader("CALLBACK 7"),
+				)
+			},
+		},
+	))
+	m.sourceDrv.(*sStub.Stub).Migrations = sourceStubMigrations
+	dbDrv := m.databaseDrv.(*dStub.Stub)
+
+	// go Up first
+	if err := m.Up(); err != nil {
+		t.Fatal(err)
+	}
+	expectedSequence := migrationSequence{
+		mr("CREATE 1"),
+		mr("CALLBACK 1"),
+		mr("CREATE 3"),
+		mr("CREATE 4"),
+		mr("CREATE 7"),
+		mr("CALLBACK 7"),
+	}
+	equalDbSeq(t, 0, expectedSequence, dbDrv)
+
+	if !bytes.Equal(dbDrv.LastRunMigration, []byte("CALLBACK 7")) {
+		t.Fatalf("expected database last migration to be callback 7, "+
+			"got %s", dbDrv.LastRunMigration)
+	}
+
+	// go Down
+	if err := m.Down(); err != nil {
+		t.Fatal(err)
+	}
+	expectedSequence = migrationSequence{
+		mr("CREATE 1"),
+		mr("CALLBACK 1"),
+		mr("CREATE 3"),
+		mr("CREATE 4"),
+		mr("CREATE 7"),
+		mr("CALLBACK 7"),
+		mr("DROP 7"),
+		mr("CALLBACK 7"),
+		mr("DROP 5"),
+		mr("DROP 4"),
+		mr("DROP 1"),
+		mr("CALLBACK 1"),
+	}
+	equalDbSeq(t, 1, expectedSequence, dbDrv)
+
+	if !bytes.Equal(dbDrv.LastRunMigration, []byte("CALLBACK 1")) {
+		t.Fatalf("expected database last migration to be callback 1, "+
+			"got %s", dbDrv.LastRunMigration)
+	}
+
+	// go 1 Up and then all the way Up
+	if err := m.Steps(1); err != nil {
+		t.Fatal(err)
+	}
+	expectedSequence = migrationSequence{
+		mr("CREATE 1"),
+		mr("CALLBACK 1"),
+		mr("CREATE 3"),
+		mr("CREATE 4"),
+		mr("CREATE 7"),
+		mr("CALLBACK 7"),
+		mr("DROP 7"),
+		mr("CALLBACK 7"),
+		mr("DROP 5"),
+		mr("DROP 4"),
+		mr("DROP 1"),
+		mr("CALLBACK 1"),
+		mr("CREATE 1"),
+		mr("CALLBACK 1"),
+	}
+	equalDbSeq(t, 2, expectedSequence, dbDrv)
+
+	if err := m.Up(); err != nil {
+		t.Fatal(err)
+	}
+	expectedSequence = migrationSequence{
+		mr("CREATE 1"),
+		mr("CALLBACK 1"),
+		mr("CREATE 3"),
+		mr("CREATE 4"),
+		mr("CREATE 7"),
+		mr("CALLBACK 7"),
+		mr("DROP 7"),
+		mr("CALLBACK 7"),
+		mr("DROP 5"),
+		mr("DROP 4"),
+		mr("DROP 1"),
+		mr("CALLBACK 1"),
+		mr("CREATE 1"),
+		mr("CALLBACK 1"),
+		mr("CREATE 3"),
+		mr("CREATE 4"),
+		mr("CREATE 7"),
+		mr("CALLBACK 7"),
+	}
+	equalDbSeq(t, 3, expectedSequence, dbDrv)
 }
 
 func TestUpDirty(t *testing.T) {
