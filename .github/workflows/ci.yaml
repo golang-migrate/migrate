@@ -9,20 +9,20 @@ jobs:
     name: lint
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.22.x"
-      - uses: actions/checkout@v4
+          go-version: "1.23.x"
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v4
+        uses: golangci/golangci-lint-action@v6
         with:
-          version: latest
+          version: v1.63.4
 
   test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: ["1.21.x", "1.22.x"]
+        go: ["1.22.x", "1.23.x"]
     steps:
       - uses: actions/checkout@v4
 
@@ -68,7 +68,7 @@ jobs:
           ruby-version: 2.7
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.22.x"
+          go-version: "1.23.x"
 
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
@@ -95,6 +95,9 @@ jobs:
         env:
           PACKAGECLOUD_TOKEN: ${{ secrets.PACKAGECLOUD_TOKEN }}
       - run: package_cloud push golang-migrate/migrate/ubuntu/jammy dist/migrate.linux-amd64.deb
+        env:
+          PACKAGECLOUD_TOKEN: ${{ secrets.PACKAGECLOUD_TOKEN }}
+      - run: package_cloud push golang-migrate/migrate/ubuntu/noble dist/migrate.linux-amd64.deb
         env:
           PACKAGECLOUD_TOKEN: ${{ secrets.PACKAGECLOUD_TOKEN }}
       - run: package_cloud push golang-migrate/migrate/debian/buster dist/migrate.linux-amd64.deb
