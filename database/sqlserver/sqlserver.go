@@ -280,7 +280,7 @@ func (ss *SQLServer) SetVersion(version int, dirty bool) error {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
 	}
 
-	query := `TRUNCATE TABLE ` + ss.getMigrationTable()
+	query := `DELETE FROM ` + ss.getMigrationTable()
 	if _, err := tx.Exec(query); err != nil {
 		if errRollback := tx.Rollback(); errRollback != nil {
 			err = multierror.Append(err, errRollback)
