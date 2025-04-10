@@ -1,4 +1,4 @@
-FROM golang:1.22-alpine AS builder
+FROM golang:1.24-alpine AS builder
 ARG VERSION
 
 RUN apk add --no-cache git gcc musl-dev make
@@ -9,7 +9,7 @@ ENV GO111MODULE=on
 
 COPY go.mod go.sum ./
 
-RUN go mod download
+RUN go mod vendor
 
 COPY . ./
 

@@ -11,7 +11,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.22.x"
+          go-version: "1.24.x"
       - uses: actions/checkout@v4
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v4
@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: ["1.21.x", "1.22.x"]
+        go: ["1.23.x", "1.24.x"]
     steps:
       - uses: actions/checkout@v4
 
