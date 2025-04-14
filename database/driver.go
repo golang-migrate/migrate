@@ -7,6 +7,7 @@ package database
 import (
 	"fmt"
 	"io"
+	"net/url"
 	"sync"
 
 	iurl "github.com/golang-migrate/migrate/v4/internal/url"
@@ -95,7 +96,12 @@ func Open(url string) (Driver, error) {
 		return nil, fmt.Errorf("database driver: unknown driver %v (forgotten import?)", scheme)
 	}
 
-	return d.Open(url)
+	if driverInstance, err := d.Open(url); err != nil {
+		maskedURL := maskPasswordInURL(url)
+		return nil, fmt.Errorf("failed to open driver for url %s: %w", maskedURL, err)
+	} else {
+		return driverInstance, nil
+	}
 }
 
 // Register globally registers a driver.
@@ -120,4 +126,25 @@ func List() []string {
 		names = append(names, n)
 	}
 	return names
+}
+
+func maskPasswordInURL(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil || u.User == nil {
+		return rawURL
+	}
+
+	masked := rawURL
+	if _, hasPassword := u.User.Password(); hasPassword {
+
+		masked = u.Scheme + "://" + u.User.Username() + ":******@" + u.Host + u.Path
+		if u.RawQuery != "" {
+			masked += "?" + u.RawQuery
+		}
+		if u.Fragment != "" {
+			masked += "#" + u.Fragment
+		}
+	}
+
+	return masked
 }
