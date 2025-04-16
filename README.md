@@ -87,7 +87,7 @@ Source drivers read migrations from local or remote sources. [Add a new source?]
 * Handles ctrl+c (SIGINT) gracefully.
 * No config search paths, no config files, no magic ENV var injections.
 
-__[CLI Documentation](cmd/migrate)__
+[CLI Documentation](cmd/migrate) (includes CLI install instructions)
 
 ### Basic usage
 
