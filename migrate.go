@@ -526,7 +526,7 @@ func (m *Migrate) read(from int, to int, ret chan<- interface{}) {
 	}
 }
 
-// readUp reads up migrations from `from` limitted by `limit`.
+// readUp reads up migrations from `from` limited by `limit`.
 // limit can be -1, implying no limit and reading until there are no more migrations.
 // Each migration is then written to the ret channel.
 // If an error occurs during reading, that error is written to the ret channel, too.
@@ -626,7 +626,7 @@ func (m *Migrate) readUp(from int, limit int, ret chan<- interface{}) {
 	}
 }
 
-// readDown reads down migrations from `from` limitted by `limit`.
+// readDown reads down migrations from `from` limited by `limit`.
 // limit can be -1, implying no limit and reading until there are no more migrations.
 // Each migration is then written to the ret channel.
 // If an error occurs during reading, that error is written to the ret channel, too.
