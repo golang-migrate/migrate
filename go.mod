@@ -11,11 +11,12 @@ require (
 	github.com/cenkalti/backoff/v4 v4.1.2
 	github.com/cockroachdb/cockroach-go/v2 v2.1.1
 	github.com/dhui/dktest v0.4.4
+	github.com/datastax/gocql-astra v0.0.0-20240612111451-db7831681c24
 	github.com/docker/docker v27.2.0+incompatible
 	github.com/fsouza/fake-gcs-server v1.17.0
 	github.com/go-sql-driver/mysql v1.5.0
 	github.com/gobuffalo/here v0.6.0
-	github.com/gocql/gocql v0.0.0-20210515062232-b7ef815b4556
+	github.com/gocql/gocql v1.6.0
 	github.com/google/go-github/v39 v39.2.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/jackc/pgconn v1.14.3
@@ -34,7 +35,7 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/xanzy/go-gitlab v0.15.0
 	go.mongodb.org/mongo-driver v1.7.5
-	go.uber.org/atomic v1.7.0
+	go.uber.org/atomic v1.8.0
 	golang.org/x/oauth2 v0.18.0
 	golang.org/x/tools v0.24.0
 	google.golang.org/api v0.169.0
@@ -43,6 +44,10 @@ require (
 )
 
 require (
+	github.com/datastax/astra-client-go/v2 v2.2.9 // indirect
+	github.com/datastax/cql-proxy v0.1.4 // indirect
+	github.com/datastax/go-cassandra-native-protocol v0.0.0-20211124104234-f6aea54fa801 // indirect
+	github.com/deepmap/oapi-codegen v1.9.0 // indirect
 	github.com/distribution/reference v0.6.0 // indirect
 	github.com/docker/go-connections v0.5.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
@@ -50,9 +55,8 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/jackc/puddle/v2 v2.2.1 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/kr/text v0.2.0 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
-	github.com/modern-go/concurrent v0.0.0-20180228061459-e0a39a4cb421 // indirect
+	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/rogpeppe/go-internal v1.12.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
@@ -64,6 +68,8 @@ require (
 	go.opentelemetry.io/otel/sdk v1.29.0 // indirect
 	go.opentelemetry.io/otel/trace v1.29.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.3.1 // indirect
+	go.uber.org/multierr v1.7.0 // indirect
+	go.uber.org/zap v1.17.0 // indirect
 )
 
 require (
@@ -130,7 +136,7 @@ require (
 	github.com/googleapis/enterprise-certificate-proxy v0.3.2 // indirect
 	github.com/googleapis/gax-go/v2 v2.12.2 // indirect
 	github.com/gorilla/handlers v1.4.2 // indirect
-	github.com/gorilla/mux v1.7.4 // indirect
+	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/gsterjov/go-libsecret v0.0.0-20161001094733-a6f4afe4910c // indirect
 	github.com/hailocab/go-hostpool v0.0.0-20160125115350-e80d13ce29ed // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
@@ -147,7 +153,7 @@ require (
 	github.com/klauspost/asmfmt v1.3.2 // indirect
 	github.com/klauspost/compress v1.15.11 // indirect
 	github.com/klauspost/cpuid/v2 v2.0.9 // indirect
-	github.com/mattn/go-colorable v0.1.6 // indirect
+	github.com/mattn/go-colorable v0.1.8 // indirect
 	github.com/mattn/go-isatty v0.0.16 // indirect
 	github.com/minio/asm2plan9s v0.0.0-20200509001527-cdd76441f9d8 // indirect
 	github.com/minio/c2goasm v0.0.0-20190812172519-36a3d3bbc4f3 // indirect
