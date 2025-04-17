@@ -1,5 +1,4 @@
 //go:build clickhouse
-// +build clickhouse
 
 package cli
 

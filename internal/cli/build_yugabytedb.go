@@ -1,5 +1,4 @@
 //go:build yugabytedb
-// +build yugabytedb
 
 package cli
 
