@@ -33,12 +33,12 @@ var (
 func clickhouseConnectionString(host, port, engine string) string {
 	if engine != "" {
 		return fmt.Sprintf(
-			"clickhouse://%v:%v?username=user&password=password&database=db&x-multi-statement=true&x-migrations-table-engine=%v&debug=false",
+			"clickhouse://%v:%v/db?username=user&password=password&x-multi-statement=true&x-migrations-table-engine=%v&debug=false",
 			host, port, engine)
 	}
 
 	return fmt.Sprintf(
-		"clickhouse://%v:%v?username=user&password=password&database=db&x-multi-statement=true&debug=false",
+		"clickhouse://%v:%v/db?username=user&password=password&x-multi-statement=true&debug=false",
 		host, port)
 }
 
