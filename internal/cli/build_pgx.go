@@ -1,5 +1,4 @@
 //go:build pgx
-// +build pgx
 
 package cli
 

@@ -1,5 +1,4 @@
 //go:build ql
-// +build ql
 
 package cli
 
