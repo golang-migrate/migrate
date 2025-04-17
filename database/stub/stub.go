@@ -50,14 +50,14 @@ func (s *Stub) Close() error {
 }
 
 func (s *Stub) Lock() error {
-	if !s.isLocked.CAS(false, true) {
+	if !s.isLocked.CompareAndSwap(false, true) {
 		return database.ErrLocked
 	}
 	return nil
 }
 
 func (s *Stub) Unlock() error {
-	if !s.isLocked.CAS(true, false) {
+	if !s.isLocked.CompareAndSwap(true, false) {
 		return database.ErrNotLocked
 	}
 	return nil
