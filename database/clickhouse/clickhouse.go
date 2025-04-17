@@ -169,7 +169,7 @@ func (ch *ClickHouse) Version() (int, bool, error) {
 	var (
 		version int
 		dirty   uint8
-		query   = "SELECT version, dirty FROM `" + ch.config.MigrationsTable + "` ORDER BY sequence DESC LIMIT 1"
+		query   = "SELECT version, dirty FROM " + quoteIdentifier(ch.config.DatabaseName) + "." + quoteIdentifier(ch.config.MigrationsTable) + " ORDER BY sequence DESC LIMIT 1"
 	)
 	if err := ch.conn.QueryRow(query).Scan(&version, &dirty); err != nil {
 		if err == sql.ErrNoRows {
@@ -194,7 +194,7 @@ func (ch *ClickHouse) SetVersion(version int, dirty bool) error {
 		return err
 	}
 
-	query := "INSERT INTO " + ch.config.MigrationsTable + " (version, dirty, sequence) VALUES (?, ?, ?)"
+	query := "INSERT INTO " + quoteIdentifier(ch.config.DatabaseName) + "." + quoteIdentifier(ch.config.MigrationsTable) + " (version, dirty, sequence) VALUES (?, ?, ?)"
 	if _, err := tx.Exec(query, version, bool(dirty), time.Now().UnixNano()); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
@@ -236,18 +236,18 @@ func (ch *ClickHouse) ensureVersionTable() (err error) {
 	// if not, create the empty migration table
 	if len(ch.config.ClusterName) > 0 {
 		query = fmt.Sprintf(`
-			CREATE TABLE %s ON CLUSTER %s (
-				version    Int64,
-				dirty      UInt8,
-				sequence   UInt64
-			) Engine=%s`, ch.config.MigrationsTable, ch.config.ClusterName, ch.config.MigrationsTableEngine)
+      CREATE TABLE %s.%s ON CLUSTER %s (
+        version    Int64,
+        dirty      UInt8,
+        sequence   UInt64
+      ) Engine=%s`, quoteIdentifier(ch.config.DatabaseName), quoteIdentifier(ch.config.MigrationsTable), ch.config.ClusterName, ch.config.MigrationsTableEngine)
 	} else {
 		query = fmt.Sprintf(`
-			CREATE TABLE %s (
-				version    Int64,
-				dirty      UInt8,
-				sequence   UInt64
-			) Engine=%s`, ch.config.MigrationsTable, ch.config.MigrationsTableEngine)
+      CREATE TABLE %s.%s (
+        version    Int64,
+        dirty      UInt8,
+        sequence   UInt64
+      ) Engine=%s`, quoteIdentifier(ch.config.DatabaseName), quoteIdentifier(ch.config.MigrationsTable), ch.config.MigrationsTableEngine)
 	}
 
 	if strings.HasSuffix(ch.config.MigrationsTableEngine, "Tree") {
