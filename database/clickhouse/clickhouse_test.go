@@ -6,6 +6,7 @@ import (
 	sqldriver "database/sql/driver"
 	"fmt"
 	"log"
+	"net/url"
 	"testing"
 
 	_ "github.com/ClickHouse/clickhouse-go/v2"
@@ -48,7 +49,9 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 		return false
 	}
 
-	db, err := sql.Open("clickhouse", clickhouseConnectionString(ip, port, ""))
+	addr := clickhouseConnectionString(ip, port, "")
+	purl, _ := url.Parse(addr)
+	db, err := sql.Open("clickhouse", migrate.FilterCustomQuery(purl).String())
 
 	if err != nil {
 		log.Println("open error", err)
@@ -114,7 +117,8 @@ func testSimpleWithInstanceDefaultConfigValues(t *testing.T) {
 		}
 
 		addr := clickhouseConnectionString(ip, port, "")
-		conn, err := sql.Open("clickhouse", addr)
+		purl, _ := url.Parse(addr)
+		conn, err := sql.Open("clickhouse", migrate.FilterCustomQuery(purl).String())
 		if err != nil {
 			t.Fatal(err)
 		}
