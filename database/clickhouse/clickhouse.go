@@ -75,7 +75,7 @@ func (ch *ClickHouse) Open(dsn string) (database.Driver, error) {
 	}
 	q := migrate.FilterCustomQuery(purl)
 	q.Scheme = "clickhouse"
-	opt, err := clickhouse.ParseDSN(purl.String())
+	opt, err := clickhouse.ParseDSN(q.String())
 	if err != nil {
 		return nil, err
 	}
