@@ -1,5 +1,4 @@
 //go:build neo4j
-// +build neo4j
 
 package cli
 

@@ -1,5 +1,4 @@
 //go:build cassandra
-// +build cassandra
 
 package cli
 

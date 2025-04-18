@@ -1,5 +1,4 @@
 //go:build github
-// +build github
 
 package cli
 
