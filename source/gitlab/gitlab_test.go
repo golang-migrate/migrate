@@ -2,6 +2,7 @@ package gitlab
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"testing"
 
@@ -23,7 +24,7 @@ func Test(t *testing.T) {
 	}
 
 	g := &Gitlab{}
-	d, err := g.Open("gitlab://" + GitlabTestSecret + "@gitlab.com/11197284/migrations")
+	d, err := g.Open(context.Background(), "gitlab://"+GitlabTestSecret+"@gitlab.com/11197284/migrations")
 	if err != nil {
 		t.Fatal(err)
 	}

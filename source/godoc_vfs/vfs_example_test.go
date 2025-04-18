@@ -1,6 +1,7 @@
 package godoc_vfs_test
 
 import (
+	"context"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/source/godoc_vfs"
 	"golang.org/x/tools/godoc/vfs/mapfs"
@@ -18,15 +19,16 @@ func Example_mapfs() {
 		"7_foobar.down.sql": "7 down",
 	})
 
-	d, err := godoc_vfs.WithInstance(fs, "")
+	ctx := context.Background()
+	d, err := godoc_vfs.WithInstance(ctx, fs, "")
 	if err != nil {
 		panic("bad migrations found!")
 	}
-	m, err := migrate.NewWithSourceInstance("godoc-vfs", d, "database://foobar")
+	m, err := migrate.NewWithSourceInstance(ctx, "godoc-vfs", d, "database://foobar")
 	if err != nil {
 		panic("error creating the migrations")
 	}
-	err = m.Up()
+	err = m.Up(ctx)
 	if err != nil {
 		panic("up failed")
 	}

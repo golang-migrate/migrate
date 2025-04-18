@@ -1,6 +1,7 @@
 package github_ee
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	nurl "net/url"
@@ -36,7 +37,7 @@ func Test(t *testing.T) {
 	}
 
 	g := &GithubEE{}
-	_, err = g.Open("github-ee://foo:bar@" + u.Host + "/mattes/migrate_test_tmp/test?verify-tls=false#452b8003e7")
+	_, err = g.Open(context.Background(), "github-ee://foo:bar@"+u.Host+"/mattes/migrate_test_tmp/test?verify-tls=false#452b8003e7")
 
 	if err != nil {
 		t.Fatal(err)

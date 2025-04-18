@@ -1,6 +1,7 @@
 package httpfs
 
 import (
+	"context"
 	"errors"
 	"io"
 	"net/http"
@@ -66,13 +67,13 @@ func (p *PartialDriver) Init(fs http.FileSystem, path string) error {
 }
 
 // Close is part of source.Driver interface implementation. This is a no-op.
-func (p *PartialDriver) Close() error {
+func (p *PartialDriver) Close(ctx context.Context) error {
 	return nil
 }
 
 // First is part of source.Driver interface implementation.
-func (p *PartialDriver) First() (version uint, err error) {
-	if version, ok := p.migrations.First(); ok {
+func (p *PartialDriver) First(ctx context.Context) (version uint, err error) {
+	if version, ok := p.migrations.First(ctx); ok {
 		return version, nil
 	}
 	return 0, &os.PathError{
@@ -83,8 +84,8 @@ func (p *PartialDriver) First() (version uint, err error) {
 }
 
 // Prev is part of source.Driver interface implementation.
-func (p *PartialDriver) Prev(version uint) (prevVersion uint, err error) {
-	if version, ok := p.migrations.Prev(version); ok {
+func (p *PartialDriver) Prev(ctx context.Context, version uint) (prevVersion uint, err error) {
+	if version, ok := p.migrations.Prev(ctx, version); ok {
 		return version, nil
 	}
 	return 0, &os.PathError{
@@ -95,8 +96,8 @@ func (p *PartialDriver) Prev(version uint) (prevVersion uint, err error) {
 }
 
 // Next is part of source.Driver interface implementation.
-func (p *PartialDriver) Next(version uint) (nextVersion uint, err error) {
-	if version, ok := p.migrations.Next(version); ok {
+func (p *PartialDriver) Next(ctx context.Context, version uint) (nextVersion uint, err error) {
+	if version, ok := p.migrations.Next(ctx, version); ok {
 		return version, nil
 	}
 	return 0, &os.PathError{
@@ -107,7 +108,7 @@ func (p *PartialDriver) Next(version uint) (nextVersion uint, err error) {
 }
 
 // ReadUp is part of source.Driver interface implementation.
-func (p *PartialDriver) ReadUp(version uint) (r io.ReadCloser, identifier string, err error) {
+func (p *PartialDriver) ReadUp(ctx context.Context, version uint) (r io.ReadCloser, identifier string, err error) {
 	if m, ok := p.migrations.Up(version); ok {
 		body, err := p.open(path.Join(p.path, m.Raw))
 		if err != nil {
@@ -123,7 +124,7 @@ func (p *PartialDriver) ReadUp(version uint) (r io.ReadCloser, identifier string
 }
 
 // ReadDown is part of source.Driver interface implementation.
-func (p *PartialDriver) ReadDown(version uint) (r io.ReadCloser, identifier string, err error) {
+func (p *PartialDriver) ReadDown(ctx context.Context, version uint) (r io.ReadCloser, identifier string, err error) {
 	if m, ok := p.migrations.Down(version); ok {
 		body, err := p.open(path.Join(p.path, m.Raw))
 		if err != nil {

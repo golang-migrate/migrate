@@ -1,6 +1,7 @@
 package awss3
 
 import (
+	"context"
 	"errors"
 	"io"
 	"strings"
@@ -30,7 +31,7 @@ func Test(t *testing.T) {
 			"prod/migrations/0-random-stuff/whatever.txt": "",
 		},
 	}
-	driver, err := WithInstance(&s3Client, &Config{
+	driver, err := WithInstance(context.Background(), &s3Client, &Config{
 		Bucket: "some-bucket",
 		Prefix: "prod/migrations/",
 	})

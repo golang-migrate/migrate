@@ -1,6 +1,7 @@
 package stub
 
 import (
+	"context"
 	"io"
 	"reflect"
 
@@ -25,7 +26,7 @@ type Stub struct {
 	Config *Config
 }
 
-func (s *Stub) Open(url string) (database.Driver, error) {
+func (s *Stub) Open(ctx context.Context, url string) (database.Driver, error) {
 	return &Stub{
 		Url:               url,
 		CurrentVersion:    database.NilVersion,
@@ -36,7 +37,7 @@ func (s *Stub) Open(url string) (database.Driver, error) {
 
 type Config struct{}
 
-func WithInstance(instance interface{}, config *Config) (database.Driver, error) {
+func WithInstance(ctx context.Context, instance interface{}, config *Config) (database.Driver, error) {
 	return &Stub{
 		Instance:          instance,
 		CurrentVersion:    database.NilVersion,
@@ -45,25 +46,25 @@ func WithInstance(instance interface{}, config *Config) (database.Driver, error)
 	}, nil
 }
 
-func (s *Stub) Close() error {
+func (s *Stub) Close(ctx context.Context) error {
 	return nil
 }
 
-func (s *Stub) Lock() error {
+func (s *Stub) Lock(ctx context.Context) error {
 	if !s.isLocked.CAS(false, true) {
 		return database.ErrLocked
 	}
 	return nil
 }
 
-func (s *Stub) Unlock() error {
+func (s *Stub) Unlock(ctx context.Context) error {
 	if !s.isLocked.CAS(true, false) {
 		return database.ErrNotLocked
 	}
 	return nil
 }
 
-func (s *Stub) Run(migration io.Reader) error {
+func (s *Stub) Run(ctx context.Context, migration io.Reader) error {
 	m, err := io.ReadAll(migration)
 	if err != nil {
 		return err
@@ -73,19 +74,19 @@ func (s *Stub) Run(migration io.Reader) error {
 	return nil
 }
 
-func (s *Stub) SetVersion(version int, state bool) error {
+func (s *Stub) SetVersion(ctx context.Context, version int, state bool) error {
 	s.CurrentVersion = version
 	s.IsDirty = state
 	return nil
 }
 
-func (s *Stub) Version() (version int, dirty bool, err error) {
+func (s *Stub) Version(ctx context.Context) (version int, dirty bool, err error) {
 	return s.CurrentVersion, s.IsDirty, nil
 }
 
 const DROP = "DROP"
 
-func (s *Stub) Drop() error {
+func (s *Stub) Drop(ctx context.Context) error {
 	s.CurrentVersion = database.NilVersion
 	s.LastRunMigration = nil
 	s.MigrationSequence = append(s.MigrationSequence, DROP)

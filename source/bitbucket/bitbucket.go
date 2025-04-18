@@ -1,6 +1,7 @@
 package bitbucket
 
 import (
+	"context"
 	"fmt"
 	"io"
 	nurl "net/url"
@@ -38,7 +39,7 @@ type Config struct {
 	Ref   string
 }
 
-func (b *Bitbucket) Open(url string) (source.Driver, error) {
+func (b *Bitbucket) Open(ctx context.Context, url string) (source.Driver, error) {
 	u, err := nurl.Parse(url)
 	if err != nil {
 		return nil, err
@@ -68,7 +69,7 @@ func (b *Bitbucket) Open(url string) (source.Driver, error) {
 	}
 	cfg.Ref = u.Fragment
 
-	bi, err := WithInstance(cl, cfg)
+	bi, err := WithInstance(ctx, cl, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +77,7 @@ func (b *Bitbucket) Open(url string) (source.Driver, error) {
 	return bi, nil
 }
 
-func WithInstance(client *bitbucket.Client, config *Config) (source.Driver, error) {
+func WithInstance(ctx context.Context, client *bitbucket.Client, config *Config) (source.Driver, error) {
 	bi := &Bitbucket{
 		client:     client,
 		config:     config,
@@ -126,41 +127,41 @@ func (b *Bitbucket) ensureFields() {
 	}
 }
 
-func (b *Bitbucket) Close() error {
+func (b *Bitbucket) Close(ctx context.Context) error {
 	return nil
 }
 
-func (b *Bitbucket) First() (version uint, er error) {
+func (b *Bitbucket) First(ctx context.Context) (version uint, er error) {
 	b.ensureFields()
 
-	if v, ok := b.migrations.First(); !ok {
+	if v, ok := b.migrations.First(ctx); !ok {
 		return 0, &os.PathError{Op: "first", Path: b.config.Path, Err: os.ErrNotExist}
 	} else {
 		return v, nil
 	}
 }
 
-func (b *Bitbucket) Prev(version uint) (prevVersion uint, err error) {
+func (b *Bitbucket) Prev(ctx context.Context, version uint) (prevVersion uint, err error) {
 	b.ensureFields()
 
-	if v, ok := b.migrations.Prev(version); !ok {
+	if v, ok := b.migrations.Prev(ctx, version); !ok {
 		return 0, &os.PathError{Op: fmt.Sprintf("prev for version %v", version), Path: b.config.Path, Err: os.ErrNotExist}
 	} else {
 		return v, nil
 	}
 }
 
-func (b *Bitbucket) Next(version uint) (nextVersion uint, err error) {
+func (b *Bitbucket) Next(ctx context.Context, version uint) (nextVersion uint, err error) {
 	b.ensureFields()
 
-	if v, ok := b.migrations.Next(version); !ok {
+	if v, ok := b.migrations.Next(ctx, version); !ok {
 		return 0, &os.PathError{Op: fmt.Sprintf("next for version %v", version), Path: b.config.Path, Err: os.ErrNotExist}
 	} else {
 		return v, nil
 	}
 }
 
-func (b *Bitbucket) ReadUp(version uint) (r io.ReadCloser, identifier string, err error) {
+func (b *Bitbucket) ReadUp(ctx context.Context, version uint) (r io.ReadCloser, identifier string, err error) {
 	b.ensureFields()
 
 	if m, ok := b.migrations.Up(version); ok {
@@ -182,7 +183,7 @@ func (b *Bitbucket) ReadUp(version uint) (r io.ReadCloser, identifier string, er
 	return nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: b.config.Path, Err: os.ErrNotExist}
 }
 
-func (b *Bitbucket) ReadDown(version uint) (r io.ReadCloser, identifier string, err error) {
+func (b *Bitbucket) ReadDown(ctx context.Context, version uint) (r io.ReadCloser, identifier string, err error) {
 	b.ensureFields()
 
 	if m, ok := b.migrations.Down(version); ok {

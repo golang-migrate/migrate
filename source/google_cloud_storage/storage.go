@@ -8,8 +8,9 @@ import (
 	"path"
 	"strings"
 
-	"cloud.google.com/go/storage"
 	"context"
+
+	"cloud.google.com/go/storage"
 	"github.com/golang-migrate/migrate/v4/source"
 	"google.golang.org/api/iterator"
 )
@@ -24,12 +25,12 @@ type gcs struct {
 	migrations *source.Migrations
 }
 
-func (g *gcs) Open(folder string) (source.Driver, error) {
+func (g *gcs) Open(ctx context.Context, folder string) (source.Driver, error) {
 	u, err := url.Parse(folder)
 	if err != nil {
 		return nil, err
 	}
-	client, err := storage.NewClient(context.Background())
+	client, err := storage.NewClient(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -38,15 +39,15 @@ func (g *gcs) Open(folder string) (source.Driver, error) {
 		prefix:     strings.Trim(u.Path, "/") + "/",
 		migrations: source.NewMigrations(),
 	}
-	err = driver.loadMigrations()
+	err = driver.loadMigrations(ctx)
 	if err != nil {
 		return nil, err
 	}
 	return &driver, nil
 }
 
-func (g *gcs) loadMigrations() error {
-	iter := g.bucket.Objects(context.Background(), &storage.Query{
+func (g *gcs) loadMigrations(ctx context.Context) error {
+	iter := g.bucket.Objects(ctx, &storage.Query{
 		Prefix:    g.prefix,
 		Delimiter: "/",
 	})
@@ -67,51 +68,51 @@ func (g *gcs) loadMigrations() error {
 	return nil
 }
 
-func (g *gcs) Close() error {
+func (g *gcs) Close(ctx context.Context) error {
 	return nil
 }
 
-func (g *gcs) First() (uint, error) {
-	v, ok := g.migrations.First()
+func (g *gcs) First(ctx context.Context) (uint, error) {
+	v, ok := g.migrations.First(ctx)
 	if !ok {
 		return 0, os.ErrNotExist
 	}
 	return v, nil
 }
 
-func (g *gcs) Prev(version uint) (uint, error) {
-	v, ok := g.migrations.Prev(version)
+func (g *gcs) Prev(ctx context.Context, version uint) (uint, error) {
+	v, ok := g.migrations.Prev(ctx, version)
 	if !ok {
 		return 0, os.ErrNotExist
 	}
 	return v, nil
 }
 
-func (g *gcs) Next(version uint) (uint, error) {
-	v, ok := g.migrations.Next(version)
+func (g *gcs) Next(ctx context.Context, version uint) (uint, error) {
+	v, ok := g.migrations.Next(ctx, version)
 	if !ok {
 		return 0, os.ErrNotExist
 	}
 	return v, nil
 }
 
-func (g *gcs) ReadUp(version uint) (io.ReadCloser, string, error) {
+func (g *gcs) ReadUp(ctx context.Context, version uint) (io.ReadCloser, string, error) {
 	if m, ok := g.migrations.Up(version); ok {
-		return g.open(m)
+		return g.open(ctx, m)
 	}
 	return nil, "", os.ErrNotExist
 }
 
-func (g *gcs) ReadDown(version uint) (io.ReadCloser, string, error) {
+func (g *gcs) ReadDown(ctx context.Context, version uint) (io.ReadCloser, string, error) {
 	if m, ok := g.migrations.Down(version); ok {
-		return g.open(m)
+		return g.open(ctx, m)
 	}
 	return nil, "", os.ErrNotExist
 }
 
-func (g *gcs) open(m *source.Migration) (io.ReadCloser, string, error) {
+func (g *gcs) open(ctx context.Context, m *source.Migration) (io.ReadCloser, string, error) {
 	objectPath := path.Join(g.prefix, m.Raw)
-	reader, err := g.bucket.Object(objectPath).NewReader(context.Background())
+	reader, err := g.bucket.Object(objectPath).NewReader(ctx)
 	if err != nil {
 		return nil, "", err
 	}

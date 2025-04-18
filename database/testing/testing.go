@@ -5,6 +5,7 @@ package testing
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -29,7 +30,7 @@ func Test(t *testing.T, d database.Driver, migration []byte) {
 }
 
 func TestNilVersion(t *testing.T, d database.Driver) {
-	v, _, err := d.Version()
+	v, _, err := d.Version(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,30 +58,31 @@ func TestLockAndUnlock(t *testing.T, d database.Driver) {
 	}()
 
 	// run the locking test ...
+	ctx := context.Background()
 	go func() {
-		if err := d.Lock(); err != nil {
+		if err := d.Lock(ctx); err != nil {
 			errs <- err
 			return
 		}
 
 		// try to acquire lock again
-		if err := d.Lock(); err == nil {
+		if err := d.Lock(ctx); err == nil {
 			errs <- errors.New("lock: expected err not to be nil")
 			return
 		}
 
 		// unlock
-		if err := d.Unlock(); err != nil {
+		if err := d.Unlock(ctx); err != nil {
 			errs <- err
 			return
 		}
 
 		// try to lock
-		if err := d.Lock(); err != nil {
+		if err := d.Lock(ctx); err != nil {
 			errs <- err
 			return
 		}
-		if err := d.Unlock(); err != nil {
+		if err := d.Unlock(ctx); err != nil {
 			errs <- err
 			return
 		}
@@ -104,13 +106,13 @@ func TestRun(t *testing.T, d database.Driver, migration io.Reader) {
 		t.Fatal("migration can't be nil")
 	}
 
-	if err := d.Run(migration); err != nil {
+	if err := d.Run(context.Background(), migration); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestDrop(t *testing.T, d database.Driver) {
-	if err := d.Drop(); err != nil {
+	if err := d.Drop(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -136,11 +138,11 @@ func TestSetVersion(t *testing.T, d database.Driver) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := d.SetVersion(tc.version, tc.dirty)
+			err := d.SetVersion(context.Background(), tc.version, tc.dirty)
 			if err != tc.expectedErr {
 				t.Fatal("Got unexpected error:", err, "!=", tc.expectedErr)
 			}
-			v, dirty, readErr := d.Version()
+			v, dirty, readErr := d.Version(context.Background())
 			if readErr != tc.expectedReadErr {
 				t.Fatal("Got unexpected error:", readErr, "!=", tc.expectedReadErr)
 			}

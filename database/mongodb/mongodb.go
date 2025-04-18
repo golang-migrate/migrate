@@ -75,7 +75,7 @@ type findFilter struct {
 	Key int `bson:"locking_key"`
 }
 
-func WithInstance(instance *mongo.Client, config *Config) (database.Driver, error) {
+func WithInstance(ctx context.Context, instance *mongo.Client, config *Config) (database.Driver, error) {
 	if config == nil {
 		return nil, ErrNilConfig
 	}
@@ -106,14 +106,14 @@ func WithInstance(instance *mongo.Client, config *Config) (database.Driver, erro
 			return nil, err
 		}
 	}
-	if err := mc.ensureVersionTable(); err != nil {
+	if err := mc.ensureVersionTable(ctx); err != nil {
 		return nil, err
 	}
 
 	return mc, nil
 }
 
-func (m *Mongo) Open(dsn string) (database.Driver, error) {
+func (m *Mongo) Open(ctx context.Context, dsn string) (database.Driver, error) {
 	// connstring is experimental package, but it used for parse connection string in mongo.Connect function
 	uri, err := connstring.Parse(dsn)
 	if err != nil {
@@ -165,7 +165,7 @@ func (m *Mongo) Open(dsn string) (database.Driver, error) {
 	if err = client.Ping(context.TODO(), nil); err != nil {
 		return nil, err
 	}
-	mc, err := WithInstance(client, &Config{
+	mc, err := WithInstance(ctx, client, &Config{
 		DatabaseName:         uri.Database,
 		MigrationsCollection: migrationsCollection,
 		TransactionMode:      transactionMode,
@@ -215,7 +215,7 @@ func parseInt(urlParam string, defaultValue int) (int, error) {
 	// if no url Param passed, return default value
 	return defaultValue, nil
 }
-func (m *Mongo) SetVersion(version int, dirty bool) error {
+func (m *Mongo) SetVersion(ctx context.Context, version int, dirty bool) error {
 	migrationsCollection := m.db.Collection(m.config.MigrationsCollection)
 	if err := migrationsCollection.Drop(context.TODO()); err != nil {
 		return &database.Error{OrigErr: err, Err: "drop migrations collection failed"}
@@ -227,7 +227,7 @@ func (m *Mongo) SetVersion(version int, dirty bool) error {
 	return nil
 }
 
-func (m *Mongo) Version() (version int, dirty bool, err error) {
+func (m *Mongo) Version(ctx context.Context) (version int, dirty bool, err error) {
 	var versionInfo versionInfo
 	err = m.db.Collection(m.config.MigrationsCollection).FindOne(context.TODO(), bson.M{}).Decode(&versionInfo)
 	switch {
@@ -240,7 +240,7 @@ func (m *Mongo) Version() (version int, dirty bool, err error) {
 	}
 }
 
-func (m *Mongo) Run(migration io.Reader) error {
+func (m *Mongo) Run(ctx context.Context, migration io.Reader) error {
 	migr, err := io.ReadAll(migration)
 	if err != nil {
 		return err
@@ -293,11 +293,11 @@ func (m *Mongo) executeCommands(ctx context.Context, cmds []bson.D) error {
 	return nil
 }
 
-func (m *Mongo) Close() error {
+func (m *Mongo) Close(ctx context.Context) error {
 	return m.client.Disconnect(context.TODO())
 }
 
-func (m *Mongo) Drop() error {
+func (m *Mongo) Drop(ctx context.Context) error {
 	return m.db.Drop(context.TODO())
 }
 
@@ -318,13 +318,13 @@ func (m *Mongo) ensureLockTable() error {
 // ensureVersionTable checks if versions table exists and, if not, creates it.
 // Note that this function locks the database, which deviates from the usual
 // convention of "caller locks" in the MongoDb type.
-func (m *Mongo) ensureVersionTable() (err error) {
-	if err = m.Lock(); err != nil {
+func (m *Mongo) ensureVersionTable(ctx context.Context) (err error) {
+	if err = m.Lock(ctx); err != nil {
 		return err
 	}
 
 	defer func() {
-		if e := m.Unlock(); e != nil {
+		if e := m.Unlock(ctx); e != nil {
 			if err == nil {
 				err = e
 			} else {
@@ -336,7 +336,7 @@ func (m *Mongo) ensureVersionTable() (err error) {
 	if err != nil {
 		return err
 	}
-	if _, _, err = m.Version(); err != nil {
+	if _, _, err = m.Version(ctx); err != nil {
 		return err
 	}
 	return nil
@@ -344,7 +344,7 @@ func (m *Mongo) ensureVersionTable() (err error) {
 
 // Utilizes advisory locking on the config.LockingCollection collection
 // This uses a unique index on the `locking_key` field.
-func (m *Mongo) Lock() error {
+func (m *Mongo) Lock(ctx context.Context) error {
 	return database.CasRestoreOnErr(&m.isLocked, false, true, database.ErrLocked, func() error {
 		if !m.config.Locking.Enabled {
 			return nil
@@ -363,7 +363,7 @@ func (m *Mongo) Lock() error {
 			CreatedAt: time.Now(),
 		}
 		operation := func() error {
-			timeout, cancelFunc := context.WithTimeout(context.Background(), contextWaitTimeout)
+			timeout, cancelFunc := context.WithTimeout(ctx, contextWaitTimeout)
 			_, err := m.db.Collection(m.config.Locking.CollectionName).InsertOne(timeout, newLockObj)
 			defer cancelFunc()
 			return err
@@ -382,7 +382,7 @@ func (m *Mongo) Lock() error {
 	})
 }
 
-func (m *Mongo) Unlock() error {
+func (m *Mongo) Unlock(ctx context.Context) error {
 	return database.CasRestoreOnErr(&m.isLocked, true, false, database.ErrNotLocked, func() error {
 		if !m.config.Locking.Enabled {
 			return nil
@@ -392,7 +392,7 @@ func (m *Mongo) Unlock() error {
 			Key: lockKeyUniqueValue,
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), contextWaitTimeout)
+		ctx, cancel := context.WithTimeout(ctx, contextWaitTimeout)
 		_, err := m.db.Collection(m.config.Locking.CollectionName).DeleteMany(ctx, filter)
 		defer cancel()
 
