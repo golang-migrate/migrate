@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
+	dockertypes "github.com/docker/docker/api/types"
 )
 
 type IsReadyFunc func(Instance) bool
@@ -98,6 +98,6 @@ type Instance interface {
 	Host() string
 	Port() uint
 	PortFor(int) uint
-	NetworkSettings() container.NetworkSettings
+	NetworkSettings() dockertypes.NetworkSettings
 	KeepForDebugging()
 }

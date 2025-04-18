@@ -15,6 +15,7 @@ import (
 	"strings"
 	"testing"
 
+	dockertypes "github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
 	dockerimage "github.com/docker/docker/api/types/image"
 	dockernetwork "github.com/docker/docker/api/types/network"
@@ -63,7 +64,7 @@ type DockerContainer struct {
 	Cmd                []string
 	ContainerId        string
 	ContainerName      string
-	ContainerJSON      dockercontainer.InspectResponse
+	ContainerJSON      dockertypes.ContainerJSON
 	containerInspected bool
 	keepForDebugging   bool
 }
@@ -268,7 +269,7 @@ func (d *DockerContainer) PortFor(cPort int) uint {
 	return port
 }
 
-func (d *DockerContainer) NetworkSettings() dockercontainer.NetworkSettings {
+func (d *DockerContainer) NetworkSettings() dockertypes.NetworkSettings {
 	if d == nil {
 		panic("Cannot get network settings for a nil *DockerContainer")
 	}
