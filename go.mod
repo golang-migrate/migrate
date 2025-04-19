@@ -6,12 +6,12 @@ require (
 	cloud.google.com/go/spanner v1.56.0
 	cloud.google.com/go/storage v1.38.0
 	github.com/Azure/go-autorest/autorest/adal v0.9.16
-	github.com/ClickHouse/clickhouse-go/v2 v2.33.0
+	github.com/ClickHouse/clickhouse-go/v2 v2.28.3
 	github.com/aws/aws-sdk-go v1.49.6
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/cockroachdb/cockroach-go/v2 v2.1.1
 	github.com/dhui/dktest v0.4.5
-	github.com/docker/docker v28.0.1+incompatible
+	github.com/docker/docker v27.2.0+incompatible
 	github.com/fsouza/fake-gcs-server v1.17.0
 	github.com/go-sql-driver/mysql v1.5.0
 	github.com/gobuffalo/here v0.6.0
