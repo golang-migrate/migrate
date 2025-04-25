@@ -12,6 +12,7 @@ import (
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
+	"github.com/golang-migrate/migrate/v4/source"
 	"github.com/hashicorp/go-multierror"
 	_ "github.com/mutecomm/go-sqlcipher/v4"
 )
@@ -66,13 +67,13 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 // ensureVersionTable checks if versions table exists and, if not, creates it.
 // Note that this function locks the database, which deviates from the usual
 // convention of "caller locks" in the Sqlite type.
-func (m *Sqlite) ensureVersionTable() (err error) {
-	if err = m.Lock(); err != nil {
+func (s *Sqlite) ensureVersionTable() (err error) {
+	if err = s.Lock(); err != nil {
 		return err
 	}
 
 	defer func() {
-		if e := m.Unlock(); e != nil {
+		if e := s.Unlock(); e != nil {
 			if err == nil {
 				err = e
 			} else {
@@ -84,15 +85,15 @@ func (m *Sqlite) ensureVersionTable() (err error) {
 	query := fmt.Sprintf(`
 	CREATE TABLE IF NOT EXISTS %s (version uint64,dirty bool);
   CREATE UNIQUE INDEX IF NOT EXISTS version_unique ON %s (version);
-  `, m.config.MigrationsTable, m.config.MigrationsTable)
+  `, s.config.MigrationsTable, s.config.MigrationsTable)
 
-	if _, err := m.db.Exec(query); err != nil {
+	if _, err := s.db.Exec(query); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (m *Sqlite) Open(url string) (database.Driver, error) {
+func (s *Sqlite) Open(url string) (database.Driver, error) {
 	purl, err := nurl.Parse(url)
 	if err != nil {
 		return nil, err
@@ -129,13 +130,13 @@ func (m *Sqlite) Open(url string) (database.Driver, error) {
 	return mx, nil
 }
 
-func (m *Sqlite) Close() error {
-	return m.db.Close()
+func (s *Sqlite) Close() error {
+	return s.db.Close()
 }
 
-func (m *Sqlite) Drop() (err error) {
+func (s *Sqlite) Drop() (err error) {
 	query := `SELECT name FROM sqlite_master WHERE type = 'table';`
-	tables, err := m.db.Query(query)
+	tables, err := s.db.Query(query)
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
@@ -162,13 +163,13 @@ func (m *Sqlite) Drop() (err error) {
 	if len(tableNames) > 0 {
 		for _, t := range tableNames {
 			query := "DROP TABLE " + t
-			err = m.executeQuery(query)
+			err = s.executeQuery(query)
 			if err != nil {
 				return &database.Error{OrigErr: err, Query: []byte(query)}
 			}
 		}
 		query := "VACUUM"
-		_, err = m.db.Query(query)
+		_, err = s.db.Query(query)
 		if err != nil {
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
@@ -177,35 +178,35 @@ func (m *Sqlite) Drop() (err error) {
 	return nil
 }
 
-func (m *Sqlite) Lock() error {
-	if !m.isLocked.CAS(false, true) {
+func (s *Sqlite) Lock() error {
+	if !s.isLocked.CAS(false, true) {
 		return database.ErrLocked
 	}
 	return nil
 }
 
-func (m *Sqlite) Unlock() error {
-	if !m.isLocked.CAS(true, false) {
+func (s *Sqlite) Unlock() error {
+	if !s.isLocked.CAS(true, false) {
 		return database.ErrNotLocked
 	}
 	return nil
 }
 
-func (m *Sqlite) Run(migration io.Reader) error {
+func (s *Sqlite) Run(migration io.Reader) error {
 	migr, err := io.ReadAll(migration)
 	if err != nil {
 		return err
 	}
 	query := string(migr[:])
 
-	if m.config.NoTxWrap {
-		return m.executeQueryNoTx(query)
+	if s.config.NoTxWrap {
+		return s.executeQueryNoTx(query)
 	}
-	return m.executeQuery(query)
+	return s.executeQuery(query)
 }
 
-func (m *Sqlite) executeQuery(query string) error {
-	tx, err := m.db.Begin()
+func (s *Sqlite) executeQuery(query string) error {
+	tx, err := s.db.Begin()
 	if err != nil {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
 	}
@@ -221,20 +222,20 @@ func (m *Sqlite) executeQuery(query string) error {
 	return nil
 }
 
-func (m *Sqlite) executeQueryNoTx(query string) error {
-	if _, err := m.db.Exec(query); err != nil {
+func (s *Sqlite) executeQueryNoTx(query string) error {
+	if _, err := s.db.Exec(query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 	return nil
 }
 
-func (m *Sqlite) SetVersion(version int, dirty bool) error {
-	tx, err := m.db.Begin()
+func (s *Sqlite) SetVersion(version int, dirty bool) error {
+	tx, err := s.db.Begin()
 	if err != nil {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
 	}
 
-	query := "DELETE FROM " + m.config.MigrationsTable
+	query := "DELETE FROM " + s.config.MigrationsTable
 	if _, err := tx.Exec(query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
@@ -243,7 +244,7 @@ func (m *Sqlite) SetVersion(version int, dirty bool) error {
 	// empty schema version for failed down migration on the first migration
 	// See: https://github.com/golang-migrate/migrate/issues/330
 	if version >= 0 || (version == database.NilVersion && dirty) {
-		query := fmt.Sprintf(`INSERT INTO %s (version, dirty) VALUES (?, ?)`, m.config.MigrationsTable)
+		query := fmt.Sprintf(`INSERT INTO %s (version, dirty) VALUES (?, ?)`, s.config.MigrationsTable)
 		if _, err := tx.Exec(query, version, dirty); err != nil {
 			if errRollback := tx.Rollback(); errRollback != nil {
 				err = multierror.Append(err, errRollback)
@@ -259,11 +260,15 @@ func (m *Sqlite) SetVersion(version int, dirty bool) error {
 	return nil
 }
 
-func (m *Sqlite) Version() (version int, dirty bool, err error) {
-	query := "SELECT version, dirty FROM " + m.config.MigrationsTable + " LIMIT 1"
-	err = m.db.QueryRow(query).Scan(&version, &dirty)
+func (s *Sqlite) Version() (version int, dirty bool, err error) {
+	query := "SELECT version, dirty FROM " + s.config.MigrationsTable + " LIMIT 1"
+	err = s.db.QueryRow(query).Scan(&version, &dirty)
 	if err != nil {
 		return database.NilVersion, false, nil
 	}
 	return version, dirty, nil
+}
+
+func (s *Sqlite) Exec(e source.Executor) error {
+	return e.Execute(s.db)
 }

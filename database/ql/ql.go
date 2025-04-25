@@ -12,6 +12,7 @@ import (
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
+	"github.com/golang-migrate/migrate/v4/source"
 	_ "modernc.org/ql/driver"
 )
 
@@ -65,13 +66,13 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 // ensureVersionTable checks if versions table exists and, if not, creates it.
 // Note that this function locks the database, which deviates from the usual
 // convention of "caller locks" in the Ql type.
-func (m *Ql) ensureVersionTable() (err error) {
-	if err = m.Lock(); err != nil {
+func (q *Ql) ensureVersionTable() (err error) {
+	if err = q.Lock(); err != nil {
 		return err
 	}
 
 	defer func() {
-		if e := m.Unlock(); e != nil {
+		if e := q.Unlock(); e != nil {
 			if err == nil {
 				err = e
 			} else {
@@ -80,14 +81,14 @@ func (m *Ql) ensureVersionTable() (err error) {
 		}
 	}()
 
-	tx, err := m.db.Begin()
+	tx, err := q.db.Begin()
 	if err != nil {
 		return err
 	}
 	if _, err := tx.Exec(fmt.Sprintf(`
 	CREATE TABLE IF NOT EXISTS %s (version uint64, dirty bool);
 	CREATE UNIQUE INDEX IF NOT EXISTS version_unique ON %s (version);
-`, m.config.MigrationsTable, m.config.MigrationsTable)); err != nil {
+`, q.config.MigrationsTable, q.config.MigrationsTable)); err != nil {
 		if err := tx.Rollback(); err != nil {
 			return err
 		}
@@ -99,7 +100,7 @@ func (m *Ql) ensureVersionTable() (err error) {
 	return nil
 }
 
-func (m *Ql) Open(url string) (database.Driver, error) {
+func (q *Ql) Open(url string) (database.Driver, error) {
 	purl, err := nurl.Parse(url)
 	if err != nil {
 		return nil, err
@@ -122,12 +123,12 @@ func (m *Ql) Open(url string) (database.Driver, error) {
 	}
 	return mx, nil
 }
-func (m *Ql) Close() error {
-	return m.db.Close()
+func (q *Ql) Close() error {
+	return q.db.Close()
 }
-func (m *Ql) Drop() (err error) {
+func (q *Ql) Drop() (err error) {
 	query := `SELECT Name FROM __Table`
-	tables, err := m.db.Query(query)
+	tables, err := q.db.Query(query)
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
@@ -156,7 +157,7 @@ func (m *Ql) Drop() (err error) {
 	if len(tableNames) > 0 {
 		for _, t := range tableNames {
 			query := "DROP TABLE " + t
-			err = m.executeQuery(query)
+			err = q.executeQuery(query)
 			if err != nil {
 				return &database.Error{OrigErr: err, Query: []byte(query)}
 			}
@@ -165,29 +166,29 @@ func (m *Ql) Drop() (err error) {
 
 	return nil
 }
-func (m *Ql) Lock() error {
-	if !m.isLocked.CAS(false, true) {
+func (q *Ql) Lock() error {
+	if !q.isLocked.CAS(false, true) {
 		return database.ErrLocked
 	}
 	return nil
 }
-func (m *Ql) Unlock() error {
-	if !m.isLocked.CAS(true, false) {
+func (q *Ql) Unlock() error {
+	if !q.isLocked.CAS(true, false) {
 		return database.ErrNotLocked
 	}
 	return nil
 }
-func (m *Ql) Run(migration io.Reader) error {
+func (q *Ql) Run(migration io.Reader) error {
 	migr, err := io.ReadAll(migration)
 	if err != nil {
 		return err
 	}
 	query := string(migr[:])
 
-	return m.executeQuery(query)
+	return q.executeQuery(query)
 }
-func (m *Ql) executeQuery(query string) error {
-	tx, err := m.db.Begin()
+func (q *Ql) executeQuery(query string) error {
+	tx, err := q.db.Begin()
 	if err != nil {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
 	}
@@ -202,13 +203,13 @@ func (m *Ql) executeQuery(query string) error {
 	}
 	return nil
 }
-func (m *Ql) SetVersion(version int, dirty bool) error {
-	tx, err := m.db.Begin()
+func (q *Ql) SetVersion(version int, dirty bool) error {
+	tx, err := q.db.Begin()
 	if err != nil {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
 	}
 
-	query := "TRUNCATE TABLE " + m.config.MigrationsTable
+	query := "TRUNCATE TABLE " + q.config.MigrationsTable
 	if _, err := tx.Exec(query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
@@ -218,7 +219,7 @@ func (m *Ql) SetVersion(version int, dirty bool) error {
 	// See: https://github.com/golang-migrate/migrate/issues/330
 	if version >= 0 || (version == database.NilVersion && dirty) {
 		query := fmt.Sprintf(`INSERT INTO %s (version, dirty) VALUES (uint64(?1), ?2)`,
-			m.config.MigrationsTable)
+			q.config.MigrationsTable)
 		if _, err := tx.Exec(query, version, dirty); err != nil {
 			if errRollback := tx.Rollback(); errRollback != nil {
 				err = multierror.Append(err, errRollback)
@@ -233,12 +234,14 @@ func (m *Ql) SetVersion(version int, dirty bool) error {
 
 	return nil
 }
-
-func (m *Ql) Version() (version int, dirty bool, err error) {
-	query := "SELECT version, dirty FROM " + m.config.MigrationsTable + " LIMIT 1"
-	err = m.db.QueryRow(query).Scan(&version, &dirty)
+func (q *Ql) Version() (version int, dirty bool, err error) {
+	query := "SELECT version, dirty FROM " + q.config.MigrationsTable + " LIMIT 1"
+	err = q.db.QueryRow(query).Scan(&version, &dirty)
 	if err != nil {
 		return database.NilVersion, false, nil
 	}
 	return version, dirty, nil
+}
+func (q *Ql) Exec(e source.Executor) error {
+	return e.Execute(q.db)
 }

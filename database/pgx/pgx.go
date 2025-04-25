@@ -18,6 +18,7 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/golang-migrate/migrate/v4/database/multistmt"
+	"github.com/golang-migrate/migrate/v4/source"
 	"github.com/hashicorp/go-multierror"
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgerrcode"
@@ -545,6 +546,10 @@ func (p *Postgres) Drop() (err error) {
 	}
 
 	return nil
+}
+
+func (p *Postgres) Exec(e source.Executor) error {
+	return e.Execute(p.db)
 }
 
 // ensureVersionTable checks if versions table exists and, if not, creates it.

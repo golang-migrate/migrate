@@ -14,6 +14,7 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/golang-migrate/migrate/v4/database/multistmt"
+	"github.com/golang-migrate/migrate/v4/source"
 	"github.com/hashicorp/go-multierror"
 )
 
@@ -288,6 +289,10 @@ func (ch *ClickHouse) Drop() (err error) {
 	}
 
 	return nil
+}
+
+func (c *ClickHouse) Exec(e source.Executor) error {
+	return e.Execute(c.conn)
 }
 
 func (ch *ClickHouse) Lock() error {

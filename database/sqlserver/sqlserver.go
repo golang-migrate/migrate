@@ -14,6 +14,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
+	"github.com/golang-migrate/migrate/v4/source"
 	"github.com/hashicorp/go-multierror"
 	mssql "github.com/microsoft/go-mssqldb" // mssql support
 )
@@ -351,6 +352,11 @@ func (ss *SQLServer) Drop() error {
 	}
 
 	return nil
+}
+
+// Exec implements database.Driver. Executes a migration exectuor.
+func (ss *SQLServer) Exec(e source.Executor) error {
+	return e.Execute(ss.db)
 }
 
 func (ss *SQLServer) ensureVersionTable() (err error) {

@@ -19,6 +19,7 @@ import (
 
 	"github.com/go-sql-driver/mysql"
 	"github.com/golang-migrate/migrate/v4/database"
+	"github.com/golang-migrate/migrate/v4/source"
 	"github.com/hashicorp/go-multierror"
 )
 
@@ -458,6 +459,10 @@ func (m *Mysql) Drop() (err error) {
 	}
 
 	return nil
+}
+
+func (m *Mysql) Exec(e source.Executor) error {
+	return e.Execute(m.db)
 }
 
 // ensureVersionTable checks if versions table exists and, if not, creates it.

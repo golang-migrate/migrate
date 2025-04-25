@@ -174,7 +174,7 @@ func (g *Github) Next(version uint) (nextVersion uint, err error) {
 	}
 }
 
-func (g *Github) ReadUp(version uint) (r io.ReadCloser, identifier string, err error) {
+func (g *Github) ReadUp(version uint) (r io.ReadCloser, e source.Executor, identifier string, err error) {
 	g.ensureFields()
 
 	if m, ok := g.migrations.Up(version); ok {
@@ -187,14 +187,14 @@ func (g *Github) ReadUp(version uint) (r io.ReadCloser, identifier string, err e
 		)
 
 		if err != nil {
-			return nil, "", err
+			return nil, nil, "", err
 		}
-		return r, m.Identifier, nil
+		return r, nil, m.Identifier, nil
 	}
-	return nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: g.config.Path, Err: os.ErrNotExist}
+	return nil, nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: g.config.Path, Err: os.ErrNotExist}
 }
 
-func (g *Github) ReadDown(version uint) (r io.ReadCloser, identifier string, err error) {
+func (g *Github) ReadDown(version uint) (r io.ReadCloser, e source.Executor, identifier string, err error) {
 	g.ensureFields()
 
 	if m, ok := g.migrations.Down(version); ok {
@@ -207,9 +207,9 @@ func (g *Github) ReadDown(version uint) (r io.ReadCloser, identifier string, err
 		)
 
 		if err != nil {
-			return nil, "", err
+			return nil, nil, "", err
 		}
-		return r, m.Identifier, nil
+		return r, nil, m.Identifier, nil
 	}
-	return nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: g.config.Path, Err: os.ErrNotExist}
+	return nil, nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: g.config.Path, Err: os.ErrNotExist}
 }
