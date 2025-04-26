@@ -178,14 +178,14 @@ func (m *Sqlite) Drop() (err error) {
 }
 
 func (m *Sqlite) Lock() error {
-	if !m.isLocked.CAS(false, true) {
+	if !m.isLocked.CompareAndSwap(false, true) {
 		return database.ErrLocked
 	}
 	return nil
 }
 
 func (m *Sqlite) Unlock() error {
-	if !m.isLocked.CAS(true, false) {
+	if !m.isLocked.CompareAndSwap(true, false) {
 		return database.ErrNotLocked
 	}
 	return nil

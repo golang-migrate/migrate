@@ -153,7 +153,7 @@ func (s *Spanner) Close() error {
 // Lock implements database.Driver but doesn't do anything because Spanner only
 // enqueues the UpdateDatabaseDdlRequest.
 func (s *Spanner) Lock() error {
-	if swapped := s.lock.CAS(unlockedVal, lockedVal); swapped {
+	if swapped := s.lock.CompareAndSwap(unlockedVal, lockedVal); swapped {
 		return nil
 	}
 	return ErrLockHeld
@@ -161,7 +161,7 @@ func (s *Spanner) Lock() error {
 
 // Unlock implements database.Driver but no action required, see Lock.
 func (s *Spanner) Unlock() error {
-	if swapped := s.lock.CAS(lockedVal, unlockedVal); swapped {
+	if swapped := s.lock.CompareAndSwap(lockedVal, unlockedVal); swapped {
 		return nil
 	}
 	return ErrLockNotHeld

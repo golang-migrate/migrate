@@ -199,14 +199,14 @@ func (c *Cassandra) Close() error {
 }
 
 func (c *Cassandra) Lock() error {
-	if !c.isLocked.CAS(false, true) {
+	if !c.isLocked.CompareAndSwap(false, true) {
 		return database.ErrLocked
 	}
 	return nil
 }
 
 func (c *Cassandra) Unlock() error {
-	if !c.isLocked.CAS(true, false) {
+	if !c.isLocked.CompareAndSwap(true, false) {
 		return database.ErrNotLocked
 	}
 	return nil
