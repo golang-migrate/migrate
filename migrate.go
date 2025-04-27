@@ -395,6 +395,44 @@ func (m *Migrate) Version() (version uint, dirty bool, err error) {
 	return suint(v), d, nil
 }
 
+// Check returns number of pending migrations.
+func (m *Migrate) Check() (pending int, err error) {
+	// Disable prefetch as we'll only be checking and not applying migrations.
+	m.PrefetchMigrations = 0
+
+	curVersion, dirty, err := m.databaseDrv.Version()
+	if err != nil {
+		return 0, err
+	}
+
+	if dirty {
+		return 0, ErrDirty{curVersion}
+	}
+
+	pending = 0
+
+	ret := make(chan interface{}, m.PrefetchMigrations)
+	go m.readUp(curVersion, -1, ret)
+
+	for r := range ret {
+		if m.stop() {
+			break
+		}
+
+		switch r := r.(type) {
+		case error:
+			if r != ErrNoChange {
+				return 0, r
+			}
+
+		case *Migration:
+			pending += 1
+		}
+	}
+
+	return pending, nil
+}
+
 // read reads either up or down migrations from source `from` to `to`.
 // Each migration is then written to the ret channel.
 // If an error occurs during reading, that error is written to the ret channel, too.
