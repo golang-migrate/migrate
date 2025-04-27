@@ -32,7 +32,7 @@ require (
 	github.com/neo4j/neo4j-go-driver v1.8.1-0.20200803113522-b626aa943eba
 	github.com/snowflakedb/gosnowflake v1.6.19
 	github.com/stretchr/testify v1.9.0
-	github.com/xanzy/go-gitlab v0.15.0
+	github.com/xanzy/go-gitlab v0.95.2
 	go.mongodb.org/mongo-driver v1.7.5
 	go.uber.org/atomic v1.7.0
 	golang.org/x/oauth2 v0.18.0
@@ -134,6 +134,8 @@ require (
 	github.com/gsterjov/go-libsecret v0.0.0-20161001094733-a6f4afe4910c // indirect
 	github.com/hailocab/go-hostpool v0.0.0-20160125115350-e80d13ce29ed // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
+	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
+	github.com/hashicorp/go-retryablehttp v0.7.2 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
 	github.com/jackc/pgio v1.0.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
