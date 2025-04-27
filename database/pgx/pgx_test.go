@@ -4,8 +4,6 @@ package pgx
 
 import (
 	"context"
-	"database/sql"
-	sqldriver "database/sql/driver"
 	"errors"
 	"fmt"
 	"io"
@@ -22,6 +20,8 @@ import (
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
 	"github.com/golang-migrate/migrate/v4/dktesting"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+
+	"github.com/jackc/pgx/v4"
 )
 
 const (
@@ -53,20 +53,17 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 		return false
 	}
 
-	db, err := sql.Open("pgx", pgConnectionString(ip, port))
+	db, err := pgx.Connect(ctx, pgConnectionString(ip, port))
 	if err != nil {
 		return false
 	}
 	defer func() {
-		if err := db.Close(); err != nil {
+		if err := db.Close(context.Background()); err != nil {
 			log.Println("close error:", err)
 		}
 	}()
-	if err = db.PingContext(ctx); err != nil {
-		switch err {
-		case sqldriver.ErrBadConn, io.EOF:
-			return false
-		default:
+	if err := db.Ping(ctx); err != nil {
+		if !errors.Is(err, io.EOF) {
 			log.Println(err)
 		}
 		return false
@@ -181,7 +178,7 @@ func TestMultipleStatements(t *testing.T) {
 
 		// make sure second table exists
 		var exists bool
-		if err := d.(*Postgres).conn.QueryRowContext(context.Background(), "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'bar' AND table_schema = (SELECT current_schema()))").Scan(&exists); err != nil {
+		if err := d.(*Postgres).conn.QueryRow(context.Background(), "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'bar' AND table_schema = (SELECT current_schema()))").Scan(&exists); err != nil {
 			t.Fatal(err)
 		}
 		if !exists {
@@ -214,7 +211,7 @@ func TestMultipleStatementsInMultiStatementMode(t *testing.T) {
 
 		// make sure created index exists
 		var exists bool
-		if err := d.(*Postgres).conn.QueryRowContext(context.Background(), "SELECT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = (SELECT current_schema()) AND indexname = 'idx_foo')").Scan(&exists); err != nil {
+		if err := d.(*Postgres).conn.QueryRow(context.Background(), "SELECT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = (SELECT current_schema()) AND indexname = 'idx_foo')").Scan(&exists); err != nil {
 			t.Fatal(err)
 		}
 		if !exists {
@@ -388,7 +385,7 @@ func TestMigrationTableOption(t *testing.T) {
 
 		// make sure migrate.schema_migrations table exists
 		var exists bool
-		if err := d.(*Postgres).conn.QueryRowContext(context.Background(), "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'schema_migrations' AND table_schema = 'migrate')").Scan(&exists); err != nil {
+		if err := d.(*Postgres).conn.QueryRow(context.Background(), "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'schema_migrations' AND table_schema = 'migrate')").Scan(&exists); err != nil {
 			t.Fatal(err)
 		}
 		if !exists {
@@ -400,7 +397,7 @@ func TestMigrationTableOption(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := d.(*Postgres).conn.QueryRowContext(context.Background(), "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'migrate.schema_migrations' AND table_schema = (SELECT current_schema()))").Scan(&exists); err != nil {
+		if err := d.(*Postgres).conn.QueryRow(context.Background(), "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'migrate.schema_migrations' AND table_schema = (SELECT current_schema()))").Scan(&exists); err != nil {
 			t.Fatal(err)
 		}
 		if !exists {
@@ -672,23 +669,7 @@ func TestWithInstance_Concurrent(t *testing.T) {
 
 		// The number of concurrent processes running WithInstance
 		const concurrency = 30
-
-		// We can instantiate a single database handle because it is
-		// actually a connection pool, and so, each of the below go
-		// routines will have a high probability of using a separate
-		// connection, which is something we want to exercise.
-		db, err := sql.Open("pgx", pgConnectionString(ip, port))
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func() {
-			if err := db.Close(); err != nil {
-				t.Error(err)
-			}
-		}()
-
-		db.SetMaxIdleConns(concurrency)
-		db.SetMaxOpenConns(concurrency)
+		connString := pgConnectionString(ip, port)
 
 		var wg sync.WaitGroup
 		defer wg.Wait()
@@ -697,7 +678,19 @@ func TestWithInstance_Concurrent(t *testing.T) {
 		for i := 0; i < concurrency; i++ {
 			go func(i int) {
 				defer wg.Done()
-				_, err := WithInstance(db, &Config{})
+
+				db, err := pgx.Connect(context.Background(), connString)
+				if err != nil {
+					t.Errorf("process %d error: %s", i, err)
+					return
+				}
+				defer func() {
+					if err := db.Close(context.Background()); err != nil {
+						t.Error(err)
+					}
+				}()
+
+				_, err = WithInstance(db, &Config{})
 				if err != nil {
 					t.Errorf("process %d error: %s", i, err)
 				}
