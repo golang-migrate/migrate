@@ -15,9 +15,9 @@ import (
 
 	"github.com/dhui/dktest"
 	"github.com/golang-migrate/migrate/v4"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
 	"github.com/golang-migrate/migrate/v4/dktesting"
@@ -48,7 +48,7 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 		return false
 	}
 
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoConnectionString(ip, port)))
+	client, err := mongo.Connect(options.Client().ApplyURI(mongoConnectionString(ip, port)))
 	if err != nil {
 		return false
 	}
@@ -130,7 +130,7 @@ func testMigrate(t *testing.T) {
 				t.Error(err)
 			}
 		}()
-		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "", d)
+		m, err := migrate.NewWithDatabaseInstance("file://../examples/migrations", "", d)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -269,7 +269,7 @@ func TestTransaction(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(mongoConnectionString(ip, port)))
+		client, err := mongo.Connect(options.Client().ApplyURI(mongoConnectionString(ip, port)))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -349,7 +349,7 @@ func TestTransaction(t *testing.T) {
 		}
 		for _, tcase := range testcases {
 			t.Run(tcase.name, func(t *testing.T) {
-				client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(mongoConnectionString(ip, port)))
+				client, err := mongo.Connect(options.Client().ApplyURI(mongoConnectionString(ip, port)))
 				if err != nil {
 					t.Fatal(err)
 				}
