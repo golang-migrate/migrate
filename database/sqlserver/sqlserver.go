@@ -16,6 +16,7 @@ import (
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/hashicorp/go-multierror"
 	mssql "github.com/microsoft/go-mssqldb" // mssql support
+	"github.com/microsoft/go-mssqldb/batch"
 )
 
 func init() {
@@ -27,6 +28,7 @@ var DefaultMigrationsTable = "schema_migrations"
 
 var (
 	ErrNilConfig                 = fmt.Errorf("no config")
+	ErrInvalidBatchValue         = fmt.Errorf("invalid x-batch value")
 	ErrNoDatabaseName            = fmt.Errorf("no database name")
 	ErrNoSchema                  = fmt.Errorf("no schema")
 	ErrDatabaseDirty             = fmt.Errorf("database is dirty")
@@ -45,6 +47,7 @@ type Config struct {
 	MigrationsTable string
 	DatabaseName    string
 	SchemaName      string
+	BatchEnabled    bool
 }
 
 // SQL Server connection
@@ -168,9 +171,18 @@ func (ss *SQLServer) Open(url string) (database.Driver, error) {
 
 	migrationsTable := purl.Query().Get("x-migrations-table")
 
+	var batchEnabled bool
+	if q := purl.Query().Get("x-batch"); q != "" {
+		batchEnabled, err = strconv.ParseBool(q)
+		if err != nil {
+			return nil, fmt.Errorf("%w: '%s': %w", ErrInvalidBatchValue, q, err)
+		}
+	}
+
 	px, err := WithInstance(db, &Config{
 		DatabaseName:    purl.Path,
 		MigrationsTable: migrationsTable,
+		BatchEnabled:    batchEnabled,
 	})
 
 	if err != nil {
@@ -246,18 +258,27 @@ func (ss *SQLServer) Run(migration io.Reader) error {
 	}
 
 	// run migration
-	query := string(migr[:])
-	if _, err := ss.conn.ExecContext(context.Background(), query); err != nil {
-		if msErr, ok := err.(mssql.Error); ok {
-			message := fmt.Sprintf("migration failed: %s", msErr.Message)
-			if msErr.ProcName != "" {
-				message = fmt.Sprintf("%s (proc name %s)", msErr.Message, msErr.ProcName)
-			}
-			return database.Error{OrigErr: err, Err: message, Query: migr, Line: uint(msErr.LineNo)}
-		}
-		return database.Error{OrigErr: err, Err: "migration failed", Query: migr}
+	var queries []string
+	if ss.config.BatchEnabled {
+		queries = batch.Split(string(migr), "go")
+	} else {
+		queries = []string{string(migr)}
 	}
 
+	for _, query := range queries {
+		if _, err := ss.conn.ExecContext(context.Background(), query); err != nil {
+			fmt.Println("ASD")
+			fmt.Println(query)
+			if msErr, ok := err.(mssql.Error); ok {
+				message := fmt.Sprintf("migration failed: %s", msErr.Message)
+				if msErr.ProcName != "" {
+					message = fmt.Sprintf("%s (proc name %s)", msErr.Message, msErr.ProcName)
+				}
+				return database.Error{OrigErr: err, Err: message, Query: migr, Line: uint(msErr.LineNo)}
+			}
+			return database.Error{OrigErr: err, Err: "migration failed", Query: migr}
+		}
+	}
 	return nil
 }
 

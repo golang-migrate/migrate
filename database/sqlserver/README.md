@@ -6,8 +6,9 @@
 | URL Query  | WithInstance Config | Description |
 |------------|---------------------|-------------|
 | `x-migrations-table` | `MigrationsTable` | Name of the migrations table |
+| `x-batch` | `BatchEnabled` | Enable drivers batch parsing |
 | `username` | |  enter the SQL Server Authentication user id or the Windows Authentication user id in the DOMAIN\User format. On Windows, if user id is empty or missing Single-Sign-On is used. |
-| `password` | | The user's password. | 
+| `password` | | The user's password. |
 | `host` | | The host to connect to. |
 | `port` | | The port to connect to. |
 | `instance` | | SQL Server instance name. |
@@ -24,7 +25,7 @@ See https://github.com/microsoft/go-mssqldb for full parameter list.
 
 ### Which go-mssqldb driver to us?
 
-Please note that the deprecated `mssql` driver is not supported. Please use the newer `sqlserver` driver.  
+Please note that the deprecated `mssql` driver is not supported. Please use the newer `sqlserver` driver.
 See https://github.com/microsoft/go-mssqldb#deprecated for more information.
 
 ### Official Support by migrate
