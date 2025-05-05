@@ -5,19 +5,18 @@ package cockroachdb
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
-	"github.com/golang-migrate/migrate/v4"
 	"log"
 	"strings"
 	"testing"
-)
+	"time"
 
-import (
 	"github.com/dhui/dktest"
 	_ "github.com/lib/pq"
-)
 
-import (
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database"
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
 	"github.com/golang-migrate/migrate/v4/dktesting"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
@@ -169,6 +168,105 @@ func TestFilterCustomQuery(t *testing.T) {
 		_, err = c.Open(addr)
 		if err != nil {
 			t.Fatal(err)
+		}
+	})
+}
+
+func TestLockDefault(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, ci dktest.ContainerInfo) {
+		createDB(t, ci)
+
+		ip, port, err := ci.Port(26257)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := fmt.Sprintf("cockroach://root@%v:%v/migrate?sslmode=disable", ip, port)
+		c := &CockroachDb{}
+		d1, err := c.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		d2, err := c.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := d1.Lock(); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := d2.Lock(); err == nil || !errors.Is(err, database.ErrLocked) {
+			t.Fatalf("expected error %v, got %v", database.ErrLocked, err)
+		}
+
+		if err := d1.Unlock(); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := d2.Lock(); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := d2.Unlock(); err != nil {
+			t.Fatal(err)
+		}
+	})
+}
+
+func TestLockWait(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, ci dktest.ContainerInfo) {
+		createDB(t, ci)
+
+		ip, port, err := ci.Port(26257)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := fmt.Sprintf("cockroach://root@%v:%v/migrate?sslmode=disable&x-max-retries=10", ip, port)
+		c := &CockroachDb{}
+		d1, err := c.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		d2, err := c.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := d1.Lock(); err != nil {
+			t.Fatal(err)
+		}
+
+		// lock d2 in a goroutine to make it wait a bit
+		done := make(chan struct{})
+		waiting := make(chan struct{})
+		var d2LockErr error
+		go func() {
+			defer close(done)
+
+			close(waiting) // signal that the goroutine started and is waiting
+
+			// we can not call t.Fatal(err) in the goroutine, so remember it and check it in the main thread
+			d2LockErr = d2.Lock()
+		}()
+
+		<-waiting // ensure the goroutine started and is waiting
+
+		if err := d1.Unlock(); err != nil {
+			t.Fatal(err)
+		}
+
+		select {
+		case <-done: // we should get here once the d2 lock is acquired
+			if d2LockErr != nil {
+				t.Fatal(d2LockErr)
+			}
+			break
+		case <-time.After(DefaultMaxRetryInterval): // wait for at least one poll
+			t.Fatal("expected lock to be acquired by d2")
 		}
 	})
 }
