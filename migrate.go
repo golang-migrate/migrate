@@ -36,6 +36,22 @@ var (
 	ErrLockTimeout    = errors.New("timeout: can't acquire database lock")
 )
 
+// ErrorVersionNotFound is an error returned when a migration version
+// is not found in the source.
+type ErrorVersionNotFound struct {
+	Version uint
+	Err     error
+}
+
+func (e ErrorVersionNotFound) Error() string {
+	return fmt.Sprintf("no migration found for version %d: %s", e.Version, e.Err.Error())
+}
+
+// We need to keep the original error when unwrapping for compatibility in case someone is validating the error type
+func (e ErrorVersionNotFound) Unwrap() error {
+	return e.Err
+}
+
 // ErrShortLimit is an error returned when not enough migrations
 // can be returned by a source for a given limit.
 type ErrShortLimit struct {
@@ -806,7 +822,7 @@ func (m *Migrate) versionExists(version uint) (result error) {
 		return err
 	}
 
-	err = fmt.Errorf("no migration found for version %d: %w", version, err)
+	err = ErrorVersionNotFound{Version: version, Err: err}
 	m.logErr(err)
 	return err
 }
