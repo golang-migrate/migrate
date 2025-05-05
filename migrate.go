@@ -80,6 +80,10 @@ type Migrate struct {
 	// LockTimeout defaults to DefaultLockTimeout,
 	// but can be set per Migrate instance.
 	LockTimeout time.Duration
+
+	// AllowHigherDbVersionOnUp allows the up command to succeed if the DB
+	// has a newer version than we do.
+	NoVersionExistChecking bool
 }
 
 // New returns a new Migrate instance from a source URL and a database URL.
@@ -776,6 +780,11 @@ func (m *Migrate) runMigrations(ret <-chan interface{}) error {
 // versionExists checks the source if either the up or down migration for
 // the specified migration version exists.
 func (m *Migrate) versionExists(version uint) (result error) {
+
+	if m.NoVersionExistChecking {
+		return nil
+	}
+
 	// try up migration first
 	up, _, err := m.sourceDrv.ReadUp(version)
 	if err == nil {
@@ -807,7 +816,6 @@ func (m *Migrate) versionExists(version uint) (result error) {
 	}
 
 	err = fmt.Errorf("no migration found for version %d: %w", version, err)
-	m.logErr(err)
 	return err
 }
 
