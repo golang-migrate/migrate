@@ -1,0 +1,4 @@
+{
+    "action": "DELETE /test-index",
+    "body": {}
+}
