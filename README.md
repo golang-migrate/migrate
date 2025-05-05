@@ -123,7 +123,7 @@ import (
 func main() {
     m, err := migrate.New(
         "github://mattes:personal-access-token@mattes/migrate_test",
-        "postgres://localhost:5432/database?sslmode=enable")
+        "postgres://localhost:5432/database?sslmode=disable")
     m.Steps(2)
 }
 ```
@@ -140,7 +140,7 @@ import (
 )
 
 func main() {
-    db, err := sql.Open("postgres", "postgres://localhost:5432/database?sslmode=enable")
+    db, err := sql.Open("postgres", "postgres://localhost:5432/database?sslmode=disable")
     driver, err := postgres.WithInstance(db, &postgres.Config{})
     m, err := migrate.NewWithDatabaseInstance(
         "file:///migrations",
