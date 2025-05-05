@@ -154,9 +154,10 @@ func urlToMySQLConfig(url string) (*mysql.Config, error) {
 
 		ctls := parsedParams.Get("tls")
 		if len(ctls) > 0 {
-			if _, isBool := readBool(ctls); !isBool && strings.ToLower(ctls) != "skip-verify" {
+			tlsCAPath := parsedParams.Get("x-tls-ca")
+			if _, isBool := readBool(ctls); !isBool && strings.ToLower(ctls) != "skip-verify" && tlsCAPath != "" {
 				rootCertPool := x509.NewCertPool()
-				pem, err := os.ReadFile(parsedParams.Get("x-tls-ca"))
+				pem, err := os.ReadFile(tlsCAPath)
 				if err != nil {
 					return nil, err
 				}
