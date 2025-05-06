@@ -52,6 +52,7 @@ type Config struct {
 	migrationsTableName   string
 	StatementTimeout      time.Duration
 	MultiStatementMaxSize int
+	NoLock                bool
 }
 
 type Postgres struct {
@@ -201,6 +202,14 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 		}
 	}
 
+	noLock := false
+	if s := purl.Query().Get("x-no-lock"); len(s) > 0 {
+		noLock, err = strconv.ParseBool(s)
+		if err != nil {
+			return nil, fmt.Errorf("Unable to parse option no-lock: %w", err)
+		}
+	}
+
 	px, err := WithInstance(db, &Config{
 		DatabaseName:          purl.Path,
 		MigrationsTable:       migrationsTable,
@@ -208,6 +217,7 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 		StatementTimeout:      time.Duration(statementTimeout) * time.Millisecond,
 		MultiStatementEnabled: multiStatementEnabled,
 		MultiStatementMaxSize: multiStatementMaxSize,
+		NoLock:                noLock,
 	})
 
 	if err != nil {
@@ -233,6 +243,9 @@ func (p *Postgres) Close() error {
 // https://www.postgresql.org/docs/9.6/static/explicit-locking.html#ADVISORY-LOCKS
 func (p *Postgres) Lock() error {
 	return database.CasRestoreOnErr(&p.isLocked, false, true, database.ErrLocked, func() error {
+		if p.config.NoLock {
+			return nil
+		}
 		aid, err := database.GenerateAdvisoryLockId(p.config.DatabaseName, p.config.migrationsSchemaName, p.config.migrationsTableName)
 		if err != nil {
 			return err
@@ -250,6 +263,9 @@ func (p *Postgres) Lock() error {
 
 func (p *Postgres) Unlock() error {
 	return database.CasRestoreOnErr(&p.isLocked, true, false, database.ErrNotLocked, func() error {
+		if p.config.NoLock {
+			return nil
+		}
 		aid, err := database.GenerateAdvisoryLockId(p.config.DatabaseName, p.config.migrationsSchemaName, p.config.migrationsTableName)
 		if err != nil {
 			return err
