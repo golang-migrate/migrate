@@ -42,6 +42,8 @@ type Config struct {
 	KeyspaceName          string
 	MultiStatementEnabled bool
 	MultiStatementMaxSize int
+
+	Triggers map[string]func(d database.Driver, detail interface{}) error
 }
 
 type Cassandra struct {
@@ -195,6 +197,22 @@ func (c *Cassandra) Open(url string) (database.Driver, error) {
 
 func (c *Cassandra) Close() error {
 	c.session.Close()
+	return nil
+}
+
+func (c *Cassandra) AddTriggers(t map[string]func(d database.Driver, detail interface{}) error) {
+	c.config.Triggers = t
+}
+
+func (c *Cassandra) Trigger(name string, detail interface{}) error {
+	if c.config.Triggers == nil {
+		return nil
+	}
+
+	if trigger, ok := c.config.Triggers[name]; ok {
+		return trigger(c, detail)
+	}
+
 	return nil
 }
 

@@ -34,6 +34,8 @@ type Config struct {
 	MigrationsTableEngine string
 	MultiStatementEnabled bool
 	MultiStatementMaxSize int
+
+	Triggers map[string]func(d database.Driver, detail interface{}) error
 }
 
 func init() {
@@ -305,6 +307,22 @@ func (ch *ClickHouse) Unlock() error {
 	return nil
 }
 func (ch *ClickHouse) Close() error { return ch.conn.Close() }
+
+func (ch *ClickHouse) AddTriggers(t map[string]func(d database.Driver, detail interface{}) error) {
+	ch.config.Triggers = t
+}
+
+func (ch *ClickHouse) Trigger(name string, detail interface{}) error {
+	if ch.config.Triggers == nil {
+		return nil
+	}
+
+	if trigger, ok := ch.config.Triggers[name]; ok {
+		return trigger(ch, detail)
+	}
+
+	return nil
+}
 
 // Copied from lib/pq implementation: https://github.com/lib/pq/blob/v1.9.0/conn.go#L1611
 func quoteIdentifier(name string) string {

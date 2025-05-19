@@ -30,6 +30,8 @@ var (
 type Config struct {
 	MigrationsTable string
 	DatabaseName    string
+
+	Triggers map[string]func(d database.Driver, detail interface{}) error
 }
 
 type Ql struct {
@@ -125,6 +127,23 @@ func (m *Ql) Open(url string) (database.Driver, error) {
 func (m *Ql) Close() error {
 	return m.db.Close()
 }
+
+func (m *Ql) AddTriggers(t map[string]func(d database.Driver, detail interface{}) error) {
+	m.config.Triggers = t
+}
+
+func (m *Ql) Trigger(name string, detail interface{}) error {
+	if m.config.Triggers == nil {
+		return nil
+	}
+
+	if trigger, ok := m.config.Triggers[name]; ok {
+		return trigger(m, detail)
+	}
+
+	return nil
+}
+
 func (m *Ql) Drop() (err error) {
 	query := `SELECT Name FROM __Table`
 	tables, err := m.db.Query(query)

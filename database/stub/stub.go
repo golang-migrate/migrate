@@ -34,7 +34,9 @@ func (s *Stub) Open(url string) (database.Driver, error) {
 	}, nil
 }
 
-type Config struct{}
+type Config struct {
+	Triggers map[string]func(d database.Driver, detail interface{}) error
+}
 
 func WithInstance(instance interface{}, config *Config) (database.Driver, error) {
 	return &Stub{
@@ -46,6 +48,22 @@ func WithInstance(instance interface{}, config *Config) (database.Driver, error)
 }
 
 func (s *Stub) Close() error {
+	return nil
+}
+
+func (s *Stub) AddTriggers(t map[string]func(d database.Driver, detail interface{}) error) {
+	s.Config.Triggers = t
+}
+
+func (s *Stub) Trigger(name string, detail interface{}) error {
+	if s.Config.Triggers == nil {
+		return nil
+	}
+
+	if trigger, ok := s.Config.Triggers[name]; ok {
+		return trigger(s, detail)
+	}
+
 	return nil
 }
 

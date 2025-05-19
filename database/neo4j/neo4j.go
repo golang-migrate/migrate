@@ -34,6 +34,8 @@ type Config struct {
 	MigrationsLabel       string
 	MultiStatement        bool
 	MultiStatementMaxSize int
+
+	Triggers map[string]func(d database.Driver, detail interface{}) error
 }
 
 type Neo4j struct {
@@ -116,6 +118,22 @@ func (n *Neo4j) Open(url string) (database.Driver, error) {
 
 func (n *Neo4j) Close() error {
 	return n.driver.Close()
+}
+
+func (n *Neo4j) AddTriggers(t map[string]func(d database.Driver, detail interface{}) error) {
+	n.config.Triggers = t
+}
+
+func (n *Neo4j) Trigger(name string, detail interface{}) error {
+	if n.config.Triggers == nil {
+		return nil
+	}
+
+	if trigger, ok := n.config.Triggers[name]; ok {
+		return trigger(n, detail)
+	}
+
+	return nil
 }
 
 // local locking in order to pass tests, Neo doesn't support database locking

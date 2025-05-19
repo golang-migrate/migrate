@@ -39,6 +39,8 @@ type Config struct {
 	ConnectInsecure bool
 	// MigrationsTable configures the migrations table name
 	MigrationsTable string
+
+	Triggers map[string]func(d database.Driver, detail interface{}) error
 }
 
 type Rqlite struct {
@@ -135,6 +137,22 @@ func (r *Rqlite) Open(url string) (database.Driver, error) {
 // Migrate will call this function only once per instance.
 func (r *Rqlite) Close() error {
 	r.db.Close()
+	return nil
+}
+
+func (r *Rqlite) AddTriggers(t map[string]func(d database.Driver, detail interface{}) error) {
+	r.config.Triggers = t
+}
+
+func (r *Rqlite) Trigger(name string, detail interface{}) error {
+	if r.config.Triggers == nil {
+		return nil
+	}
+
+	if trigger, ok := r.config.Triggers[name]; ok {
+		return trigger(r, detail)
+	}
+
 	return nil
 }
 

@@ -64,6 +64,8 @@ type Config struct {
 	MigrationsTableQuoted bool
 	MultiStatementEnabled bool
 	MultiStatementMaxSize int
+
+	Triggers map[string]func(d database.Driver, detail interface{}) error
 }
 
 type Postgres struct {
@@ -244,6 +246,22 @@ func (p *Postgres) Close() error {
 	if connErr != nil || dbErr != nil {
 		return fmt.Errorf("conn: %v, db: %v", connErr, dbErr)
 	}
+	return nil
+}
+
+func (p *Postgres) AddTriggers(t map[string]func(d database.Driver, detail interface{}) error) {
+	p.config.Triggers = t
+}
+
+func (p *Postgres) Trigger(name string, detail interface{}) error {
+	if p.config.Triggers == nil {
+		return nil
+	}
+
+	if trigger, ok := p.config.Triggers[name]; ok {
+		return trigger(p, detail)
+	}
+
 	return nil
 }
 

@@ -36,6 +36,11 @@ var (
 	ErrLockTimeout    = errors.New("timeout: can't acquire database lock")
 )
 
+const TrigRunMigrationPre = "RunMigrationPre"
+const TrigRunMigrationPost = "RunMigrationPost"
+const TrigRunMigrationVersionPre = "RunMigrationVersionPre"
+const TrigRunMigrationVersionPost = "RunMigrationVersionPost"
+
 // ErrShortLimit is an error returned when not enough migrations
 // can be returned by a source for a given limit.
 type ErrShortLimit struct {
@@ -80,38 +85,91 @@ type Migrate struct {
 	// LockTimeout defaults to DefaultLockTimeout,
 	// but can be set per Migrate instance.
 	LockTimeout time.Duration
+
+	Triggers map[string]func(m *Migrate, detail interface{}) error
+}
+
+type Options struct {
+	// Source from URL
+	// The URL scheme is defined by each driver.
+	SourceURL string
+
+	// Source from Instance
+	// Use any string that can serve as an identifier during logging as sourceName.
+	// You are responsible for closing down the underlying source if necessary.
+	SourceName     string
+	SourceInstance source.Driver
+
+	// Database from URL
+	// The URL scheme is defined by each driver.
+	DatabaseURL string
+
+	// Database from Instance
+	// Use any string that can serve as an identifier during logging as databaseName.
+	// You are responsible for closing the underlying database client if necessary.
+	// You will also need to setup your own triggers if needed.
+	DatabaseName     string
+	DatabaseInstance database.Driver
+
+	// Triggers - these can be used to execute arbitrary code to meet any additional
+	// requirements that may be needed (i.e. some people need a history of migrations)
+	MigrateTriggers  map[string]func(m *Migrate, detail interface{}) error
+	DatabaseTriggers map[string]func(d database.Driver, detail interface{}) error
+}
+
+// NewFromOptions returns a new Migrate instance from the options provided.
+func NewFromOptions(o Options) (*Migrate, error) {
+	m := newCommon()
+
+	if o.SourceURL != "" {
+		sourceName, err := iurl.SchemeFromURL(o.SourceURL)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse scheme from source URL: %w", err)
+		}
+		m.sourceName = sourceName
+
+		sourceDrv, err := source.Open(o.SourceURL)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open source, %q: %w", o.SourceURL, err)
+		}
+		m.sourceDrv = sourceDrv
+	} else if o.SourceName != "" && o.SourceInstance != nil {
+		m.sourceName = o.SourceName
+		m.sourceDrv = o.SourceInstance
+	} else {
+		return nil, fmt.Errorf("must specify either SourceURL or SourceName and SourceInstance")
+	}
+
+	if o.DatabaseURL != "" {
+		databaseName, err := iurl.SchemeFromURL(o.DatabaseURL)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse scheme from database URL: %w", err)
+		}
+		m.databaseName = databaseName
+
+		databaseDrv, err := database.Open(o.DatabaseURL)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open database: %w", err)
+		}
+		m.databaseDrv = databaseDrv
+		m.databaseDrv.AddTriggers(o.DatabaseTriggers)
+	} else if o.DatabaseName != "" && o.DatabaseInstance != nil {
+		m.databaseName = o.DatabaseName
+		m.databaseDrv = o.DatabaseInstance
+	}
+
+	m.Triggers = o.MigrateTriggers
+
+	return m, nil
 }
 
 // New returns a new Migrate instance from a source URL and a database URL.
 // The URL scheme is defined by each driver.
 func New(sourceURL, databaseURL string) (*Migrate, error) {
-	m := newCommon()
-
-	sourceName, err := iurl.SchemeFromURL(sourceURL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse scheme from source URL: %w", err)
-	}
-	m.sourceName = sourceName
-
-	databaseName, err := iurl.SchemeFromURL(databaseURL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse scheme from database URL: %w", err)
-	}
-	m.databaseName = databaseName
-
-	sourceDrv, err := source.Open(sourceURL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open source, %q: %w", sourceURL, err)
-	}
-	m.sourceDrv = sourceDrv
-
-	databaseDrv, err := database.Open(databaseURL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open database: %w", err)
-	}
-	m.databaseDrv = databaseDrv
-
-	return m, nil
+	return NewFromOptions(Options{
+		SourceURL:   sourceURL,
+		DatabaseURL: databaseURL,
+	})
 }
 
 // NewWithDatabaseInstance returns a new Migrate instance from a source URL
@@ -119,25 +177,11 @@ func New(sourceURL, databaseURL string) (*Migrate, error) {
 // Use any string that can serve as an identifier during logging as databaseName.
 // You are responsible for closing the underlying database client if necessary.
 func NewWithDatabaseInstance(sourceURL string, databaseName string, databaseInstance database.Driver) (*Migrate, error) {
-	m := newCommon()
-
-	sourceName, err := iurl.SchemeFromURL(sourceURL)
-	if err != nil {
-		return nil, err
-	}
-	m.sourceName = sourceName
-
-	m.databaseName = databaseName
-
-	sourceDrv, err := source.Open(sourceURL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open source, %q: %w", sourceURL, err)
-	}
-	m.sourceDrv = sourceDrv
-
-	m.databaseDrv = databaseInstance
-
-	return m, nil
+	return NewFromOptions(Options{
+		SourceURL:        sourceURL,
+		DatabaseName:     databaseName,
+		DatabaseInstance: databaseInstance,
+	})
 }
 
 // NewWithSourceInstance returns a new Migrate instance from an existing source instance
@@ -145,25 +189,11 @@ func NewWithDatabaseInstance(sourceURL string, databaseName string, databaseInst
 // Use any string that can serve as an identifier during logging as sourceName.
 // You are responsible for closing the underlying source client if necessary.
 func NewWithSourceInstance(sourceName string, sourceInstance source.Driver, databaseURL string) (*Migrate, error) {
-	m := newCommon()
-
-	databaseName, err := iurl.SchemeFromURL(databaseURL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse scheme from database URL: %w", err)
-	}
-	m.databaseName = databaseName
-
-	m.sourceName = sourceName
-
-	databaseDrv, err := database.Open(databaseURL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open database: %w", err)
-	}
-	m.databaseDrv = databaseDrv
-
-	m.sourceDrv = sourceInstance
-
-	return m, nil
+	return NewFromOptions(Options{
+		SourceName:     sourceName,
+		SourceInstance: sourceInstance,
+		DatabaseURL:    databaseURL,
+	})
 }
 
 // NewWithInstance returns a new Migrate instance from an existing source and
@@ -171,15 +201,12 @@ func NewWithSourceInstance(sourceName string, sourceInstance source.Driver, data
 // as sourceName and databaseName. You are responsible for closing down
 // the underlying source and database client if necessary.
 func NewWithInstance(sourceName string, sourceInstance source.Driver, databaseName string, databaseInstance database.Driver) (*Migrate, error) {
-	m := newCommon()
-
-	m.sourceName = sourceName
-	m.databaseName = databaseName
-
-	m.sourceDrv = sourceInstance
-	m.databaseDrv = databaseInstance
-
-	return m, nil
+	return NewFromOptions(Options{
+		SourceName:       sourceName,
+		SourceInstance:   sourceInstance,
+		DatabaseName:     databaseName,
+		DatabaseInstance: databaseInstance,
+	})
 }
 
 func newCommon() *Migrate {
@@ -189,6 +216,18 @@ func newCommon() *Migrate {
 		LockTimeout:        DefaultLockTimeout,
 		isLockedMu:         &sync.Mutex{},
 	}
+}
+
+func (m *Migrate) Trigger(name string, detail interface{}) error {
+	if m.Triggers == nil {
+		return nil
+	}
+
+	if trigger, ok := m.Triggers[name]; ok {
+		return trigger(m, detail)
+	}
+
+	return nil
 }
 
 // Close closes the source and the database.
@@ -723,6 +762,10 @@ func (m *Migrate) readDown(from int, limit int, ret chan<- interface{}) {
 // to stop execution because it might have received a stop signal on the
 // GracefulStop channel.
 func (m *Migrate) runMigrations(ret <-chan interface{}) error {
+	if err := m.Trigger(TrigRunMigrationPre, nil); err != nil {
+		return err
+	}
+
 	for r := range ret {
 
 		if m.stop() {
@@ -742,8 +785,16 @@ func (m *Migrate) runMigrations(ret <-chan interface{}) error {
 			}
 
 			if migr.Body != nil {
+				if err := m.Trigger(TrigRunMigrationVersionPre, struct{ Migration *Migration }{migr}); err != nil {
+					return err
+				}
+
 				m.logVerbosePrintf("Read and execute %v\n", migr.LogString())
 				if err := m.databaseDrv.Run(migr.BufferedBody); err != nil {
+					return err
+				}
+
+				if err := m.Trigger(TrigRunMigrationVersionPost, struct{ Migration *Migration }{migr}); err != nil {
 					return err
 				}
 			}
@@ -770,6 +821,11 @@ func (m *Migrate) runMigrations(ret <-chan interface{}) error {
 			return fmt.Errorf("unknown type: %T with value: %+v", r, r)
 		}
 	}
+
+	if err := m.Trigger(TrigRunMigrationPost, nil); err != nil {
+		return err
+	}
+
 	return nil
 }
 

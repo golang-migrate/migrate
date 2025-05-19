@@ -31,6 +31,8 @@ var (
 type Config struct {
 	DatabaseName    string
 	MigrationsTable string
+
+	Triggers map[string]func(d database.Driver, detail interface{}) error
 }
 
 type Firebird struct {
@@ -103,6 +105,22 @@ func (f *Firebird) Close() error {
 	if connErr != nil || dbErr != nil {
 		return fmt.Errorf("conn: %v, db: %v", connErr, dbErr)
 	}
+	return nil
+}
+
+func (f *Firebird) AddTriggers(t map[string]func(d database.Driver, detail interface{}) error) {
+	f.config.Triggers = t
+}
+
+func (f *Firebird) Trigger(name string, detail interface{}) error {
+	if f.config.Triggers == nil {
+		return nil
+	}
+
+	if trigger, ok := f.config.Triggers[name]; ok {
+		return trigger(f, detail)
+	}
+
 	return nil
 }
 

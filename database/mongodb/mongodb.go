@@ -59,6 +59,8 @@ type Config struct {
 	MigrationsCollection string
 	TransactionMode      bool
 	Locking              Locking
+
+	Triggers map[string]func(d database.Driver, detail interface{}) error
 }
 type versionInfo struct {
 	Version int  `bson:"version"`
@@ -295,6 +297,22 @@ func (m *Mongo) executeCommands(ctx context.Context, cmds []bson.D) error {
 
 func (m *Mongo) Close() error {
 	return m.client.Disconnect(context.TODO())
+}
+
+func (m *Mongo) AddTriggers(t map[string]func(d database.Driver, detail interface{}) error) {
+	m.config.Triggers = t
+}
+
+func (m *Mongo) Trigger(name string, detail interface{}) error {
+	if m.config.Triggers == nil {
+		return nil
+	}
+
+	if trigger, ok := m.config.Triggers[name]; ok {
+		return trigger(m, detail)
+	}
+
+	return nil
 }
 
 func (m *Mongo) Drop() error {

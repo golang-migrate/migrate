@@ -49,6 +49,8 @@ type Config struct {
 	MaxRetryInterval    time.Duration
 	MaxRetryElapsedTime time.Duration
 	MaxRetries          int
+
+	Triggers map[string]func(d database.Driver, detail interface{}) error
 }
 
 type YugabyteDB struct {
@@ -187,6 +189,22 @@ func (c *YugabyteDB) Open(dbURL string) (database.Driver, error) {
 
 func (c *YugabyteDB) Close() error {
 	return c.db.Close()
+}
+
+func (c *YugabyteDB) AddTriggers(t map[string]func(d database.Driver, detail interface{}) error) {
+	c.config.Triggers = t
+}
+
+func (c *YugabyteDB) Trigger(name string, detail interface{}) error {
+	if c.config.Triggers == nil {
+		return nil
+	}
+
+	if trigger, ok := c.config.Triggers[name]; ok {
+		return trigger(c, detail)
+	}
+
+	return nil
 }
 
 // Locking is done manually with a separate lock table. Implementing advisory locks in YugabyteDB is being discussed

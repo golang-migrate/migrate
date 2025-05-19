@@ -34,6 +34,8 @@ var (
 type Config struct {
 	MigrationsTable string
 	DatabaseName    string
+
+	Triggers map[string]func(d database.Driver, detail interface{}) error
 }
 
 type Redshift struct {
@@ -122,6 +124,22 @@ func (p *Redshift) Close() error {
 	if connErr != nil || dbErr != nil {
 		return fmt.Errorf("conn: %v, db: %v", connErr, dbErr)
 	}
+	return nil
+}
+
+func (p *Redshift) AddTriggers(t map[string]func(d database.Driver, detail interface{}) error) {
+	p.config.Triggers = t
+}
+
+func (p *Redshift) Trigger(name string, detail interface{}) error {
+	if p.config.Triggers == nil {
+		return nil
+	}
+
+	if trigger, ok := p.config.Triggers[name]; ok {
+		return trigger(p, detail)
+	}
+
 	return nil
 }
 

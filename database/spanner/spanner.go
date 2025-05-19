@@ -56,6 +56,8 @@ type Config struct {
 	// Parsing outputs clean DDL statements such as reformatted
 	// and void of comments.
 	CleanStatements bool
+
+	Triggers map[string]func(d database.Driver, detail interface{}) error
 }
 
 // Spanner implements database.Driver for Google Cloud Spanner
@@ -148,6 +150,22 @@ func (s *Spanner) Open(url string) (database.Driver, error) {
 func (s *Spanner) Close() error {
 	s.db.data.Close()
 	return s.db.admin.Close()
+}
+
+func (s *Spanner) AddTriggers(t map[string]func(d database.Driver, detail interface{}) error) {
+	s.config.Triggers = t
+}
+
+func (s *Spanner) Trigger(name string, detail interface{}) error {
+	if s.config.Triggers == nil {
+		return nil
+	}
+
+	if trigger, ok := s.config.Triggers[name]; ok {
+		return trigger(s, detail)
+	}
+
+	return nil
 }
 
 // Lock implements database.Driver but doesn't do anything because Spanner only

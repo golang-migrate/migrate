@@ -35,6 +35,8 @@ var (
 type Config struct {
 	MigrationsTable string
 	DatabaseName    string
+
+	Triggers map[string]func(d database.Driver, detail interface{}) error
 }
 
 type Snowflake struct {
@@ -155,6 +157,22 @@ func (p *Snowflake) Close() error {
 	if connErr != nil || dbErr != nil {
 		return fmt.Errorf("conn: %v, db: %v", connErr, dbErr)
 	}
+	return nil
+}
+
+func (p *Snowflake) AddTriggers(t map[string]func(d database.Driver, detail interface{}) error) {
+	p.config.Triggers = t
+}
+
+func (p *Snowflake) Trigger(name string, detail interface{}) error {
+	if p.config.Triggers == nil {
+		return nil
+	}
+
+	if trigger, ok := p.config.Triggers[name]; ok {
+		return trigger(p, detail)
+	}
+
 	return nil
 }
 

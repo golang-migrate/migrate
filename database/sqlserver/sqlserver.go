@@ -45,6 +45,8 @@ type Config struct {
 	MigrationsTable string
 	DatabaseName    string
 	SchemaName      string
+
+	Triggers map[string]func(d database.Driver, detail interface{}) error
 }
 
 // SQL Server connection
@@ -187,6 +189,22 @@ func (ss *SQLServer) Close() error {
 	if connErr != nil || dbErr != nil {
 		return fmt.Errorf("conn: %v, db: %v", connErr, dbErr)
 	}
+	return nil
+}
+
+func (ss *SQLServer) AddTriggers(t map[string]func(d database.Driver, detail interface{}) error) {
+	ss.config.Triggers = t
+}
+
+func (ss *SQLServer) Trigger(name string, detail interface{}) error {
+	if ss.config.Triggers == nil {
+		return nil
+	}
+
+	if trigger, ok := ss.config.Triggers[name]; ok {
+		return trigger(ss, detail)
+	}
+
 	return nil
 }
 

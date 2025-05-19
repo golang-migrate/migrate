@@ -31,6 +31,8 @@ type Config struct {
 	MigrationsTable string
 	DatabaseName    string
 	NoTxWrap        bool
+
+	Triggers map[string]func(d database.Driver, detail interface{}) error
 }
 
 type Sqlite struct {
@@ -131,6 +133,22 @@ func (m *Sqlite) Open(url string) (database.Driver, error) {
 
 func (m *Sqlite) Close() error {
 	return m.db.Close()
+}
+
+func (m *Sqlite) AddTriggers(t map[string]func(d database.Driver, detail interface{}) error) {
+	m.config.Triggers = t
+}
+
+func (m *Sqlite) Trigger(name string, detail interface{}) error {
+	if m.config.Triggers == nil {
+		return nil
+	}
+
+	if trigger, ok := m.config.Triggers[name]; ok {
+		return trigger(m, detail)
+	}
+
+	return nil
 }
 
 func (m *Sqlite) Drop() (err error) {

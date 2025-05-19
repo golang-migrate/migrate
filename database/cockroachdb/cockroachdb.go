@@ -37,6 +37,8 @@ type Config struct {
 	LockTable       string
 	ForceLock       bool
 	DatabaseName    string
+
+	Triggers map[string]func(d database.Driver, detail interface{}) error
 }
 
 type CockroachDb struct {
@@ -142,6 +144,22 @@ func (c *CockroachDb) Open(url string) (database.Driver, error) {
 
 func (c *CockroachDb) Close() error {
 	return c.db.Close()
+}
+
+func (c *CockroachDb) AddTriggers(t map[string]func(d database.Driver, detail interface{}) error) {
+	c.config.Triggers = t
+}
+
+func (c *CockroachDb) Trigger(name string, detail interface{}) error {
+	if c.config.Triggers == nil {
+		return nil
+	}
+
+	if trigger, ok := c.config.Triggers[name]; ok {
+		return trigger(c, detail)
+	}
+
+	return nil
 }
 
 // Locking is done manually with a separate lock table.  Implementing advisory locks in CRDB is being discussed
