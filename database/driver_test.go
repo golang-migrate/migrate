@@ -28,7 +28,7 @@ func (m *mockDriver) Close() error {
 	return nil
 }
 
-func (m *mockDriver) AddTriggers(t map[string]func(m Driver, detail interface{}) error) {}
+func (m *mockDriver) AddTriggers(t map[string]func(detail interface{}) error) {}
 
 func (m *mockDriver) Trigger(name string, detail interface{}) error {
 	return nil
