@@ -57,7 +57,7 @@ type Config struct {
 	// and void of comments.
 	CleanStatements bool
 
-	Triggers map[string]func(d database.Driver, detail interface{}) error
+	Triggers map[string]func(response interface{}) error
 }
 
 // Spanner implements database.Driver for Google Cloud Spanner
@@ -72,6 +72,13 @@ type Spanner struct {
 type DB struct {
 	admin *sdb.DatabaseAdminClient
 	data  *spanner.Client
+}
+
+type TriggerResponse struct {
+	Driver  *Spanner
+	Config  *Config
+	Trigger string
+	Detail  interface{}
 }
 
 func NewDB(admin sdb.DatabaseAdminClient, data spanner.Client) *DB {
@@ -152,7 +159,7 @@ func (s *Spanner) Close() error {
 	return s.db.admin.Close()
 }
 
-func (s *Spanner) AddTriggers(t map[string]func(d database.Driver, detail interface{}) error) {
+func (s *Spanner) AddTriggers(t map[string]func(response interface{}) error) {
 	s.config.Triggers = t
 }
 
@@ -162,7 +169,12 @@ func (s *Spanner) Trigger(name string, detail interface{}) error {
 	}
 
 	if trigger, ok := s.config.Triggers[name]; ok {
-		return trigger(s, detail)
+		return trigger(TriggerResponse{
+			Driver:  s,
+			Config:  s.config,
+			Trigger: name,
+			Detail:  detail,
+		})
 	}
 
 	return nil
@@ -192,6 +204,12 @@ func (s *Spanner) Run(migration io.Reader) error {
 		return err
 	}
 
+	if err := s.Trigger(database.TrigRunPre, struct {
+		Query string
+	}{Query: string(migr)}); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger RunPre"}
+	}
+
 	stmts := []string{string(migr)}
 	if s.config.CleanStatements {
 		stmts, err = cleanStatements(migr)
@@ -214,12 +232,25 @@ func (s *Spanner) Run(migration io.Reader) error {
 		return &database.Error{OrigErr: err, Err: "migration failed", Query: migr}
 	}
 
+	if err := s.Trigger(database.TrigRunPost, struct {
+		Query string
+	}{Query: string(migr)}); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger RunPost"}
+	}
+
 	return nil
 }
 
 // SetVersion implements database.Driver
 func (s *Spanner) SetVersion(version int, dirty bool) error {
 	ctx := context.Background()
+
+	if err := s.Trigger(database.TrigSetVersionPre, struct {
+		Version int
+		Dirty   bool
+	}{Version: version, Dirty: dirty}); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger SetVersionPre"}
+	}
 
 	_, err := s.db.data.ReadWriteTransaction(ctx,
 		func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
@@ -233,6 +264,13 @@ func (s *Spanner) SetVersion(version int, dirty bool) error {
 		})
 	if err != nil {
 		return &database.Error{OrigErr: err}
+	}
+
+	if err := s.Trigger(database.TrigSetVersionPost, struct {
+		Version int
+		Dirty   bool
+	}{Version: version, Dirty: dirty}); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger SetVersionPost"}
 	}
 
 	return nil
@@ -335,7 +373,14 @@ func (s *Spanner) ensureVersionTable() (err error) {
 	tbl := s.config.MigrationsTable
 	iter := s.db.data.Single().Read(ctx, tbl, spanner.AllKeys(), []string{"Version"})
 	if err := iter.Do(func(r *spanner.Row) error { return nil }); err == nil {
+		if err := s.Trigger(database.TrigVersionTableExists, nil); err != nil {
+			return &database.Error{OrigErr: err, Err: "failed to trigger VersionTableExists"}
+		}
 		return nil
+	}
+
+	if err := s.Trigger(database.TrigVersionTablePre, nil); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger VersionTablePre"}
 	}
 
 	stmt := fmt.Sprintf(`CREATE TABLE %s (
@@ -353,6 +398,10 @@ func (s *Spanner) ensureVersionTable() (err error) {
 	}
 	if err := op.Wait(ctx); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(stmt)}
+	}
+
+	if err := s.Trigger(database.TrigVersionTablePost, nil); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger VersionTablePost"}
 	}
 
 	return nil

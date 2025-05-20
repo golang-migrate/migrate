@@ -32,7 +32,7 @@ type Config struct {
 	DatabaseName    string
 	NoTxWrap        bool
 
-	Triggers map[string]func(d database.Driver, detail interface{}) error
+	Triggers map[string]func(response interface{}) error
 }
 
 type Sqlite struct {
@@ -40,6 +40,13 @@ type Sqlite struct {
 	isLocked atomic.Bool
 
 	config *Config
+}
+
+type TriggerResponse struct {
+	Driver  *Sqlite
+	Config  *Config
+	Trigger string
+	Detail  interface{}
 }
 
 func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
@@ -83,6 +90,10 @@ func (m *Sqlite) ensureVersionTable() (err error) {
 		}
 	}()
 
+	if err := m.Trigger(database.TrigVersionTablePre, nil); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger VersionTablePre"}
+	}
+
 	query := fmt.Sprintf(`
 	CREATE TABLE IF NOT EXISTS %s (version uint64,dirty bool);
   CREATE UNIQUE INDEX IF NOT EXISTS version_unique ON %s (version);
@@ -90,6 +101,10 @@ func (m *Sqlite) ensureVersionTable() (err error) {
 
 	if _, err := m.db.Exec(query); err != nil {
 		return err
+	}
+
+	if err := m.Trigger(database.TrigVersionTablePost, nil); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger VersionTablePost"}
 	}
 	return nil
 }
@@ -135,7 +150,7 @@ func (m *Sqlite) Close() error {
 	return m.db.Close()
 }
 
-func (m *Sqlite) AddTriggers(t map[string]func(d database.Driver, detail interface{}) error) {
+func (m *Sqlite) AddTriggers(t map[string]func(response interface{}) error) {
 	m.config.Triggers = t
 }
 
@@ -145,7 +160,12 @@ func (m *Sqlite) Trigger(name string, detail interface{}) error {
 	}
 
 	if trigger, ok := m.config.Triggers[name]; ok {
-		return trigger(m, detail)
+		return trigger(TriggerResponse{
+			Driver:  m,
+			Config:  m.config,
+			Trigger: name,
+			Detail:  detail,
+		})
 	}
 
 	return nil
@@ -217,9 +237,19 @@ func (m *Sqlite) Run(migration io.Reader) error {
 	query := string(migr[:])
 
 	if m.config.NoTxWrap {
-		return m.executeQueryNoTx(query)
+		if err = m.executeQueryNoTx(query); err != nil {
+			return err
+		}
+	} else if err = m.executeQuery(query); err != nil {
+		return err
 	}
-	return m.executeQuery(query)
+
+	if err := m.Trigger(database.TrigRunPost, struct {
+		Query string
+	}{Query: query}); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger RunPost"}
+	}
+	return nil
 }
 
 func (m *Sqlite) executeQuery(query string) error {
@@ -252,6 +282,16 @@ func (m *Sqlite) SetVersion(version int, dirty bool) error {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
 	}
 
+	if err := m.Trigger(database.TrigSetVersionPre, struct {
+		Version int
+		Dirty   bool
+	}{Version: version, Dirty: dirty}); err != nil {
+		if errRollback := tx.Rollback(); errRollback != nil {
+			err = multierror.Append(err, errRollback)
+		}
+		return &database.Error{OrigErr: err, Err: "failed to trigger SetVersionPre"}
+	}
+
 	query := "DELETE FROM " + m.config.MigrationsTable
 	if _, err := tx.Exec(query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
@@ -268,6 +308,16 @@ func (m *Sqlite) SetVersion(version int, dirty bool) error {
 			}
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
+	}
+
+	if err := m.Trigger(database.TrigSetVersionPost, struct {
+		Version int
+		Dirty   bool
+	}{Version: version, Dirty: dirty}); err != nil {
+		if errRollback := tx.Rollback(); errRollback != nil {
+			err = multierror.Append(err, errRollback)
+		}
+		return &database.Error{OrigErr: err, Err: "failed to trigger SetVersionPost"}
 	}
 
 	if err := tx.Commit(); err != nil {

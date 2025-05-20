@@ -50,7 +50,7 @@ type Config struct {
 	MaxRetryElapsedTime time.Duration
 	MaxRetries          int
 
-	Triggers map[string]func(d database.Driver, detail interface{}) error
+	Triggers map[string]func(response interface{}) error
 }
 
 type YugabyteDB struct {
@@ -59,6 +59,13 @@ type YugabyteDB struct {
 
 	// Open and WithInstance need to guarantee that config is never nil
 	config *Config
+}
+
+type TriggerResponse struct {
+	Driver  *YugabyteDB
+	Config  *Config
+	Trigger string
+	Detail  interface{}
 }
 
 func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
@@ -191,7 +198,7 @@ func (c *YugabyteDB) Close() error {
 	return c.db.Close()
 }
 
-func (c *YugabyteDB) AddTriggers(t map[string]func(d database.Driver, detail interface{}) error) {
+func (c *YugabyteDB) AddTriggers(t map[string]func(response interface{}) error) {
 	c.config.Triggers = t
 }
 
@@ -201,7 +208,12 @@ func (c *YugabyteDB) Trigger(name string, detail interface{}) error {
 	}
 
 	if trigger, ok := c.config.Triggers[name]; ok {
-		return trigger(c, detail)
+		return trigger(TriggerResponse{
+			Driver:  c,
+			Config:  c.config,
+			Trigger: name,
+			Detail:  detail,
+		})
 	}
 
 	return nil
@@ -281,8 +293,18 @@ func (c *YugabyteDB) Run(migration io.Reader) error {
 
 	// run migration
 	query := string(migr[:])
+	if err := c.Trigger(database.TrigRunPre, struct {
+		Query string
+	}{Query: query}); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger RunPre"}
+	}
 	if _, err := c.db.Exec(query); err != nil {
 		return database.Error{OrigErr: err, Err: "migration failed", Query: migr}
+	}
+	if err := c.Trigger(database.TrigRunPost, struct {
+		Query string
+	}{Query: query}); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger RunPost"}
 	}
 
 	return nil
@@ -290,6 +312,13 @@ func (c *YugabyteDB) Run(migration io.Reader) error {
 
 func (c *YugabyteDB) SetVersion(version int, dirty bool) error {
 	return c.doTxWithRetry(context.Background(), &sql.TxOptions{Isolation: sql.LevelSerializable}, func(tx *sql.Tx) error {
+		if err := c.Trigger(database.TrigSetVersionPre, struct {
+			Version int
+			Dirty   bool
+		}{Version: version, Dirty: dirty}); err != nil {
+			return &database.Error{OrigErr: err, Err: "failed to trigger SetVersionPre"}
+		}
+
 		if _, err := tx.Exec(`DELETE FROM "` + c.config.MigrationsTable + `"`); err != nil {
 			return err
 		}
@@ -301,6 +330,13 @@ func (c *YugabyteDB) SetVersion(version int, dirty bool) error {
 			if _, err := tx.Exec(`INSERT INTO "`+c.config.MigrationsTable+`" (version, dirty) VALUES ($1, $2)`, version, dirty); err != nil {
 				return err
 			}
+		}
+
+		if err := c.Trigger(database.TrigSetVersionPost, struct {
+			Version int
+			Dirty   bool
+		}{Version: version, Dirty: dirty}); err != nil {
+			return &database.Error{OrigErr: err, Err: "failed to trigger SetVersionPost"}
 		}
 
 		return nil
@@ -393,13 +429,24 @@ func (c *YugabyteDB) ensureVersionTable() (err error) {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 	if count == 1 {
+		if err := c.Trigger(database.TrigVersionTableExists, nil); err != nil {
+			return &database.Error{OrigErr: err, Err: "failed to trigger VersionTableExists"}
+		}
 		return nil
+	}
+
+	if err := c.Trigger(database.TrigVersionTablePre, nil); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger VersionTablePre"}
 	}
 
 	// if not, create the empty migration table
 	query = `CREATE TABLE "` + c.config.MigrationsTable + `" (version INT NOT NULL PRIMARY KEY, dirty BOOL NOT NULL)`
 	if _, err := c.db.Exec(query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
+	}
+
+	if err := c.Trigger(database.TrigVersionTablePost, nil); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger VersionTablePost"}
 	}
 	return nil
 }

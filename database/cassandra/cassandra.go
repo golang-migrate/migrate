@@ -43,7 +43,14 @@ type Config struct {
 	MultiStatementEnabled bool
 	MultiStatementMaxSize int
 
-	Triggers map[string]func(d database.Driver, detail interface{}) error
+	Triggers map[string]func(response interface{}) error
+}
+
+type TriggerResponse struct {
+	Driver  *Cassandra
+	Config  *Config
+	Trigger string
+	Detail  interface{}
 }
 
 type Cassandra struct {
@@ -200,7 +207,7 @@ func (c *Cassandra) Close() error {
 	return nil
 }
 
-func (c *Cassandra) AddTriggers(t map[string]func(d database.Driver, detail interface{}) error) {
+func (c *Cassandra) AddTriggers(t map[string]func(response interface{}) error) {
 	c.config.Triggers = t
 }
 
@@ -210,7 +217,12 @@ func (c *Cassandra) Trigger(name string, detail interface{}) error {
 	}
 
 	if trigger, ok := c.config.Triggers[name]; ok {
-		return trigger(c, detail)
+		return trigger(TriggerResponse{
+			Driver:  c,
+			Config:  c.config,
+			Trigger: name,
+			Detail:  detail,
+		})
 	}
 
 	return nil
@@ -238,8 +250,20 @@ func (c *Cassandra) Run(migration io.Reader) error {
 			if tq == "" {
 				return true
 			}
+			if e := c.Trigger(database.TrigRunPre, struct {
+				Query string
+			}{Query: tq}); e != nil {
+				err = database.Error{OrigErr: e, Err: "failed to trigger RunPre"}
+				return false
+			}
 			if e := c.session.Query(tq).Exec(); e != nil {
 				err = database.Error{OrigErr: e, Err: "migration failed", Query: m}
+				return false
+			}
+			if e := c.Trigger(database.TrigRunPost, struct {
+				Query string
+			}{Query: tq}); e != nil {
+				err = database.Error{OrigErr: e, Err: "failed to trigger RunPost"}
 				return false
 			}
 			return true
@@ -253,15 +277,32 @@ func (c *Cassandra) Run(migration io.Reader) error {
 	if err != nil {
 		return err
 	}
+	if err := c.Trigger(database.TrigRunPre, struct {
+		Query string
+	}{Query: string(migr)}); err != nil {
+		return database.Error{OrigErr: err, Err: "failed to trigger RunPre"}
+	}
 	// run migration
 	if err := c.session.Query(string(migr)).Exec(); err != nil {
 		// TODO: cast to Cassandra error and get line number
 		return database.Error{OrigErr: err, Err: "migration failed", Query: migr}
 	}
+	if err := c.Trigger(database.TrigRunPre, struct {
+		Query string
+	}{Query: string(migr)}); err != nil {
+		return database.Error{OrigErr: err, Err: "failed to trigger RunPost"}
+	}
 	return nil
 }
 
 func (c *Cassandra) SetVersion(version int, dirty bool) error {
+	if err := c.Trigger(database.TrigSetVersionPre, struct {
+		Version int
+		Dirty   bool
+	}{Version: version, Dirty: dirty}); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger SetVersionPre"}
+	}
+
 	// DELETE instead of TRUNCATE because AWS Keyspaces does not support it
 	// see: https://docs.aws.amazon.com/keyspaces/latest/devguide/cassandra-apis.html
 	squery := `SELECT version FROM "` + c.config.MigrationsTable + `"`
@@ -285,6 +326,13 @@ func (c *Cassandra) SetVersion(version int, dirty bool) error {
 		if err := c.session.Query(query, version, dirty).Exec(); err != nil {
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
+	}
+
+	if err := c.Trigger(database.TrigSetVersionPost, struct {
+		Version int
+		Dirty   bool
+	}{Version: version, Dirty: dirty}); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger SetVersionPost"}
 	}
 
 	return nil
@@ -342,6 +390,10 @@ func (c *Cassandra) ensureVersionTable() (err error) {
 		}
 	}()
 
+	if err := c.Trigger(database.TrigVersionTablePre, nil); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger VersionTablePre"}
+	}
+
 	err = c.session.Query(fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (version bigint, dirty boolean, PRIMARY KEY(version))", c.config.MigrationsTable)).Exec()
 	if err != nil {
 		return err
@@ -349,6 +401,11 @@ func (c *Cassandra) ensureVersionTable() (err error) {
 	if _, _, err = c.Version(); err != nil {
 		return err
 	}
+
+	if err := c.Trigger(database.TrigVersionTablePost, nil); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger VersionTablePost"}
+	}
+
 	return nil
 }
 

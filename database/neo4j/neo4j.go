@@ -35,7 +35,7 @@ type Config struct {
 	MultiStatement        bool
 	MultiStatementMaxSize int
 
-	Triggers map[string]func(d database.Driver, detail interface{}) error
+	Triggers map[string]func(response interface{}) error
 }
 
 type Neo4j struct {
@@ -44,6 +44,13 @@ type Neo4j struct {
 
 	// Open and WithInstance need to guarantee that config is never nil
 	config *Config
+}
+
+type TriggerResponse struct {
+	Driver  *Neo4j
+	Config  *Config
+	Trigger string
+	Detail  interface{}
 }
 
 func WithInstance(driver neo4j.Driver, config *Config) (database.Driver, error) {
@@ -120,7 +127,7 @@ func (n *Neo4j) Close() error {
 	return n.driver.Close()
 }
 
-func (n *Neo4j) AddTriggers(t map[string]func(d database.Driver, detail interface{}) error) {
+func (n *Neo4j) AddTriggers(t map[string]func(response interface{}) error) {
 	n.config.Triggers = t
 }
 
@@ -130,7 +137,12 @@ func (n *Neo4j) Trigger(name string, detail interface{}) error {
 	}
 
 	if trigger, ok := n.config.Triggers[name]; ok {
-		return trigger(n, detail)
+		return trigger(TriggerResponse{
+			Driver:  n,
+			Config:  n.config,
+			Trigger: name,
+			Detail:  detail,
+		})
 	}
 
 	return nil
@@ -176,11 +188,26 @@ func (n *Neo4j) Run(migration io.Reader) (err error) {
 					return true
 				}
 
+				if err = n.Trigger(database.TrigRunPre, struct {
+					Query string
+				}{Query: string(trimStmt)}); err != nil {
+					stmtRunErr = err
+					return false
+				}
+
 				result, err := transaction.Run(string(trimStmt), nil)
 				if _, err := neo4j.Collect(result, err); err != nil {
 					stmtRunErr = err
 					return false
 				}
+
+				if err = n.Trigger(database.TrigRunPost, struct {
+					Query string
+				}{Query: string(trimStmt)}); err != nil {
+					stmtRunErr = err
+					return false
+				}
+
 				return true
 			}); err != nil {
 				return nil, err
@@ -194,8 +221,19 @@ func (n *Neo4j) Run(migration io.Reader) (err error) {
 	if err != nil {
 		return err
 	}
-
-	_, err = neo4j.Collect(session.Run(string(body[:]), nil))
+	if err = n.Trigger(database.TrigRunPre, struct {
+		Query string
+	}{Query: string(body[:])}); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger RunPre"}
+	}
+	if _, err = neo4j.Collect(session.Run(string(body[:]), nil)); err != nil {
+		return err
+	}
+	if err = n.Trigger(database.TrigRunPost, struct {
+		Query string
+	}{Query: string(body[:])}); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger RunPost"}
+	}
 	return err
 }
 
@@ -210,11 +248,23 @@ func (n *Neo4j) SetVersion(version int, dirty bool) (err error) {
 		}
 	}()
 
+	if err := n.Trigger(database.TrigSetVersionPre, struct {
+		Version int
+		Dirty   bool
+	}{Version: version, Dirty: dirty}); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger SetVersionPre"}
+	}
 	query := fmt.Sprintf("MERGE (sm:%s {version: $version}) SET sm.dirty = $dirty, sm.ts = datetime()",
 		n.config.MigrationsLabel)
 	_, err = neo4j.Collect(session.Run(query, map[string]interface{}{"version": version, "dirty": dirty}))
 	if err != nil {
 		return err
+	}
+	if err := n.Trigger(database.TrigSetVersionPost, struct {
+		Version int
+		Dirty   bool
+	}{Version: version, Dirty: dirty}); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger SetVersionPost"}
 	}
 	return nil
 }
@@ -310,12 +360,21 @@ func (n *Neo4j) ensureVersionConstraint() (err error) {
 		return err
 	}
 	if len(res) == 1 {
+		if err := n.Trigger(database.TrigVersionTableExists, nil); err != nil {
+			return &database.Error{OrigErr: err, Err: "failed to trigger VersionTableExists"}
+		}
 		return nil
 	}
 
+	if err := n.Trigger(database.TrigVersionTablePre, nil); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger VersionTablePre"}
+	}
 	query := fmt.Sprintf("CREATE CONSTRAINT ON (a:%s) ASSERT a.version IS UNIQUE", n.config.MigrationsLabel)
 	if _, err := neo4j.Collect(session.Run(query, nil)); err != nil {
 		return err
+	}
+	if err := n.Trigger(database.TrigVersionTablePost, nil); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger VersionTablePost"}
 	}
 	return nil
 }

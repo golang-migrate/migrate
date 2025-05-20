@@ -60,7 +60,7 @@ type Config struct {
 	TransactionMode      bool
 	Locking              Locking
 
-	Triggers map[string]func(d database.Driver, detail interface{}) error
+	Triggers map[string]func(response interface{}) error
 }
 type versionInfo struct {
 	Version int  `bson:"version"`
@@ -75,6 +75,13 @@ type lockObj struct {
 }
 type findFilter struct {
 	Key int `bson:"locking_key"`
+}
+
+type TriggerResponse struct {
+	Driver  *Mongo
+	Config  *Config
+	Trigger string
+	Detail  interface{}
 }
 
 func WithInstance(instance *mongo.Client, config *Config) (database.Driver, error) {
@@ -218,6 +225,13 @@ func parseInt(urlParam string, defaultValue int) (int, error) {
 	return defaultValue, nil
 }
 func (m *Mongo) SetVersion(version int, dirty bool) error {
+	if err := m.Trigger(database.TrigSetVersionPre, struct {
+		Version int
+		Dirty   bool
+	}{Version: version, Dirty: dirty}); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger SetVersionPre"}
+	}
+
 	migrationsCollection := m.db.Collection(m.config.MigrationsCollection)
 	if err := migrationsCollection.Drop(context.TODO()); err != nil {
 		return &database.Error{OrigErr: err, Err: "drop migrations collection failed"}
@@ -226,6 +240,14 @@ func (m *Mongo) SetVersion(version int, dirty bool) error {
 	if err != nil {
 		return &database.Error{OrigErr: err, Err: "save version failed"}
 	}
+
+	if err := m.Trigger(database.TrigSetVersionPost, struct {
+		Version int
+		Dirty   bool
+	}{Version: version, Dirty: dirty}); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger SetVersionPost"}
+	}
+
 	return nil
 }
 
@@ -252,6 +274,11 @@ func (m *Mongo) Run(migration io.Reader) error {
 	if err != nil {
 		return fmt.Errorf("unmarshaling json error: %s", err)
 	}
+	if err := m.Trigger(database.TrigRunPre, struct {
+		Query string
+	}{Query: string(migr)}); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger RunPre"}
+	}
 	if m.config.TransactionMode {
 		if err := m.executeCommandsWithTransaction(context.TODO(), cmds); err != nil {
 			return err
@@ -260,6 +287,11 @@ func (m *Mongo) Run(migration io.Reader) error {
 		if err := m.executeCommands(context.TODO(), cmds); err != nil {
 			return err
 		}
+	}
+	if err := m.Trigger(database.TrigRunPost, struct {
+		Query string
+	}{Query: string(migr)}); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger RunPost"}
 	}
 	return nil
 }
@@ -299,7 +331,7 @@ func (m *Mongo) Close() error {
 	return m.client.Disconnect(context.TODO())
 }
 
-func (m *Mongo) AddTriggers(t map[string]func(d database.Driver, detail interface{}) error) {
+func (m *Mongo) AddTriggers(t map[string]func(response interface{}) error) {
 	m.config.Triggers = t
 }
 
@@ -309,7 +341,12 @@ func (m *Mongo) Trigger(name string, detail interface{}) error {
 	}
 
 	if trigger, ok := m.config.Triggers[name]; ok {
-		return trigger(m, detail)
+		return trigger(TriggerResponse{
+			Driver:  m,
+			Config:  m.config,
+			Trigger: name,
+			Detail:  detail,
+		})
 	}
 
 	return nil
@@ -354,8 +391,14 @@ func (m *Mongo) ensureVersionTable() (err error) {
 	if err != nil {
 		return err
 	}
+	if err := m.Trigger(database.TrigVersionTablePre, nil); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger VersionTablePre"}
+	}
 	if _, _, err = m.Version(); err != nil {
 		return err
+	}
+	if err := m.Trigger(database.TrigVersionTablePost, nil); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger VersionTablePost"}
 	}
 	return nil
 }

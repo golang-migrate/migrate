@@ -40,7 +40,7 @@ type Config struct {
 	// MigrationsTable configures the migrations table name
 	MigrationsTable string
 
-	Triggers map[string]func(d database.Driver, detail interface{}) error
+	Triggers map[string]func(response interface{}) error
 }
 
 type Rqlite struct {
@@ -48,6 +48,13 @@ type Rqlite struct {
 	isLocked atomic.Bool
 
 	config *Config
+}
+
+type TriggerResponse struct {
+	Driver  *Rqlite
+	Config  *Config
+	Trigger string
+	Detail  interface{}
 }
 
 // WithInstance creates a rqlite database driver with an existing gorqlite database connection
@@ -99,6 +106,10 @@ func (r *Rqlite) ensureVersionTable() (err error) {
 		}
 	}()
 
+	if err := r.Trigger(database.TrigVersionTablePre, nil); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger VersionTablePre"}
+	}
+
 	stmts := []string{
 		fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s (version uint64, dirty bool)`, r.config.MigrationsTable),
 		fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS version_unique ON %s (version)`, r.config.MigrationsTable),
@@ -106,6 +117,10 @@ func (r *Rqlite) ensureVersionTable() (err error) {
 
 	if _, err := r.db.Write(stmts); err != nil {
 		return err
+	}
+
+	if err := r.Trigger(database.TrigVersionTablePost, nil); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger VersionTablePost"}
 	}
 
 	return nil
@@ -140,7 +155,7 @@ func (r *Rqlite) Close() error {
 	return nil
 }
 
-func (r *Rqlite) AddTriggers(t map[string]func(d database.Driver, detail interface{}) error) {
+func (r *Rqlite) AddTriggers(t map[string]func(response interface{}) error) {
 	r.config.Triggers = t
 }
 
@@ -150,7 +165,12 @@ func (r *Rqlite) Trigger(name string, detail interface{}) error {
 	}
 
 	if trigger, ok := r.config.Triggers[name]; ok {
-		return trigger(r, detail)
+		return trigger(TriggerResponse{
+			Driver:  r,
+			Config:  r.config,
+			Trigger: name,
+			Detail:  detail,
+		})
 	}
 
 	return nil
@@ -184,8 +204,18 @@ func (r *Rqlite) Run(migration io.Reader) error {
 	}
 
 	query := string(migr[:])
+	if err := r.Trigger(database.TrigRunPre, struct {
+		Query string
+	}{Query: query}); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger RunPre"}
+	}
 	if _, err := r.db.WriteOne(query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
+	}
+	if err := r.Trigger(database.TrigRunPost, struct {
+		Query string
+	}{Query: query}); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger RunPost"}
 	}
 
 	return nil
@@ -195,6 +225,13 @@ func (r *Rqlite) Run(migration io.Reader) error {
 // Migrate will call this function before and after each call to Run.
 // version must be >= -1. -1 means NilVersion.
 func (r *Rqlite) SetVersion(version int, dirty bool) error {
+	if err := r.Trigger(database.TrigSetVersionPre, struct {
+		Version int
+		Dirty   bool
+	}{Version: version, Dirty: dirty}); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger SetVersionPre"}
+	}
+
 	deleteQuery := fmt.Sprintf(`DELETE FROM %s`, r.config.MigrationsTable)
 	statements := []gorqlite.ParameterizedStatement{
 		{
@@ -226,6 +263,13 @@ func (r *Rqlite) SetVersion(version int, dirty bool) error {
 
 		// if somehow we're still here, return the original error with combined queries
 		return &database.Error{OrigErr: err, Query: []byte(deleteQuery + "\n" + insertQuery)}
+	}
+
+	if err := r.Trigger(database.TrigSetVersionPost, struct {
+		Version int
+		Dirty   bool
+	}{Version: version, Dirty: dirty}); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger SetVersionPost"}
 	}
 
 	return nil

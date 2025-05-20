@@ -53,7 +53,7 @@ type Config struct {
 	StatementTimeout      time.Duration
 	MultiStatementMaxSize int
 
-	Triggers map[string]func(d database.Driver, detail interface{}) error
+	Triggers map[string]func(response interface{}) error
 }
 
 type Postgres struct {
@@ -64,6 +64,13 @@ type Postgres struct {
 
 	// Open and WithInstance need to guarantee that config is never nil
 	config *Config
+}
+
+type TriggerResponse struct {
+	Driver  *Postgres
+	Config  *Config
+	Trigger string
+	Detail  interface{}
 }
 
 func WithConnection(ctx context.Context, conn *sql.Conn, config *Config) (*Postgres, error) {
@@ -232,7 +239,7 @@ func (p *Postgres) Close() error {
 	return nil
 }
 
-func (p *Postgres) AddTriggers(t map[string]func(d database.Driver, detail interface{}) error) {
+func (p *Postgres) AddTriggers(t map[string]func(response interface{}) error) {
 	p.config.Triggers = t
 }
 
@@ -242,7 +249,12 @@ func (p *Postgres) Trigger(name string, detail interface{}) error {
 	}
 
 	if trigger, ok := p.config.Triggers[name]; ok {
-		return trigger(p, detail)
+		return trigger(TriggerResponse{
+			Driver:  p,
+			Config:  p.config,
+			Trigger: name,
+			Detail:  detail,
+		})
 	}
 
 	return nil
@@ -285,7 +297,17 @@ func (p *Postgres) Run(migration io.Reader) error {
 	if p.config.MultiStatementEnabled {
 		var err error
 		if e := multistmt.Parse(migration, multiStmtDelimiter, p.config.MultiStatementMaxSize, func(m []byte) bool {
+			if e := p.Trigger(database.TrigRunPre, struct {
+				Query string
+			}{Query: string(m)}); e != nil {
+				return false
+			}
 			if err = p.runStatement(m); err != nil {
+				return false
+			}
+			if e := p.Trigger(database.TrigRunPost, struct {
+				Query string
+			}{Query: string(m)}); e != nil {
 				return false
 			}
 			return true
@@ -298,7 +320,20 @@ func (p *Postgres) Run(migration io.Reader) error {
 	if err != nil {
 		return err
 	}
-	return p.runStatement(migr)
+	if err = p.Trigger(database.TrigRunPre, struct {
+		Query string
+	}{Query: string(migr)}); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger RunPre"}
+	}
+	if err = p.runStatement(migr); err != nil {
+		return err
+	}
+	if err = p.Trigger(database.TrigRunPost, struct {
+		Query string
+	}{Query: string(migr)}); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger RunPost"}
+	}
+	return nil
 }
 
 func (p *Postgres) runStatement(statement []byte) error {
@@ -377,6 +412,16 @@ func (p *Postgres) SetVersion(version int, dirty bool) error {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
 	}
 
+	if err := p.Trigger(database.TrigSetVersionPre, struct {
+		Version int
+		Dirty   bool
+	}{Version: version, Dirty: dirty}); err != nil {
+		if errRollback := tx.Rollback(); errRollback != nil {
+			err = multierror.Append(err, errRollback)
+		}
+		return &database.Error{OrigErr: err, Err: "failed to trigger SetVersionPre"}
+	}
+
 	query := `TRUNCATE ` + pq.QuoteIdentifier(p.config.migrationsSchemaName) + `.` + pq.QuoteIdentifier(p.config.migrationsTableName)
 	if _, err := tx.Exec(query); err != nil {
 		if errRollback := tx.Rollback(); errRollback != nil {
@@ -396,6 +441,16 @@ func (p *Postgres) SetVersion(version int, dirty bool) error {
 			}
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
+	}
+
+	if err := p.Trigger(database.TrigSetVersionPost, struct {
+		Version int
+		Dirty   bool
+	}{Version: version, Dirty: dirty}); err != nil {
+		if errRollback := tx.Rollback(); errRollback != nil {
+			err = multierror.Append(err, errRollback)
+		}
+		return &database.Error{OrigErr: err, Err: "failed to trigger SetVersionPost"}
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -498,12 +553,23 @@ func (p *Postgres) ensureVersionTable() (err error) {
 	}
 
 	if count == 1 {
+		if err := p.Trigger(database.TrigVersionTableExists, nil); err != nil {
+			return &database.Error{OrigErr: err, Err: "failed to trigger VersionTableExists"}
+		}
 		return nil
+	}
+
+	if err := p.Trigger(database.TrigVersionTablePre, nil); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger VersionTablePre"}
 	}
 
 	query = `CREATE TABLE IF NOT EXISTS ` + pq.QuoteIdentifier(p.config.migrationsSchemaName) + `.` + pq.QuoteIdentifier(p.config.migrationsTableName) + ` (version bigint not null primary key, dirty boolean not null)`
 	if _, err = p.conn.ExecContext(context.Background(), query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
+	}
+
+	if err := p.Trigger(database.TrigVersionTablePost, nil); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger VersionTablePost"}
 	}
 
 	return nil

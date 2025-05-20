@@ -35,7 +35,14 @@ func (s *Stub) Open(url string) (database.Driver, error) {
 }
 
 type Config struct {
-	Triggers map[string]func(d database.Driver, detail interface{}) error
+	Triggers map[string]func(response interface{}) error
+}
+
+type TriggerResponse struct {
+	Driver  *Stub
+	Config  *Config
+	Trigger string
+	Detail  interface{}
 }
 
 func WithInstance(instance interface{}, config *Config) (database.Driver, error) {
@@ -51,7 +58,7 @@ func (s *Stub) Close() error {
 	return nil
 }
 
-func (s *Stub) AddTriggers(t map[string]func(d database.Driver, detail interface{}) error) {
+func (s *Stub) AddTriggers(t map[string]func(response interface{}) error) {
 	s.Config.Triggers = t
 }
 
@@ -61,7 +68,12 @@ func (s *Stub) Trigger(name string, detail interface{}) error {
 	}
 
 	if trigger, ok := s.Config.Triggers[name]; ok {
-		return trigger(s, detail)
+		return trigger(TriggerResponse{
+			Driver:  s,
+			Config:  s.Config,
+			Trigger: name,
+			Detail:  detail,
+		})
 	}
 
 	return nil

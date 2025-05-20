@@ -35,7 +35,7 @@ type Config struct {
 	MultiStatementEnabled bool
 	MultiStatementMaxSize int
 
-	Triggers map[string]func(d database.Driver, detail interface{}) error
+	Triggers map[string]func(response interface{}) error
 }
 
 func init() {
@@ -67,6 +67,13 @@ type ClickHouse struct {
 	conn     *sql.DB
 	config   *Config
 	isLocked atomic.Bool
+}
+
+type TriggerResponse struct {
+	Driver  *ClickHouse
+	Config  *Config
+	Trigger string
+	Detail  interface{}
 }
 
 func (ch *ClickHouse) Open(dsn string) (database.Driver, error) {
@@ -143,8 +150,20 @@ func (ch *ClickHouse) Run(r io.Reader) error {
 			if tq == "" {
 				return true
 			}
+			if e := ch.Trigger(database.TrigRunPre, struct {
+				Query string
+			}{Query: tq}); e != nil {
+				err = database.Error{OrigErr: e, Err: "failed to trigger RunPre"}
+				return false
+			}
 			if _, e := ch.conn.Exec(string(m)); e != nil {
 				err = database.Error{OrigErr: e, Err: "migration failed", Query: m}
+				return false
+			}
+			if e := ch.Trigger(database.TrigRunPost, struct {
+				Query string
+			}{Query: tq}); e != nil {
+				err = database.Error{OrigErr: e, Err: "failed to trigger RunPost"}
 				return false
 			}
 			return true
@@ -159,8 +178,20 @@ func (ch *ClickHouse) Run(r io.Reader) error {
 		return err
 	}
 
+	if err := ch.Trigger(database.TrigRunPre, struct {
+		Query string
+	}{Query: string(migration)}); err != nil {
+		return database.Error{OrigErr: err, Err: "failed to trigger RunPre"}
+	}
+
 	if _, err := ch.conn.Exec(string(migration)); err != nil {
 		return database.Error{OrigErr: err, Err: "migration failed", Query: migration}
+	}
+
+	if err := ch.Trigger(database.TrigRunPost, struct {
+		Query string
+	}{Query: string(migration)}); err != nil {
+		return database.Error{OrigErr: err, Err: "failed to trigger RunPost"}
 	}
 
 	return nil
@@ -182,7 +213,7 @@ func (ch *ClickHouse) Version() (int, bool, error) {
 
 func (ch *ClickHouse) SetVersion(version int, dirty bool) error {
 	var (
-		bool = func(v bool) uint8 {
+		booln = func(v bool) uint8 {
 			if v {
 				return 1
 			}
@@ -194,9 +225,23 @@ func (ch *ClickHouse) SetVersion(version int, dirty bool) error {
 		return err
 	}
 
+	if err := ch.Trigger(database.TrigSetVersionPre, struct {
+		Version int
+		Dirty   bool
+	}{Version: version, Dirty: dirty}); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger SetVersionPre"}
+	}
+
 	query := "INSERT INTO " + ch.config.MigrationsTable + " (version, dirty, sequence) VALUES (?, ?, ?)"
-	if _, err := tx.Exec(query, version, bool(dirty), time.Now().UnixNano()); err != nil {
+	if _, err := tx.Exec(query, version, booln(dirty), time.Now().UnixNano()); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
+	}
+
+	if err := ch.Trigger(database.TrigSetVersionPost, struct {
+		Version int
+		Dirty   bool
+	}{Version: version, Dirty: dirty}); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger SetVersionPost"}
 	}
 
 	return tx.Commit()
@@ -230,7 +275,14 @@ func (ch *ClickHouse) ensureVersionTable() (err error) {
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
 	} else {
+		if err := ch.Trigger(database.TrigVersionTableExists, nil); err != nil {
+			return &database.Error{OrigErr: err, Err: "failed to trigger VersionTableExists"}
+		}
 		return nil
+	}
+
+	if err := ch.Trigger(database.TrigVersionTablePre, nil); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger VersionTablePre"}
 	}
 
 	// if not, create the empty migration table
@@ -257,6 +309,11 @@ func (ch *ClickHouse) ensureVersionTable() (err error) {
 	if _, err := ch.conn.Exec(query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
+
+	if err := ch.Trigger(database.TrigVersionTablePost, nil); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger VersionTablePost"}
+	}
+
 	return nil
 }
 
@@ -308,7 +365,7 @@ func (ch *ClickHouse) Unlock() error {
 }
 func (ch *ClickHouse) Close() error { return ch.conn.Close() }
 
-func (ch *ClickHouse) AddTriggers(t map[string]func(d database.Driver, detail interface{}) error) {
+func (ch *ClickHouse) AddTriggers(t map[string]func(response interface{}) error) {
 	ch.config.Triggers = t
 }
 
@@ -318,7 +375,12 @@ func (ch *ClickHouse) Trigger(name string, detail interface{}) error {
 	}
 
 	if trigger, ok := ch.config.Triggers[name]; ok {
-		return trigger(ch, detail)
+		return trigger(TriggerResponse{
+			Driver:  ch,
+			Config:  ch.config,
+			Trigger: name,
+			Detail:  detail,
+		})
 	}
 
 	return nil

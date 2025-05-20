@@ -32,7 +32,7 @@ type Config struct {
 	DatabaseName    string
 	MigrationsTable string
 
-	Triggers map[string]func(d database.Driver, detail interface{}) error
+	Triggers map[string]func(response interface{}) error
 }
 
 type Firebird struct {
@@ -43,6 +43,13 @@ type Firebird struct {
 
 	// Open and WithInstance need to guarantee that config is never nil
 	config *Config
+}
+
+type TriggerResponse struct {
+	Driver  *Firebird
+	Config  *Config
+	Trigger string
+	Detail  interface{}
 }
 
 func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
@@ -108,7 +115,7 @@ func (f *Firebird) Close() error {
 	return nil
 }
 
-func (f *Firebird) AddTriggers(t map[string]func(d database.Driver, detail interface{}) error) {
+func (f *Firebird) AddTriggers(t map[string]func(response interface{}) error) {
 	f.config.Triggers = t
 }
 
@@ -118,7 +125,12 @@ func (f *Firebird) Trigger(name string, detail interface{}) error {
 	}
 
 	if trigger, ok := f.config.Triggers[name]; ok {
-		return trigger(f, detail)
+		return trigger(TriggerResponse{
+			Driver:  f,
+			Config:  f.config,
+			Trigger: name,
+			Detail:  detail,
+		})
 	}
 
 	return nil
@@ -146,8 +158,18 @@ func (f *Firebird) Run(migration io.Reader) error {
 
 	// run migration
 	query := string(migr[:])
+	if err := f.Trigger(database.TrigRunPre, struct {
+		Query string
+	}{Query: query}); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger RunPre"}
+	}
 	if _, err := f.conn.ExecContext(context.Background(), query); err != nil {
 		return database.Error{OrigErr: err, Err: "migration failed", Query: migr}
+	}
+	if err := f.Trigger(database.TrigRunPost, struct {
+		Query string
+	}{Query: query}); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger RunPost"}
 	}
 
 	return nil
@@ -157,6 +179,13 @@ func (f *Firebird) SetVersion(version int, dirty bool) error {
 	// Always re-write the schema version to prevent empty schema version
 	// for failed down migration on the first migration
 	// See: https://github.com/golang-migrate/migrate/issues/330
+
+	if err := f.Trigger(database.TrigSetVersionPre, struct {
+		Version int
+		Dirty   bool
+	}{Version: version, Dirty: dirty}); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger SetVersionPre"}
+	}
 
 	// TODO: parameterize this SQL statement
 	//       https://firebirdsql.org/refdocs/langrefupd20-execblock.html
@@ -169,6 +198,13 @@ func (f *Firebird) SetVersion(version int, dirty bool) error {
 
 	if _, err := f.conn.ExecContext(context.Background(), query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
+	}
+
+	if err := f.Trigger(database.TrigSetVersionPost, struct {
+		Version int
+		Dirty   bool
+	}{Version: version, Dirty: dirty}); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger SetVersionPost"}
 	}
 
 	return nil
@@ -249,6 +285,10 @@ func (f *Firebird) ensureVersionTable() (err error) {
 		}
 	}()
 
+	if err := f.Trigger(database.TrigVersionTablePre, nil); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger VersionTablePre"}
+	}
+
 	query := fmt.Sprintf(`EXECUTE BLOCK AS BEGIN
 			if (not exists(select 1 from rdb$relations where rdb$relation_name = '%v')) then
 			execute statement 'create table "%v" (version bigint not null primary key, dirty smallint not null)';
@@ -257,6 +297,10 @@ func (f *Firebird) ensureVersionTable() (err error) {
 
 	if _, err = f.conn.ExecContext(context.Background(), query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
+	}
+
+	if err := f.Trigger(database.TrigVersionTablePost, nil); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger VersionTablePost"}
 	}
 
 	return nil

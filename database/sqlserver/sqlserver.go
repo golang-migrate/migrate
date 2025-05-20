@@ -46,7 +46,7 @@ type Config struct {
 	DatabaseName    string
 	SchemaName      string
 
-	Triggers map[string]func(d database.Driver, detail interface{}) error
+	Triggers map[string]func(response interface{}) error
 }
 
 // SQL Server connection
@@ -58,6 +58,13 @@ type SQLServer struct {
 
 	// Open and WithInstance need to garantuee that config is never nil
 	config *Config
+}
+
+type TriggerResponse struct {
+	Driver  *SQLServer
+	Config  *Config
+	Trigger string
+	Detail  interface{}
 }
 
 // WithInstance returns a database instance from an already created database connection.
@@ -192,7 +199,7 @@ func (ss *SQLServer) Close() error {
 	return nil
 }
 
-func (ss *SQLServer) AddTriggers(t map[string]func(d database.Driver, detail interface{}) error) {
+func (ss *SQLServer) AddTriggers(t map[string]func(response interface{}) error) {
 	ss.config.Triggers = t
 }
 
@@ -202,7 +209,12 @@ func (ss *SQLServer) Trigger(name string, detail interface{}) error {
 	}
 
 	if trigger, ok := ss.config.Triggers[name]; ok {
-		return trigger(ss, detail)
+		return trigger(TriggerResponse{
+			Driver:  ss,
+			Config:  ss.config,
+			Trigger: name,
+			Detail:  detail,
+		})
 	}
 
 	return nil
@@ -265,6 +277,11 @@ func (ss *SQLServer) Run(migration io.Reader) error {
 
 	// run migration
 	query := string(migr[:])
+	if err := ss.Trigger(database.TrigRunPre, struct {
+		Query string
+	}{Query: query}); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger RunPre"}
+	}
 	if _, err := ss.conn.ExecContext(context.Background(), query); err != nil {
 		if msErr, ok := err.(mssql.Error); ok {
 			message := fmt.Sprintf("migration failed: %s", msErr.Message)
@@ -274,6 +291,11 @@ func (ss *SQLServer) Run(migration io.Reader) error {
 			return database.Error{OrigErr: err, Err: message, Query: migr, Line: uint(msErr.LineNo)}
 		}
 		return database.Error{OrigErr: err, Err: "migration failed", Query: migr}
+	}
+	if err := ss.Trigger(database.TrigRunPost, struct {
+		Query string
+	}{Query: query}); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger RunPost"}
 	}
 
 	return nil
@@ -285,6 +307,16 @@ func (ss *SQLServer) SetVersion(version int, dirty bool) error {
 	tx, err := ss.conn.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
+	}
+
+	if err := ss.Trigger(database.TrigSetVersionPre, struct {
+		Version int
+		Dirty   bool
+	}{Version: version, Dirty: dirty}); err != nil {
+		if errRollback := tx.Rollback(); errRollback != nil {
+			err = multierror.Append(err, errRollback)
+		}
+		return &database.Error{OrigErr: err, Err: "failed to trigger SetVersionPre"}
 	}
 
 	query := `TRUNCATE TABLE ` + ss.getMigrationTable()
@@ -310,6 +342,16 @@ func (ss *SQLServer) SetVersion(version int, dirty bool) error {
 			}
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
+	}
+
+	if err := ss.Trigger(database.TrigSetVersionPost, struct {
+		Version int
+		Dirty   bool
+	}{Version: version, Dirty: dirty}); err != nil {
+		if errRollback := tx.Rollback(); errRollback != nil {
+			err = multierror.Append(err, errRollback)
+		}
+		return &database.Error{OrigErr: err, Err: "failed to trigger SetVersionPost"}
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -386,6 +428,10 @@ func (ss *SQLServer) ensureVersionTable() (err error) {
 		}
 	}()
 
+	if err := ss.Trigger(database.TrigVersionTablePre, nil); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger VersionTablePre"}
+	}
+
 	query := `IF NOT EXISTS
 	(SELECT *
 		 FROM sysobjects
@@ -396,6 +442,10 @@ func (ss *SQLServer) ensureVersionTable() (err error) {
 
 	if _, err = ss.conn.ExecContext(context.Background(), query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
+	}
+
+	if err := ss.Trigger(database.TrigVersionTablePost, nil); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger VersionTablePost"}
 	}
 
 	return nil

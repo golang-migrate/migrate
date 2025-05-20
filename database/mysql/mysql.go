@@ -48,11 +48,10 @@ type Config struct {
 }
 
 type TriggerResponse struct {
-	Driver     *Mysql
-	Config     *Config
-	Connection *sql.Conn
-	Trigger    string
-	Detail     interface{}
+	Driver  *Mysql
+	Config  *Config
+	Trigger string
+	Detail  interface{}
 }
 
 type Mysql struct {
