@@ -44,7 +44,15 @@ type Config struct {
 	NoLock           bool
 	StatementTimeout time.Duration
 
-	Triggers map[string]func(d database.Driver, detail interface{}) error
+	Triggers map[string]func(response interface{}) error
+}
+
+type TriggerResponse struct {
+	Driver     *Mysql
+	Config     *Config
+	Connection *sql.Conn
+	Trigger    string
+	Detail     interface{}
 }
 
 type Mysql struct {
@@ -285,7 +293,7 @@ func (m *Mysql) Close() error {
 	return nil
 }
 
-func (m *Mysql) AddTriggers(t map[string]func(d database.Driver, detail interface{}) error) {
+func (m *Mysql) AddTriggers(t map[string]func(response interface{}) error) {
 	m.config.Triggers = t
 }
 
@@ -295,7 +303,12 @@ func (m *Mysql) Trigger(name string, detail interface{}) error {
 	}
 
 	if trigger, ok := m.config.Triggers[name]; ok {
-		return trigger(m, detail)
+		return trigger(TriggerResponse{
+			Driver:  m,
+			Config:  m.config,
+			Trigger: name,
+			Detail:  detail,
+		})
 	}
 
 	return nil
@@ -365,13 +378,17 @@ func (m *Mysql) Run(migration io.Reader) error {
 	}
 
 	query := string(migr[:])
-	if err := m.Trigger(database.TrigRunPre, struct{ Query string }{Query: query}); err != nil {
+	if err := m.Trigger(database.TrigRunPre, struct {
+		Query string
+	}{Query: query}); err != nil {
 		return &database.Error{OrigErr: err, Err: "failed to trigger RunPre"}
 	}
 	if _, err := m.conn.ExecContext(ctx, query); err != nil {
 		return database.Error{OrigErr: err, Err: "migration failed", Query: migr}
 	}
-	if err := m.Trigger(database.TrigRunPost, struct{ Query string }{Query: query}); err != nil {
+	if err := m.Trigger(database.TrigRunPost, struct {
+		Query string
+	}{Query: query}); err != nil {
 		return &database.Error{OrigErr: err, Err: "failed to trigger RunPost"}
 	}
 

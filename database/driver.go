@@ -61,7 +61,7 @@ type Driver interface {
 	Close() error
 
 	// AddTriggers adds triggers to the database. The map key is the trigger name
-	AddTriggers(t map[string]func(m Driver, detail interface{}) error)
+	AddTriggers(t map[string]func(response interface{}) error)
 
 	// Trigger is called when a trigger is fired. The name is the trigger name
 	// and detail is the trigger detail.

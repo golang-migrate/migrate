@@ -86,7 +86,7 @@ type Migrate struct {
 	// but can be set per Migrate instance.
 	LockTimeout time.Duration
 
-	Triggers map[string]func(m *Migrate, detail interface{}) error
+	Triggers map[string]func(response TriggerResponse) error
 }
 
 type Options struct {
@@ -113,8 +113,13 @@ type Options struct {
 
 	// Triggers - these can be used to execute arbitrary code to meet any additional
 	// requirements that may be needed (i.e. some people need a history of migrations)
-	MigrateTriggers  map[string]func(m *Migrate, detail interface{}) error
-	DatabaseTriggers map[string]func(d database.Driver, detail interface{}) error
+	MigrateTriggers  map[string]func(response TriggerResponse) error
+	DatabaseTriggers map[string]func(response interface{}) error
+}
+
+type TriggerResponse struct {
+	Trigger string
+	Detail  interface{}
 }
 
 // NewFromOptions returns a new Migrate instance from the options provided.
@@ -224,7 +229,10 @@ func (m *Migrate) Trigger(name string, detail interface{}) error {
 	}
 
 	if trigger, ok := m.Triggers[name]; ok {
-		return trigger(m, detail)
+		return trigger(TriggerResponse{
+			Trigger: name,
+			Detail:  detail,
+		})
 	}
 
 	return nil
