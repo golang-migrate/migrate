@@ -6,20 +6,22 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"log/slog"
 	nurl "net/url"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"cloud.google.com/go/spanner"
 	sdb "cloud.google.com/go/spanner/admin/database/apiv1"
-	"cloud.google.com/go/spanner/spansql"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
+	"github.com/golang-migrate/migrate/v4/database/spanner/ddl"
 
+	"cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
 	adminpb "cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
 	"github.com/hashicorp/go-multierror"
+	"github.com/samber/lo"
 	uatomic "go.uber.org/atomic"
 	"google.golang.org/api/iterator"
 )
@@ -51,11 +53,6 @@ var (
 type Config struct {
 	MigrationsTable string
 	DatabaseName    string
-	// Whether to parse the migration DDL with spansql before
-	// running them towards Spanner.
-	// Parsing outputs clean DDL statements such as reformatted
-	// and void of comments.
-	CleanStatements bool
 }
 
 // Spanner implements database.Driver for Google Cloud Spanner
@@ -127,20 +124,10 @@ func (s *Spanner) Open(url string) (database.Driver, error) {
 
 	migrationsTable := purl.Query().Get("x-migrations-table")
 
-	cleanQuery := purl.Query().Get("x-clean-statements")
-	clean := false
-	if cleanQuery != "" {
-		clean, err = strconv.ParseBool(cleanQuery)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	db := &DB{admin: adminClient, data: dataClient}
 	return WithInstance(db, &Config{
 		DatabaseName:    dbname,
 		MigrationsTable: migrationsTable,
-		CleanStatements: clean,
 	})
 }
 
@@ -174,26 +161,30 @@ func (s *Spanner) Run(migration io.Reader) error {
 		return err
 	}
 
-	stmts := []string{string(migr)}
-	if s.config.CleanStatements {
-		stmts, err = cleanStatements(migr)
-		if err != nil {
-			return err
-		}
+	stmts, err := ddl.ToMigrationStatements("", string(migr))
+	if err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to cleanup statements", Query: migr}
 	}
 
 	ctx := context.Background()
-	op, err := s.db.admin.UpdateDatabaseDdl(ctx, &adminpb.UpdateDatabaseDdlRequest{
-		Database:   s.config.DatabaseName,
-		Statements: stmts,
-	})
 
-	if err != nil {
-		return &database.Error{OrigErr: err, Err: "migration failed", Query: migr}
-	}
+	// Because the statements limit is 10, we have to chunk the statements.
+	for i, chunk := range lo.Chunk(stmts, 10) {
+		// The migration is usually very slow, some can take 10 more minutes to run.
+		// Print some progress so that it doesn't look like the process is stuck.
+		slog.InfoContext(ctx, "spanner db migration progress", "progress", i*10+len(chunk), "total", len(stmts))
 
-	if err := op.Wait(ctx); err != nil {
-		return &database.Error{OrigErr: err, Err: "migration failed", Query: migr}
+		op, err := s.db.admin.UpdateDatabaseDdl(ctx, &databasepb.UpdateDatabaseDdlRequest{
+			Database:   s.config.DatabaseName,
+			Statements: chunk,
+		})
+		if err != nil {
+			return &database.Error{OrigErr: err, Err: "failed to update spanner db ddl", Query: []byte(strings.Join(chunk, "; "))}
+		}
+
+		if err := op.Wait(ctx); err != nil {
+			return &database.Error{OrigErr: err, Err: "failed to wait for spanner db ddl update", Query: []byte(strings.Join(chunk, "; "))}
+		}
 	}
 
 	return nil
@@ -338,19 +329,4 @@ func (s *Spanner) ensureVersionTable() (err error) {
 	}
 
 	return nil
-}
-
-func cleanStatements(migration []byte) ([]string, error) {
-	// The Spanner GCP backend does not yet support comments for the UpdateDatabaseDdl RPC
-	// (see https://issuetracker.google.com/issues/159730604) we use
-	// spansql to parse the DDL and output valid stamements without comments
-	ddl, err := spansql.ParseDDL("", string(migration))
-	if err != nil {
-		return nil, err
-	}
-	stmts := make([]string, 0, len(ddl.List))
-	for _, stmt := range ddl.List {
-		stmts = append(stmts, stmt.SQL())
-	}
-	return stmts, nil
 }
