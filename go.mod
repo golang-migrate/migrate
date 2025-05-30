@@ -7,6 +7,7 @@ require (
 	cloud.google.com/go/storage v1.38.0
 	github.com/Azure/go-autorest/autorest/adal v0.9.16
 	github.com/ClickHouse/clickhouse-go v1.4.3
+	github.com/alecthomas/participle/v2 v2.1.4
 	github.com/aws/aws-sdk-go v1.49.6
 	github.com/cenkalti/backoff/v4 v4.1.2
 	github.com/cockroachdb/cockroach-go/v2 v2.1.1
@@ -33,6 +34,7 @@ require (
 	github.com/snowflakedb/gosnowflake v1.6.19
 	github.com/stretchr/testify v1.9.0
 	github.com/xanzy/go-gitlab v0.15.0
+	github.com/ysmood/got v0.41.0
 	go.mongodb.org/mongo-driver v1.7.5
 	go.uber.org/atomic v1.7.0
 	golang.org/x/oauth2 v0.18.0
@@ -56,6 +58,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/rogpeppe/go-internal v1.12.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
+	github.com/ysmood/gop v0.2.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.49.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.54.0 // indirect
 	go.opentelemetry.io/otel v1.29.0 // indirect
