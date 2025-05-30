@@ -6,12 +6,18 @@ import (
 )
 
 func ToMigrationStatements(path, ddl string) ([]string, error) {
-	_, err := parser.ParseString(path, ddl)
+	parsed, err := parser.ParseString(path, ddl)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse DDL: %w", err)
 	}
 
-	return nil, nil
+	list := []string{}
+
+	for _, statement := range parsed.Statements {
+		list = append(list, strings.TrimRight(statement.String(), ";"))
+	}
+
+	return list, nil
 }
 
 func (d *SpannerDDL) String() string {

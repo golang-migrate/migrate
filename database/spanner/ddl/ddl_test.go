@@ -30,3 +30,19 @@ func TestBasic(t *testing.T) {
 
 	g.Snapshot("ddl-string", ddl.String())
 }
+
+func TestToMigrationStatements(t *testing.T) {
+	g := got.T(t)
+
+	list, err := ToMigrationStatements("", `
+		-- Comment
+		CREATE TABLE test(id INT64);
+
+		CREATE PROPERTY GRAPH SocialGraph
+		NODE TABLES (Person)
+		EDGE TABLES (Knows);
+	`)
+	g.E(err)
+
+	g.Snapshot("list", list)
+}

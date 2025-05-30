@@ -1,0 +1,4 @@
+[
+  "CREATE TABLE test (id INT64)",
+  "CREATE PROPERTY GRAPH SocialGraph NODE TABLES (Person) EDGE TABLES (Knows)"
+]
