@@ -28,3 +28,6 @@ issues:
   exclude:
     # gosec: Duplicated errcheck checks
     - G104
+    - bad syntax for struct tag pair
+    - struct literal uses unkeyed fields
+    - bad syntax for struct tag key

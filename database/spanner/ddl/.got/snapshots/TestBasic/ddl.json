@@ -1,0 +1,133 @@
+{
+  "Statements": [
+    {
+      "Expression": {
+        "Values": [
+          {
+            "Component": ["A", "B"],
+            "Braced": null,
+            "Bracketed": null
+          }
+        ]
+      },
+      "End": ";"
+    },
+    {
+      "Expression": {
+        "Values": [
+          {
+            "Component": ["A"],
+            "Braced": null,
+            "Bracketed": null
+          }
+        ]
+      },
+      "End": ";"
+    },
+    {
+      "Expression": {
+        "Values": [
+          {
+            "Component": ["A"],
+            "Braced": null,
+            "Bracketed": null
+          },
+          {
+            "Component": null,
+            "Braced": {
+              "Values": [
+                {
+                  "Component": ["B", "C"],
+                  "Braced": null,
+                  "Bracketed": null
+                }
+              ]
+            },
+            "Bracketed": null
+          }
+        ]
+      },
+      "End": ";"
+    },
+    {
+      "Expression": {
+        "Values": [
+          {
+            "Component": ["A", "\"B\""],
+            "Braced": null,
+            "Bracketed": null
+          }
+        ]
+      },
+      "End": ";"
+    },
+    {
+      "Expression": {
+        "Values": [
+          {
+            "Component": ["A"],
+            "Braced": null,
+            "Bracketed": null
+          },
+          {
+            "Component": null,
+            "Braced": null,
+            "Bracketed": {
+              "Values": [
+                {
+                  "Component": ["B", ",", "C"],
+                  "Braced": null,
+                  "Bracketed": null
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "End": ";"
+    },
+    {
+      "Expression": {
+        "Values": [
+          {
+            "Component": ["A", "B", ",", "A"],
+            "Braced": null,
+            "Bracketed": null
+          },
+          {
+            "Component": null,
+            "Braced": {
+              "Values": [
+                {
+                  "Component": ["B"],
+                  "Braced": null,
+                  "Bracketed": null
+                },
+                {
+                  "Component": null,
+                  "Braced": {
+                    "Values": [
+                      {
+                        "Component": ["C", "D"],
+                        "Braced": null,
+                        "Bracketed": null
+                      }
+                    ]
+                  },
+                  "Bracketed": null
+                }
+              ]
+            },
+            "Bracketed": null
+          },
+          {
+            "Component": ["E"],
+            "Braced": null,
+            "Bracketed": null
+          }
+        ]
+      },
+      "End": ""
+    }
+  ]
+}
