@@ -13,15 +13,14 @@ import (
 
 	"cloud.google.com/go/spanner"
 	sdb "cloud.google.com/go/spanner/admin/database/apiv1"
-	"cloud.google.com/go/spanner/spansql"
-
-	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database"
-
 	adminpb "cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
+	"github.com/cloudspannerecosystem/memefish"
 	"github.com/hashicorp/go-multierror"
 	uatomic "go.uber.org/atomic"
 	"google.golang.org/api/iterator"
+
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database"
 )
 
 func init() {
@@ -51,7 +50,7 @@ var (
 type Config struct {
 	MigrationsTable string
 	DatabaseName    string
-	// Whether to parse the migration DDL with spansql before
+	// Whether to parse the migration DDL with memefish before
 	// running them towards Spanner.
 	// Parsing outputs clean DDL statements such as reformatted
 	// and void of comments.
@@ -343,13 +342,13 @@ func (s *Spanner) ensureVersionTable() (err error) {
 func cleanStatements(migration []byte) ([]string, error) {
 	// The Spanner GCP backend does not yet support comments for the UpdateDatabaseDdl RPC
 	// (see https://issuetracker.google.com/issues/159730604) we use
-	// spansql to parse the DDL and output valid stamements without comments
-	ddl, err := spansql.ParseDDL("", string(migration))
+	// memefish to parse the SQL statements and output valid stamements without comments
+	astStmts, err := memefish.ParseStatements("", string(migration))
 	if err != nil {
 		return nil, err
 	}
-	stmts := make([]string, 0, len(ddl.List))
-	for _, stmt := range ddl.List {
+	stmts := make([]string, 0, len(astStmts))
+	for _, stmt := range astStmts {
 		stmts = append(stmts, stmt.SQL())
 	}
 	return stmts, nil
