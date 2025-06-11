@@ -106,7 +106,10 @@ func TestEmbed_ReadUpDown(t *testing.T) {
 	if len(b) == 0 {
 		t.Fatal("expected file content")
 	}
-	r.Close()
+	err = r.Close()
+	if err != nil {
+		t.Fatalf("failed to close reader: %v", err)
+	}
 
 	// Down migration may not exist for first, so test with next if available
 	next, _ := driver.Next(first)
@@ -115,7 +118,10 @@ func TestEmbed_ReadUpDown(t *testing.T) {
 		if rd == nil || idd == "" {
 			t.Fatal("expected valid reader and identifier for down")
 		}
-		rd.Close()
+		err = rd.Close()
+		if err != nil {
+			t.Fatalf("failed to close reader: %v", err)
+		}
 	}
 }
 
