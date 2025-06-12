@@ -15,11 +15,11 @@ COPY . ./
 
 RUN make build-docker
 
-FROM alpine:latest
+FROM scratch
 
 COPY --from=builder /go/src/github.com/infobloxopen/migrate/cmd/migrate/config /cli/config/
-COPY --from=builder /go/src/github.com/infobloxopen/migrate/build/migrate.linux-386 /usr/local/bin/migrate
-RUN ln -s /usr/local/bin/migrate /migrate
+COPY --from=builder /go/src/github.com/infobloxopen/migrate/build/migrate.linux-386 /migrate
+COPY --from=builder /etc/ssl/certs/ /etc/ssl/certs/
 
 ENTRYPOINT ["migrate"]
 CMD ["--help"]
