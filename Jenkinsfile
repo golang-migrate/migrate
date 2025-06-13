@@ -32,11 +32,6 @@ pipeline {
       }
     }
     stage("Build Image") {
-      // only build images on trunk builds. An alternate approach
-      // when { branch 'main' } or when { anyOf { branch "main", branch "develop", "ib" } }
-      when {
-        expression { ! isPrBuild() }
-      }
       steps {
         withDockerRegistry([credentialsId: "${env.JENKINS_DOCKER_CRED_ID}", url: ""]) {
           dir("$DIRECTORY") {

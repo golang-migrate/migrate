@@ -6,6 +6,7 @@ RUN apk add --no-cache git gcc musl-dev make
 WORKDIR /go/src/github.com/infobloxopen/migrate
 
 ENV GO111MODULE=on
+ENV GOFLAGS=""
 
 COPY go.mod go.sum ./
 
