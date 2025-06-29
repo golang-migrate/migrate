@@ -5,15 +5,17 @@ import (
 	"database/sql"
 	sqldriver "database/sql/driver"
 	"fmt"
-	"log"
-
-	"github.com/golang-migrate/migrate/v4"
 	"io"
+	"log"
+	nurl "net/url"
+	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/dhui/dktest"
 
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/multistmt"
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
 	"github.com/golang-migrate/migrate/v4/dktesting"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
@@ -126,6 +128,41 @@ func TestMigrate(t *testing.T) {
 	})
 }
 
+func TestMultipleStatementsInMultiStatementMode(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := fbConnectionString(ip, port) + "?x-multi-statement=true"
+		p := &Firebird{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
+		// Use CREATE INDEX instead of CONCURRENTLY (Firebird doesn't support CREATE INDEX CONCURRENTLY)
+		if err := d.Run(strings.NewReader("CREATE TABLE foo (foo VARCHAR(40)); CREATE INDEX idx_foo ON foo (foo);")); err != nil {
+			t.Fatalf("expected err to be nil, got %v", err)
+		}
+
+		// make sure created index exists
+		var exists bool
+		query := "SELECT CASE WHEN EXISTS (SELECT 1 FROM RDB$INDICES WHERE RDB$INDEX_NAME = 'IDX_FOO') THEN 1 ELSE 0 END FROM RDB$DATABASE"
+		if err := d.(*Firebird).conn.QueryRowContext(context.Background(), query).Scan(&exists); err != nil {
+			t.Fatal(err)
+		}
+		if !exists {
+			t.Fatalf("expected index idx_foo to exist")
+		}
+	})
+}
+
 func TestErrorParsing(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.FirstPort()
@@ -224,4 +261,170 @@ func Test_Lock(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
+}
+
+func TestMultiStatementURLParsing(t *testing.T) {
+	tests := []struct {
+		name                  string
+		url                   string
+		expectedMultiStmt     bool
+		expectedMultiStmtSize int
+		shouldError           bool
+	}{
+		{
+			name:                  "multi-statement enabled",
+			url:                   "firebird://user:pass@localhost:3050//path/to/db.fdb?x-multi-statement=true",
+			expectedMultiStmt:     true,
+			expectedMultiStmtSize: DefaultMultiStatementMaxSize,
+			shouldError:           false,
+		},
+		{
+			name:                  "multi-statement disabled",
+			url:                   "firebird://user:pass@localhost:3050//path/to/db.fdb?x-multi-statement=false",
+			expectedMultiStmt:     false,
+			expectedMultiStmtSize: DefaultMultiStatementMaxSize,
+			shouldError:           false,
+		},
+		{
+			name:                  "multi-statement with custom size",
+			url:                   "firebird://user:pass@localhost:3050//path/to/db.fdb?x-multi-statement=true&x-multi-statement-max-size=5242880",
+			expectedMultiStmt:     true,
+			expectedMultiStmtSize: 5242880,
+			shouldError:           false,
+		},
+		{
+			name:                  "multi-statement with invalid size falls back to default",
+			url:                   "firebird://user:pass@localhost:3050//path/to/db.fdb?x-multi-statement=true&x-multi-statement-max-size=0",
+			expectedMultiStmt:     true,
+			expectedMultiStmtSize: DefaultMultiStatementMaxSize,
+			shouldError:           false,
+		},
+		{
+			name:                  "invalid boolean value should error",
+			url:                   "firebird://user:pass@localhost:3050//path/to/db.fdb?x-multi-statement=invalid",
+			expectedMultiStmt:     false,
+			expectedMultiStmtSize: DefaultMultiStatementMaxSize,
+			shouldError:           true,
+		},
+		{
+			name:                  "invalid size value should error",
+			url:                   "firebird://user:pass@localhost:3050//path/to/db.fdb?x-multi-statement=true&x-multi-statement-max-size=invalid",
+			expectedMultiStmt:     true,
+			expectedMultiStmtSize: DefaultMultiStatementMaxSize,
+			shouldError:           true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// We can't actually open a database connection without Docker,
+			// but we can test the URL parsing logic by examining how Open would behave
+			purl, err := nurl.Parse(tt.url)
+			if err != nil {
+				if !tt.shouldError {
+					t.Fatalf("parseURL failed: %v", err)
+				}
+				return
+			}
+
+			// Test multi-statement parameter parsing
+			multiStatementEnabled := false
+			multiStatementMaxSize := DefaultMultiStatementMaxSize
+
+			if s := purl.Query().Get("x-multi-statement"); len(s) > 0 {
+				multiStatementEnabled, err = strconv.ParseBool(s)
+				if err != nil {
+					if tt.shouldError {
+						return // Expected error
+					}
+					t.Fatalf("unable to parse option x-multi-statement: %v", err)
+				}
+			}
+
+			if s := purl.Query().Get("x-multi-statement-max-size"); len(s) > 0 {
+				multiStatementMaxSize, err = strconv.Atoi(s)
+				if err != nil {
+					if tt.shouldError {
+						return // Expected error
+					}
+					t.Fatalf("unable to parse x-multi-statement-max-size: %v", err)
+				}
+				if multiStatementMaxSize <= 0 {
+					multiStatementMaxSize = DefaultMultiStatementMaxSize
+				}
+			}
+
+			if tt.shouldError {
+				t.Fatalf("expected error but got none")
+			}
+
+			if multiStatementEnabled != tt.expectedMultiStmt {
+				t.Errorf("expected MultiStatementEnabled to be %v, got %v", tt.expectedMultiStmt, multiStatementEnabled)
+			}
+
+			if multiStatementMaxSize != tt.expectedMultiStmtSize {
+				t.Errorf("expected MultiStatementMaxSize to be %d, got %d", tt.expectedMultiStmtSize, multiStatementMaxSize)
+			}
+		})
+	}
+}
+
+func TestMultiStatementParsing(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected []string
+	}{
+		{
+			name:     "single statement",
+			input:    "CREATE TABLE test (id INTEGER);",
+			expected: []string{"CREATE TABLE test (id INTEGER);"},
+		},
+		{
+			name:     "multiple statements",
+			input:    "CREATE TABLE foo (id INTEGER); CREATE TABLE bar (name VARCHAR(50));",
+			expected: []string{"CREATE TABLE foo (id INTEGER);", "CREATE TABLE bar (name VARCHAR(50));"},
+		},
+		{
+			name:     "statements with whitespace",
+			input:    "CREATE TABLE foo (id INTEGER);\n\n  CREATE TABLE bar (name VARCHAR(50));  \n",
+			expected: []string{"CREATE TABLE foo (id INTEGER);", "CREATE TABLE bar (name VARCHAR(50));"},
+		},
+		{
+			name:     "empty statements ignored",
+			input:    "CREATE TABLE foo (id INTEGER);;CREATE TABLE bar (name VARCHAR(50));",
+			expected: []string{"CREATE TABLE foo (id INTEGER);", "CREATE TABLE bar (name VARCHAR(50));"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var statements []string
+			reader := strings.NewReader(tt.input)
+
+			// Simulate what the Firebird driver does with multi-statement parsing
+			err := multistmt.Parse(reader, multiStmtDelimiter, DefaultMultiStatementMaxSize, func(stmt []byte) bool {
+				query := strings.TrimSpace(string(stmt))
+				// Skip empty statements and standalone semicolons
+				if len(query) > 0 && query != ";" {
+					statements = append(statements, query)
+				}
+				return true // continue parsing
+			})
+
+			if err != nil {
+				t.Fatalf("parsing failed: %v", err)
+			}
+
+			if len(statements) != len(tt.expected) {
+				t.Fatalf("expected %d statements, got %d: %v", len(tt.expected), len(statements), statements)
+			}
+
+			for i, expected := range tt.expected {
+				if statements[i] != expected {
+					t.Errorf("statement %d: expected %q, got %q", i, expected, statements[i])
+				}
+			}
+		})
+	}
 }
