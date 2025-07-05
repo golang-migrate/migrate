@@ -3,7 +3,6 @@ package victoria
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -13,6 +12,12 @@ import (
 	"time"
 
 	"github.com/golang-migrate/migrate/v4/database"
+)
+
+// Define error constants if they don't exist in the database package
+var (
+	ErrLocked = errors.New("database is locked")
+	ErrClosed = errors.New("database connection is closed")
 )
 
 func init() {
@@ -110,7 +115,7 @@ func (v *Victoria) Close() error {
 // Lock acquires a database lock (no-op for VictoriaMetrics)
 func (v *Victoria) Lock() error {
 	if !v.isOpen {
-		return database.ErrLocked
+		return ErrLocked
 	}
 	v.isLocked = true
 	return nil
@@ -119,7 +124,7 @@ func (v *Victoria) Lock() error {
 // Unlock releases a database lock (no-op for VictoriaMetrics)
 func (v *Victoria) Unlock() error {
 	if !v.isOpen {
-		return database.ErrLocked
+		return ErrLocked
 	}
 	v.isLocked = false
 	return nil
@@ -128,16 +133,16 @@ func (v *Victoria) Unlock() error {
 // Run executes a migration by importing data into VictoriaMetrics
 func (v *Victoria) Run(migration io.Reader) error {
 	if !v.isOpen {
-		return database.ErrClosed
+		return ErrClosed
 	}
 
 	if !v.isLocked {
-		return database.ErrLocked
+		return ErrLocked
 	}
 
 	// Buffer to collect migration data
 	var migrationBuffer bytes.Buffer
-	
+
 	// Read migration content
 	scanner := bufio.NewScanner(migration)
 	scanner.Buffer(make([]byte, 4*1024*1024), 4*1024*1024) // 4MB buffer
@@ -199,4 +204,3 @@ func (v *Victoria) Drop() error {
 
 // Ensure Victoria implements the database.Driver interface
 var _ database.Driver = (*Victoria)(nil)
-var _ database.Locker = (*Victoria)(nil)
