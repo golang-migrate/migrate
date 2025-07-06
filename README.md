@@ -3,7 +3,7 @@
 [![Coverage Status](https://img.shields.io/coveralls/github/golang-migrate/migrate/master.svg)](https://coveralls.io/github/golang-migrate/migrate?branch=master)
 [![packagecloud.io](https://img.shields.io/badge/deb-packagecloud.io-844fec.svg)](https://packagecloud.io/golang-migrate/migrate?filter=debs)
 [![Docker Pulls](https://img.shields.io/docker/pulls/migrate/migrate.svg)](https://hub.docker.com/r/migrate/migrate/)
-![Supported Go Versions](https://img.shields.io/badge/Go-1.22%2C%201.23-lightgrey.svg)
+![Supported Go Versions](https://img.shields.io/badge/Go-1.23%2C%201.24-lightgrey.svg)
 [![GitHub Release](https://img.shields.io/github/release/golang-migrate/migrate.svg)](https://github.com/golang-migrate/migrate/releases)
 [![Go Report Card](https://goreportcard.com/badge/github.com/golang-migrate/migrate/v4)](https://goreportcard.com/report/github.com/golang-migrate/migrate/v4)
 
@@ -87,7 +87,7 @@ Source drivers read migrations from local or remote sources. [Add a new source?]
 * Handles ctrl+c (SIGINT) gracefully.
 * No config search paths, no config files, no magic ENV var injections.
 
-__[CLI Documentation](cmd/migrate)__
+[CLI Documentation](cmd/migrate) (includes CLI install instructions)
 
 ### Basic usage
 
