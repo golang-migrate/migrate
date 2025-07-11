@@ -158,7 +158,7 @@ func NewFromOptions(o Options) (*Migrate, error) {
 		}
 		m.databaseDrv = databaseDrv
 		m.databaseDrv.AddTriggers(o.DatabaseTriggers)
-	} else if o.DatabaseName != "" && o.DatabaseInstance != nil {
+	} else if o.DatabaseInstance != nil {
 		m.databaseName = o.DatabaseName
 		m.databaseDrv = o.DatabaseInstance
 	}
