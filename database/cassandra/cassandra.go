@@ -287,7 +287,7 @@ func (c *Cassandra) Run(migration io.Reader) error {
 		// TODO: cast to Cassandra error and get line number
 		return database.Error{OrigErr: err, Err: "migration failed", Query: migr}
 	}
-	if err := c.Trigger(database.TrigRunPre, struct {
+	if err := c.Trigger(database.TrigRunPost, struct {
 		Query string
 	}{Query: string(migr)}); err != nil {
 		return database.Error{OrigErr: err, Err: "failed to trigger RunPost"}

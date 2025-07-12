@@ -411,6 +411,7 @@ func (c *CockroachDb) ensureVersionTable() (err error) {
 }
 
 func (c *CockroachDb) ensureLockTable() error {
+
 	// check if lock table exists
 	var count int
 	query := `SELECT COUNT(1) FROM information_schema.tables WHERE table_name = $1 AND table_schema = (SELECT current_schema()) LIMIT 1`

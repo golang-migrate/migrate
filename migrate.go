@@ -238,6 +238,10 @@ func (m *Migrate) Trigger(name string, detail interface{}) error {
 	return nil
 }
 
+func (m *Migrate) AddDatabaseTriggers(t map[string]func(response interface{}) error) {
+	m.databaseDrv.AddTriggers(t)
+}
+
 // Close closes the source and the database.
 func (m *Migrate) Close() (source error, database error) {
 	databaseSrvClose := make(chan error)
