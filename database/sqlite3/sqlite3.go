@@ -236,6 +236,12 @@ func (m *Sqlite) Run(migration io.Reader) error {
 	}
 	query := string(migr[:])
 
+	if err := m.Trigger(database.TrigRunPre, struct {
+		Query string
+	}{Query: query}); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger RunPre"}
+	}
+
 	if m.config.NoTxWrap {
 		if err = m.executeQueryNoTx(query); err != nil {
 			return err
