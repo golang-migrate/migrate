@@ -98,8 +98,22 @@ func (s *Stub) Run(migration io.Reader) error {
 	if err != nil {
 		return err
 	}
+
+	if err := s.Trigger(database.TrigRunPre, struct {
+		Query string
+	}{Query: string(m[:])}); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger RunPre"}
+	}
+
 	s.LastRunMigration = m
 	s.MigrationSequence = append(s.MigrationSequence, string(m[:]))
+
+	if err := s.Trigger(database.TrigRunPost, struct {
+		Query string
+	}{Query: string(m[:])}); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger RunPost"}
+	}
+	
 	return nil
 }
 
