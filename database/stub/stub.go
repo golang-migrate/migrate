@@ -113,7 +113,7 @@ func (s *Stub) Run(migration io.Reader) error {
 	}{Query: string(m[:])}); err != nil {
 		return &database.Error{OrigErr: err, Err: "failed to trigger RunPost"}
 	}
-	
+
 	return nil
 }
 
