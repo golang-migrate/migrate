@@ -35,7 +35,7 @@ require (
 	github.com/xanzy/go-gitlab v0.15.0
 	go.mongodb.org/mongo-driver v1.7.5
 	go.uber.org/atomic v1.7.0
-	golang.org/x/oauth2 v0.18.0
+	golang.org/x/oauth2 v0.27.0
 	golang.org/x/tools v0.24.0
 	google.golang.org/api v0.169.0
 	modernc.org/ql v1.0.0
@@ -68,8 +68,7 @@ require (
 
 require (
 	cloud.google.com/go v0.112.1 // indirect
-	cloud.google.com/go/compute v1.25.1 // indirect
-	cloud.google.com/go/compute/metadata v0.2.3 // indirect
+	cloud.google.com/go/compute/metadata v0.3.0 // indirect
 	cloud.google.com/go/iam v1.1.6 // indirect
 	cloud.google.com/go/longrunning v0.5.5 // indirect
 	github.com/99designs/go-keychain v0.0.0-20191008050251-8e49817e8af4 // indirect
@@ -184,7 +183,6 @@ require (
 	golang.org/x/text v0.23.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028 // indirect
-	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto v0.0.0-20240213162025-012b6fc9bca9 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240513163218-0867130af1f8 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240513163218-0867130af1f8 // indirect
