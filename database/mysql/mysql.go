@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"go.uber.org/atomic"
+	"sync/atomic"
 
 	"github.com/go-sql-driver/mysql"
 	"github.com/golang-migrate/migrate/v4/database"

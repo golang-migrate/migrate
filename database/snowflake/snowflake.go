@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"go.uber.org/atomic"
+	"sync/atomic"
 
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/hashicorp/go-multierror"
@@ -159,14 +159,14 @@ func (p *Snowflake) Close() error {
 }
 
 func (p *Snowflake) Lock() error {
-	if !p.isLocked.CAS(false, true) {
+	if !p.isLocked.CompareAndSwap(false, true) {
 		return database.ErrLocked
 	}
 	return nil
 }
 
 func (p *Snowflake) Unlock() error {
-	if !p.isLocked.CAS(true, false) {
+	if !p.isLocked.CompareAndSwap(true, false) {
 		return database.ErrNotLocked
 	}
 	return nil

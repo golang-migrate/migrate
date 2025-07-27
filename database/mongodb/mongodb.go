@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"time"
 
+	"sync/atomic"
+
 	"github.com/cenkalti/backoff/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/hashicorp/go-multierror"
@@ -16,7 +18,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/x/mongo/driver/connstring"
-	"go.uber.org/atomic"
 )
 
 func init() {

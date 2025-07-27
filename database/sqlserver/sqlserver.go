@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"go.uber.org/atomic"
+	"sync/atomic"
 
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/golang-migrate/migrate/v4"

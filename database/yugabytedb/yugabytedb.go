@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"time"
 
+	"sync/atomic"
+
 	"github.com/cenkalti/backoff/v4"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
@@ -17,7 +19,6 @@ import (
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgerrcode"
 	"github.com/lib/pq"
-	"go.uber.org/atomic"
 )
 
 const (

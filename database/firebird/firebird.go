@@ -9,11 +9,12 @@ import (
 	"io"
 	nurl "net/url"
 
+	"sync/atomic"
+
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/hashicorp/go-multierror"
 	_ "github.com/nakagami/firebirdsql"
-	"go.uber.org/atomic"
 )
 
 func init() {
@@ -107,14 +108,14 @@ func (f *Firebird) Close() error {
 }
 
 func (f *Firebird) Lock() error {
-	if !f.isLocked.CAS(false, true) {
+	if !f.isLocked.CompareAndSwap(false, true) {
 		return database.ErrLocked
 	}
 	return nil
 }
 
 func (f *Firebird) Unlock() error {
-	if !f.isLocked.CAS(true, false) {
+	if !f.isLocked.CompareAndSwap(true, false) {
 		return database.ErrNotLocked
 	}
 	return nil

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"go.uber.org/atomic"
+	"sync/atomic"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
@@ -291,14 +291,14 @@ func (ch *ClickHouse) Drop() (err error) {
 }
 
 func (ch *ClickHouse) Lock() error {
-	if !ch.isLocked.CAS(false, true) {
+	if !ch.isLocked.CompareAndSwap(false, true) {
 		return database.ErrLocked
 	}
 
 	return nil
 }
 func (ch *ClickHouse) Unlock() error {
-	if !ch.isLocked.CAS(true, false) {
+	if !ch.isLocked.CompareAndSwap(true, false) {
 		return database.ErrNotLocked
 	}
 
