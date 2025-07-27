@@ -8,9 +8,8 @@ import (
 	"net/url"
 	"regexp"
 	"strconv"
-	"time"
-
 	"sync/atomic"
+	"time"
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/golang-migrate/migrate/v4"

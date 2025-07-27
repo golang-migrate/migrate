@@ -7,9 +7,8 @@ import (
 	"net/url"
 	"os"
 	"strconv"
-	"time"
-
 	"sync/atomic"
+	"time"
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/golang-migrate/migrate/v4/database"

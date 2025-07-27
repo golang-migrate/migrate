@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	nurl "net/url"
-
 	"sync/atomic"
 
 	"github.com/golang-migrate/migrate/v4"

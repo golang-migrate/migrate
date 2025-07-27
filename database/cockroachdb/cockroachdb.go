@@ -8,7 +8,6 @@ import (
 	nurl "net/url"
 	"regexp"
 	"strconv"
-
 	"sync/atomic"
 
 	"github.com/cockroachdb/cockroach-go/v2/crdb"

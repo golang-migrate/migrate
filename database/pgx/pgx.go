@@ -11,9 +11,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
-
 	"sync/atomic"
+	"time"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"

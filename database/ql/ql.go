@@ -6,7 +6,6 @@ import (
 	"io"
 	nurl "net/url"
 	"strings"
-
 	"sync/atomic"
 
 	"github.com/hashicorp/go-multierror"

@@ -13,9 +13,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
-
 	"sync/atomic"
+	"time"
 
 	"github.com/go-sql-driver/mysql"
 	"github.com/golang-migrate/migrate/v4/database"

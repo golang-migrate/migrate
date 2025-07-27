@@ -8,7 +8,6 @@ import (
 	nurl "net/url"
 	"strconv"
 	"strings"
-
 	"sync/atomic"
 
 	"github.com/Azure/go-autorest/autorest/adal"
