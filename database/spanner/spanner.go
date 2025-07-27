@@ -59,7 +59,7 @@ type Spanner struct {
 
 	config *Config
 
-	lock *atomic.Bool
+	lock atomic.Bool
 }
 
 type DB struct {
