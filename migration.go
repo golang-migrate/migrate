@@ -127,6 +127,15 @@ func (m *Migration) Buffer() error {
 
 	b := bufio.NewReaderSize(m.Body, int(m.BufferSize))
 
+	var bufferWriterCloseErr error
+	// Always close bufferWriter, even on error, to prevent deadlocks.
+	// This lets Buffer know that there is no more data coming.
+	defer func() {
+		if err := m.bufferWriter.Close(); err != nil {
+			bufferWriterCloseErr = err
+		}
+	}()
+
 	// start reading from body, peek won't move the read pointer though
 	// poor man's solution?
 	if _, err := b.Peek(int(m.BufferSize)); err != nil && err != io.EOF {
@@ -145,15 +154,13 @@ func (m *Migration) Buffer() error {
 	m.FinishedReading = time.Now()
 	m.BytesRead = n
 
-	// close bufferWriter so Buffer knows that there is no
-	// more data coming
-	if err := m.bufferWriter.Close(); err != nil {
-		return err
-	}
-
 	// it's safe to close the Body too
 	if err := m.Body.Close(); err != nil {
 		return err
+	}
+
+	if bufferWriterCloseErr != nil {
+		return bufferWriterCloseErr
 	}
 
 	return nil
