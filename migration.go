@@ -131,7 +131,7 @@ func (m *Migration) Buffer() error {
 	// Always close bufferWriter, even on error, to prevent deadlocks.
 	// This lets Buffer know that there is no more data coming.
 	defer func() {
-		if err := m.bufferWriter.Close(); err != nil {
+		if err := m.bufferWriter.Close(); err != nil && bufferWriterCloseErr == nil {
 			bufferWriterCloseErr = err
 		}
 	}()
