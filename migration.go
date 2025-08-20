@@ -2,6 +2,7 @@ package migrate
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -118,7 +119,7 @@ func (m *Migration) LogString() string {
 
 // Buffer buffers Body up to BufferSize.
 // Calling this function blocks. Call with goroutine.
-func (m *Migration) Buffer() error {
+func (m *Migration) Buffer() (err error) {
 	if m.Body == nil {
 		return nil
 	}
@@ -127,41 +128,41 @@ func (m *Migration) Buffer() error {
 
 	b := bufio.NewReaderSize(m.Body, int(m.BufferSize))
 
-	var bufferWriterCloseErr error
-	// Always close bufferWriter, even on error, to prevent deadlocks.
-	// This lets Buffer know that there is no more data coming.
+	// defer closing buffer writer and body.
+	// defer blocks run in reverse order
+
+	// close the Body.
 	defer func() {
-		if err := m.bufferWriter.Close(); err != nil && bufferWriterCloseErr == nil {
-			bufferWriterCloseErr = err
+		if cerr := m.Body.Close(); cerr != nil {
+			err = errors.Join(err, cerr)
+		}
+	}()
+
+	// always close bufferWriter, even on error, to prevent deadlocks.
+	// this lets Buffer know that there is no more data coming.
+	defer func() {
+		if cerr := m.bufferWriter.Close(); cerr != nil {
+			err = errors.Join(err, cerr)
 		}
 	}()
 
 	// start reading from body, peek won't move the read pointer though
 	// poor man's solution?
-	if _, err := b.Peek(int(m.BufferSize)); err != nil && err != io.EOF {
-		return err
+	if _, perr := b.Peek(int(m.BufferSize)); perr != nil && perr != io.EOF {
+		return perr
 	}
 
 	m.FinishedBuffering = time.Now()
 
 	// write to bufferWriter, this will block until
 	// something starts reading from m.Buffer
-	n, err := b.WriteTo(m.bufferWriter)
-	if err != nil {
-		return err
+	n, werr := b.WriteTo(m.bufferWriter)
+	if werr != nil {
+		return werr
 	}
 
 	m.FinishedReading = time.Now()
 	m.BytesRead = n
-
-	// it's safe to close the Body too
-	if err := m.Body.Close(); err != nil {
-		return err
-	}
-
-	if bufferWriterCloseErr != nil {
-		return bufferWriterCloseErr
-	}
 
 	return nil
 }
