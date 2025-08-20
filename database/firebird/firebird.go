@@ -8,9 +8,12 @@ import (
 	"fmt"
 	"io"
 	nurl "net/url"
+	"strconv"
+	"strings"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
+	"github.com/golang-migrate/migrate/v4/database/multistmt"
 	"github.com/hashicorp/go-multierror"
 	_ "github.com/nakagami/firebirdsql"
 	"go.uber.org/atomic"
@@ -22,15 +25,22 @@ func init() {
 	database.Register("firebirdsql", &db)
 }
 
-var DefaultMigrationsTable = "schema_migrations"
+var (
+	multiStmtDelimiter = []byte(";")
+
+	DefaultMigrationsTable       = "schema_migrations"
+	DefaultMultiStatementMaxSize = 10 * 1 << 20 // 10 MB
+)
 
 var (
 	ErrNilConfig = fmt.Errorf("no config")
 )
 
 type Config struct {
-	DatabaseName    string
-	MigrationsTable string
+	DatabaseName          string
+	MigrationsTable       string
+	MultiStatementEnabled bool
+	MultiStatementMaxSize int
 }
 
 type Firebird struct {
@@ -85,9 +95,30 @@ func (f *Firebird) Open(dsn string) (database.Driver, error) {
 		return nil, err
 	}
 
+	multiStatementMaxSize := DefaultMultiStatementMaxSize
+	if s := purl.Query().Get("x-multi-statement-max-size"); len(s) > 0 {
+		multiStatementMaxSize, err = strconv.Atoi(s)
+		if err != nil {
+			return nil, err
+		}
+		if multiStatementMaxSize <= 0 {
+			multiStatementMaxSize = DefaultMultiStatementMaxSize
+		}
+	}
+
+	multiStatementEnabled := false
+	if s := purl.Query().Get("x-multi-statement"); len(s) > 0 {
+		multiStatementEnabled, err = strconv.ParseBool(s)
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse option x-multi-statement: %w", err)
+		}
+	}
+
 	px, err := WithInstance(db, &Config{
-		MigrationsTable: purl.Query().Get("x-migrations-table"),
-		DatabaseName:    purl.Path,
+		MigrationsTable:       purl.Query().Get("x-migrations-table"),
+		DatabaseName:          purl.Path,
+		MultiStatementEnabled: multiStatementEnabled,
+		MultiStatementMaxSize: multiStatementMaxSize,
 	})
 
 	if err != nil {
@@ -121,6 +152,26 @@ func (f *Firebird) Unlock() error {
 }
 
 func (f *Firebird) Run(migration io.Reader) error {
+	if f.config.MultiStatementEnabled {
+		var err error
+
+		if e := multistmt.Parse(migration, multiStmtDelimiter, f.config.MultiStatementMaxSize, func(m []byte) bool {
+			query := strings.TrimSpace(string(m))
+			if len(query) == 0 {
+				return true
+			}
+			if _, err = f.conn.ExecContext(context.Background(), query); err != nil {
+				return false // stop parsing on error
+			}
+			return true // continue parsing
+		}); e != nil {
+			return &database.Error{OrigErr: e, Err: "error parsing multi-statement migration"}
+		}
+		if err != nil {
+			return &database.Error{OrigErr: err, Err: "error executing multi-statement migration"}
+		}
+		return nil
+	}
 	migr, err := io.ReadAll(migration)
 	if err != nil {
 		return err
