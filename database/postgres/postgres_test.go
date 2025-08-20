@@ -96,6 +96,7 @@ func Test(t *testing.T) {
 	t.Run("testFailToCreateTableWithoutPermissions", testFailToCreateTableWithoutPermissions)
 	t.Run("testCheckBeforeCreateTable", testCheckBeforeCreateTable)
 	t.Run("testParallelSchema", testParallelSchema)
+	t.Run("testPostgresConcurrentMigrations", testPostgresConcurrentMigrations)
 	t.Run("testPostgresLock", testPostgresLock)
 	t.Run("testWithInstanceConcurrent", testWithInstanceConcurrent)
 	t.Run("testWithConnection", testWithConnection)
@@ -625,6 +626,49 @@ func testParallelSchema(t *testing.T) {
 		if err := dfoo.Unlock(); err != nil {
 			t.Fatal(err)
 		}
+	})
+}
+
+func testPostgresConcurrentMigrations(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		// GIVEN - a set of concurrent processes running migrations
+		const concurrency = 3
+		var wg sync.WaitGroup
+
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
+		addr := pgConnectionString(ip, port, "x-lock-retry-max-interval=2000")
+
+		// WHEN
+		for i := 0; i < concurrency; i++ {
+			wg.Add(1)
+
+			go func() {
+				defer wg.Done()
+
+				p := &Postgres{}
+				d, err := p.Open(addr)
+				if err != nil {
+					t.Error(err)
+				}
+				defer func() {
+					if err := d.Close(); err != nil {
+						t.Error(err)
+					}
+				}()
+
+				m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "postgres", d)
+				if err != nil {
+					t.Error(err)
+				}
+				dt.TestMigrate(t, m)
+			}()
+		}
+
+		wg.Wait()
+		// THEN
 	})
 }
 

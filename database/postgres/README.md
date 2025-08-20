@@ -9,6 +9,7 @@
 | `x-statement-timeout` | `StatementTimeout` | Abort any statement that takes more than the specified number of milliseconds |
 | `x-multi-statement` | `MultiStatementEnabled` | Enable multi-statement execution (default: false) |
 | `x-multi-statement-max-size` | `MultiStatementMaxSize` | Maximum size of single statement in bytes (default: 10MB) |
+| `x-lock-retry-max-interval` | `Locking` | When acquiring a lock fails, retries are used with an exponential backoff. This parameter specifies what is the maximum interval between retries in milliseconds (default: 1000ms). Values below the [initial retry interval](./postgres.go#L39) (100ms) will be ignored. |
 | `dbname` | `DatabaseName` | The name of the database to connect to |
 | `search_path` | | This variable specifies the order in which schemas are searched when an object is referenced by a simple name with no schema specified. |
 | `user` | | The user to sign in as |
