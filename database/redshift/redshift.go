@@ -10,8 +10,7 @@ import (
 	nurl "net/url"
 	"strconv"
 	"strings"
-
-	"go.uber.org/atomic"
+	"sync/atomic"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
@@ -127,14 +126,14 @@ func (p *Redshift) Close() error {
 
 // Redshift does not support advisory lock functions: https://docs.aws.amazon.com/redshift/latest/dg/c_unsupported-postgresql-functions.html
 func (p *Redshift) Lock() error {
-	if !p.isLocked.CAS(false, true) {
+	if !p.isLocked.CompareAndSwap(false, true) {
 		return database.ErrLocked
 	}
 	return nil
 }
 
 func (p *Redshift) Unlock() error {
-	if !p.isLocked.CAS(true, false) {
+	if !p.isLocked.CompareAndSwap(true, false) {
 		return database.ErrNotLocked
 	}
 	return nil
