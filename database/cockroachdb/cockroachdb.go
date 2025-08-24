@@ -37,6 +37,8 @@ type Config struct {
 	LockTable       string
 	ForceLock       bool
 	DatabaseName    string
+
+	Triggers map[string]func(response interface{}) error
 }
 
 type CockroachDb struct {
@@ -45,6 +47,13 @@ type CockroachDb struct {
 
 	// Open and WithInstance need to guarantee that config is never nil
 	config *Config
+}
+
+type TriggerResponse struct {
+	Driver  *CockroachDb
+	Config  *Config
+	Trigger string
+	Detail  interface{}
 }
 
 func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
@@ -144,6 +153,27 @@ func (c *CockroachDb) Close() error {
 	return c.db.Close()
 }
 
+func (c *CockroachDb) AddTriggers(t map[string]func(response interface{}) error) {
+	c.config.Triggers = t
+}
+
+func (c *CockroachDb) Trigger(name string, detail interface{}) error {
+	if c.config.Triggers == nil {
+		return nil
+	}
+
+	if trigger, ok := c.config.Triggers[name]; ok {
+		return trigger(TriggerResponse{
+			Driver:  c,
+			Config:  c.config,
+			Trigger: name,
+			Detail:  detail,
+		})
+	}
+
+	return nil
+}
+
 // Locking is done manually with a separate lock table.  Implementing advisory locks in CRDB is being discussed
 // See: https://github.com/cockroachdb/cockroach/issues/13546
 func (c *CockroachDb) Lock() error {
@@ -218,8 +248,18 @@ func (c *CockroachDb) Run(migration io.Reader) error {
 
 	// run migration
 	query := string(migr[:])
+	if err := c.Trigger(database.TrigRunPre, struct {
+		Query string
+	}{Query: query}); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger RunPre"}
+	}
 	if _, err := c.db.Exec(query); err != nil {
 		return database.Error{OrigErr: err, Err: "migration failed", Query: migr}
+	}
+	if err := c.Trigger(database.TrigRunPost, struct {
+		Query string
+	}{Query: query}); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger RunPost"}
 	}
 
 	return nil
@@ -227,6 +267,13 @@ func (c *CockroachDb) Run(migration io.Reader) error {
 
 func (c *CockroachDb) SetVersion(version int, dirty bool) error {
 	return crdb.ExecuteTx(context.Background(), c.db, nil, func(tx *sql.Tx) error {
+		if err := c.Trigger(database.TrigSetVersionPre, struct {
+			Version int
+			Dirty   bool
+		}{Version: version, Dirty: dirty}); err != nil {
+			return err
+		}
+
 		if _, err := tx.Exec(`DELETE FROM "` + c.config.MigrationsTable + `"`); err != nil {
 			return err
 		}
@@ -238,6 +285,13 @@ func (c *CockroachDb) SetVersion(version int, dirty bool) error {
 			if _, err := tx.Exec(`INSERT INTO "`+c.config.MigrationsTable+`" (version, dirty) VALUES ($1, $2)`, version, dirty); err != nil {
 				return err
 			}
+		}
+
+		if err := c.Trigger(database.TrigSetVersionPost, struct {
+			Version int
+			Dirty   bool
+		}{Version: version, Dirty: dirty}); err != nil {
+			return err
 		}
 
 		return nil
@@ -333,7 +387,14 @@ func (c *CockroachDb) ensureVersionTable() (err error) {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 	if count == 1 {
+		if err := c.Trigger(database.TrigVersionTableExists, nil); err != nil {
+			return &database.Error{OrigErr: err, Err: "failed to trigger VersionTableExists"}
+		}
 		return nil
+	}
+
+	if err := c.Trigger(database.TrigVersionTablePre, nil); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger VersionTablePre"}
 	}
 
 	// if not, create the empty migration table
@@ -341,10 +402,16 @@ func (c *CockroachDb) ensureVersionTable() (err error) {
 	if _, err := c.db.Exec(query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
+
+	if err := c.Trigger(database.TrigVersionTablePost, nil); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger VersionTablePost"}
+	}
+
 	return nil
 }
 
 func (c *CockroachDb) ensureLockTable() error {
+
 	// check if lock table exists
 	var count int
 	query := `SELECT COUNT(1) FROM information_schema.tables WHERE table_name = $1 AND table_schema = (SELECT current_schema()) LIMIT 1`

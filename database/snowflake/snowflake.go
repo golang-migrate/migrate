@@ -34,6 +34,8 @@ var (
 type Config struct {
 	MigrationsTable string
 	DatabaseName    string
+
+	Triggers map[string]func(response interface{}) error
 }
 
 type Snowflake struct {
@@ -43,6 +45,13 @@ type Snowflake struct {
 
 	// Open and WithInstance need to guarantee that config is never nil
 	config *Config
+}
+
+type TriggerResponse struct {
+	Driver  *Snowflake
+	Config  *Config
+	Trigger string
+	Detail  interface{}
 }
 
 func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
@@ -157,6 +166,27 @@ func (p *Snowflake) Close() error {
 	return nil
 }
 
+func (p *Snowflake) AddTriggers(t map[string]func(response interface{}) error) {
+	p.config.Triggers = t
+}
+
+func (p *Snowflake) Trigger(name string, detail interface{}) error {
+	if p.config.Triggers == nil {
+		return nil
+	}
+
+	if trigger, ok := p.config.Triggers[name]; ok {
+		return trigger(TriggerResponse{
+			Driver:  p,
+			Config:  p.config,
+			Trigger: name,
+			Detail:  detail,
+		})
+	}
+
+	return nil
+}
+
 func (p *Snowflake) Lock() error {
 	if !p.isLocked.CompareAndSwap(false, true) {
 		return database.ErrLocked
@@ -179,6 +209,11 @@ func (p *Snowflake) Run(migration io.Reader) error {
 
 	// run migration
 	query := string(migr[:])
+	if err := p.Trigger(database.TrigRunPre, struct {
+		Query string
+	}{Query: query}); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger RunPre"}
+	}
 	if _, err := p.conn.ExecContext(context.Background(), query); err != nil {
 		if pgErr, ok := err.(*pq.Error); ok {
 			var line uint
@@ -199,6 +234,11 @@ func (p *Snowflake) Run(migration io.Reader) error {
 			return database.Error{OrigErr: err, Err: message, Query: migr, Line: line}
 		}
 		return database.Error{OrigErr: err, Err: "migration failed", Query: migr}
+	}
+	if err := p.Trigger(database.TrigRunPost, struct {
+		Query string
+	}{Query: query}); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger RunPost"}
 	}
 
 	return nil
@@ -245,6 +285,16 @@ func (p *Snowflake) SetVersion(version int, dirty bool) error {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
 	}
 
+	if err := p.Trigger(database.TrigSetVersionPre, struct {
+		Version int
+		Dirty   bool
+	}{Version: version, Dirty: dirty}); err != nil {
+		if errRollback := tx.Rollback(); errRollback != nil {
+			err = multierror.Append(err, errRollback)
+		}
+		return &database.Error{OrigErr: err, Err: "failed to trigger SetVersionPre"}
+	}
+
 	query := `DELETE FROM "` + p.config.MigrationsTable + `"`
 	if _, err := tx.Exec(query); err != nil {
 		if errRollback := tx.Rollback(); errRollback != nil {
@@ -266,6 +316,16 @@ func (p *Snowflake) SetVersion(version int, dirty bool) error {
 			}
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
+	}
+
+	if err := p.Trigger(database.TrigSetVersionPost, struct {
+		Version int
+		Dirty   bool
+	}{Version: version, Dirty: dirty}); err != nil {
+		if errRollback := tx.Rollback(); errRollback != nil {
+			err = multierror.Append(err, errRollback)
+		}
+		return &database.Error{OrigErr: err, Err: "failed to trigger SetVersionPost"}
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -361,7 +421,14 @@ func (p *Snowflake) ensureVersionTable() (err error) {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 	if count == 1 {
+		if err := p.Trigger(database.TrigVersionTableExists, nil); err != nil {
+			return &database.Error{OrigErr: err, Err: "failed to trigger VersionTableExists"}
+		}
 		return nil
+	}
+
+	if err := p.Trigger(database.TrigVersionTablePre, nil); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger VersionTablePre"}
 	}
 
 	// if not, create the empty migration table
@@ -369,6 +436,10 @@ func (p *Snowflake) ensureVersionTable() (err error) {
 			version bigint not null primary key, dirty boolean not null)`
 	if _, err := p.conn.ExecContext(context.Background(), query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
+	}
+
+	if err := p.Trigger(database.TrigVersionTablePost, nil); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger VersionTablePost"}
 	}
 
 	return nil

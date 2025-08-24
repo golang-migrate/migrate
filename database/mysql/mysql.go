@@ -42,6 +42,15 @@ type Config struct {
 	DatabaseName     string
 	NoLock           bool
 	StatementTimeout time.Duration
+
+	Triggers map[string]func(response interface{}) error
+}
+
+type TriggerResponse struct {
+	Driver  *Mysql
+	Config  *Config
+	Trigger string
+	Detail  interface{}
 }
 
 type Mysql struct {
@@ -282,6 +291,27 @@ func (m *Mysql) Close() error {
 	return nil
 }
 
+func (m *Mysql) AddTriggers(t map[string]func(response interface{}) error) {
+	m.config.Triggers = t
+}
+
+func (m *Mysql) Trigger(name string, detail interface{}) error {
+	if m.config.Triggers == nil {
+		return nil
+	}
+
+	if trigger, ok := m.config.Triggers[name]; ok {
+		return trigger(TriggerResponse{
+			Driver:  m,
+			Config:  m.config,
+			Trigger: name,
+			Detail:  detail,
+		})
+	}
+
+	return nil
+}
+
 func (m *Mysql) Lock() error {
 	return database.CasRestoreOnErr(&m.isLocked, false, true, database.ErrLocked, func() error {
 		if m.config.NoLock {
@@ -346,8 +376,18 @@ func (m *Mysql) Run(migration io.Reader) error {
 	}
 
 	query := string(migr[:])
+	if err := m.Trigger(database.TrigRunPre, struct {
+		Query string
+	}{Query: query}); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger RunPre"}
+	}
 	if _, err := m.conn.ExecContext(ctx, query); err != nil {
 		return database.Error{OrigErr: err, Err: "migration failed", Query: migr}
+	}
+	if err := m.Trigger(database.TrigRunPost, struct {
+		Query string
+	}{Query: query}); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger RunPost"}
 	}
 
 	return nil
@@ -357,6 +397,16 @@ func (m *Mysql) SetVersion(version int, dirty bool) error {
 	tx, err := m.conn.BeginTx(context.Background(), &sql.TxOptions{Isolation: sql.LevelSerializable})
 	if err != nil {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
+	}
+
+	if err := m.Trigger(database.TrigSetVersionPre, struct {
+		Version int
+		Dirty   bool
+	}{Version: version, Dirty: dirty}); err != nil {
+		if errRollback := tx.Rollback(); errRollback != nil {
+			err = multierror.Append(err, errRollback)
+		}
+		return &database.Error{OrigErr: err, Err: "failed to trigger SetVersionPre"}
 	}
 
 	query := "DELETE FROM `" + m.config.MigrationsTable + "` LIMIT 1"
@@ -378,6 +428,16 @@ func (m *Mysql) SetVersion(version int, dirty bool) error {
 			}
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
+	}
+
+	if err := m.Trigger(database.TrigSetVersionPost, struct {
+		Version int
+		Dirty   bool
+	}{Version: version, Dirty: dirty}); err != nil {
+		if errRollback := tx.Rollback(); errRollback != nil {
+			err = multierror.Append(err, errRollback)
+		}
+		return &database.Error{OrigErr: err, Err: "failed to trigger SetVersionPost"}
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -485,13 +545,24 @@ func (m *Mysql) ensureVersionTable() (err error) {
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
 	} else {
+		if err := m.Trigger(database.TrigVersionTableExists, nil); err != nil {
+			return &database.Error{OrigErr: err, Err: "failed to trigger VersionTableExists"}
+		}
 		return nil
+	}
+
+	if err := m.Trigger(database.TrigVersionTablePre, nil); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger VersionTablePre"}
 	}
 
 	// if not, create the empty migration table
 	query = "CREATE TABLE `" + m.config.MigrationsTable + "` (version bigint not null primary key, dirty boolean not null)"
 	if _, err := m.conn.ExecContext(context.Background(), query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
+	}
+
+	if err := m.Trigger(database.TrigVersionTablePost, nil); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger VersionTablePost"}
 	}
 	return nil
 }

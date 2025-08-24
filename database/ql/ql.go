@@ -30,6 +30,8 @@ var (
 type Config struct {
 	MigrationsTable string
 	DatabaseName    string
+
+	Triggers map[string]func(response interface{}) error
 }
 
 type Ql struct {
@@ -37,6 +39,13 @@ type Ql struct {
 	isLocked atomic.Bool
 
 	config *Config
+}
+
+type TriggerResponse struct {
+	Driver  *Ql
+	Config  *Config
+	Trigger string
+	Detail  interface{}
 }
 
 func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
@@ -84,10 +93,22 @@ func (m *Ql) ensureVersionTable() (err error) {
 	if err != nil {
 		return err
 	}
+	if err := m.Trigger(database.TrigVersionTablePre, nil); err != nil {
+		if err := tx.Rollback(); err != nil {
+			return err
+		}
+		return err
+	}
 	if _, err := tx.Exec(fmt.Sprintf(`
 	CREATE TABLE IF NOT EXISTS %s (version uint64, dirty bool);
 	CREATE UNIQUE INDEX IF NOT EXISTS version_unique ON %s (version);
 `, m.config.MigrationsTable, m.config.MigrationsTable)); err != nil {
+		if err := tx.Rollback(); err != nil {
+			return err
+		}
+		return err
+	}
+	if err := m.Trigger(database.TrigVersionTablePost, nil); err != nil {
 		if err := tx.Rollback(); err != nil {
 			return err
 		}
@@ -125,6 +146,28 @@ func (m *Ql) Open(url string) (database.Driver, error) {
 func (m *Ql) Close() error {
 	return m.db.Close()
 }
+
+func (m *Ql) AddTriggers(t map[string]func(response interface{}) error) {
+	m.config.Triggers = t
+}
+
+func (m *Ql) Trigger(name string, detail interface{}) error {
+	if m.config.Triggers == nil {
+		return nil
+	}
+
+	if trigger, ok := m.config.Triggers[name]; ok {
+		return trigger(TriggerResponse{
+			Driver:  m,
+			Config:  m.config,
+			Trigger: name,
+			Detail:  detail,
+		})
+	}
+
+	return nil
+}
+
 func (m *Ql) Drop() (err error) {
 	query := `SELECT Name FROM __Table`
 	tables, err := m.db.Query(query)
@@ -184,7 +227,22 @@ func (m *Ql) Run(migration io.Reader) error {
 	}
 	query := string(migr[:])
 
-	return m.executeQuery(query)
+	if err := m.Trigger(database.TrigRunPre, struct {
+		Query string
+	}{Query: query}); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger RunPre"}
+	}
+
+	if err = m.executeQuery(query); err != nil {
+		return err
+	}
+
+	if err := m.Trigger(database.TrigRunPost, struct {
+		Query string
+	}{Query: query}); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger RunPost"}
+	}
+	return nil
 }
 func (m *Ql) executeQuery(query string) error {
 	tx, err := m.db.Begin()
@@ -208,6 +266,16 @@ func (m *Ql) SetVersion(version int, dirty bool) error {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
 	}
 
+	if err := m.Trigger(database.TrigSetVersionPre, struct {
+		Version int
+		Dirty   bool
+	}{Version: version, Dirty: dirty}); err != nil {
+		if errRollback := tx.Rollback(); errRollback != nil {
+			err = multierror.Append(err, errRollback)
+		}
+		return &database.Error{OrigErr: err, Err: "failed to trigger SetVersionPre"}
+	}
+
 	query := "TRUNCATE TABLE " + m.config.MigrationsTable
 	if _, err := tx.Exec(query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
@@ -225,6 +293,16 @@ func (m *Ql) SetVersion(version int, dirty bool) error {
 			}
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
+	}
+
+	if err := m.Trigger(database.TrigSetVersionPost, struct {
+		Version int
+		Dirty   bool
+	}{Version: version, Dirty: dirty}); err != nil {
+		if errRollback := tx.Rollback(); errRollback != nil {
+			err = multierror.Append(err, errRollback)
+		}
+		return &database.Error{OrigErr: err, Err: "failed to trigger SetVersionPost"}
 	}
 
 	if err := tx.Commit(); err != nil {

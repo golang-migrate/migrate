@@ -19,6 +19,14 @@ var (
 
 const NilVersion int = -1
 
+const TrigRunPre string = "RunPre"
+const TrigRunPost string = "RunPost"
+const TrigSetVersionPre string = "SetVersionPre"
+const TrigSetVersionPost string = "SetVersionPost"
+const TrigVersionTableExists string = "VersionTableExists"
+const TrigVersionTablePre string = "VersionTablePre"
+const TrigVersionTablePost string = "VersionTablePost"
+
 var driversMu sync.RWMutex
 var drivers = make(map[string]Driver)
 
@@ -51,6 +59,13 @@ type Driver interface {
 	// Close closes the underlying database instance managed by the driver.
 	// Migrate will call this function only once per instance.
 	Close() error
+
+	// AddTriggers adds triggers to the database. The map key is the trigger name
+	AddTriggers(t map[string]func(response interface{}) error)
+
+	// Trigger is called when a trigger is fired. The name is the trigger name
+	// and detail is the trigger detail.
+	Trigger(name string, detail interface{}) error
 
 	// Lock should acquire a database lock so that only one migration process
 	// can run at a time. Migrate will call this function before Run is called.

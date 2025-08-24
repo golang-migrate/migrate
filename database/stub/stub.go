@@ -33,7 +33,16 @@ func (s *Stub) Open(url string) (database.Driver, error) {
 	}, nil
 }
 
-type Config struct{}
+type Config struct {
+	Triggers map[string]func(response interface{}) error
+}
+
+type TriggerResponse struct {
+	Driver  *Stub
+	Config  *Config
+	Trigger string
+	Detail  interface{}
+}
 
 func WithInstance(instance interface{}, config *Config) (database.Driver, error) {
 	return &Stub{
@@ -45,6 +54,27 @@ func WithInstance(instance interface{}, config *Config) (database.Driver, error)
 }
 
 func (s *Stub) Close() error {
+	return nil
+}
+
+func (s *Stub) AddTriggers(t map[string]func(response interface{}) error) {
+	s.Config.Triggers = t
+}
+
+func (s *Stub) Trigger(name string, detail interface{}) error {
+	if s.Config.Triggers == nil {
+		return nil
+	}
+
+	if trigger, ok := s.Config.Triggers[name]; ok {
+		return trigger(TriggerResponse{
+			Driver:  s,
+			Config:  s.Config,
+			Trigger: name,
+			Detail:  detail,
+		})
+	}
+
 	return nil
 }
 
@@ -67,8 +97,22 @@ func (s *Stub) Run(migration io.Reader) error {
 	if err != nil {
 		return err
 	}
+
+	if err := s.Trigger(database.TrigRunPre, struct {
+		Query string
+	}{Query: string(m[:])}); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger RunPre"}
+	}
+
 	s.LastRunMigration = m
 	s.MigrationSequence = append(s.MigrationSequence, string(m[:]))
+
+	if err := s.Trigger(database.TrigRunPost, struct {
+		Query string
+	}{Query: string(m[:])}); err != nil {
+		return &database.Error{OrigErr: err, Err: "failed to trigger RunPost"}
+	}
+
 	return nil
 }
 
