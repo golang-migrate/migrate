@@ -5,6 +5,7 @@ go 1.23.0
 require (
 	cloud.google.com/go/spanner v1.56.0
 	cloud.google.com/go/storage v1.38.0
+	gitee.com/GBase8s/go-gci v0.1.1
 	github.com/Azure/go-autorest/autorest/adal v0.9.16
 	github.com/ClickHouse/clickhouse-go v1.4.3
 	github.com/aws/aws-sdk-go v1.49.6

@@ -1,0 +1,3 @@
+CREATE TABLE IF NOT EXISTS test (
+  username VARCHAR(20)
+);
