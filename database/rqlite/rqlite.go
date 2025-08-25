@@ -6,8 +6,7 @@ import (
 	nurl "net/url"
 	"strconv"
 	"strings"
-
-	"go.uber.org/atomic"
+	"sync/atomic"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
@@ -143,7 +142,7 @@ func (r *Rqlite) Close() error {
 // If the implementation can't provide this functionality, return nil.
 // Return database.ErrLocked if database is already locked.
 func (r *Rqlite) Lock() error {
-	if !r.isLocked.CAS(false, true) {
+	if !r.isLocked.CompareAndSwap(false, true) {
 		return database.ErrLocked
 	}
 	return nil
@@ -152,7 +151,7 @@ func (r *Rqlite) Lock() error {
 // Unlock should release the lock. Migrate will call this function after
 // all migrations have been run.
 func (r *Rqlite) Unlock() error {
-	if !r.isLocked.CAS(true, false) {
+	if !r.isLocked.CompareAndSwap(true, false) {
 		return database.ErrNotLocked
 	}
 	return nil
