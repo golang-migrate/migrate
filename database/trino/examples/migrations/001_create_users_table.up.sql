@@ -3,4 +3,4 @@ CREATE TABLE users (
     name VARCHAR,
     email VARCHAR,
     created_at TIMESTAMP
-);
+)

@@ -2,4 +2,4 @@
 CREATE VIEW user_by_email AS
 SELECT id, name, email, created_at
 FROM users
-WHERE email IS NOT NULL;
+WHERE email IS NOT NULL

@@ -18,7 +18,7 @@ import (
 
 var (
 	DefaultMigrationsTable = "schema_migrations"
-	ErrNilConfig          = fmt.Errorf("no config")
+	ErrNilConfig           = fmt.Errorf("no config")
 )
 
 type Config struct {
@@ -64,17 +64,17 @@ func (t *Trino) Open(dsn string) (database.Driver, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Use Trino HTTP URL directly - just filter our custom parameters
 	q := migrate.FilterCustomQuery(purl)
-	
+
 	// Set source if not provided
 	query := q.Query()
 	if query.Get("source") == "" {
 		query.Set("source", "golang-migrate")
 	}
 	q.RawQuery = query.Encode()
-	
+
 	conn, err := sql.Open("trino", q.String())
 	if err != nil {
 		return nil, err
@@ -157,7 +157,7 @@ func (t *Trino) Version() (int, bool, error) {
 		query   = fmt.Sprintf("SELECT version, dirty FROM %s.%s.%s LIMIT 1",
 			t.config.MigrationsCatalog, t.config.MigrationsSchema, t.config.MigrationsTable)
 	)
-	
+
 	err := t.conn.QueryRow(query).Scan(&version, &dirty)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -176,27 +176,6 @@ func (t *Trino) Version() (int, bool, error) {
 func (t *Trino) SetVersion(version int, dirty bool) error {
 	migrationsTable := fmt.Sprintf("%s.%s.%s",
 		t.config.MigrationsCatalog, t.config.MigrationsSchema, t.config.MigrationsTable)
-
-	// For Memory connector and other append-only systems, use table recreation
-	// Check if we need to clear existing data by trying to recreate table
-	dropQuery := fmt.Sprintf("DROP TABLE IF EXISTS %s", migrationsTable)
-	if _, err := t.conn.Exec(dropQuery); err != nil {
-		// If DROP fails, try DELETE (for connectors that support it)
-		deleteQuery := fmt.Sprintf("DELETE FROM %s", migrationsTable)
-		if _, err := t.conn.Exec(deleteQuery); err != nil {
-			return &database.Error{OrigErr: err, Query: []byte(deleteQuery)}
-		}
-	} else {
-		// Recreate table after successful drop
-		createQuery := fmt.Sprintf(`
-			CREATE TABLE %s (
-				version BIGINT NOT NULL,
-				dirty BOOLEAN NOT NULL
-			)`, migrationsTable)
-		if _, err := t.conn.Exec(createQuery); err != nil {
-			return &database.Error{OrigErr: err, Query: []byte(createQuery)}
-		}
-	}
 
 	// Insert new version if needed
 	if version >= 0 || (version == database.NilVersion && dirty) {

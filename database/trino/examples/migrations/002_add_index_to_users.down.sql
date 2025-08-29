@@ -1,1 +1,1 @@
-DROP VIEW IF EXISTS user_by_email;
+DROP VIEW IF EXISTS user_by_email
