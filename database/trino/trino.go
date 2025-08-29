@@ -65,8 +65,19 @@ func (t *Trino) Open(dsn string) (database.Driver, error) {
 		return nil, err
 	}
 
-	// Use Trino HTTP URL directly - just filter our custom parameters
+	// Filter custom parameters and handle scheme conversion
 	q := migrate.FilterCustomQuery(purl)
+	
+	// Convert trino:// scheme to http:// or https:// based on ssl parameter
+	if q.Scheme == "trino" {
+		// Check ssl parameter (default is true)
+		ssl := purl.Query().Get("ssl")
+		if ssl == "" || ssl == "true" {
+			q.Scheme = "https"
+		} else {
+			q.Scheme = "http"
+		}
+	}
 
 	// Set source if not provided
 	query := q.Query()
