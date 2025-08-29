@@ -1,6 +1,6 @@
 CREATE TABLE users (
     id BIGINT,
-    name VARCHAR(255),
-    email VARCHAR(255),
+    name VARCHAR,
+    email VARCHAR,
     created_at TIMESTAMP
 );

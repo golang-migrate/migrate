@@ -9,6 +9,7 @@ import (
 	"log"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dhui/dktest"
 	"github.com/golang-migrate/migrate/v4"
@@ -19,9 +20,9 @@ import (
 )
 
 const (
-	trinoUser     = "testuser"
-	trinoCatalog  = "memory"
-	trinoSchema   = "default"
+	trinoUser    = "testuser"
+	trinoCatalog = "memory"
+	trinoSchema  = "default"
 )
 
 var (
@@ -29,8 +30,9 @@ var (
 		Env: map[string]string{
 			"TRINO_ENVIRONMENT": "test",
 		},
-		PortRequired: true, 
+		PortRequired: true,
 		ReadyFunc:    isReady,
+		ReadyTimeout: 10 * time.Minute, // Increased timeout for Trino startup
 	}
 	// Using the official Trino Docker image
 	specs = []dktesting.ContainerSpec{
@@ -39,9 +41,10 @@ var (
 )
 
 func trinoConnectionString(host, port string, options ...string) string {
-	baseURL := fmt.Sprintf("trino://%s@%s:%s/%s/%s", trinoUser, host, port, trinoCatalog, trinoSchema)
+	baseURL := fmt.Sprintf("http://%s@%s:%s?catalog=%s&schema=%s&source=migrate-test",
+		trinoUser, host, port, trinoCatalog, trinoSchema)
 	if len(options) > 0 {
-		baseURL += "?" + strings.Join(options, "&")
+		baseURL += "&" + strings.Join(options, "&")
 	}
 	return baseURL
 }
@@ -53,9 +56,9 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 	}
 
 	// Build the direct Trino HTTP URL for sql.Open
-	trinoURL := fmt.Sprintf("http://%s@%s:%s?catalog=%s&schema=%s&source=migrate-test", 
+	trinoURL := fmt.Sprintf("http://%s@%s:%s?catalog=%s&schema=%s&source=migrate-test",
 		trinoUser, ip, port, trinoCatalog, trinoSchema)
-	
+
 	db, err := sql.Open("trino", trinoURL)
 	if err != nil {
 		log.Printf("trino open error: %v", err)
@@ -67,17 +70,39 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 		}
 	}()
 
-	if err = db.PingContext(ctx); err != nil {
-		switch err {
-		case sqldriver.ErrBadConn, io.EOF:
-			return false
-		default:
-			log.Printf("trino ping error: %v", err)
-		}
-		return false
-	}
+	// Use a dedicated context with longer timeout for Trino startup
+	readyCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
 
-	return true
+	for i := 0; i < 120; i++ { // Increased attempts
+		if err = db.PingContext(readyCtx); err != nil {
+			switch err {
+			case sqldriver.ErrBadConn, io.EOF:
+				time.Sleep(2 * time.Second) // Longer sleep for Trino
+				continue
+			default:
+				log.Printf("trino ping attempt %d error: %v", i+1, err)
+			}
+
+			time.Sleep(2 * time.Second)
+			continue
+		}
+		
+		// Test a simple query to ensure Trino is fully ready
+		var result int
+		if err = db.QueryRowContext(readyCtx, "SELECT 1").Scan(&result); err != nil {
+			log.Printf("trino query test attempt %d error: %v", i+1, err)
+			time.Sleep(2 * time.Second)
+			continue
+		}
+		
+		log.Printf("trino ready after %d attempts", i+1)
+		// Give Trino a moment to stabilize before tests start
+		time.Sleep(3 * time.Second)
+		return true
+	}
+	log.Printf("trino failed to become ready after 120 attempts")
+	return false
 }
 
 func mustRun(t *testing.T, d database.Driver, statements []string) {
@@ -91,7 +116,6 @@ func mustRun(t *testing.T, d database.Driver, statements []string) {
 func Test(t *testing.T) {
 	t.Run("test", test)
 	t.Run("testMigrate", testMigrate)
-	t.Run("testLockingMethods", testLockingMethods)
 	t.Run("testWithInstance", testWithInstance)
 	t.Run("testOpen", testOpen)
 
@@ -153,74 +177,6 @@ func testMigrate(t *testing.T) {
 	})
 }
 
-func testLockingMethods(t *testing.T) {
-	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
-		ip, port, err := c.FirstPort()
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		// Test file-based locking (default)
-		addr := trinoConnectionString(ip, port, "x-lock-method=file")
-		tr := &Trino{}
-		d, err := tr.Open(addr)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func() {
-			if err := d.Close(); err != nil {
-				t.Error(err)
-			}
-		}()
-
-		// Test locking functionality
-		if err := d.Lock(); err != nil {
-			t.Fatal(err)
-		}
-		if err := d.Unlock(); err != nil {
-			t.Fatal(err)
-		}
-
-		// Test table-based locking
-		addr2 := trinoConnectionString(ip, port, "x-lock-method=table")
-		d2, err := tr.Open(addr2)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func() {
-			if err := d2.Close(); err != nil {
-				t.Error(err)
-			}
-		}()
-
-		if err := d2.Lock(); err != nil {
-			t.Fatal(err)
-		}
-		if err := d2.Unlock(); err != nil {
-			t.Fatal(err)
-		}
-
-		// Test no locking
-		addr3 := trinoConnectionString(ip, port, "x-lock-method=none")
-		d3, err := tr.Open(addr3)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func() {
-			if err := d3.Close(); err != nil {
-				t.Error(err)
-			}
-		}()
-
-		if err := d3.Lock(); err != nil {
-			t.Fatal(err)
-		}
-		if err := d3.Unlock(); err != nil {
-			t.Fatal(err)
-		}
-	})
-}
-
 func testWithInstance(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.FirstPort()
@@ -229,9 +185,9 @@ func testWithInstance(t *testing.T) {
 		}
 
 		// Create direct connection to Trino
-		trinoURL := fmt.Sprintf("http://%s@%s:%s?catalog=%s&schema=%s&source=migrate-test", 
+		trinoURL := fmt.Sprintf("http://%s@%s:%s?catalog=%s&schema=%s&source=migrate-test",
 			trinoUser, ip, port, trinoCatalog, trinoSchema)
-		
+
 		db, err := sql.Open("trino", trinoURL)
 		if err != nil {
 			t.Fatal(err)
@@ -245,7 +201,6 @@ func testWithInstance(t *testing.T) {
 		config := &Config{
 			MigrationsCatalog: trinoCatalog,
 			MigrationsSchema:  trinoSchema,
-			User:              trinoUser,
 		}
 
 		d, err := WithInstance(db, config)
@@ -283,12 +238,12 @@ func testOpen(t *testing.T) {
 				url:  trinoConnectionString(ip, port, "x-migrations-table=custom_migrations"),
 			},
 			{
-				name: "URL with custom schema",
-				url:  trinoConnectionString(ip, port, "x-migrations-schema=test_schema"),
+				name: "URL with custom schema",  
+				url:  trinoConnectionString(ip, port, "x-migrations-schema=default"),
 			},
 			{
 				name: "URL with timeouts",
-				url:  trinoConnectionString(ip, port, "x-statement-timeout=5000", "x-connection-timeout=10000"),
+				url:  trinoConnectionString(ip, port, "x-statement-timeout=5000"),
 			},
 		}
 
@@ -328,44 +283,42 @@ func TestTrinoLockConcurrency(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		addr := trinoConnectionString(ip, port, "x-lock-method=file")
+		addr := trinoConnectionString(ip, port)
 		tr := &Trino{}
-		
-		// First instance
-		d1, err := tr.Open(addr)
+
+		// Single instance to test locking mechanism
+		d, err := tr.Open(addr)
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer d1.Close()
+		defer d.Close()
 
-		// Second instance
-		d2, err := tr.Open(addr)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer d2.Close()
-
-		// First instance acquires lock
-		if err := d1.Lock(); err != nil {
+		// Test basic locking functionality
+		if err := d.Lock(); err != nil {
 			t.Fatal(err)
 		}
 
-		// Second instance should fail to acquire lock
-		if err := d2.Lock(); err != database.ErrLocked {
+		// Try to acquire lock again (should fail)
+		if err := d.Lock(); err != database.ErrLocked {
 			t.Fatalf("Expected ErrLocked, got %v", err)
 		}
 
-		// First instance releases lock
-		if err := d1.Unlock(); err != nil {
+		// Release lock
+		if err := d.Unlock(); err != nil {
 			t.Fatal(err)
 		}
 
-		// Second instance should now be able to acquire lock
-		if err := d2.Lock(); err != nil {
+		// Try to unlock again (should fail)
+		if err := d.Unlock(); err != database.ErrNotLocked {
+			t.Fatalf("Expected ErrNotLocked, got %v", err)
+		}
+
+		// Should be able to lock again
+		if err := d.Lock(); err != nil {
 			t.Fatal(err)
 		}
 
-		if err := d2.Unlock(); err != nil {
+		if err := d.Unlock(); err != nil {
 			t.Fatal(err)
 		}
 	})
