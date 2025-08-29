@@ -1,6 +1,7 @@
 package sqlite3
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"io"
@@ -33,18 +34,39 @@ type Config struct {
 }
 
 type Sqlite struct {
+	conn     *sql.Conn
 	db       *sql.DB
 	isLocked atomic.Bool
-
-	config *Config
+	config   *Config
 }
 
 func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
+	ctx := context.Background()
+	if err := instance.Ping(); err != nil {
+		return nil, err
+	}
+
+	conn, err := instance.Conn(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	mx, err := WithConnection(conn, config)
+	if err != nil {
+		return nil, err
+	}
+
+	mx.db = instance
+
+	return mx, nil
+}
+
+func WithConnection(conn *sql.Conn, config *Config) (*Sqlite, error) {
 	if config == nil {
 		return nil, ErrNilConfig
 	}
 
-	if err := instance.Ping(); err != nil {
+	if err := conn.PingContext(context.Background()); err != nil {
 		return nil, err
 	}
 
@@ -53,9 +75,11 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	}
 
 	mx := &Sqlite{
-		db:     instance,
+		conn:   conn,
+		db:     nil,
 		config: config,
 	}
+
 	if err := mx.ensureVersionTable(); err != nil {
 		return nil, err
 	}
@@ -85,7 +109,7 @@ func (m *Sqlite) ensureVersionTable() (err error) {
   CREATE UNIQUE INDEX IF NOT EXISTS version_unique ON %s (version);
   `, m.config.MigrationsTable, m.config.MigrationsTable)
 
-	if _, err := m.db.Exec(query); err != nil {
+	if _, err := m.conn.ExecContext(context.Background(), query); err != nil {
 		return err
 	}
 	return nil
@@ -129,12 +153,21 @@ func (m *Sqlite) Open(url string) (database.Driver, error) {
 }
 
 func (m *Sqlite) Close() error {
-	return m.db.Close()
+	connErr := m.conn.Close()
+	var dbErr error
+	if m.db != nil {
+		dbErr = m.db.Close()
+	}
+
+	if connErr != nil || dbErr != nil {
+		return fmt.Errorf("conn: %v, db: %v", connErr, dbErr)
+	}
+	return nil
 }
 
 func (m *Sqlite) Drop() (err error) {
 	query := `SELECT name FROM sqlite_master WHERE type = 'table';`
-	tables, err := m.db.Query(query)
+	tables, err := m.conn.QueryContext(context.Background(), query)
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
@@ -167,7 +200,7 @@ func (m *Sqlite) Drop() (err error) {
 			}
 		}
 		query := "VACUUM"
-		_, err = m.db.Query(query)
+		_, err = m.conn.QueryContext(context.Background(), query)
 		if err != nil {
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
@@ -204,7 +237,7 @@ func (m *Sqlite) Run(migration io.Reader) error {
 }
 
 func (m *Sqlite) executeQuery(query string) error {
-	tx, err := m.db.Begin()
+	tx, err := m.conn.BeginTx(context.Background(), nil)
 	if err != nil {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
 	}
@@ -221,14 +254,14 @@ func (m *Sqlite) executeQuery(query string) error {
 }
 
 func (m *Sqlite) executeQueryNoTx(query string) error {
-	if _, err := m.db.Exec(query); err != nil {
+	if _, err := m.conn.ExecContext(context.Background(), query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 	return nil
 }
 
 func (m *Sqlite) SetVersion(version int, dirty bool) error {
-	tx, err := m.db.Begin()
+	tx, err := m.conn.BeginTx(context.Background(), nil)
 	if err != nil {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
 	}
@@ -260,7 +293,7 @@ func (m *Sqlite) SetVersion(version int, dirty bool) error {
 
 func (m *Sqlite) Version() (version int, dirty bool, err error) {
 	query := "SELECT version, dirty FROM " + m.config.MigrationsTable + " LIMIT 1"
-	err = m.db.QueryRow(query).Scan(&version, &dirty)
+	err = m.conn.QueryRowContext(context.Background(), query).Scan(&version, &dirty)
 	if err != nil {
 		return database.NilVersion, false, nil
 	}
