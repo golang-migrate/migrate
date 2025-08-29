@@ -154,7 +154,7 @@ func (t *Trino) Version() (int, bool, error) {
 	var (
 		version int
 		dirty   bool
-		query   = fmt.Sprintf("SELECT version, dirty FROM %s.%s.%s LIMIT 1",
+		query   = fmt.Sprintf("SELECT version, dirty FROM %s.%s.%s  ORDER BY sequence DESC LIMIT 1",
 			t.config.MigrationsCatalog, t.config.MigrationsSchema, t.config.MigrationsTable)
 	)
 
@@ -177,12 +177,9 @@ func (t *Trino) SetVersion(version int, dirty bool) error {
 	migrationsTable := fmt.Sprintf("%s.%s.%s",
 		t.config.MigrationsCatalog, t.config.MigrationsSchema, t.config.MigrationsTable)
 
-	// Insert new version if needed
-	if version >= 0 || (version == database.NilVersion && dirty) {
-		insertQuery := fmt.Sprintf("INSERT INTO %s (version, dirty) VALUES (?, ?)", migrationsTable)
-		if _, err := t.conn.Exec(insertQuery, version, dirty); err != nil {
-			return &database.Error{OrigErr: err, Query: []byte(insertQuery)}
-		}
+	insertQuery := fmt.Sprintf("INSERT INTO %s (version, dirty, sequence) VALUES (?, ?, ?)", migrationsTable)
+	if _, err := t.conn.Exec(insertQuery, version, dirty, time.Now().UnixNano()); err != nil {
+		return &database.Error{OrigErr: err, Query: []byte(insertQuery)}
 	}
 
 	return nil
@@ -211,7 +208,8 @@ func (t *Trino) ensureVersionTable() (err error) {
 	createQuery := fmt.Sprintf(`
 		CREATE TABLE IF NOT EXISTS %s (
 			version BIGINT NOT NULL,
-			dirty BOOLEAN NOT NULL
+			dirty BOOLEAN NOT NULL,
+			sequence BIGINT NOT NULL
 		)`, migrationsTable)
 
 	if _, err := t.conn.Exec(createQuery); err != nil {
