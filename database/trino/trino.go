@@ -21,6 +21,8 @@ var (
 	ErrNilConfig           = fmt.Errorf("no config")
 )
 
+const TrinoDriverName = "trino"
+
 type Config struct {
 	MigrationsTable   string
 	MigrationsSchema  string
@@ -29,7 +31,7 @@ type Config struct {
 }
 
 func init() {
-	database.Register("trino", &Trino{})
+	database.Register(TrinoDriverName, &Trino{})
 }
 
 func WithInstance(conn *sql.DB, config *Config) (database.Driver, error) {
@@ -67,9 +69,9 @@ func (t *Trino) Open(dsn string) (database.Driver, error) {
 
 	// Filter custom parameters and handle scheme conversion
 	q := migrate.FilterCustomQuery(purl)
-	
+
 	// Convert trino:// scheme to http:// or https:// based on ssl parameter
-	if q.Scheme == "trino" {
+	if q.Scheme == TrinoDriverName {
 		// Check ssl parameter (default is true)
 		ssl := purl.Query().Get("ssl")
 		if ssl == "" || ssl == "true" {
@@ -86,7 +88,7 @@ func (t *Trino) Open(dsn string) (database.Driver, error) {
 	}
 	q.RawQuery = query.Encode()
 
-	conn, err := sql.Open("trino", q.String())
+	conn, err := sql.Open(TrinoDriverName, q.String())
 	if err != nil {
 		return nil, err
 	}

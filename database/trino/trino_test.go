@@ -97,7 +97,7 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 			time.Sleep(2 * time.Second)
 			continue
 		}
-		
+
 		// Test a simple query to ensure Trino is fully ready
 		var result int
 		if err = db.QueryRowContext(readyCtx, "SELECT 1").Scan(&result); err != nil {
@@ -105,7 +105,7 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 			time.Sleep(2 * time.Second)
 			continue
 		}
-		
+
 		log.Printf("trino ready after %d attempts", i+1)
 		// Give Trino a moment to stabilize before tests start
 		time.Sleep(3 * time.Second)
@@ -333,7 +333,7 @@ func TestTrinoSchemeConversion(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			
+
 			// Apply the same logic as in the Open function
 			q := migrate.FilterCustomQuery(purl)
 			if q.Scheme == "trino" {
@@ -344,7 +344,7 @@ func TestTrinoSchemeConversion(t *testing.T) {
 					q.Scheme = "http"
 				}
 			}
-			
+
 			if q.Scheme != tc.expectedScheme {
 				t.Errorf("Expected scheme %s, got %s for URL %s", tc.expectedScheme, q.Scheme, tc.inputURL)
 			}
@@ -367,7 +367,7 @@ func TestTrinoLockConcurrency(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer d.Close()
+		defer func() { _ = d.Close() }()
 
 		// Test basic locking functionality
 		if err := d.Lock(); err != nil {
