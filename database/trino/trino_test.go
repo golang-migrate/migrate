@@ -115,14 +115,6 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 	return false
 }
 
-func mustRun(t *testing.T, d database.Driver, statements []string) {
-	for _, statement := range statements {
-		if err := d.Run(strings.NewReader(statement)); err != nil {
-			t.Fatal(err)
-		}
-	}
-}
-
 func Test(t *testing.T) {
 	t.Run("test", test)
 	t.Run("testMigrate", testMigrate)

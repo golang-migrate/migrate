@@ -8,16 +8,16 @@ import (
 
 func TestConfig_Defaults(t *testing.T) {
 	config := &Config{}
-	
+
 	// Test default values get set properly
 	if config.MigrationsTable != "" {
 		t.Errorf("Expected empty MigrationsTable, got %s", config.MigrationsTable)
 	}
-	
+
 	if config.MigrationsSchema != "" {
 		t.Errorf("Expected empty MigrationsSchema, got %s", config.MigrationsSchema)
 	}
-	
+
 	if config.MigrationsCatalog != "" {
 		t.Errorf("Expected empty MigrationsCatalog, got %s", config.MigrationsCatalog)
 	}
@@ -45,7 +45,7 @@ func TestTrino_Registration(t *testing.T) {
 			break
 		}
 	}
-	
+
 	if !found {
 		t.Error("Trino driver should be registered")
 	}
