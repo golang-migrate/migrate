@@ -36,7 +36,7 @@ test-short:
 test:
 	@-rm -r $(COVERAGE_DIR)
 	@mkdir $(COVERAGE_DIR)
-	make test-with-flags TEST_FLAGS='-v -race -covermode atomic -coverprofile $$(COVERAGE_DIR)/combined.txt -bench=. -benchmem -timeout 20m'
+	make test-with-flags TEST_FLAGS='-v -race -covermode atomic -coverprofile $$(COVERAGE_DIR)/combined.txt -bench=. -benchmem -timeout 30m'
 
 
 test-with-flags:

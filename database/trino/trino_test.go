@@ -117,9 +117,45 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 
 func Test(t *testing.T) {
 	t.Run("test", test)
-	t.Run("testMigrate", testMigrate)
-	t.Run("testWithInstance", testWithInstance)
+
+	t.Cleanup(func() {
+		for _, spec := range specs {
+			t.Log("Cleaning up ", spec.ImageName)
+			if err := spec.Cleanup(); err != nil {
+				t.Error("Error removing ", spec.ImageName, "error:", err)
+			}
+		}
+	})
+}
+
+func TestOpen(t *testing.T) {
 	t.Run("testOpen", testOpen)
+
+	t.Cleanup(func() {
+		for _, spec := range specs {
+			t.Log("Cleaning up ", spec.ImageName)
+			if err := spec.Cleanup(); err != nil {
+				t.Error("Error removing ", spec.ImageName, "error:", err)
+			}
+		}
+	})
+}
+
+func TestMigrate(t *testing.T) {
+	t.Run("testMigrate", testMigrate)
+
+	t.Cleanup(func() {
+		for _, spec := range specs {
+			t.Log("Cleaning up ", spec.ImageName)
+			if err := spec.Cleanup(); err != nil {
+				t.Error("Error removing ", spec.ImageName, "error:", err)
+			}
+		}
+	})
+}
+
+func TestWithInstance(t *testing.T) {
+	t.Run("testWithInstance", testWithInstance)
 
 	t.Cleanup(func() {
 		for _, spec := range specs {
