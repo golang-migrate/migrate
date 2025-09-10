@@ -29,7 +29,8 @@ require (
 	github.com/microsoft/go-mssqldb v1.0.0
 	github.com/mutecomm/go-sqlcipher/v4 v4.4.0
 	github.com/nakagami/firebirdsql v0.0.0-20190310045651-3c02a58cfed8
-	github.com/neo4j/neo4j-go-driver v1.8.1-0.20200803113522-b626aa943eba
+	github.com/neo4j/neo4j-go-driver v1.8.3
+	github.com/neo4j/neo4j-go-driver/v4 v4.4.7
 	github.com/snowflakedb/gosnowflake v1.6.19
 	github.com/stretchr/testify v1.10.0
 	github.com/xanzy/go-gitlab v0.15.0
@@ -157,8 +158,6 @@ require (
 	github.com/moby/term v0.5.0 // indirect
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/mtibben/percent v0.2.1 // indirect
-	github.com/onsi/ginkgo v1.16.4 // indirect
-	github.com/onsi/gomega v1.15.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.16 // indirect

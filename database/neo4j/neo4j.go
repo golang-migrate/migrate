@@ -11,7 +11,7 @@ import (
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/golang-migrate/migrate/v4/database/multistmt"
 	"github.com/hashicorp/go-multierror"
-	"github.com/neo4j/neo4j-go-driver/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
 )
 
 func init() {
@@ -69,27 +69,15 @@ func (n *Neo4j) Open(url string) (database.Driver, error) {
 	password, _ := uri.User.Password()
 	authToken := neo4j.BasicAuth(uri.User.Username(), password, "")
 	uri.User = nil
-	uri.Scheme = "bolt"
+	uri.Scheme = "neo4j"
 	msQuery := uri.Query().Get("x-multi-statement")
-
-	// Whether to turn on/off TLS encryption.
-	tlsEncrypted := uri.Query().Get("x-tls-encrypted")
 	multi := false
-	encrypted := false
 	if msQuery != "" {
 		multi, err = strconv.ParseBool(uri.Query().Get("x-multi-statement"))
 		if err != nil {
 			return nil, err
 		}
 	}
-
-	if tlsEncrypted != "" {
-		encrypted, err = strconv.ParseBool(tlsEncrypted)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	multiStatementMaxSize := DefaultMultiStatementMaxSize
 	if s := uri.Query().Get("x-multi-statement-max-size"); s != "" {
 		multiStatementMaxSize, err = strconv.Atoi(s)
@@ -97,12 +85,8 @@ func (n *Neo4j) Open(url string) (database.Driver, error) {
 			return nil, err
 		}
 	}
-
 	uri.RawQuery = ""
-
-	driver, err := neo4j.NewDriver(uri.String(), authToken, func(config *neo4j.Config) {
-		config.Encrypted = encrypted
-	})
+	driver, err := neo4j.NewDriver(uri.String(), authToken)
 	if err != nil {
 		return nil, err
 	}
@@ -295,7 +279,7 @@ func (n *Neo4j) ensureVersionConstraint() (err error) {
 		return nil
 	}
 
-	query := fmt.Sprintf("CREATE CONSTRAINT ON (a:%s) ASSERT a.version IS UNIQUE", n.config.MigrationsLabel)
+	query := fmt.Sprintf("CREATE CONSTRAINT FOR (a:%s) REQUIRE a.version IS UNIQUE", n.config.MigrationsLabel)
 	if _, err := neo4j.Collect(session.Run(query, nil)); err != nil {
 		return err
 	}
