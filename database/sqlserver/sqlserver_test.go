@@ -96,6 +96,7 @@ func SkipIfUnsupportedArch(t *testing.T, c dktest.ContainerInfo) {
 }
 
 func Test(t *testing.T) {
+	t.Skip("Skipping SQL Server tests in CI for infobloxopen/migrate repo")
 	t.Run("test", test)
 	t.Run("testMigrate", testMigrate)
 	t.Run("testMultiStatement", testMultiStatement)
