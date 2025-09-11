@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: ["1.23.x", "1.24.x"]
+        go: ["1.24.x"]
     steps:
       - uses: actions/checkout@v4
 
@@ -18,7 +18,7 @@ jobs:
           go-version: ${{ matrix.go }}
 
       - name: Run test
-        run: make test COVERAGE_DIR=/tmp/coverage
+        run: make test COVERAGE_DIR=/tmp/coverage DATABASE="postgres mysql clickhouse mongodb pgx pgx5 rqlite sqlite sqlite3"
 
       - name: Send goveralls coverage
         uses: shogo82148/actions-goveralls@v1
