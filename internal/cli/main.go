@@ -38,6 +38,7 @@ const (
 	dropUsage = `drop [-f]    Drop everything inside database
 	Use -f to bypass confirmation`
 	forceUsage = `force V      Set version V but don't run migration (ignores dirty state)`
+	installToUsage = `install-to DIR    Copy the running binary to the specified directory`
 )
 
 func handleSubCmdHelp(help bool, usage string, flagSet *flag.FlagSet) {
@@ -123,10 +124,11 @@ Commands:
   %s
   %s
   %s
+  %s
   version      Print current migration version
 
 Source drivers: `+strings.Join(source.List(), ", ")+`
-Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoUsage, upUsage, downUsage, dropUsage, forceUsage)
+Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoUsage, upUsage, downUsage, dropUsage, forceUsage, installToUsage)
 	}
 
 	// initialize logger
@@ -421,6 +423,39 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 
 		if log.verbose {
 			log.Println("Finished after", time.Since(startTime))
+		}
+
+	case "install-to":
+		installToFlagSet, helpPtr := newFlagSetWithHelp("install-to")
+
+		if err := installToFlagSet.Parse(args); err != nil {
+			log.fatalErr(err)
+		}
+
+		handleSubCmdHelp(*helpPtr, installToUsage, installToFlagSet)
+
+		if installToFlagSet.NArg() == 0 {
+			log.fatal("error: please specify destination directory")
+		}
+
+		destDir := installToFlagSet.Arg(0)
+
+		// Check if destination directory exists
+		if info, err := os.Stat(destDir); err != nil {
+			if os.IsNotExist(err) {
+				log.fatal("error: destination directory does not exist")
+			}
+			log.fatalErr(fmt.Errorf("error checking destination directory: %w", err))
+		} else if !info.IsDir() {
+			log.fatal("error: destination path is not a directory")
+		}
+
+		if err := installToCmd(destDir); err != nil {
+			log.fatalErr(err)
+		}
+
+		if log.verbose {
+			log.Println("Binary successfully installed to", destDir)
 		}
 
 	case "version":
