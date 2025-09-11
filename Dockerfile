@@ -1,9 +1,9 @@
-FROM golang:1.24-alpine3.21 AS builder
+FROM golang:1.24-alpine AS builder
 ARG VERSION
 
 RUN apk add --no-cache git gcc musl-dev make
 
-WORKDIR /go/src/github.com/golang-migrate/migrate
+WORKDIR /go/src/github.com/infobloxopen/migrate
 
 ENV GO111MODULE=on
 
@@ -15,12 +15,11 @@ COPY . ./
 
 RUN make build-docker
 
-FROM alpine:3.21
+FROM gcr.io/distroless/static:nonroot
 
-RUN apk add --no-cache ca-certificates
-
-COPY --from=builder /go/src/github.com/golang-migrate/migrate/build/migrate.linux-386 /usr/local/bin/migrate
-RUN ln -s /usr/local/bin/migrate /migrate
+COPY --from=builder /go/src/github.com/infobloxopen/migrate/cmd/migrate/config /cli/config/
+COPY --from=builder /go/src/github.com/infobloxopen/migrate/build/migrate.linux-386 /migrate
+COPY --from=builder /etc/ssl/certs/ /etc/ssl/certs/
 
 ENTRYPOINT ["migrate"]
 CMD ["--help"]

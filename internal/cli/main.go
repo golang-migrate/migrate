@@ -1,8 +1,9 @@
 package cli
 
 import (
-	"flag"
+	"database/sql"
 	"fmt"
+	"net/url"
 	"os"
 	"os/signal"
 	"strconv"
@@ -10,8 +11,12 @@ import (
 	"syscall"
 	"time"
 
+	flag "github.com/spf13/pflag"
+	"github.com/spf13/viper"
+
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
+	"github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/golang-migrate/migrate/v4/source"
 )
 
@@ -24,7 +29,9 @@ const (
 	   Use -format option to specify a Go time format string. Note: migrations with the same time cause "duplicate migration version" error.
            Use -tz option to specify the timezone that will be used when generating non-sequential migrations (defaults: UTC).
 `
-	gotoUsage = `goto V       Migrate to version V`
+	gotoUsage = `goto V [-force-dirty-handling] [-cache-dir P]      Migrate to version V
+	Use -force-dirty-handling to handle dirty database state
+	Use -cache-dir to specify the intermediate path P for storing migrations`
 	upUsage   = `up [N]       Apply all or N up migrations`
 	downUsage = `down [N] [-all]    Apply all or N down migrations
 	Use -all to apply all down migrations`
@@ -58,16 +65,30 @@ func printUsageAndExit() {
 	os.Exit(2)
 }
 
+func dbMakeConnectionString(driver, user, password, address, name, ssl string) string {
+	return fmt.Sprintf("%s://%s:%s@%s/%s?sslmode=%s",
+		driver, url.QueryEscape(user), url.QueryEscape(password), address, name, ssl,
+	)
+}
+
 // Main function of a cli application. It is public for backwards compatibility with `cli` package
 func Main(version string) {
-	helpPtr := flag.Bool("help", false, "")
-	versionPtr := flag.Bool("version", false, "")
-	verbosePtr := flag.Bool("verbose", false, "")
-	prefetchPtr := flag.Uint("prefetch", 10, "")
-	lockTimeoutPtr := flag.Uint("lock-timeout", 15, "")
-	pathPtr := flag.String("path", "", "")
-	databasePtr := flag.String("database", "", "")
-	sourcePtr := flag.String("source", "", "")
+	help := viper.GetBool("help")
+	version = viper.GetString("version")
+	verbose := viper.GetBool("verbose")
+	prefetch := viper.GetInt("prefetch")
+	lockTimeout := viper.GetInt("lock-timeout")
+	path := viper.GetString("path")
+	sourcePtr := viper.GetString("source")
+
+	databasePtr := viper.GetString("database.dsn")
+	if databasePtr == "" {
+		databasePtr = dbMakeConnectionString(
+			viper.GetString("database.driver"), viper.GetString("database.user"),
+			viper.GetString("database.password"), viper.GetString("database.address"),
+			viper.GetString("database.name"), viper.GetString("database.ssl"),
+		)
+	}
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr,
@@ -75,14 +96,25 @@ func Main(version string) {
        migrate [ -version | -help ]
 
 Options:
-  -source          Location of the migrations (driver://url)
-  -path            Shorthand for -source=file://path
-  -database        Run migrations against this database (driver://url)
-  -prefetch N      Number of migrations to load in advance before executing (default 10)
-  -lock-timeout N  Allow N seconds to acquire database lock (default 15)
-  -verbose         Print verbose logging
-  -version         Print version
-  -help            Print usage
+  --source          Location of the migrations (driver://url)
+  --path            Shorthand for -source=file://path
+  --database        Run migrations against this database (driver://url)
+  --prefetch N      Number of migrations to load in advance before executing (default 10)
+  --lock-timeout N  Allow N seconds to acquire database lock (default 15)
+  --verbose         Print verbose logging
+  --version         Print version
+  --help            Print usage
+
+  // Infoblox specific
+  --config.source        directory of the configuration file (default "/cli/config")
+  --config.file          configuration file name (without extension)
+  --database.dsn         database connection string
+  --database.driver      database driver (default postgres)
+  --database.address     address of the database (default "0.0.0.0:5432")
+  --database.name        name of the database
+  --database.user        database username (default "postgres")
+  --database.password    database password (default "postgres")
+  --database.ssl         database ssl mode (default "disable")
 
 Commands:
   %s
@@ -97,32 +129,50 @@ Source drivers: `+strings.Join(source.List(), ", ")+`
 Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoUsage, upUsage, downUsage, dropUsage, forceUsage)
 	}
 
-	flag.Parse()
-
 	// initialize logger
-	log.verbose = *verbosePtr
+	log.verbose = verbose
 
 	// show cli version
-	if *versionPtr {
+	if version == "" {
 		fmt.Fprintln(os.Stderr, version)
 		os.Exit(0)
 	}
 
 	// show help
-	if *helpPtr {
+	if help {
 		flag.Usage()
 		os.Exit(0)
 	}
 
 	// translate -path into -source if given
-	if *sourcePtr == "" && *pathPtr != "" {
-		*sourcePtr = fmt.Sprintf("file://%v", *pathPtr)
+	if sourcePtr == "" && path != "" {
+		sourcePtr = fmt.Sprintf("file://%v", path)
 	}
 
 	// initialize migrate
 	// don't catch migraterErr here and let each command decide
 	// how it wants to handle the error
-	migrater, migraterErr := migrate.New(*sourcePtr, *databasePtr)
+	var migrater *migrate.Migrate
+	var migraterErr error
+
+	if driver := viper.GetString("database.driver"); driver == "hotload" {
+		db, err := sql.Open(driver, databasePtr)
+		if err != nil {
+			log.fatalErr(fmt.Errorf("could not open hotload dsn %s: %s", databasePtr, err))
+		}
+		var dbname, user string
+		if err := db.QueryRow("SELECT current_database(), user").Scan(&dbname, &user); err != nil {
+			log.fatalErr(fmt.Errorf("could not get current_database: %s", err.Error()))
+		}
+		// dbname is not needed since it gets filled in by the driver but we want to be complete
+		migrateDriver, err := postgres.WithInstance(db, &postgres.Config{DatabaseName: dbname})
+		if err != nil {
+			log.fatalErr(fmt.Errorf("could not create migrate driver: %s", err))
+		}
+		migrater, migraterErr = migrate.NewWithDatabaseInstance(sourcePtr, dbname, migrateDriver)
+	} else {
+		migrater, migraterErr = migrate.New(sourcePtr, databasePtr)
+	}
 	defer func() {
 		if migraterErr == nil {
 			if _, err := migrater.Close(); err != nil {
@@ -132,8 +182,8 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 	}()
 	if migraterErr == nil {
 		migrater.Log = log
-		migrater.PrefetchMigrations = *prefetchPtr
-		migrater.LockTimeout = time.Duration(int64(*lockTimeoutPtr)) * time.Second
+		migrater.PrefetchMigrations = uint(prefetch)
+		migrater.LockTimeout = time.Duration(int64(lockTimeout)) * time.Second
 
 		// handle Ctrl+c
 		signals := make(chan os.Signal, 1)
@@ -214,8 +264,19 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 		if err != nil {
 			log.fatal("error: can't read version argument V")
 		}
+		handleDirty := viper.GetBool("force-dirty-handling")
+		if handleDirty {
+			destPath := viper.GetString("cache-dir")
+			if destPath == "" {
+				log.fatal("error: cache-dir must be specified when force-dirty-handling is set")
+			}
 
-		if err := gotoCmd(migrater, uint(v)); err != nil {
+			if err = migrater.WithDirtyStateConfig(sourcePtr, destPath, handleDirty); err != nil {
+				log.fatalErr(err)
+			}
+		}
+
+		if err = gotoCmd(migrater, uint(v)); err != nil {
 			log.fatalErr(err)
 		}
 

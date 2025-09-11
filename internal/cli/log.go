@@ -2,7 +2,7 @@ package cli
 
 import (
 	"fmt"
-	logpkg "log"
+	logpkg "github.com/sirupsen/logrus"
 	"os"
 )
 
