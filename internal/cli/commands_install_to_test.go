@@ -29,7 +29,7 @@ func TestInstallToCmdSuccess(t *testing.T) {
 		t.Fatalf("Failed to get executable path: %v", err)
 	}
 	executableName := filepath.Base(executablePath)
-	
+
 	// Check that the file was created
 	installedPath := filepath.Join(destDir, executableName)
 	info, err := os.Stat(installedPath)
@@ -61,12 +61,12 @@ func TestInstallToCmdSuccess(t *testing.T) {
 func TestInstallToCmdNonexistentDirectory(t *testing.T) {
 	tempDir := t.TempDir()
 	nonexistentDir := filepath.Join(tempDir, "nonexistent", "deep", "path")
-	
+
 	err := installToCmd(nonexistentDir)
 	if err == nil {
 		t.Error("Expected error for nonexistent directory, got nil")
 	}
-	
+
 	// Should contain a meaningful error message
 	if err != nil && err.Error() == "" {
 		t.Error("Error message should not be empty")
@@ -154,7 +154,7 @@ func TestInstallToCmdTempFileCleanup(t *testing.T) {
 		t.Fatalf("Failed to get executable path: %v", err)
 	}
 	executableName := filepath.Base(executablePath)
-	
+
 	// We can't easily simulate a failure in the middle of installToCmd,
 	// but we can check that no temp files are left after successful execution
 	err = installToCmd(destDir)
@@ -235,7 +235,7 @@ func TestInstallToCmdIntegration(t *testing.T) {
 	// Build a test binary first
 	tempDir := t.TempDir()
 	testBinary := filepath.Join(tempDir, "migrate-test")
-	
+
 	// Find the repo root by looking for go.mod
 	repoRoot := "."
 	for i := 0; i < 5; i++ { // Look up to 5 levels up
@@ -244,7 +244,7 @@ func TestInstallToCmdIntegration(t *testing.T) {
 		}
 		repoRoot = filepath.Join("..", repoRoot)
 	}
-	
+
 	cmd := exec.Command("go", "build", "-o", testBinary, "./cmd/migrate")
 	cmd.Dir = repoRoot
 	output, err := cmd.CombinedOutput()

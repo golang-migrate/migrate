@@ -16,7 +16,7 @@ func installToCmd(destDir string) error {
 
 	// Get the base name of the executable
 	executableName := filepath.Base(executablePath)
-	
+
 	// Create destination path
 	destPath := filepath.Join(destDir, executableName)
 	tempPath := destPath + ".tmp"

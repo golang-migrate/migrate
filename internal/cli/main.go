@@ -37,7 +37,7 @@ const (
 	Use -all to apply all down migrations`
 	dropUsage = `drop [-f]    Drop everything inside database
 	Use -f to bypass confirmation`
-	forceUsage = `force V      Set version V but don't run migration (ignores dirty state)`
+	forceUsage     = `force V      Set version V but don't run migration (ignores dirty state)`
 	installToUsage = `install-to DIR    Copy the running binary to the specified directory`
 )
 
