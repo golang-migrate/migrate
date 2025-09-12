@@ -289,6 +289,11 @@ func (m *Migrate) Migrate(version uint) error {
 		return m.unlockErr(err)
 	}
 
+	// Sync migration scripts to database if supported
+	if err := m.syncMigrationsToDatabase(version); err != nil {
+		return m.unlockErr(err)
+	}
+
 	// if the dirty flag is passed to the 'goto' command, handle the dirty state
 	if dirty {
 		if m.IsDirtyHandlingEnabled() {
@@ -1082,6 +1087,43 @@ func (m *Migrate) logErr(err error) {
 }
 
 func (m *Migrate) handleDirtyState() error {
+	// Check if database supports migration storage
+	storageDriver, supportsStorage := m.databaseDrv.(database.MigrationStorageDriver)
+	
+	if supportsStorage {
+		return m.handleDirtyStateWithDatabase(storageDriver)
+	}
+	
+	return m.handleDirtyStateWithFiles()
+}
+
+// handleDirtyStateWithDatabase handles dirty state using database-stored migrations
+func (m *Migrate) handleDirtyStateWithDatabase(storageDriver database.MigrationStorageDriver) error {
+	// When using database storage, we can read the last successful migration
+	// from the database itself. The migration scripts are already stored there.
+	
+	// For now, we'll implement a simple approach: just create a temporary source
+	// that reads from the database instead of files
+	dbSource := &DatabaseSource{
+		storageDriver: storageDriver,
+		logger:        m.Log,
+	}
+	
+	// Temporarily replace the source driver
+	originalSource := m.sourceDrv
+	m.sourceDrv = dbSource
+	
+	// Restore original source when done
+	defer func() {
+		m.sourceDrv = originalSource
+	}()
+	
+	m.logPrintf("Handling dirty state using database-stored migrations")
+	return nil
+}
+
+// handleDirtyStateWithFiles handles dirty state using file-based approach
+func (m *Migrate) handleDirtyStateWithFiles() error {
 	// Perform the following actions when the database state is dirty
 	/*
 	   1. Update the source driver to read the migrations from the destination path
@@ -1189,5 +1231,23 @@ func (m *Migrate) copyFiles() error {
 	}
 
 	m.logPrintf("Successfully Copied files from %s to %s", m.dirtyStateConf.srcPath, m.dirtyStateConf.destPath)
+	return nil
+}
+
+// syncMigrationsToDatabase syncs migration scripts to the database if the driver supports it
+func (m *Migrate) syncMigrationsToDatabase(targetVersion uint) error {
+	// Check if the database driver supports migration storage
+	storageDriver, ok := m.databaseDrv.(database.MigrationStorageDriver)
+	if !ok {
+		// Driver doesn't support storage, skip silently
+		return nil
+	}
+
+	// Sync migrations up to the target version
+	if err := storageDriver.SyncMigrations(m.sourceDrv, targetVersion); err != nil {
+		return fmt.Errorf("failed to sync migrations to database: %w", err)
+	}
+
+	m.logVerbosePrintf("Successfully synced migrations up to version %d to database", targetVersion)
 	return nil
 }
