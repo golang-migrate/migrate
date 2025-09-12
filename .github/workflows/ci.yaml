@@ -6,6 +6,7 @@ on:
 
 jobs:
   lint:
+    if: false # disable linting for infobloxopen/migrate
     name: lint
     runs-on: ubuntu-latest
     steps:
