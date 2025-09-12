@@ -27,8 +27,8 @@ $ scoop install migrate
 ### Linux (*.deb package)
 
 ```bash
-$ curl -L https://packagecloud.io/golang-migrate/migrate/gpgkey | apt-key add -
-$ echo "deb https://packagecloud.io/golang-migrate/migrate/ubuntu/ $(lsb_release -sc) main" > /etc/apt/sources.list.d/migrate.list
+$ curl -fsSL https://packagecloud.io/golang-migrate/migrate/gpgkey | sudo gpg --dearmor -o /etc/apt/keyrings/migrate.gpg
+$ echo "deb [signed-by=/etc/apt/keyrings/migrate.gpg] https://packagecloud.io/golang-migrate/migrate/ubuntu/ $(lsb_release -sc) main" > /etc/apt/sources.list.d/migrate.list
 $ apt-get update
 $ apt-get install -y migrate
 ```
@@ -86,14 +86,18 @@ Options:
   -help            Print usage
 
 Commands:
-  create [-ext E] [-dir D] [-seq] [-digits N] [-format] NAME
-               Create a set of timestamped up/down migrations titled NAME, in directory D with extension E.
-               Use -seq option to generate sequential up/down migrations with N digits.
-               Use -format option to specify a Go time format string.
+  create [-ext E] [-dir D] [-seq] [-digits N] [-format] [-tz] NAME
+           Create a set of timestamped up/down migrations titled NAME, in directory D with extension E.
+           Use -seq option to generate sequential up/down migrations with N digits.
+           Use -format option to specify a Go time format string. Note: migrations with the same time cause "duplicate migration version" error.
+           Use -tz option to specify the timezone that will be used when generating non-sequential migrations (defaults: UTC).
+
   goto V       Migrate to version V
   up [N]       Apply all or N up migrations
-  down [N]     Apply all or N down migrations
-  drop         Drop everything inside database
+  down [N] [-all]    Apply all or N down migrations
+        Use -all to apply all down migrations
+  drop [-f]    Drop everything inside database
+        Use -f to bypass confirmation
   force V      Set version V but don't run migration (ignores dirty state)
   version      Print current migration version
 ```

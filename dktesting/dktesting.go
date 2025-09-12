@@ -4,11 +4,9 @@ import (
 	"context"
 	"fmt"
 	"testing"
-)
 
-import (
 	"github.com/dhui/dktest"
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 )
 
@@ -36,7 +34,7 @@ func (s *ContainerSpec) Cleanup() (retErr error) {
 	}
 	ctx, timeoutCancelFunc := context.WithTimeout(context.Background(), cleanupTimeout)
 	defer timeoutCancelFunc()
-	if _, err := dc.ImageRemove(ctx, s.ImageName, types.ImageRemoveOptions{Force: true, PruneChildren: true}); err != nil {
+	if _, err := dc.ImageRemove(ctx, s.ImageName, image.RemoveOptions{Force: true, PruneChildren: true}); err != nil {
 		return err
 	}
 	return nil

@@ -1,5 +1,4 @@
 //go:build go1.9
-// +build go1.9
 
 package mysql
 
@@ -14,9 +13,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
-
-	"go.uber.org/atomic"
 
 	"github.com/go-sql-driver/mysql"
 	"github.com/golang-migrate/migrate/v4/database"
