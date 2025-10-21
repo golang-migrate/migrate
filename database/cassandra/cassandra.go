@@ -280,9 +280,6 @@ func (c *Cassandra) Version() (version int, dirty bool, err error) {
 		return database.NilVersion, false, nil
 
 	case err != nil:
-		if _, ok := err.(*gocql.Error); ok {
-			return database.NilVersion, false, nil
-		}
 		return 0, false, &database.Error{OrigErr: err, Query: []byte(query)}
 
 	default:
