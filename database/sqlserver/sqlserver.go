@@ -13,7 +13,6 @@ import (
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
-	"github.com/hashicorp/go-multierror"
 	mssql "github.com/microsoft/go-mssqldb" // mssql support
 )
 
@@ -271,7 +270,7 @@ func (ss *SQLServer) SetVersion(version int, dirty bool) error {
 	query := `TRUNCATE TABLE ` + ss.getMigrationTable()
 	if _, err := tx.Exec(query); err != nil {
 		if errRollback := tx.Rollback(); errRollback != nil {
-			err = multierror.Append(err, errRollback)
+			err = fmt.Errorf("%w: %w", err, errRollback)
 		}
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
@@ -287,7 +286,7 @@ func (ss *SQLServer) SetVersion(version int, dirty bool) error {
 		query = `INSERT INTO ` + ss.getMigrationTable() + ` (version, dirty) VALUES (@p1, @p2)`
 		if _, err := tx.Exec(query, version, dirtyBit); err != nil {
 			if errRollback := tx.Rollback(); errRollback != nil {
-				err = multierror.Append(err, errRollback)
+				err = fmt.Errorf("%w: %w", err, errRollback)
 			}
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
@@ -362,7 +361,7 @@ func (ss *SQLServer) ensureVersionTable() (err error) {
 			if err == nil {
 				err = e
 			} else {
-				err = multierror.Append(err, e)
+				err = fmt.Errorf("%w: %w", err, e)
 			}
 		}
 	}()

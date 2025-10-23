@@ -12,7 +12,6 @@ import (
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
-	"github.com/hashicorp/go-multierror"
 	_ "github.com/nakagami/firebirdsql"
 )
 
@@ -180,7 +179,11 @@ func (f *Firebird) Drop() (err error) {
 	}
 	defer func() {
 		if errClose := tables.Close(); errClose != nil {
-			err = multierror.Append(err, errClose)
+			if err == nil {
+				err = errClose
+			} else {
+				err = fmt.Errorf("%w: %w", err, errClose)
+			}
 		}
 	}()
 
@@ -226,7 +229,7 @@ func (f *Firebird) ensureVersionTable() (err error) {
 			if err == nil {
 				err = e
 			} else {
-				err = multierror.Append(err, e)
+				err = fmt.Errorf("%w: %w", err, e)
 			}
 		}
 	}()

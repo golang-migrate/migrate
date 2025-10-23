@@ -17,7 +17,6 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/golang-migrate/migrate/v4/database/multistmt"
-	"github.com/hashicorp/go-multierror"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5/pgconn"
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -345,7 +344,7 @@ func (p *Postgres) SetVersion(version int, dirty bool) error {
 	query := `TRUNCATE ` + quoteIdentifier(p.config.migrationsSchemaName) + `.` + quoteIdentifier(p.config.migrationsTableName)
 	if _, err := tx.Exec(query); err != nil {
 		if errRollback := tx.Rollback(); errRollback != nil {
-			err = multierror.Append(err, errRollback)
+			err = fmt.Errorf("%w: %w", err, errRollback)
 		}
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
@@ -357,7 +356,7 @@ func (p *Postgres) SetVersion(version int, dirty bool) error {
 		query = `INSERT INTO ` + quoteIdentifier(p.config.migrationsSchemaName) + `.` + quoteIdentifier(p.config.migrationsTableName) + ` (version, dirty) VALUES ($1, $2)`
 		if _, err := tx.Exec(query, version, dirty); err != nil {
 			if errRollback := tx.Rollback(); errRollback != nil {
-				err = multierror.Append(err, errRollback)
+				err = fmt.Errorf("%w: %w", err, errRollback)
 			}
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
@@ -399,7 +398,11 @@ func (p *Postgres) Drop() (err error) {
 	}
 	defer func() {
 		if errClose := tables.Close(); errClose != nil {
-			err = multierror.Append(err, errClose)
+			if err == nil {
+				err = errClose
+			} else {
+				err = fmt.Errorf("%w: %w", err, errClose)
+			}
 		}
 	}()
 
@@ -444,7 +447,7 @@ func (p *Postgres) ensureVersionTable() (err error) {
 			if err == nil {
 				err = e
 			} else {
-				err = multierror.Append(err, e)
+				err = fmt.Errorf("%w: %w", err, e)
 			}
 		}
 	}()

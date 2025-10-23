@@ -19,7 +19,6 @@ import (
 	dockerimage "github.com/docker/docker/api/types/image"
 	dockernetwork "github.com/docker/docker/api/types/network"
 	dockerclient "github.com/docker/docker/client"
-	"github.com/hashicorp/go-multierror"
 )
 
 func NewDockerContainer(t testing.TB, image string, env []string, cmd []string) (*DockerContainer, error) {
@@ -79,7 +78,11 @@ func (d *DockerContainer) PullImage() (err error) {
 	}
 	defer func() {
 		if errClose := r.Close(); errClose != nil {
-			err = multierror.Append(errClose)
+			if err == nil {
+				err = errClose
+			} else {
+				err = fmt.Errorf("%w: %w", err, errClose)
+			}
 		}
 	}()
 

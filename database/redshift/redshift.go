@@ -14,7 +14,6 @@ import (
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
-	"github.com/hashicorp/go-multierror"
 	"github.com/lib/pq"
 )
 
@@ -216,7 +215,7 @@ func (p *Redshift) SetVersion(version int, dirty bool) error {
 	query := `DELETE FROM "` + p.config.MigrationsTable + `"`
 	if _, err := tx.Exec(query); err != nil {
 		if errRollback := tx.Rollback(); errRollback != nil {
-			err = multierror.Append(err, errRollback)
+			err = fmt.Errorf("%w: %w", err, errRollback)
 		}
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
@@ -228,7 +227,7 @@ func (p *Redshift) SetVersion(version int, dirty bool) error {
 		query = `INSERT INTO "` + p.config.MigrationsTable + `" (version, dirty) VALUES ($1, $2)`
 		if _, err := tx.Exec(query, version, dirty); err != nil {
 			if errRollback := tx.Rollback(); errRollback != nil {
-				err = multierror.Append(err, errRollback)
+				err = fmt.Errorf("%w: %w", err, errRollback)
 			}
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
@@ -270,7 +269,11 @@ func (p *Redshift) Drop() (err error) {
 	}
 	defer func() {
 		if errClose := tables.Close(); errClose != nil {
-			err = multierror.Append(err, errClose)
+			if err == nil {
+				err = errClose
+			} else {
+				err = fmt.Errorf("%w: %w", err, errClose)
+			}
 		}
 	}()
 
@@ -315,7 +318,7 @@ func (p *Redshift) ensureVersionTable() (err error) {
 			if err == nil {
 				err = e
 			} else {
-				err = multierror.Append(err, e)
+				err = fmt.Errorf("%w: %w", err, e)
 			}
 		}
 	}()

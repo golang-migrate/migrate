@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"io"
 	"net/url"
 	"regexp"
@@ -14,7 +15,6 @@ import (
 	"github.com/cenkalti/backoff/v4"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
-	"github.com/hashicorp/go-multierror"
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgerrcode"
 	"github.com/lib/pq"
@@ -206,7 +206,11 @@ func (c *YugabyteDB) Lock() error {
 			}
 			defer func() {
 				if errClose := rows.Close(); errClose != nil {
-					err = multierror.Append(err, errClose)
+					if err == nil {
+						err = errClose
+					} else {
+						err = fmt.Errorf("%w: %w", err, errClose)
+					}
 				}
 			}()
 
@@ -320,7 +324,11 @@ func (c *YugabyteDB) Drop() (err error) {
 	}
 	defer func() {
 		if errClose := tables.Close(); errClose != nil {
-			err = multierror.Append(err, errClose)
+			if err == nil {
+				err = errClose
+			} else {
+				err = fmt.Errorf("%w: %w", err, errClose)
+			}
 		}
 	}()
 
@@ -363,7 +371,7 @@ func (c *YugabyteDB) ensureVersionTable() (err error) {
 			if err == nil {
 				err = e
 			} else {
-				err = multierror.Append(err, e)
+				err = fmt.Errorf("%w: %w", err, e)
 			}
 		}
 	}()

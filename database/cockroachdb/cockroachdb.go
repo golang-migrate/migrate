@@ -13,7 +13,6 @@ import (
 	"github.com/cockroachdb/cockroach-go/v2/crdb"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
-	"github.com/hashicorp/go-multierror"
 	"github.com/lib/pq"
 )
 
@@ -161,7 +160,11 @@ func (c *CockroachDb) Lock() error {
 			}
 			defer func() {
 				if errClose := rows.Close(); errClose != nil {
-					err = multierror.Append(err, errClose)
+					if err == nil {
+						err = errClose
+					} else {
+						err = fmt.Errorf("%w: %w", err, errClose)
+					}
 				}
 			}()
 
@@ -276,7 +279,11 @@ func (c *CockroachDb) Drop() (err error) {
 	}
 	defer func() {
 		if errClose := tables.Close(); errClose != nil {
-			err = multierror.Append(err, errClose)
+			if err == nil {
+				err = errClose
+			} else {
+				err = fmt.Errorf("%w: %w", err, errClose)
+			}
 		}
 	}()
 
@@ -321,7 +328,7 @@ func (c *CockroachDb) ensureVersionTable() (err error) {
 			if err == nil {
 				err = e
 			} else {
-				err = multierror.Append(err, e)
+				err = fmt.Errorf("%w: %w", err, e)
 			}
 		}
 	}()

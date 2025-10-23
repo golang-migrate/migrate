@@ -20,7 +20,6 @@ import (
 	"github.com/golang-migrate/migrate/v4/database"
 
 	adminpb "cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
-	"github.com/hashicorp/go-multierror"
 	"google.golang.org/api/iterator"
 )
 
@@ -302,7 +301,7 @@ func (s *Spanner) ensureVersionTable() (err error) {
 			if err == nil {
 				err = e
 			} else {
-				err = multierror.Append(err, e)
+				err = fmt.Errorf("%w: %w", err, e)
 			}
 		}
 	}()

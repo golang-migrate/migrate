@@ -8,8 +8,6 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/hashicorp/go-multierror"
-
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 	_ "modernc.org/ql/driver"
@@ -75,7 +73,7 @@ func (m *Ql) ensureVersionTable() (err error) {
 			if err == nil {
 				err = e
 			} else {
-				err = multierror.Append(err, e)
+				err = fmt.Errorf("%w: %w", err, e)
 			}
 		}
 	}()
@@ -133,7 +131,11 @@ func (m *Ql) Drop() (err error) {
 	}
 	defer func() {
 		if errClose := tables.Close(); errClose != nil {
-			err = multierror.Append(err, errClose)
+			if err == nil {
+				err = errClose
+			} else {
+				err = fmt.Errorf("%w: %w", err, errClose)
+			}
 		}
 	}()
 
@@ -193,7 +195,7 @@ func (m *Ql) executeQuery(query string) error {
 	}
 	if _, err := tx.Exec(query); err != nil {
 		if errRollback := tx.Rollback(); errRollback != nil {
-			err = multierror.Append(err, errRollback)
+			err = fmt.Errorf("%w: %w", err, errRollback)
 		}
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
@@ -221,7 +223,7 @@ func (m *Ql) SetVersion(version int, dirty bool) error {
 			m.config.MigrationsTable)
 		if _, err := tx.Exec(query, version, dirty); err != nil {
 			if errRollback := tx.Rollback(); errRollback != nil {
-				err = multierror.Append(err, errRollback)
+				err = fmt.Errorf("%w: %w", err, errRollback)
 			}
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
