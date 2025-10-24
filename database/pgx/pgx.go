@@ -5,6 +5,7 @@ package pgx
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"io"
 	nurl "net/url"
@@ -294,11 +295,7 @@ func (p *Postgres) applyTableLock() error {
 	defer func() {
 		errRollback := tx.Rollback()
 		if errRollback != nil {
-			if err == nil {
-				err = errRollback
-			} else {
-				err = fmt.Errorf("%w: %w", err, errRollback)
-			}
+			err = errors.Join(err, errRollback)
 		}
 	}()
 
@@ -315,11 +312,7 @@ func (p *Postgres) applyTableLock() error {
 
 	defer func() {
 		if errClose := rows.Close(); errClose != nil {
-			if err == nil {
-				err = errClose
-			} else {
-				err = fmt.Errorf("%w: %w", err, errClose)
-			}
+			err = errors.Join(err, errClose)
 		}
 	}()
 
@@ -461,7 +454,7 @@ func (p *Postgres) SetVersion(version int, dirty bool) error {
 	query := `TRUNCATE ` + quoteIdentifier(p.config.migrationsSchemaName) + `.` + quoteIdentifier(p.config.migrationsTableName)
 	if _, err := tx.Exec(query); err != nil {
 		if errRollback := tx.Rollback(); errRollback != nil {
-			err = fmt.Errorf("%w: %w", err, errRollback)
+			err = errors.Join(err, errRollback)
 		}
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
@@ -473,7 +466,7 @@ func (p *Postgres) SetVersion(version int, dirty bool) error {
 		query = `INSERT INTO ` + quoteIdentifier(p.config.migrationsSchemaName) + `.` + quoteIdentifier(p.config.migrationsTableName) + ` (version, dirty) VALUES ($1, $2)`
 		if _, err := tx.Exec(query, version, dirty); err != nil {
 			if errRollback := tx.Rollback(); errRollback != nil {
-				err = fmt.Errorf("%w: %w", err, errRollback)
+				err = errors.Join(err, errRollback)
 			}
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
@@ -515,11 +508,7 @@ func (p *Postgres) Drop() (err error) {
 	}
 	defer func() {
 		if errClose := tables.Close(); errClose != nil {
-			if err == nil {
-				err = errClose
-			} else {
-				err = fmt.Errorf("%w: %w", err, errClose)
-			}
+			err = errors.Join(err, errClose)
 		}
 	}()
 
@@ -567,11 +556,7 @@ func (p *Postgres) ensureVersionTable() (err error) {
 
 	defer func() {
 		if e := p.Unlock(); e != nil {
-			if err == nil {
-				err = e
-			} else {
-				err = fmt.Errorf("%w: %w", err, e)
-			}
+			err = errors.Join(err, e)
 		}
 	}()
 

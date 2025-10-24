@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"io"
 	"net/url"
 	"regexp"
@@ -206,11 +205,7 @@ func (c *YugabyteDB) Lock() error {
 			}
 			defer func() {
 				if errClose := rows.Close(); errClose != nil {
-					if err == nil {
-						err = errClose
-					} else {
-						err = fmt.Errorf("%w: %w", err, errClose)
-					}
+					err = errors.Join(err, errClose)
 				}
 			}()
 
@@ -324,11 +319,7 @@ func (c *YugabyteDB) Drop() (err error) {
 	}
 	defer func() {
 		if errClose := tables.Close(); errClose != nil {
-			if err == nil {
-				err = errClose
-			} else {
-				err = fmt.Errorf("%w: %w", err, errClose)
-			}
+			err = errors.Join(err, errClose)
 		}
 	}()
 
@@ -368,11 +359,7 @@ func (c *YugabyteDB) ensureVersionTable() (err error) {
 
 	defer func() {
 		if e := c.Unlock(); e != nil {
-			if err == nil {
-				err = e
-			} else {
-				err = fmt.Errorf("%w: %w", err, e)
-			}
+			err = errors.Join(err, e)
 		}
 	}()
 

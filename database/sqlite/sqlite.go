@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"io"
 	nurl "net/url"
@@ -71,11 +72,7 @@ func (m *Sqlite) ensureVersionTable() (err error) {
 
 	defer func() {
 		if e := m.Unlock(); e != nil {
-			if err == nil {
-				err = e
-			} else {
-				err = fmt.Errorf("%w: %w", err, e)
-			}
+			err = errors.Join(err, e)
 		}
 	}()
 
@@ -139,11 +136,7 @@ func (m *Sqlite) Drop() (err error) {
 	}
 	defer func() {
 		if errClose := tables.Close(); errClose != nil {
-			if err == nil {
-				err = errClose
-			} else {
-				err = fmt.Errorf("%w: %w", err, errClose)
-			}
+			err = errors.Join(err, errClose)
 		}
 	}()
 
@@ -213,7 +206,7 @@ func (m *Sqlite) executeQuery(query string) error {
 	}
 	if _, err := tx.Exec(query); err != nil {
 		if errRollback := tx.Rollback(); errRollback != nil {
-			err = fmt.Errorf("%w: %w", err, errRollback)
+			err = errors.Join(err, errRollback)
 		}
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
@@ -248,7 +241,7 @@ func (m *Sqlite) SetVersion(version int, dirty bool) error {
 		query := fmt.Sprintf(`INSERT INTO %s (version, dirty) VALUES (?, ?)`, m.config.MigrationsTable)
 		if _, err := tx.Exec(query, version, dirty); err != nil {
 			if errRollback := tx.Rollback(); errRollback != nil {
-				err = fmt.Errorf("%w: %w", err, errRollback)
+				err = errors.Join(err, errRollback)
 			}
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}

@@ -2,6 +2,7 @@ package clickhouse
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -208,11 +209,7 @@ func (ch *ClickHouse) ensureVersionTable() (err error) {
 
 	defer func() {
 		if e := ch.Unlock(); e != nil {
-			if err == nil {
-				err = e
-			} else {
-				err = fmt.Errorf("%w: %w", err, e)
-			}
+			err = errors.Join(err, e)
 		}
 	}()
 
@@ -265,11 +262,7 @@ func (ch *ClickHouse) Drop() (err error) {
 	}
 	defer func() {
 		if errClose := tables.Close(); errClose != nil {
-			if err == nil {
-				err = errClose
-			} else {
-				err = fmt.Errorf("%w: %w", err, errClose)
-			}
+			err = errors.Join(err, errClose)
 		}
 	}()
 

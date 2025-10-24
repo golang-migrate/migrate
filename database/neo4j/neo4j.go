@@ -2,6 +2,7 @@ package neo4j
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	neturl "net/url"
@@ -140,11 +141,7 @@ func (n *Neo4j) Run(migration io.Reader) (err error) {
 	}
 	defer func() {
 		if cerr := session.Close(); cerr != nil {
-			if err == nil {
-				err = cerr
-			} else {
-				err = fmt.Errorf("%w: %w", err, cerr)
-			}
+			err = errors.Join(err, cerr)
 		}
 	}()
 
@@ -191,11 +188,7 @@ func (n *Neo4j) SetVersion(version int, dirty bool) (err error) {
 	}
 	defer func() {
 		if cerr := session.Close(); cerr != nil {
-			if err == nil {
-				err = cerr
-			} else {
-				err = fmt.Errorf("%w: %w", err, cerr)
-			}
+			err = errors.Join(err, cerr)
 		}
 	}()
 
@@ -220,11 +213,7 @@ func (n *Neo4j) Version() (version int, dirty bool, err error) {
 	}
 	defer func() {
 		if cerr := session.Close(); cerr != nil {
-			if err == nil {
-				err = cerr
-			} else {
-				err = fmt.Errorf("%w: %w", err, cerr)
-			}
+			err = errors.Join(err, cerr)
 		}
 	}()
 
@@ -272,11 +261,7 @@ func (n *Neo4j) Drop() (err error) {
 	}
 	defer func() {
 		if cerr := session.Close(); cerr != nil {
-			if err == nil {
-				err = cerr
-			} else {
-				err = fmt.Errorf("%w: %w", err, cerr)
-			}
+			err = errors.Join(err, cerr)
 		}
 	}()
 
@@ -293,11 +278,7 @@ func (n *Neo4j) ensureVersionConstraint() (err error) {
 	}
 	defer func() {
 		if cerr := session.Close(); cerr != nil {
-			if err == nil {
-				err = cerr
-			} else {
-				err = fmt.Errorf("%w: %w", err, cerr)
-			}
+			err = errors.Join(err, cerr)
 		}
 	}()
 

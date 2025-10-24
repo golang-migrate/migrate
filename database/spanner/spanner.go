@@ -298,11 +298,7 @@ func (s *Spanner) ensureVersionTable() (err error) {
 
 	defer func() {
 		if e := s.Unlock(); e != nil {
-			if err == nil {
-				err = e
-			} else {
-				err = fmt.Errorf("%w: %w", err, e)
-			}
+			err = errors.Join(err, e)
 		}
 	}()
 

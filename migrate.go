@@ -779,11 +779,7 @@ func (m *Migrate) versionExists(version uint) (result error) {
 	if err == nil {
 		defer func() {
 			if errClose := up.Close(); errClose != nil {
-				if result == nil {
-					result = errClose
-				} else {
-					result = fmt.Errorf("%w: %w", err, errClose)
-				}
+				result = errors.Join(result, errClose)
 			}
 		}()
 	}
@@ -798,11 +794,7 @@ func (m *Migrate) versionExists(version uint) (result error) {
 	if err == nil {
 		defer func() {
 			if errClose := down.Close(); errClose != nil {
-				if result == nil {
-					result = errClose
-				} else {
-					result = fmt.Errorf("%w: %w", err, errClose)
-				}
+				result = errors.Join(result, errClose)
 			}
 		}()
 	}
@@ -960,11 +952,7 @@ func (m *Migrate) unlock() error {
 // if a prevErr is not nil.
 func (m *Migrate) unlockErr(prevErr error) error {
 	if err := m.unlock(); err != nil {
-		if prevErr == nil {
-			prevErr = err
-		} else {
-			prevErr = fmt.Errorf("%w: %w", err, prevErr)
-		}
+		prevErr = errors.Join(prevErr, err)
 	}
 	return prevErr
 }

@@ -5,6 +5,7 @@ package firebird
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"io"
 	nurl "net/url"
@@ -179,11 +180,7 @@ func (f *Firebird) Drop() (err error) {
 	}
 	defer func() {
 		if errClose := tables.Close(); errClose != nil {
-			if err == nil {
-				err = errClose
-			} else {
-				err = fmt.Errorf("%w: %w", err, errClose)
-			}
+			err = errors.Join(err, errClose)
 		}
 	}()
 
@@ -226,11 +223,7 @@ func (f *Firebird) ensureVersionTable() (err error) {
 
 	defer func() {
 		if e := f.Unlock(); e != nil {
-			if err == nil {
-				err = e
-			} else {
-				err = fmt.Errorf("%w: %w", err, e)
-			}
+			err = errors.Join(err, e)
 		}
 	}()
 

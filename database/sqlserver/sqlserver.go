@@ -3,6 +3,7 @@ package sqlserver
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"io"
 	nurl "net/url"
@@ -270,7 +271,7 @@ func (ss *SQLServer) SetVersion(version int, dirty bool) error {
 	query := `TRUNCATE TABLE ` + ss.getMigrationTable()
 	if _, err := tx.Exec(query); err != nil {
 		if errRollback := tx.Rollback(); errRollback != nil {
-			err = fmt.Errorf("%w: %w", err, errRollback)
+			err = errors.Join(err, errRollback)
 		}
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
@@ -286,7 +287,7 @@ func (ss *SQLServer) SetVersion(version int, dirty bool) error {
 		query = `INSERT INTO ` + ss.getMigrationTable() + ` (version, dirty) VALUES (@p1, @p2)`
 		if _, err := tx.Exec(query, version, dirtyBit); err != nil {
 			if errRollback := tx.Rollback(); errRollback != nil {
-				err = fmt.Errorf("%w: %w", err, errRollback)
+				err = errors.Join(err, errRollback)
 			}
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
@@ -358,11 +359,7 @@ func (ss *SQLServer) ensureVersionTable() (err error) {
 
 	defer func() {
 		if e := ss.Unlock(); e != nil {
-			if err == nil {
-				err = e
-			} else {
-				err = fmt.Errorf("%w: %w", err, e)
-			}
+			err = errors.Join(err, e)
 		}
 	}()
 

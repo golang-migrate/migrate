@@ -1,6 +1,7 @@
 package rqlite
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	nurl "net/url"
@@ -87,11 +88,7 @@ func (r *Rqlite) ensureVersionTable() (err error) {
 
 	defer func() {
 		if e := r.Unlock(); e != nil {
-			if err == nil {
-				err = e
-			} else {
-				err = fmt.Errorf("%w: %w", err, e)
-			}
+			err = errors.Join(err, e)
 		}
 	}()
 

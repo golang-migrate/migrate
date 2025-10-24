@@ -78,11 +78,7 @@ func (d *DockerContainer) PullImage() (err error) {
 	}
 	defer func() {
 		if errClose := r.Close(); errClose != nil {
-			if err == nil {
-				err = errClose
-			} else {
-				err = fmt.Errorf("%w: %w", err, errClose)
-			}
+			err = errors.Join(err, errClose)
 		}
 	}()
 
