@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	iurl "github.com/golang-migrate/migrate/v4/internal/url"
 	"io"
 	nurl "net/url"
 	"strconv"
@@ -24,11 +25,8 @@ func init() {
 var DefaultMigrationsTable = "schema_migrations"
 
 var (
-	ErrNilConfig          = fmt.Errorf("no config")
-	ErrNoDatabaseName     = fmt.Errorf("no database name")
-	ErrNoPassword         = fmt.Errorf("no password")
-	ErrNoSchema           = fmt.Errorf("no schema")
-	ErrNoSchemaOrDatabase = fmt.Errorf("no schema/database name")
+	ErrNilConfig      = fmt.Errorf("no config")
+	ErrNoDatabaseName = fmt.Errorf("no database name")
 )
 
 type Config struct {
@@ -92,40 +90,25 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 }
 
 func (p *Snowflake) Open(url string) (database.Driver, error) {
+	scheme, err := iurl.SchemeFromURL(url)
+	if err != nil {
+		return nil, err
+	}
+
+	// Getting the actual snowflake URL by skipping snowflake://.
+	snowflakeUrl := url[len(scheme)+3:]
+
+	config, err := sf.ParseDSN(snowflakeUrl)
+	if err != nil {
+		return nil, err
+	}
+
 	purl, err := nurl.Parse(url)
 	if err != nil {
 		return nil, err
 	}
 
-	password, isPasswordSet := purl.User.Password()
-	if !isPasswordSet {
-		return nil, ErrNoPassword
-	}
-
-	splitPath := strings.Split(purl.Path, "/")
-	if len(splitPath) < 3 {
-		return nil, ErrNoSchemaOrDatabase
-	}
-
-	database := splitPath[2]
-	if len(database) == 0 {
-		return nil, ErrNoDatabaseName
-	}
-
-	schema := splitPath[1]
-	if len(schema) == 0 {
-		return nil, ErrNoSchema
-	}
-
-	cfg := &sf.Config{
-		Account:  purl.Host,
-		User:     purl.User.Username(),
-		Password: password,
-		Database: database,
-		Schema:   schema,
-	}
-
-	dsn, err := sf.DSN(cfg)
+	dsn, err := sf.DSN(config)
 	if err != nil {
 		return nil, err
 	}
@@ -136,6 +119,7 @@ func (p *Snowflake) Open(url string) (database.Driver, error) {
 	}
 
 	migrationsTable := purl.Query().Get("x-migrations-table")
+	database := config.Database
 
 	px, err := WithInstance(db, &Config{
 		DatabaseName:    database,
@@ -178,65 +162,28 @@ func (p *Snowflake) Run(migration io.Reader) error {
 	}
 
 	// run migration
-	query := string(migr[:])
-	if _, err := p.conn.ExecContext(context.Background(), query); err != nil {
-		if pgErr, ok := err.(*pq.Error); ok {
-			var line uint
-			var col uint
-			var lineColOK bool
-			if pgErr.Position != "" {
-				if pos, err := strconv.ParseUint(pgErr.Position, 10, 64); err == nil {
-					line, col, lineColOK = computeLineFromPos(query, int(pos))
-				}
+	queriesStr := string(migr[:])
+
+	// Splitting queries string as executing multiple queries isnt possible in
+	// one go (https://support.snowflake.
+	// net/s/question/0D50Z00007ltRE7SAM?multiple-sql-statements-in-a-single
+	// -api-call-are-not-supported-use-one-api-call-per-statement-instead).
+	queries := strings.Split(queriesStr, ";")
+
+	for _, query := range queries {
+		query = strings.TrimSpace(query)
+
+		if len(query) > 0 {
+			query = query + ";"
+
+			if _, err := p.conn.ExecContext(context.Background(), query); err != nil {
+				return database.Error{OrigErr: err, Err: "Migration query failed",
+					Query: []byte(query)}
 			}
-			message := fmt.Sprintf("migration failed: %s", pgErr.Message)
-			if lineColOK {
-				message = fmt.Sprintf("%s (column %d)", message, col)
-			}
-			if pgErr.Detail != "" {
-				message = fmt.Sprintf("%s, %s", message, pgErr.Detail)
-			}
-			return database.Error{OrigErr: err, Err: message, Query: migr, Line: line}
 		}
-		return database.Error{OrigErr: err, Err: "migration failed", Query: migr}
 	}
 
 	return nil
-}
-
-func computeLineFromPos(s string, pos int) (line uint, col uint, ok bool) {
-	// replace crlf with lf
-	s = strings.Replace(s, "\r\n", "\n", -1)
-	// pg docs: pos uses index 1 for the first character, and positions are measured in characters not bytes
-	runes := []rune(s)
-	if pos > len(runes) {
-		return 0, 0, false
-	}
-	sel := runes[:pos]
-	line = uint(runesCount(sel, newLine) + 1)
-	col = uint(pos - 1 - runesLastIndex(sel, newLine))
-	return line, col, true
-}
-
-const newLine = '\n'
-
-func runesCount(input []rune, target rune) int {
-	var count int
-	for _, r := range input {
-		if r == target {
-			count++
-		}
-	}
-	return count
-}
-
-func runesLastIndex(input []rune, target rune) int {
-	for i := len(input) - 1; i >= 0; i-- {
-		if input[i] == target {
-			return i
-		}
-	}
-	return -1
 }
 
 func (p *Snowflake) SetVersion(version int, dirty bool) error {
