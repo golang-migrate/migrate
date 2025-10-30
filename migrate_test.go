@@ -1339,11 +1339,6 @@ func newMigSeq(migr ...*Migration) migrationSequence {
 	return migr
 }
 
-func (m *migrationSequence) add(migr ...*Migration) migrationSequence { // nolint:unused
-	*m = append(*m, migr...)
-	return *m
-}
-
 func (m *migrationSequence) bodySequence() []string {
 	r := make([]string, 0)
 	for _, v := range *m {
