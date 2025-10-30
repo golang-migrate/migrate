@@ -149,7 +149,7 @@ func (c *CockroachDb) Close() error {
 func (c *CockroachDb) Lock() error {
 	return database.CasRestoreOnErr(&c.isLocked, false, true, database.ErrLocked, func() (err error) {
 		return crdb.ExecuteTx(context.Background(), c.db, nil, func(tx *sql.Tx) (err error) {
-			aid, err := database.GenerateAdvisoryLockId(c.config.DatabaseName)
+			aid, err := database.GenerateAdvisoryLockID(c.config.DatabaseName)
 			if err != nil {
 				return err
 			}
@@ -185,7 +185,7 @@ func (c *CockroachDb) Lock() error {
 // See: https://github.com/cockroachdb/cockroach/issues/13546
 func (c *CockroachDb) Unlock() error {
 	return database.CasRestoreOnErr(&c.isLocked, true, false, database.ErrNotLocked, func() (err error) {
-		aid, err := database.GenerateAdvisoryLockId(c.config.DatabaseName)
+		aid, err := database.GenerateAdvisoryLockID(c.config.DatabaseName)
 		if err != nil {
 			return err
 		}

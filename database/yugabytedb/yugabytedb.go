@@ -194,7 +194,7 @@ func (c *YugabyteDB) Close() error {
 func (c *YugabyteDB) Lock() error {
 	return database.CasRestoreOnErr(&c.isLocked, false, true, database.ErrLocked, func() (err error) {
 		return c.doTxWithRetry(context.Background(), &sql.TxOptions{Isolation: sql.LevelSerializable}, func(tx *sql.Tx) (err error) {
-			aid, err := database.GenerateAdvisoryLockId(c.config.DatabaseName)
+			aid, err := database.GenerateAdvisoryLockID(c.config.DatabaseName)
 			if err != nil {
 				return err
 			}
@@ -230,7 +230,7 @@ func (c *YugabyteDB) Lock() error {
 // See: https://github.com/yugabyte/yugabyte-db/issues/3642
 func (c *YugabyteDB) Unlock() error {
 	return database.CasRestoreOnErr(&c.isLocked, true, false, database.ErrNotLocked, func() (err error) {
-		aid, err := database.GenerateAdvisoryLockId(c.config.DatabaseName)
+		aid, err := database.GenerateAdvisoryLockID(c.config.DatabaseName)
 		if err != nil {
 			return err
 		}
@@ -420,8 +420,9 @@ func (c *YugabyteDB) doTxWithRetry(
 		}
 
 		// If we've tried to commit the transaction Rollback just returns sql.ErrTxDone.
-		//nolint:errcheck
-		defer tx.Rollback()
+		defer func() {
+			_ = tx.Rollback()
+		}()
 
 		if err := fn(tx); err != nil {
 			if errIsRetryable(err) {

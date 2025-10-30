@@ -220,7 +220,7 @@ func (p *Postgres) Close() error {
 // https://www.postgresql.org/docs/9.6/static/explicit-locking.html#ADVISORY-LOCKS
 func (p *Postgres) Lock() error {
 	return database.CasRestoreOnErr(&p.isLocked, false, true, database.ErrLocked, func() error {
-		aid, err := database.GenerateAdvisoryLockId(p.config.DatabaseName, p.config.migrationsSchemaName, p.config.migrationsTableName)
+		aid, err := database.GenerateAdvisoryLockID(p.config.DatabaseName, p.config.migrationsSchemaName, p.config.migrationsTableName)
 		if err != nil {
 			return err
 		}
@@ -236,7 +236,7 @@ func (p *Postgres) Lock() error {
 
 func (p *Postgres) Unlock() error {
 	return database.CasRestoreOnErr(&p.isLocked, true, false, database.ErrNotLocked, func() error {
-		aid, err := database.GenerateAdvisoryLockId(p.config.DatabaseName, p.config.migrationsSchemaName, p.config.migrationsTableName)
+		aid, err := database.GenerateAdvisoryLockID(p.config.DatabaseName, p.config.migrationsSchemaName, p.config.migrationsTableName)
 		if err != nil {
 			return err
 		}

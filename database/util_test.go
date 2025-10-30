@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestGenerateAdvisoryLockId(t *testing.T) {
+func TestGenerateAdvisoryLockID(t *testing.T) {
 	testcases := []struct {
 		dbname     string
 		additional []string
@@ -35,7 +35,7 @@ func TestGenerateAdvisoryLockId(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.dbname, func(t *testing.T) {
-			if id, err := GenerateAdvisoryLockId(tc.dbname, tc.additional...); err == nil {
+			if id, err := GenerateAdvisoryLockID(tc.dbname, tc.additional...); err == nil {
 				if id != tc.expectedID {
 					t.Error("Generated incorrect ID:", id, "!=", tc.expectedID)
 				}
