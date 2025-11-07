@@ -284,38 +284,6 @@ func (m *Migrate) Up() error {
 	return m.unlockErr(m.runMigrations(ret))
 }
 
-// Down looks at the currently active migration version
-// and will migrate all the way down (applying all down migrations).
-func (m *Migrate) Down() error {
-	if err := m.lock(); err != nil {
-		return err
-	}
-
-	curVersion, dirty, err := m.databaseDrv.Version()
-	if err != nil {
-		return m.unlockErr(err)
-	}
-
-	if dirty {
-		return m.unlockErr(ErrDirty{curVersion})
-	}
-
-	ret := make(chan interface{}, m.PrefetchMigrations)
-	go m.readDown(curVersion, -1, ret)
-	return m.unlockErr(m.runMigrations(ret))
-}
-
-// Drop deletes everything in the database.
-func (m *Migrate) Drop() error {
-	if err := m.lock(); err != nil {
-		return err
-	}
-	if err := m.databaseDrv.Drop(); err != nil {
-		return m.unlockErr(err)
-	}
-	return m.unlock()
-}
-
 // Run runs any migration provided by you against the database.
 // It does not check any currently active version in database.
 // Usually you don't need this function at all. Use Migrate,

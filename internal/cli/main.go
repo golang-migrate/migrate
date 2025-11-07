@@ -254,38 +254,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 		}
 
 	case "down":
-		downFlagSet, helpPtr := newFlagSetWithHelp("down")
-		applyAll := downFlagSet.Bool("all", false, "Apply all down migrations")
-
-		if err := downFlagSet.Parse(args); err != nil {
-			log.fatalErr(err)
-		}
-
-		handleSubCmdHelp(*helpPtr, downUsage, downFlagSet)
-
-		if migraterErr != nil {
-			log.fatalErr(migraterErr)
-		}
-
-		downArgs := downFlagSet.Args()
-		num, needsConfirm, err := numDownMigrationsFromArgs(*applyAll, downArgs)
-		if err != nil {
-			log.fatalErr(err)
-		}
-		if needsConfirm {
-			log.Println("Are you sure you want to apply all down migrations? [y/N]")
-			var response string
-			_, _ = fmt.Scanln(&response)
-			response = strings.ToLower(strings.TrimSpace(response))
-
-			if response == "y" {
-				log.Println("Applying all down migrations")
-			} else {
-				log.fatal("Not applying all down migrations")
-			}
-		}
-
-		if err := downCmd(migrater, num); err != nil {
+		if err := downCmd(migrater, 1); err != nil {
 			log.fatalErr(err)
 		}
 
@@ -295,7 +264,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 
 	case "drop":
 		dropFlagSet, help := newFlagSetWithHelp("drop")
-		forceDrop := dropFlagSet.Bool("f", false, "Force the drop command by bypassing the confirmation prompt")
+		_ = dropFlagSet.Bool("f", false, "Force the drop command by bypassing the confirmation prompt")
 
 		if err := dropFlagSet.Parse(args); err != nil {
 			log.fatalErr(err)
@@ -303,30 +272,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 
 		handleSubCmdHelp(*help, dropUsage, dropFlagSet)
 
-		if !*forceDrop {
-			log.Println("Are you sure you want to drop the entire database schema? [y/N]")
-			var response string
-			_, _ = fmt.Scanln(&response)
-			response = strings.ToLower(strings.TrimSpace(response))
-
-			if response == "y" {
-				log.Println("Dropping the entire database schema")
-			} else {
-				log.fatal("Aborted dropping the entire database schema")
-			}
-		}
-
-		if migraterErr != nil {
-			log.fatalErr(migraterErr)
-		}
-
-		if err := dropCmd(migrater); err != nil {
-			log.fatalErr(err)
-		}
-
-		if log.verbose {
-			log.Println("Finished after", time.Since(startTime))
-		}
+		log.fatal("With migrate-safe you can not drop the entire database schema. Please specify a number of migrations to apply.")
 
 	case "force":
 		forceSet, helpPtr := newFlagSetWithHelp("force")

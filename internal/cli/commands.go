@@ -185,19 +185,7 @@ func downCmd(m *migrate.Migrate, limit int) error {
 			log.Println(err)
 		}
 	} else {
-		if err := m.Down(); err != nil {
-			if err != migrate.ErrNoChange {
-				return err
-			}
-			log.Println(err)
-		}
-	}
-	return nil
-}
-
-func dropCmd(m *migrate.Migrate) error {
-	if err := m.Drop(); err != nil {
-		return err
+		log.Println("With migrate-safe you can not apply all down migrations. Please specify a number of migrations to apply.")
 	}
 	return nil
 }
@@ -223,26 +211,25 @@ func versionCmd(m *migrate.Migrate) error {
 }
 
 // numDownMigrationsFromArgs returns an int for number of migrations to apply
-// and a bool indicating if we need a confirm before applying
-func numDownMigrationsFromArgs(applyAll bool, args []string) (int, bool, error) {
+func numDownMigrationsFromArgs(applyAll bool, args []string) (int, error) {
 	if applyAll {
 		if len(args) > 0 {
-			return 0, false, errors.New("-all cannot be used with other arguments")
+			return 0, errors.New("-all cannot be used with other arguments")
 		}
-		return -1, false, nil
+		return -1, nil
 	}
 
 	switch len(args) {
 	case 0:
-		return -1, true, nil
+		return -1, nil
 	case 1:
 		downValue := args[0]
 		n, err := strconv.ParseUint(downValue, 10, 64)
 		if err != nil {
-			return 0, false, errors.New("can't read limit argument N")
+			return 0, errors.New("can't read limit argument N")
 		}
-		return int(n), false, nil
+		return int(n), nil
 	default:
-		return 0, false, errors.New("too many arguments")
+		return 0, errors.New("too many arguments")
 	}
 }
