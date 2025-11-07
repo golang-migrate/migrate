@@ -209,27 +209,3 @@ func versionCmd(m *migrate.Migrate) error {
 	}
 	return nil
 }
-
-// numDownMigrationsFromArgs returns an int for number of migrations to apply
-func numDownMigrationsFromArgs(applyAll bool, args []string) (int, error) {
-	if applyAll {
-		if len(args) > 0 {
-			return 0, errors.New("-all cannot be used with other arguments")
-		}
-		return -1, nil
-	}
-
-	switch len(args) {
-	case 0:
-		return -1, nil
-	case 1:
-		downValue := args[0]
-		n, err := strconv.ParseUint(downValue, 10, 64)
-		if err != nil {
-			return 0, errors.New("can't read limit argument N")
-		}
-		return int(n), nil
-	default:
-		return 0, errors.New("too many arguments")
-	}
-}
