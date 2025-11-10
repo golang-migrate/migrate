@@ -7,7 +7,6 @@ linters:
   enable:
     - unconvert
     - goconst
-    - gofmt
     - misspell
     - unparam
     - nakedret
@@ -19,3 +18,7 @@ linters:
     revive:
       rules:
         - name: redundant-build-tag
+
+formatters:
+  enable:
+    - gofmt
