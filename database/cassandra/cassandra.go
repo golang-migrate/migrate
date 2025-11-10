@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/gocql/gocql"
+	gocql "github.com/apache/cassandra-gocql-driver/v2"
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/golang-migrate/migrate/v4/database/multistmt"
 	"github.com/hashicorp/go-multierror"
@@ -280,9 +280,6 @@ func (c *Cassandra) Version() (version int, dirty bool, err error) {
 		return database.NilVersion, false, nil
 
 	case err != nil:
-		if _, ok := err.(*gocql.Error); ok {
-			return database.NilVersion, false, nil
-		}
 		return 0, false, &database.Error{OrigErr: err, Query: []byte(query)}
 
 	default:
