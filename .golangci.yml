@@ -1,14 +1,11 @@
-version: 2
+version: "2"
 
 run:
-  # timeout for analysis, e.g. 30s, 5m, default is 1m
   timeout: 5m
+
 linters:
   enable:
-    #- golint
-    #- interfacer
     - unconvert
-    #- dupl
     - goconst
     - gofmt
     - misspell
@@ -16,17 +13,14 @@ linters:
     - nakedret
     - prealloc
     - revive
-    #- gosec
-linters-settings:
+
+settings:
   misspell:
     locale: US
   revive:
     rules:
       - name: redundant-build-tag
+
 issues:
-  max-same-issues: 0
-  max-issues-per-linter: 0
-  exclude-use-default: false
-  exclude:
-    # gosec: Duplicated errcheck checks
-    - G104
+  max-per-linter: 0
+  max-same: 0
