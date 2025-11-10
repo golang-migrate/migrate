@@ -13,14 +13,9 @@ linters:
     - nakedret
     - prealloc
     - revive
-
-settings:
-  misspell:
-    locale: US
-  revive:
-    rules:
-      - name: redundant-build-tag
-
-issues:
-  max-per-linter: 0
-  max-same: 0
+  settings:
+    misspell:
+      locale: US
+    revive:
+      rules:
+        - name: redundant-build-tag
