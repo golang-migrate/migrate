@@ -274,7 +274,7 @@ func (p *Postgres) Unlock() error {
 
 // https://www.postgresql.org/docs/9.6/static/explicit-locking.html#ADVISORY-LOCKS
 func (p *Postgres) applyAdvisoryLock() error {
-	aid, err := database.GenerateAdvisoryLockID(p.config.DatabaseName, p.config.migrationsSchemaName, p.config.migrationsTableName)
+	aid, err := database.GenerateAdvisoryLockId(p.config.DatabaseName, p.config.migrationsSchemaName, p.config.migrationsTableName)
 	if err != nil {
 		return err
 	}
@@ -299,7 +299,7 @@ func (p *Postgres) applyTableLock() error {
 		}
 	}()
 
-	aid, err := database.GenerateAdvisoryLockID(p.config.DatabaseName)
+	aid, err := database.GenerateAdvisoryLockId(p.config.DatabaseName)
 	if err != nil {
 		return err
 	}
@@ -331,7 +331,7 @@ func (p *Postgres) applyTableLock() error {
 }
 
 func (p *Postgres) releaseAdvisoryLock() error {
-	aid, err := database.GenerateAdvisoryLockID(p.config.DatabaseName, p.config.migrationsSchemaName, p.config.migrationsTableName)
+	aid, err := database.GenerateAdvisoryLockId(p.config.DatabaseName, p.config.migrationsSchemaName, p.config.migrationsTableName)
 	if err != nil {
 		return err
 	}
@@ -345,7 +345,7 @@ func (p *Postgres) releaseAdvisoryLock() error {
 }
 
 func (p *Postgres) releaseTableLock() error {
-	aid, err := database.GenerateAdvisoryLockID(p.config.DatabaseName)
+	aid, err := database.GenerateAdvisoryLockId(p.config.DatabaseName)
 	if err != nil {
 		return err
 	}
