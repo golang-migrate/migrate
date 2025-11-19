@@ -11,8 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hashicorp/go-multierror"
-
 	"github.com/golang-migrate/migrate/v4/database"
 	iurl "github.com/golang-migrate/migrate/v4/internal/url"
 	"github.com/golang-migrate/migrate/v4/source"
@@ -781,7 +779,7 @@ func (m *Migrate) versionExists(version uint) (result error) {
 	if err == nil {
 		defer func() {
 			if errClose := up.Close(); errClose != nil {
-				result = multierror.Append(result, errClose)
+				result = errors.Join(result, errClose)
 			}
 		}()
 	}
@@ -796,7 +794,7 @@ func (m *Migrate) versionExists(version uint) (result error) {
 	if err == nil {
 		defer func() {
 			if errClose := down.Close(); errClose != nil {
-				result = multierror.Append(result, errClose)
+				result = errors.Join(result, errClose)
 			}
 		}()
 	}
@@ -954,7 +952,7 @@ func (m *Migrate) unlock() error {
 // if a prevErr is not nil.
 func (m *Migrate) unlockErr(prevErr error) error {
 	if err := m.unlock(); err != nil {
-		return multierror.Append(prevErr, err)
+		prevErr = errors.Join(prevErr, err)
 	}
 	return prevErr
 }

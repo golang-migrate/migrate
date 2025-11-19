@@ -1,6 +1,7 @@
 package rqlite
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	nurl "net/url"
@@ -10,7 +11,6 @@ import (
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
-	"github.com/hashicorp/go-multierror"
 	"github.com/rqlite/gorqlite"
 )
 
@@ -88,11 +88,7 @@ func (r *Rqlite) ensureVersionTable() (err error) {
 
 	defer func() {
 		if e := r.Unlock(); e != nil {
-			if err == nil {
-				err = e
-			} else {
-				err = multierror.Append(err, e)
-			}
+			err = errors.Join(err, e)
 		}
 	}()
 
