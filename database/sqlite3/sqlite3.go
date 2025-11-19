@@ -133,7 +133,11 @@ func (m *Sqlite) Close() error {
 }
 
 func (m *Sqlite) Drop() (err error) {
-	query := `SELECT name FROM sqlite_master WHERE type = 'table';`
+	query := `
+		SELECT name FROM sqlite_master
+		WHERE type = 'table'
+		AND name NOT LIKE 'sqlite_%';`
+
 	tables, err := m.db.Query(query)
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
