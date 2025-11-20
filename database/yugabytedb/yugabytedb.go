@@ -420,8 +420,9 @@ func (c *YugabyteDB) doTxWithRetry(
 		}
 
 		// If we've tried to commit the transaction Rollback just returns sql.ErrTxDone.
-		//nolint:errcheck
-		defer tx.Rollback()
+		defer func() {
+			_ = tx.Rollback()
+		}()
 
 		if err := fn(tx); err != nil {
 			if errIsRetryable(err) {

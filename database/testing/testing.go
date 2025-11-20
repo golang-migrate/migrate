@@ -116,7 +116,6 @@ func TestDrop(t *testing.T, d database.Driver) {
 }
 
 func TestSetVersion(t *testing.T, d database.Driver) {
-	// nolint:maligned
 	testCases := []struct {
 		name            string
 		version         int
