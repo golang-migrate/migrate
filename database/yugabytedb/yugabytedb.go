@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"regexp"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
@@ -17,7 +18,6 @@ import (
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgerrcode"
 	"github.com/lib/pq"
-	"go.uber.org/atomic"
 )
 
 const (

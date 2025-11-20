@@ -6,9 +6,9 @@ import (
 	"io"
 	nurl "net/url"
 	"strings"
+	"sync/atomic"
 
 	"github.com/hashicorp/go-multierror"
-	"go.uber.org/atomic"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
@@ -166,13 +166,13 @@ func (m *Ql) Drop() (err error) {
 	return nil
 }
 func (m *Ql) Lock() error {
-	if !m.isLocked.CAS(false, true) {
+	if !m.isLocked.CompareAndSwap(false, true) {
 		return database.ErrLocked
 	}
 	return nil
 }
 func (m *Ql) Unlock() error {
-	if !m.isLocked.CAS(true, false) {
+	if !m.isLocked.CompareAndSwap(true, false) {
 		return database.ErrNotLocked
 	}
 	return nil

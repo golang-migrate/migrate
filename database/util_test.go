@@ -2,7 +2,7 @@ package database
 
 import (
 	"errors"
-	"go.uber.org/atomic"
+	"sync/atomic"
 	"testing"
 )
 
@@ -54,7 +54,7 @@ func TestCasRestoreOnErr(t *testing.T) {
 
 	testcases := []struct {
 		name        string
-		lock        *atomic.Bool
+		lock        bool
 		from        bool
 		to          bool
 		expectLock  bool
@@ -63,7 +63,7 @@ func TestCasRestoreOnErr(t *testing.T) {
 	}{
 		{
 			name:        "Test positive CAS lock",
-			lock:        atomic.NewBool(false),
+			lock:        false,
 			from:        false,
 			to:          true,
 			expectLock:  true,
@@ -72,7 +72,7 @@ func TestCasRestoreOnErr(t *testing.T) {
 		},
 		{
 			name:        "Test negative CAS lock",
-			lock:        atomic.NewBool(true),
+			lock:        true,
 			from:        false,
 			to:          true,
 			expectLock:  true,
@@ -81,7 +81,7 @@ func TestCasRestoreOnErr(t *testing.T) {
 		},
 		{
 			name:        "Test negative with callback lock",
-			lock:        atomic.NewBool(false),
+			lock:        false,
 			from:        false,
 			to:          true,
 			expectLock:  false,
@@ -92,13 +92,15 @@ func TestCasRestoreOnErr(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			if err := CasRestoreOnErr(tc.lock, tc.from, tc.to, casErr, func() error {
+			var lock atomic.Bool
+			lock.Store(tc.lock)
+			if err := CasRestoreOnErr(&lock, tc.from, tc.to, casErr, func() error {
 				return tc.fErr
 			}); err != tc.expectError {
 				t.Error("Incorrect error value returned")
 			}
 
-			if tc.lock.Load() != tc.expectLock {
+			if lock.Load() != tc.expectLock {
 				t.Error("Incorrect state of lock")
 			}
 		})
