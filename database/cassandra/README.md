@@ -23,7 +23,7 @@ system_schema table which comes with 3.X
 | `x-multi-statement` | false | Enable multiple statements to be ran in a single migration (See note above) |
 | `port` | 9042 | The port to bind to  |
 | `consistency` | ALL | Migration consistency
-| `protocol` |  | Cassandra protocol version (3 or 4)
+| `protocol` |  | Cassandra protocol version (3, 4, or 5)
 | `timeout` | 1 minute | Migration timeout
 | `connect-timeout` | 600ms | Initial connection timeout to the cluster |
 | `username` | nil | Username to use when authenticating. |
