@@ -249,7 +249,7 @@ func (y *YDB) SetVersion(version int, dirty bool) error {
 	if err := tx.Commit(); err != nil {
 		return &database.Error{OrigErr: err, Err: "transaction commit failed"}
 	}
-	return err
+	return nil
 }
 
 func (y *YDB) Version() (version int, dirty bool, err error) {
