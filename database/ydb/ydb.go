@@ -38,7 +38,7 @@ const (
 var (
 	ErrNilConfig             = fmt.Errorf("no config")
 	ErrNoDatabaseName        = fmt.Errorf("no database name")
-	ErrUnsupportedTLSVersion = fmt.Errorf("unsupported tls version: use 1.0, 1.1, 1,2 or 1.3")
+	ErrUnsupportedTLSVersion = fmt.Errorf("unsupported tls version: use 1.0, 1.1, 1.2 or 1.3")
 )
 
 type Config struct {
