@@ -123,7 +123,7 @@ func (y *YDB) Open(dsn string) (database.Driver, error) {
 	}
 
 	nativeDriver, err := ydb.Open(
-		context.TODO(),
+		context.Background(),
 		purl.String(),
 		append(tlsOptions, credentials, ydb.WithBalancer(balancers.SingleConn()))...,
 	)
@@ -222,7 +222,7 @@ func (y *YDB) SetVersion(version int, dirty bool) error {
 		INSERT INTO %s (version, dirty, created) VALUES (%d, %t, CurrentUtcTimestamp())
 	`, y.config.MigrationsTable, version, dirty)
 
-	tx, err := y.conn.BeginTx(context.TODO(), &sql.TxOptions{})
+	tx, err := y.conn.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
 	}
@@ -258,7 +258,7 @@ func (y *YDB) Version() (version int, dirty bool, err error) {
 	`, y.config.MigrationsTable)
 
 	var v uint64
-	err = y.conn.QueryRowContext(context.TODO(), getVersionQuery).Scan(&v, &dirty)
+	err = y.conn.QueryRowContext(context.Background(), getVersionQuery).Scan(&v, &dirty)
 	switch {
 	case err == sql.ErrNoRows:
 		return database.NilVersion, false, nil
@@ -271,7 +271,7 @@ func (y *YDB) Version() (version int, dirty bool, err error) {
 
 func (y *YDB) Drop() (err error) {
 	listQuery := "SELECT DISTINCT Path FROM `.sys/partition_stats` WHERE Path NOT LIKE '%/.sys%'"
-	rs, err := y.conn.QueryContext(context.TODO(), listQuery)
+	rs, err := y.conn.QueryContext(context.Background(), listQuery)
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(listQuery)}
 	}
@@ -306,7 +306,7 @@ func (y *YDB) Drop() (err error) {
 
 func (y *YDB) Lock() error {
 	return database.CasRestoreOnErr(&y.isLocked, false, true, database.ErrLocked, func() (err error) {
-		return retry.DoTx(context.TODO(), y.db, func(ctx context.Context, tx *sql.Tx) (err error) {
+		return retry.DoTx(context.Background(), y.db, func(ctx context.Context, tx *sql.Tx) (err error) {
 			aid, err := database.GenerateAdvisoryLockId(y.config.DatabaseName)
 			if err != nil {
 				return err
@@ -346,7 +346,7 @@ func (y *YDB) Unlock() error {
 		}
 
 		releaseLockQuery := fmt.Sprintf("DELETE FROM %s WHERE lock_id = '%s'", y.config.LockTable, aid)
-		if _, err = y.conn.ExecContext(context.TODO(), releaseLockQuery); err != nil {
+		if _, err = y.conn.ExecContext(context.Background(), releaseLockQuery); err != nil {
 			// On drops, the lock table is fully removed; This is fine, and is a valid "unlocked" state for the schema.
 			if ydb.IsOperationErrorSchemeError(err) {
 				return nil
