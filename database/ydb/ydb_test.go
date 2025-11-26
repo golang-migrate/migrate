@@ -50,7 +50,7 @@ var (
 	// Released version: https://ydb.tech/docs/downloads/#ydb-server
 	specs = []dktesting.ContainerSpec{
 		{ImageName: "ydbplatform/local-ydb:latest", Options: getOptions("22000")},
-		{ImageName: "ydbplatform/local-ydb:24.3", Options: getOptions("22001")},
+		{ImageName: "ydbplatform/local-ydb:25.2", Options: getOptions("22001")},
 	}
 )
 
