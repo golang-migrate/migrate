@@ -73,7 +73,7 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		config.LockTable = defaultLockTable
 	}
 
-	conn, err := instance.Conn(context.TODO())
+	conn, err := instance.Conn(context.Background())
 	if err != nil {
 		return nil, err
 	}
