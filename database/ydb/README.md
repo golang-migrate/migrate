@@ -42,7 +42,6 @@ Through the url query, you can change the default behavior:
 
 ### Locks
 
-If golang-migrate fails to acquire the lock and no migrations are currently running.
-This may indicate that one of the migrations did not complete successfully.
+If golang-migrate fails to acquire the lock when no migrations are currently running, this may indicate that one of the migrations did not complete successfully.
 In this case, you need to analyze the previous migrations, rollback if necessary, and manually remove the lock from the
 `x-lock-table`. 
