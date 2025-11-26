@@ -7,12 +7,12 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"sync/atomic"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
-	"go.uber.org/atomic"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"

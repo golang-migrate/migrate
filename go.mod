@@ -36,7 +36,6 @@ require (
 	github.com/xanzy/go-gitlab v0.15.0
 	github.com/ydb-platform/ydb-go-sdk/v3 v3.120.0
 	go.mongodb.org/mongo-driver v1.7.5
-	go.uber.org/atomic v1.6.0
 	golang.org/x/oauth2 v0.27.0
 	golang.org/x/tools v0.24.0
 	google.golang.org/api v0.169.0
