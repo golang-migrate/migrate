@@ -265,7 +265,7 @@ func (y *YDB) Version() (version int, dirty bool, err error) {
 	case err != nil:
 		return 0, false, &database.Error{OrigErr: err, Query: []byte(getVersionQuery)}
 	default:
-		return int(v), dirty, err
+		return int(v), dirty, nil
 	}
 }
 
