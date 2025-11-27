@@ -20,7 +20,7 @@ func init() {
 	database.Register("duckdb", &DuckDB{})
 }
 
-const MigrationTable = "gmg_schema_migrations"
+var DefaultMigrationsTable = "schema_migrations"
 
 type DuckDB struct {
 	db       *sql.DB
@@ -118,7 +118,7 @@ func (d *DuckDB) SetVersion(version int, dirty bool) error {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
 	}
 
-	query := "DELETE FROM " + MigrationTable
+	query := "DELETE FROM " + DefaultMigrationsTable
 	if _, err := tx.Exec(query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
@@ -130,7 +130,7 @@ func (d *DuckDB) SetVersion(version int, dirty bool) error {
 	// NOTE: Copied from sqlite implementation, unsure if this is necessary for
 	// duckdb
 	if version >= 0 || (version == database.NilVersion && dirty) {
-		query := fmt.Sprintf(`INSERT INTO %s (version, dirty) VALUES (?, ?)`, MigrationTable)
+		query := fmt.Sprintf(`INSERT INTO %s (version, dirty) VALUES (?, ?)`, DefaultMigrationsTable)
 		if _, err := tx.Exec(query, version, dirty); err != nil {
 			if errRollback := tx.Rollback(); errRollback != nil {
 				err = errors.Join(err, errRollback)
@@ -147,7 +147,7 @@ func (d *DuckDB) SetVersion(version int, dirty bool) error {
 }
 
 func (m *DuckDB) Version() (version int, dirty bool, err error) {
-	query := "SELECT version, dirty FROM " + MigrationTable + " LIMIT 1"
+	query := "SELECT version, dirty FROM " + DefaultMigrationsTable + " LIMIT 1"
 	err = m.db.QueryRow(query).Scan(&version, &dirty)
 	if err != nil {
 		return database.NilVersion, false, nil
@@ -196,7 +196,7 @@ func (d *DuckDB) ensureVersionTable() (err error) {
 		}
 	}()
 
-	query := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s (version BIGINT, dirty BOOLEAN);`, MigrationTable)
+	query := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s (version BIGINT, dirty BOOLEAN);`, DefaultMigrationsTable)
 
 	if _, err := d.db.Exec(query); err != nil {
 		return fmt.Errorf("creating version table via '%s': %w", query, err)
