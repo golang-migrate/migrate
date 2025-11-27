@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"io"
 	nurl "net/url"
+	"strconv"
 	"strings"
-
 	"sync/atomic"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
-	
+
 	_ "github.com/duckdb/duckdb-go/v2"
 )
 
@@ -22,9 +22,19 @@ func init() {
 
 var DefaultMigrationsTable = "schema_migrations"
 
+var (
+	ErrNilConfig = errors.New("no config")
+)
+
+type Config struct {
+	MigrationsTable string
+	NoTxWrap        bool
+}
+
 type DuckDB struct {
 	db       *sql.DB
 	isLocked atomic.Bool
+	config   *Config
 }
 
 func (d *DuckDB) Open(url string) (database.Driver, error) {
@@ -38,16 +48,28 @@ func (d *DuckDB) Open(url string) (database.Driver, error) {
 		return nil, fmt.Errorf("opening '%s': %w", dbfile, err)
 	}
 
+	qv := purl.Query()
+	migrationsTable := qv.Get("x-migrations-table")
+	if len(migrationsTable) == 0 {
+		migrationsTable = DefaultMigrationsTable
+	}
+
+	noTxWrap := false
+	if v := qv.Get("x-no-tx-wrap"); v != "" {
+		noTxWrap, err = strconv.ParseBool(v)
+		if err != nil {
+			return nil, fmt.Errorf("x-no-tx-wrap: %s", err)
+		}
+	}
+
 	if err := db.Ping(); err != nil {
 		return nil, fmt.Errorf("pinging: %w", err)
 	}
-	d.db = db
-
-	if err := d.ensureVersionTable(); err != nil {
-		return nil, fmt.Errorf("ensuring version table: %w", err)
+	cfg := &Config{
+		MigrationsTable: migrationsTable,
+		NoTxWrap:        noTxWrap,
 	}
-
-	return d, nil
+	return WithInstance(db, cfg)
 }
 
 func (d *DuckDB) Close() error {
@@ -118,7 +140,7 @@ func (d *DuckDB) SetVersion(version int, dirty bool) error {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
 	}
 
-	query := "DELETE FROM " + DefaultMigrationsTable
+	query := "DELETE FROM " + d.config.MigrationsTable
 	if _, err := tx.Exec(query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
@@ -130,7 +152,7 @@ func (d *DuckDB) SetVersion(version int, dirty bool) error {
 	// NOTE: Copied from sqlite implementation, unsure if this is necessary for
 	// duckdb
 	if version >= 0 || (version == database.NilVersion && dirty) {
-		query := fmt.Sprintf(`INSERT INTO %s (version, dirty) VALUES (?, ?)`, DefaultMigrationsTable)
+		query := fmt.Sprintf(`INSERT INTO %s (version, dirty) VALUES (?, ?)`, d.config.MigrationsTable)
 		if _, err := tx.Exec(query, version, dirty); err != nil {
 			if errRollback := tx.Rollback(); errRollback != nil {
 				err = errors.Join(err, errRollback)
@@ -147,7 +169,7 @@ func (d *DuckDB) SetVersion(version int, dirty bool) error {
 }
 
 func (m *DuckDB) Version() (version int, dirty bool, err error) {
-	query := "SELECT version, dirty FROM " + DefaultMigrationsTable + " LIMIT 1"
+	query := "SELECT version, dirty FROM " + m.config.MigrationsTable + " LIMIT 1"
 	err = m.db.QueryRow(query).Scan(&version, &dirty)
 	if err != nil {
 		return database.NilVersion, false, nil
@@ -161,6 +183,13 @@ func (d *DuckDB) Run(migration io.Reader) error {
 		return fmt.Errorf("reading migration: %w", err)
 	}
 	query := string(migr[:])
+
+	if d.config.NoTxWrap {
+		if _, err := d.db.Exec(query); err != nil {
+			return &database.Error{OrigErr: err, Query: []byte(query)}
+		}
+		return nil
+	}
 
 	tx, err := d.db.Begin()
 	if err != nil {
@@ -196,10 +225,36 @@ func (d *DuckDB) ensureVersionTable() (err error) {
 		}
 	}()
 
-	query := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s (version BIGINT, dirty BOOLEAN);`, DefaultMigrationsTable)
+	query := fmt.Sprintf(`
+	CREATE TABLE IF NOT EXISTS %s (version BIGINT, dirty BOOLEAN);
+	CREATE UNIQUE INDEX IF NOT EXISTS version_unique ON %s (version);
+`, d.config.MigrationsTable, d.config.MigrationsTable)
 
 	if _, err := d.db.Exec(query); err != nil {
 		return fmt.Errorf("creating version table via '%s': %w", query, err)
 	}
 	return nil
+}
+
+func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
+	if config == nil {
+		return nil, ErrNilConfig
+	}
+
+	if err := instance.Ping(); err != nil {
+		return nil, err
+	}
+
+	if len(config.MigrationsTable) == 0 {
+		config.MigrationsTable = DefaultMigrationsTable
+	}
+
+	mx := &DuckDB{
+		db:     instance,
+		config: config,
+	}
+	if err := mx.ensureVersionTable(); err != nil {
+		return nil, err
+	}
+	return mx, nil
 }

@@ -5,6 +5,7 @@
 | URL Query  | Description |
 |------------|-------------|
 | `x-migrations-table` | Name of the migrations table (default: `schema_migrations`) |
+| `x-no-tx-wrap` | Disable automatic transaction wrapping for migrations (default: `false`) |
 
 ## Notes
 
