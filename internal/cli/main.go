@@ -63,6 +63,7 @@ func Main(version string) {
 	helpPtr := flag.Bool("help", false, "")
 	versionPtr := flag.Bool("version", false, "")
 	verbosePtr := flag.Bool("verbose", false, "")
+	templatePtr := flag.Bool("template", false, "")
 	prefetchPtr := flag.Uint("prefetch", 10, "")
 	lockTimeoutPtr := flag.Uint("lock-timeout", 15, "")
 	pathPtr := flag.String("path", "", "")
@@ -80,6 +81,19 @@ Options:
   -database        Run migrations against this database (driver://url)
   -prefetch N      Number of migrations to load in advance before executing (default 10)
   -lock-timeout N  Allow N seconds to acquire database lock (default 15)
+  -template        Treat migration files as go text templates; making environment variables accessible in your
+                   migration files. 
+                     i.e. If you set the LOCAL_WAREHOUSE environment variable to MY_DB and have a migration file with the
+                     following contents:
+                       INSERT INTO {{.LOCAL_WAREHOUSE}}.INVENTORY.RECORDS ('foo') VALUES ('bar');
+                     it will be transformed into the following before being executed:
+                       INSERT INTO MY_DB.INVENTORY.RECORDS ('foo') VALUES ('bar');
+                   
+                     Note that enabling templating requires that the contents of the migration file be brought into memory 
+                     in order to perform the transformation, and streaming the file directly from the source driver into
+                     the database is not currently possible with the go templating implementation.
+
+                     See https://pkg.go.dev/text/template for more information on supported template formats.
   -verbose         Print verbose logging
   -version         Print version
   -help            Print usage
@@ -134,6 +148,9 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 		migrater.Log = log
 		migrater.PrefetchMigrations = *prefetchPtr
 		migrater.LockTimeout = time.Duration(int64(*lockTimeoutPtr)) * time.Second
+		if *templatePtr {
+			migrater.EnableTemplating = true
+		}
 
 		// handle Ctrl+c
 		signals := make(chan os.Signal, 1)

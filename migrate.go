@@ -7,6 +7,7 @@ package migrate
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"sync"
 	"time"
@@ -80,6 +81,17 @@ type Migrate struct {
 	// LockTimeout defaults to DefaultLockTimeout,
 	// but can be set per Migrate instance.
 	LockTimeout time.Duration
+
+	// EnableTemplating treats migration files as go text templates; making environment variables accessible in your
+	// migration files.
+	// i.e. If you set the LOCAL_WAREHOUSE environment variable to MY_DB and have a migration file with the
+	// following contents:
+	//   INSERT INTO {{.LOCAL_WAREHOUSE}}.INVENTORY.RECORDS ('foo') VALUES ('bar');
+	// it will be transformed into the following before being executed:
+	//   INSERT INTO MY_DB.INVENTORY.RECORDS ('foo') VALUES ('bar');
+	//
+	// See https://pkg.go.dev/text/template for more information on template formats
+	EnableTemplating bool
 }
 
 // New returns a new Migrate instance from a source URL and a database URL.
@@ -833,45 +845,36 @@ func (m *Migrate) stop() bool {
 // specified version and targetVersion.
 func (m *Migrate) newMigration(version uint, targetVersion int) (*Migration, error) {
 	var migr *Migration
+	var r io.ReadCloser
+	var identifier string
+	var err error
 
 	if targetVersion >= int(version) {
-		r, identifier, err := m.sourceDrv.ReadUp(version)
-		if errors.Is(err, os.ErrNotExist) {
-			// create "empty" migration
-			migr, err = NewMigration(nil, "", version, targetVersion)
-			if err != nil {
-				return nil, err
-			}
+		r, identifier, err = m.sourceDrv.ReadUp(version)
+	} else {
+		r, identifier, err = m.sourceDrv.ReadDown(version)
+	}
 
-		} else if err != nil {
+	if errors.Is(err, os.ErrNotExist) {
+		// create "empty" migration
+		migr, err = NewMigration(nil, "", version, targetVersion)
+		if err != nil {
 			return nil, err
+		}
 
-		} else {
-			// create migration from up source
-			migr, err = NewMigration(r, identifier, version, targetVersion)
-			if err != nil {
+	} else if err != nil {
+		return nil, err
+
+	} else {
+		if m.EnableTemplating {
+			if r, err = applyEnvironmentTemplate(r); err != nil {
 				return nil, err
 			}
 		}
-
-	} else {
-		r, identifier, err := m.sourceDrv.ReadDown(version)
-		if errors.Is(err, os.ErrNotExist) {
-			// create "empty" migration
-			migr, err = NewMigration(nil, "", version, targetVersion)
-			if err != nil {
-				return nil, err
-			}
-
-		} else if err != nil {
+		// create migration from source
+		migr, err = NewMigration(r, identifier, version, targetVersion)
+		if err != nil {
 			return nil, err
-
-		} else {
-			// create migration from down source
-			migr, err = NewMigration(r, identifier, version, targetVersion)
-			if err != nil {
-				return nil, err
-			}
 		}
 	}
 
@@ -880,7 +883,6 @@ func (m *Migrate) newMigration(version uint, targetVersion int) (*Migration, err
 	} else {
 		m.logVerbosePrintf("Scheduled %v\n", migr.LogString())
 	}
-
 	return migr, nil
 }
 
