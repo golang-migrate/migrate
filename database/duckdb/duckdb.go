@@ -2,17 +2,18 @@ package duckdb
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"io"
 	nurl "net/url"
 	"strings"
 
-	"go.uber.org/atomic"
+	"sync/atomic"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
-	"github.com/hashicorp/go-multierror"
-	_ "github.com/marcboeker/go-duckdb"
+	
+	_ "github.com/duckdb/duckdb-go/v2"
 )
 
 func init() {
@@ -54,14 +55,14 @@ func (d *DuckDB) Close() error {
 }
 
 func (d *DuckDB) Lock() error {
-	if !d.isLocked.CAS(false, true) {
+	if !d.isLocked.CompareAndSwap(false, true) {
 		return database.ErrLocked
 	}
 	return nil
 }
 
 func (d *DuckDB) Unlock() error {
-	if !d.isLocked.CAS(true, false) {
+	if !d.isLocked.CompareAndSwap(true, false) {
 		return database.ErrNotLocked
 	}
 	return nil
@@ -75,7 +76,7 @@ func (d *DuckDB) Drop() error {
 	}
 	defer func() {
 		if errClose := tables.Close(); errClose != nil {
-			err = multierror.Append(err, errClose)
+			err = errors.Join(err, errClose)
 		}
 	}()
 
@@ -132,7 +133,7 @@ func (d *DuckDB) SetVersion(version int, dirty bool) error {
 		query := fmt.Sprintf(`INSERT INTO %s (version, dirty) VALUES (?, ?)`, MigrationTable)
 		if _, err := tx.Exec(query, version, dirty); err != nil {
 			if errRollback := tx.Rollback(); errRollback != nil {
-				err = multierror.Append(err, errRollback)
+				err = errors.Join(err, errRollback)
 			}
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
@@ -167,7 +168,7 @@ func (d *DuckDB) Run(migration io.Reader) error {
 	}
 	if _, err := tx.Exec(query); err != nil {
 		if errRollback := tx.Rollback(); errRollback != nil {
-			err = multierror.Append(err, errRollback)
+			err = errors.Join(err, errRollback)
 		}
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
@@ -190,7 +191,7 @@ func (d *DuckDB) ensureVersionTable() (err error) {
 			if err == nil {
 				err = e
 			} else {
-				err = multierror.Append(err, e)
+				err = errors.Join(err, e)
 			}
 		}
 	}()
