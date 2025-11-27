@@ -200,7 +200,7 @@ func (d *DockerContainer) Logs() (io.ReadCloser, error) {
 	})
 }
 
-func (d *DockerContainer) portMapping(selectFirst bool, cPort int) (containerPort uint, hostIP string, hostPort uint, err error) { // nolint:unparam
+func (d *DockerContainer) portMapping(selectFirst bool, cPort int) (hostIP string, hostPort uint, err error) {
 	if !d.containerInspected {
 		if err := d.Inspect(); err != nil {
 			d.t.Fatal(err)
@@ -212,21 +212,20 @@ func (d *DockerContainer) portMapping(selectFirst bool, cPort int) (containerPor
 			// Skip ahead until we find the port we want
 			continue
 		}
-		for _, binding := range bindings {
-
+		if len(bindings) > 0 {
+			binding := bindings[0]
 			hostPortUint, err := strconv.ParseUint(binding.HostPort, 10, 64)
 			if err != nil {
-				return 0, "", 0, err
+				return "", 0, err
 			}
-
-			return uint(port.Int()), binding.HostIP, uint(hostPortUint), nil // nolint: staticcheck
+			return bindings[0].HostIP, uint(hostPortUint), nil
 		}
 	}
 
 	if selectFirst {
-		return 0, "", 0, errors.New("no port binding")
+		return "", 0, errors.New("no port binding")
 	} else {
-		return 0, "", 0, errors.New("specified port not bound")
+		return "", 0, errors.New("specified port not bound")
 	}
 }
 
@@ -234,7 +233,7 @@ func (d *DockerContainer) Host() string {
 	if d == nil {
 		panic("Cannot get host for a nil *DockerContainer")
 	}
-	_, hostIP, _, err := d.portMapping(true, -1)
+	hostIP, _, err := d.portMapping(true, -1)
 	if err != nil {
 		d.t.Fatal(err)
 	}
@@ -250,7 +249,7 @@ func (d *DockerContainer) Port() uint {
 	if d == nil {
 		panic("Cannot get port for a nil *DockerContainer")
 	}
-	_, _, port, err := d.portMapping(true, -1)
+	_, port, err := d.portMapping(true, -1)
 	if err != nil {
 		d.t.Fatal(err)
 	}
@@ -261,7 +260,7 @@ func (d *DockerContainer) PortFor(cPort int) uint {
 	if d == nil {
 		panic("Cannot get port for a nil *DockerContainer")
 	}
-	_, _, port, err := d.portMapping(false, cPort)
+	_, port, err := d.portMapping(false, cPort)
 	if err != nil {
 		d.t.Fatal(err)
 	}
