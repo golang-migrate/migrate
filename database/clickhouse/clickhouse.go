@@ -307,5 +307,5 @@ func quoteIdentifier(name string) string {
 	if end > -1 {
 		name = name[:end]
 	}
-	return `"` + strings.Replace(name, `"`, `""`, -1) + `"`
+	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
 }

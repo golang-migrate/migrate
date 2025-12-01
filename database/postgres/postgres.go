@@ -165,7 +165,7 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 	if s := purl.Query().Get("x-migrations-table-quoted"); len(s) > 0 {
 		migrationsTableQuoted, err = strconv.ParseBool(s)
 		if err != nil {
-			return nil, fmt.Errorf("Unable to parse option x-migrations-table-quoted: %w", err)
+			return nil, fmt.Errorf("unable to parse option x-migrations-table-quoted: %w", err)
 		}
 	}
 	if (len(migrationsTable) > 0) && (migrationsTableQuoted) && ((migrationsTable[0] != '"') || (migrationsTable[len(migrationsTable)-1] != '"')) {
@@ -196,7 +196,7 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 	if s := purl.Query().Get("x-multi-statement"); len(s) > 0 {
 		multiStatementEnabled, err = strconv.ParseBool(s)
 		if err != nil {
-			return nil, fmt.Errorf("Unable to parse option x-multi-statement: %w", err)
+			return nil, fmt.Errorf("unable to parse option x-multi-statement: %w", err)
 		}
 	}
 
@@ -319,7 +319,7 @@ func (p *Postgres) runStatement(statement []byte) error {
 
 func computeLineFromPos(s string, pos int) (line uint, col uint, ok bool) {
 	// replace crlf with lf
-	s = strings.Replace(s, "\r\n", "\n", -1)
+	s = strings.ReplaceAll(s, "\r\n", "\n")
 	// pg docs: pos uses index 1 for the first character, and positions are measured in characters not bytes
 	runes := []rune(s)
 	if pos > len(runes) {
