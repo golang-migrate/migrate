@@ -69,7 +69,7 @@ type DockerContainer struct {
 
 func (d *DockerContainer) PullImage() (err error) {
 	if d == nil {
-		return errors.New("Cannot pull image on a nil *DockerContainer")
+		return errors.New("cannot pull image on a nil *DockerContainer")
 	}
 	d.t.Logf("Docker: Pull image %v", d.ImageName)
 	r, err := d.client.ImagePull(context.Background(), d.ImageName, dockerimage.PullOptions{})
@@ -98,7 +98,7 @@ func (d *DockerContainer) PullImage() (err error) {
 
 func (d *DockerContainer) Start() error {
 	if d == nil {
-		return errors.New("Cannot start a nil *DockerContainer")
+		return errors.New("cannot start a nil *DockerContainer")
 	}
 
 	containerName := fmt.Sprintf("migrate_test_%s", pseudoRandStr(10))
@@ -146,7 +146,7 @@ func (d *DockerContainer) KeepForDebugging() {
 
 func (d *DockerContainer) Remove() error {
 	if d == nil {
-		return errors.New("Cannot remove a nil *DockerContainer")
+		return errors.New("cannot remove a nil *DockerContainer")
 	}
 
 	if d.keepForDebugging {
@@ -169,7 +169,7 @@ func (d *DockerContainer) Remove() error {
 
 func (d *DockerContainer) Inspect() error {
 	if d == nil {
-		return errors.New("Cannot inspect a nil *DockerContainer")
+		return errors.New("cannot inspect a nil *DockerContainer")
 	}
 
 	if len(d.ContainerId) == 0 {
@@ -187,7 +187,7 @@ func (d *DockerContainer) Inspect() error {
 
 func (d *DockerContainer) Logs() (io.ReadCloser, error) {
 	if d == nil {
-		return nil, errors.New("Cannot view logs for a nil *DockerContainer")
+		return nil, errors.New("cannot view logs for a nil *DockerContainer")
 	}
 	if len(d.ContainerId) == 0 {
 		return nil, errors.New("missing containerId")

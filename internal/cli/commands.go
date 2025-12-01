@@ -15,9 +15,9 @@ import (
 )
 
 var (
-	errInvalidSequenceWidth     = errors.New("Digits must be positive")
-	errIncompatibleSeqAndFormat = errors.New("The seq and format options are mutually exclusive")
-	errInvalidTimeFormat        = errors.New("Time format may not be empty")
+	errInvalidSequenceWidth     = errors.New("digits must be positive")
+	errIncompatibleSeqAndFormat = errors.New("the seq and format options are mutually exclusive")
+	errInvalidTimeFormat        = errors.New("time format may not be empty")
 )
 
 func nextSeqVersion(matches []string, seqDigits int) (string, error) {
@@ -33,7 +33,7 @@ func nextSeqVersion(matches []string, seqDigits int) (string, error) {
 		idx := strings.Index(matchSeqStr, "_")
 
 		if idx < 1 { // Using 1 instead of 0 since there should be at least 1 digit
-			return "", fmt.Errorf("Malformed migration filename: %s", filename)
+			return "", fmt.Errorf("malformed migration filename: %s", filename)
 		}
 
 		var err error
@@ -50,7 +50,7 @@ func nextSeqVersion(matches []string, seqDigits int) (string, error) {
 	version := fmt.Sprintf("%0[2]*[1]d", nextSeq, seqDigits)
 
 	if len(version) > seqDigits {
-		return "", fmt.Errorf("Next sequence number %s too large. At most %d digits are allowed", version, seqDigits)
+		return "", fmt.Errorf("next sequence number %s too large, at most %d digits are allowed", version, seqDigits)
 	}
 
 	return version, nil

@@ -755,10 +755,10 @@ func Test_computeLineFromPos(t *testing.T) {
 				t.Run(name, func(t *testing.T) {
 					input := tc.input
 					if crlf {
-						input = strings.Replace(input, "\n", "\r\n", -1)
+						input = strings.ReplaceAll(input, "\n", "\r\n")
 					}
 					if nonASCII {
-						input = strings.Replace(input, "FROM", "FRÖM", -1)
+						input = strings.ReplaceAll(input, "FROM", "FRÖM")
 					}
 					gotLine, gotCol, gotOK := computeLineFromPos(input, tc.pos)
 
