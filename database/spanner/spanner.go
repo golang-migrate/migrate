@@ -14,8 +14,9 @@ import (
 
 	"cloud.google.com/go/spanner"
 	sdb "cloud.google.com/go/spanner/admin/database/apiv1"
-	"cloud.google.com/go/spanner/spansql"
 
+	"github.com/cloudspannerecosystem/memefish"
+	"github.com/cloudspannerecosystem/memefish/token"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 
@@ -54,22 +55,22 @@ type Config struct {
 
 // Spanner implements database.Driver for Google Cloud Spanner
 type Spanner struct {
-	db *DB
-
+	db     *DB
 	config *Config
-
-	lock atomic.Bool
+	lock   atomic.Bool
 }
 
 type DB struct {
-	admin *sdb.DatabaseAdminClient
-	data  *spanner.Client
+	admin  *sdb.DatabaseAdminClient
+	data   *spanner.Client
+	shared bool
 }
 
 func NewDB(admin sdb.DatabaseAdminClient, data spanner.Client) *DB {
 	return &DB{
-		admin: &admin,
-		data:  &data,
+		admin:  &admin,
+		data:   &data,
+		shared: true,
 	}
 }
 
@@ -139,6 +140,9 @@ func (s *Spanner) Open(url string) (database.Driver, error) {
 
 // Close implements database.Driver
 func (s *Spanner) Close() error {
+	if s.db.shared {
+		return nil
+	}
 	s.db.data.Close()
 	return s.db.admin.Close()
 }
@@ -167,26 +171,64 @@ func (s *Spanner) Run(migration io.Reader) error {
 		return err
 	}
 
-	stmts := []string{string(migr)}
-	if s.config.CleanStatements {
-		stmts, err = cleanStatements(migr)
-		if err != nil {
-			return err
+	ctx := context.Background()
+
+	if !s.config.CleanStatements {
+		return s.runDdl(ctx, []string{string(migr)})
+	}
+
+	stmtGroups, err := statementGroups(migr)
+	if err != nil {
+		return err
+	}
+
+	for _, group := range stmtGroups {
+		switch group.typ {
+		case statementTypeDDL:
+			if err := s.runDdl(ctx, group.stmts); err != nil {
+				return err
+			}
+		case statementTypeDML:
+			if err := s.runDml(ctx, group.stmts); err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("unknown statement type: %s", group.typ)
 		}
 	}
 
-	ctx := context.Background()
+	return nil
+}
+
+func (s *Spanner) runDdl(ctx context.Context, stmts []string) error {
 	op, err := s.db.admin.UpdateDatabaseDdl(ctx, &adminpb.UpdateDatabaseDdlRequest{
 		Database:   s.config.DatabaseName,
 		Statements: stmts,
 	})
-
 	if err != nil {
-		return &database.Error{OrigErr: err, Err: "migration failed", Query: migr}
+		return &database.Error{OrigErr: err, Err: "migration failed", Query: []byte(strings.Join(stmts, ";\n"))}
 	}
 
 	if err := op.Wait(ctx); err != nil {
-		return &database.Error{OrigErr: err, Err: "migration failed", Query: migr}
+		return &database.Error{OrigErr: err, Err: "migration failed", Query: []byte(strings.Join(stmts, ";\n"))}
+	}
+
+	return nil
+}
+
+func (s *Spanner) runDml(ctx context.Context, stmts []string) error {
+	_, err := s.db.data.ReadWriteTransaction(ctx,
+		func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
+			for _, s := range stmts {
+				_, err := txn.Update(ctx, spanner.Statement{SQL: s})
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+	if err != nil {
+		return &database.Error{OrigErr: err, Err: "migration failed", Query: []byte(strings.Join(stmts, ";\n"))}
 	}
 
 	return nil
@@ -203,7 +245,8 @@ func (s *Spanner) SetVersion(version int, dirty bool) error {
 				spanner.Insert(s.config.MigrationsTable,
 					[]string{"Version", "Dirty"},
 					[]interface{}{version, dirty},
-				)}
+				),
+			}
 			return txn.BufferWrite(m)
 		})
 	if err != nil {
@@ -318,7 +361,6 @@ func (s *Spanner) ensureVersionTable() (err error) {
 		Database:   s.config.DatabaseName,
 		Statements: []string{stmt},
 	})
-
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(stmt)}
 	}
@@ -329,17 +371,80 @@ func (s *Spanner) ensureVersionTable() (err error) {
 	return nil
 }
 
-func cleanStatements(migration []byte) ([]string, error) {
-	// The Spanner GCP backend does not yet support comments for the UpdateDatabaseDdl RPC
-	// (see https://issuetracker.google.com/issues/159730604) we use
-	// spansql to parse the DDL and output valid stamements without comments
-	ddl, err := spansql.ParseDDL("", string(migration))
-	if err != nil {
-		return nil, err
+type statementType string
+
+const (
+	statementTypeUnknown statementType = ""
+	statementTypeDDL     statementType = "DDL"
+	statementTypeDML     statementType = "DML"
+)
+
+type statementGroup struct {
+	typ   statementType
+	stmts []string
+}
+
+func statementGroups(migr []byte) (groups []*statementGroup, err error) {
+	lex := &memefish.Lexer{
+		File: &token.File{Buffer: string(migr)},
 	}
-	stmts := make([]string, 0, len(ddl.List))
-	for _, stmt := range ddl.List {
-		stmts = append(stmts, stmt.SQL())
+
+	group := &statementGroup{}
+	var stmtTyp statementType
+	var stmt strings.Builder
+	for {
+		if err := lex.NextToken(); err != nil {
+			return nil, err
+		}
+
+		if stmtTyp == statementTypeUnknown {
+			switch {
+			case lex.Token.IsKeywordLike("INSERT") || lex.Token.IsKeywordLike("DELETE") || lex.Token.IsKeywordLike("UPDATE"):
+				stmtTyp = statementTypeDML
+			default:
+				stmtTyp = statementTypeDDL
+			}
+			if group.typ != stmtTyp {
+				if len(group.stmts) > 0 {
+					groups = append(groups, group)
+				}
+				group = &statementGroup{typ: stmtTyp}
+			}
+		}
+
+		if lex.Token.Kind == token.TokenEOF || lex.Token.Kind == ";" {
+			if stmt.Len() > 0 {
+				group.stmts = append(group.stmts, stmt.String())
+			}
+			stmtTyp = statementTypeUnknown
+			stmt.Reset()
+
+			if lex.Token.Kind == token.TokenEOF {
+				if len(group.stmts) > 0 {
+					groups = append(groups, group)
+				}
+
+				break
+			}
+
+			continue
+		}
+
+		if len(lex.Token.Comments) > 0 && strings.HasPrefix(lex.Token.Comments[0].Raw, "--") {
+			// standard comment Token consumes a \n, so we need to add it back
+			if _, err := stmt.WriteString("\n"); err != nil {
+				return nil, err
+			}
+		}
+		if stmt.Len() > 0 {
+			if _, err := stmt.WriteString(lex.Token.Space); err != nil {
+				return nil, err
+			}
+		}
+		if _, err := stmt.WriteString(lex.Token.Raw); err != nil {
+			return nil, err
+		}
 	}
-	return stmts, nil
+
+	return groups, nil
 }
