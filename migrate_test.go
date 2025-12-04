@@ -12,6 +12,7 @@ import (
 
 	dStub "github.com/golang-migrate/migrate/v4/database/stub"
 	"github.com/golang-migrate/migrate/v4/source"
+
 	sStub "github.com/golang-migrate/migrate/v4/source/stub"
 )
 
@@ -1139,9 +1140,14 @@ func TestRead(t *testing.T) {
 	}
 
 	for i, v := range tt {
-		ret := make(chan interface{})
-		go m.read(v.from, v.to, ret)
-		migrations, err := migrationsFromChannel(ret)
+		errCh := make(chan error, 1)
+		ret := make(chan *Migration)
+		go func() {
+			defer close(ret)
+			errCh <- m.read(v.from, v.to, &providerHelper{m, ret, make(<-chan bool)})
+		}()
+		migrations := migrationsFromChannel(ret)
+		err := <-errCh
 
 		if (v.expectErr == os.ErrNotExist && !errors.Is(err, os.ErrNotExist)) ||
 			(v.expectErr != os.ErrNotExist && v.expectErr != err) {
@@ -1216,9 +1222,14 @@ func TestReadUp(t *testing.T) {
 	}
 
 	for i, v := range tt {
-		ret := make(chan interface{})
-		go m.readUp(v.from, v.limit, ret)
-		migrations, err := migrationsFromChannel(ret)
+		errCh := make(chan error, 1)
+		ret := make(chan *Migration)
+		go func() {
+			defer close(ret)
+			errCh <- m.readUp(v.from, v.limit, &providerHelper{m, ret, make(<-chan bool)})
+		}()
+		migrations := migrationsFromChannel(ret)
+		err := <-errCh
 
 		if (v.expectErr == os.ErrNotExist && !errors.Is(err, os.ErrNotExist)) ||
 			(v.expectErr != os.ErrNotExist && v.expectErr != err) {
@@ -1293,9 +1304,14 @@ func TestReadDown(t *testing.T) {
 	}
 
 	for i, v := range tt {
-		ret := make(chan interface{})
-		go m.readDown(v.from, v.limit, ret)
-		migrations, err := migrationsFromChannel(ret)
+		errCh := make(chan error, 1)
+		ret := make(chan *Migration)
+		go func() {
+			defer close(ret)
+			errCh <- m.readDown(v.from, v.limit, &providerHelper{m, ret, make(<-chan bool)})
+		}()
+		migrations := migrationsFromChannel(ret)
+		err := <-errCh
 
 		if (v.expectErr == os.ErrNotExist && !errors.Is(err, os.ErrNotExist)) ||
 			(v.expectErr != os.ErrNotExist && v.expectErr != err) {
@@ -1319,18 +1335,12 @@ func TestLock(t *testing.T) {
 	}
 }
 
-func migrationsFromChannel(ret chan interface{}) ([]*Migration, error) {
+func migrationsFromChannel(ret chan *Migration) []*Migration {
 	slice := make([]*Migration, 0)
 	for r := range ret {
-		switch t := r.(type) {
-		case error:
-			return slice, t
-
-		case *Migration:
-			slice = append(slice, t)
-		}
+		slice = append(slice, r)
 	}
-	return slice, nil
+	return slice
 }
 
 type migrationSequence []*Migration
