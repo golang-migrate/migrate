@@ -29,7 +29,7 @@ var (
 	ErrNoDatabaseName            = fmt.Errorf("no database name")
 	ErrNoSchema                  = fmt.Errorf("no schema")
 	ErrDatabaseDirty             = fmt.Errorf("database is dirty")
-	ErrMultipleAuthOptionsPassed = fmt.Errorf("both password and useMsi=true were passed.")
+	ErrMultipleAuthOptionsPassed = fmt.Errorf("both password and useMsi=true were passed")
 )
 
 var lockErrorMap = map[int]string{
