@@ -268,6 +268,9 @@ func (s *Spanner) Drop() error {
 		if len(m) == 0 {
 			continue
 		} else if tbl := m[2]; len(tbl) > 0 {
+			if strings.Contains(s, "ROW DELETION POLICY") {
+				stmts = append(stmts, fmt.Sprintf(`ALTER TABLE %s DROP ROW DELETION POLICY`, tbl))
+			}
 			stmts = append(stmts, fmt.Sprintf(`DROP TABLE %s`, tbl))
 		} else if idx := m[4]; len(idx) > 0 {
 			stmts = append(stmts, fmt.Sprintf(`DROP INDEX %s`, idx))
