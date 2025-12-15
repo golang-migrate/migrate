@@ -5,14 +5,14 @@ import (
 	"os"
 	"testing"
 
-	"github.com/golang-migrate/migrate/v4"
-
-	dt "github.com/golang-migrate/migrate/v4/database/testing"
-	_ "github.com/golang-migrate/migrate/v4/source/file"
-
 	"cloud.google.com/go/spanner/spannertest"
+	"cloud.google.com/go/spanner/spansql"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/golang-migrate/migrate/v4"
+	dt "github.com/golang-migrate/migrate/v4/database/testing"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
 // withSpannerEmulator is not thread-safe and cannot be used with parallel tests since it sets the emulator
@@ -61,111 +61,196 @@ func TestMigrate(t *testing.T) {
 	})
 }
 
-func TestCleanStatements(t *testing.T) {
+func TestParseStatements(t *testing.T) {
 	testCases := []struct {
-		name           string
-		multiStatement string
-		expected       []string
+		name         string
+		migration    string
+		expectedKind statementKind
+		expectError  error
 	}{
 		{
-			name:           "no statement",
-			multiStatement: "",
-			expected:       []string{},
+			name:        "empty migration",
+			migration:   "",
+			expectError: ErrEmptyMigration,
 		},
 		{
-			name:           "single statement, single line, no semicolon, no comment",
-			multiStatement: "CREATE TABLE table_name (id STRING(255) NOT NULL) PRIMARY KEY (id)",
-			expected:       []string{"CREATE TABLE table_name (\n  id STRING(255) NOT NULL,\n) PRIMARY KEY(id)"},
+			name:        "whitespace only migration",
+			migration:   "   \n\t  ",
+			expectError: ErrEmptyMigration,
 		},
 		{
-			name: "single statement, multi line, no semicolon, no comment",
-			multiStatement: `CREATE TABLE table_name (
-			id STRING(255) NOT NULL,
-		) PRIMARY KEY (id)`,
-			expected: []string{"CREATE TABLE table_name (\n  id STRING(255) NOT NULL,\n) PRIMARY KEY(id)"},
+			name:         "single DDL statement - CREATE TABLE",
+			migration:    "CREATE TABLE users (id STRING(36) NOT NULL) PRIMARY KEY (id)",
+			expectedKind: statementKindDDL,
 		},
 		{
-			name:           "single statement, single line, with semicolon, no comment",
-			multiStatement: "CREATE TABLE table_name (id STRING(255) NOT NULL) PRIMARY KEY (id);",
-			expected:       []string{"CREATE TABLE table_name (\n  id STRING(255) NOT NULL,\n) PRIMARY KEY(id)"},
+			name: "multiple DDL statements",
+			migration: `CREATE TABLE users (
+				id STRING(36) NOT NULL
+			) PRIMARY KEY (id);
+			CREATE INDEX users_idx ON users (id);`,
+			expectedKind: statementKindDDL,
 		},
 		{
-			name: "single statement, multi line, with semicolon, no comment",
-			multiStatement: `CREATE TABLE table_name (
-			id STRING(255) NOT NULL,
-		) PRIMARY KEY (id);`,
-			expected: []string{"CREATE TABLE table_name (\n  id STRING(255) NOT NULL,\n) PRIMARY KEY(id)"},
+			name:         "single DML statement - INSERT",
+			migration:    "INSERT INTO users (id, name) VALUES ('1', 'test')",
+			expectedKind: statementKindDML,
 		},
 		{
-			name: "multi statement, with trailing semicolon. no comment",
-			// From https://github.com/mattes/migrate/pull/281
-			multiStatement: `CREATE TABLE table_name (
-			id STRING(255) NOT NULL,
-		) PRIMARY KEY(id);
-
-		CREATE INDEX table_name_id_idx ON table_name (id);`,
-			expected: []string{`CREATE TABLE table_name (
-  id STRING(255) NOT NULL,
-) PRIMARY KEY(id)`, "CREATE INDEX table_name_id_idx ON table_name(id)"},
+			name: "multiple INSERT statements",
+			migration: `INSERT INTO users (id, name) VALUES ('1', 'test1');
+			INSERT INTO users (id, name) VALUES ('2', 'test2');`,
+			expectedKind: statementKindDML,
 		},
 		{
-			name: "multi statement, no trailing semicolon, no comment",
-			// From https://github.com/mattes/migrate/pull/281
-			multiStatement: `CREATE TABLE table_name (
-			id STRING(255) NOT NULL,
-		) PRIMARY KEY(id);
-
-		CREATE INDEX table_name_id_idx ON table_name (id)`,
-			expected: []string{`CREATE TABLE table_name (
-  id STRING(255) NOT NULL,
-) PRIMARY KEY(id)`, "CREATE INDEX table_name_id_idx ON table_name(id)"},
+			name:         "single partitioned DML - UPDATE",
+			migration:    "UPDATE users SET name = 'updated' WHERE id = '1'",
+			expectedKind: statementKindPartitionedDML,
 		},
 		{
-			name: "multi statement, no trailing semicolon, standalone comment",
-			// From https://github.com/mattes/migrate/pull/281
-			multiStatement: `CREATE TABLE table_name (
-			-- standalone comment
-			id STRING(255) NOT NULL,
-		) PRIMARY KEY(id);
-
-		CREATE INDEX table_name_id_idx ON table_name (id)`,
-			expected: []string{`CREATE TABLE table_name (
-  id STRING(255) NOT NULL,
-) PRIMARY KEY(id)`, "CREATE INDEX table_name_id_idx ON table_name(id)"},
+			name:         "single partitioned DML - DELETE",
+			migration:    "DELETE FROM users WHERE id = '1'",
+			expectedKind: statementKindPartitionedDML,
 		},
 		{
-			name: "multi statement, no trailing semicolon, inline comment",
-			// From https://github.com/mattes/migrate/pull/281
-			multiStatement: `CREATE TABLE table_name (
-			id STRING(255) NOT NULL, -- inline comment
-		) PRIMARY KEY(id);
-
-		CREATE INDEX table_name_id_idx ON table_name (id)`,
-			expected: []string{`CREATE TABLE table_name (
-  id STRING(255) NOT NULL,
-) PRIMARY KEY(id)`, "CREATE INDEX table_name_id_idx ON table_name(id)"},
+			name: "multiple UPDATE statements",
+			migration: `UPDATE users SET name = 'updated1' WHERE id = '1';
+			UPDATE users SET name = 'updated2' WHERE id = '2';`,
+			expectedKind: statementKindPartitionedDML,
 		},
 		{
-			name: "alter table with SET OPTIONS",
-			multiStatement: `ALTER TABLE users ALTER COLUMN created
-			SET OPTIONS (allow_commit_timestamp=true);`,
-			expected: []string{"ALTER TABLE users ALTER COLUMN created SET OPTIONS (allow_commit_timestamp = true)"},
+			name: "mixed UPDATE and DELETE",
+			migration: `UPDATE users SET name = 'updated' WHERE id = '1';
+			DELETE FROM users WHERE id = '2';`,
+			expectedKind: statementKindPartitionedDML,
 		},
 		{
-			name: "column with NUMERIC type",
-			multiStatement: `CREATE TABLE table_name (
-				id STRING(255) NOT NULL,
-				sum NUMERIC,
+			name: "DDL with inline comment",
+			migration: `CREATE TABLE users (
+				id STRING(36) NOT NULL, -- primary identifier
+				name STRING(100)
 			) PRIMARY KEY (id)`,
-			expected: []string{"CREATE TABLE table_name (\n  id STRING(255) NOT NULL,\n  sum NUMERIC,\n) PRIMARY KEY(id)"},
+			expectedKind: statementKindDDL,
+		},
+		{
+			name: "DDL with standalone comment",
+			migration: `-- This migration creates the users table
+			CREATE TABLE users (
+				id STRING(36) NOT NULL
+			) PRIMARY KEY (id)`,
+			expectedKind: statementKindDDL,
+		},
+		{
+			name: "DDL with multi-line comment",
+			migration: `/*
+			 * This is a multi-line comment
+			 * describing the migration
+			 */
+			CREATE TABLE users (
+				id STRING(36) NOT NULL
+			) PRIMARY KEY (id)`,
+			expectedKind: statementKindDDL,
+		},
+		{
+			name: "DML INSERT with comment",
+			migration: `-- Seed initial user data
+			INSERT INTO users (id, name) VALUES ('1', 'test')`,
+			expectedKind: statementKindDML,
+		},
+		{
+			name: "DML UPDATE with comment",
+			migration: `-- Update user emails
+			UPDATE users SET name = 'updated' WHERE id = '1'`,
+			expectedKind: statementKindPartitionedDML,
+		},
+		{
+			name: "DML DELETE with comment",
+			migration: `-- Clean up test data
+			DELETE FROM users WHERE id = '1'`,
+			expectedKind: statementKindPartitionedDML,
+		},
+		{
+			name: "mixed INSERT and UPDATE - should error",
+			migration: `INSERT INTO users (id, name) VALUES ('1', 'test');
+			UPDATE users SET name = 'updated' WHERE id = '1';`,
+			expectError: ErrMixedStatements,
+		},
+		{
+			name: "mixed INSERT and DELETE - should error",
+			migration: `INSERT INTO users (id, name) VALUES ('1', 'test');
+			DELETE FROM users WHERE id = '1';`,
+			expectError: ErrMixedStatements,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			stmts, err := cleanStatements([]byte(tc.multiStatement))
-			require.NoError(t, err, "Error cleaning statements")
-			assert.Equal(t, tc.expected, stmts)
+			stmts, kind, err := parseStatements([]byte(tc.migration))
+			if tc.expectError != nil {
+				require.ErrorIs(t, err, tc.expectError)
+				return
+			}
+			require.NoError(t, err, "Error parsing statements")
+			assert.Equal(t, tc.expectedKind, kind)
+			assert.NotEmpty(t, stmts)
+		})
+	}
+}
+
+func TestInspectDMLKind(t *testing.T) {
+	testCases := []struct {
+		name         string
+		migration    string
+		expectedKind statementKind
+		expectError  error
+	}{
+		{
+			name:         "INSERT only",
+			migration:    "INSERT INTO users (id) VALUES ('1')",
+			expectedKind: statementKindDML,
+		},
+		{
+			name:         "UPDATE only",
+			migration:    "UPDATE users SET name = 'test' WHERE id = '1'",
+			expectedKind: statementKindPartitionedDML,
+		},
+		{
+			name:         "DELETE only",
+			migration:    "DELETE FROM users WHERE id = '1'",
+			expectedKind: statementKindPartitionedDML,
+		},
+		{
+			name: "multiple INSERTs",
+			migration: `INSERT INTO users (id) VALUES ('1');
+			INSERT INTO users (id) VALUES ('2');`,
+			expectedKind: statementKindDML,
+		},
+		{
+			name: "UPDATE and DELETE combined",
+			migration: `UPDATE users SET name = 'test' WHERE id = '1';
+			DELETE FROM users WHERE id = '2';`,
+			expectedKind: statementKindPartitionedDML,
+		},
+		{
+			name: "INSERT and UPDATE mixed - error",
+			migration: `INSERT INTO users (id) VALUES ('1');
+			UPDATE users SET name = 'test' WHERE id = '1';`,
+			expectError: ErrMixedStatements,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			dml, err := spansql.ParseDML("", tc.migration)
+			require.NoError(t, err, "Failed to parse DML")
+
+			kind, err := inspectDMLKind(dml.List)
+			if tc.expectError != nil {
+				require.ErrorIs(t, err, tc.expectError)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.expectedKind, kind)
 		})
 	}
 }
