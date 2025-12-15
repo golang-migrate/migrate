@@ -41,7 +41,7 @@ var (
 	ErrNoAssetSource = fmt.Errorf("expects *AssetSource")
 )
 
-func WithInstance(instance interface{}) (source.Driver, error) {
+func WithInstance(instance any) (source.Driver, error) {
 	if _, ok := instance.(*AssetSource); !ok {
 		return nil, ErrNoAssetSource
 	}

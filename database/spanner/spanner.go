@@ -202,7 +202,7 @@ func (s *Spanner) SetVersion(version int, dirty bool) error {
 				spanner.Delete(s.config.MigrationsTable, spanner.AllKeys()),
 				spanner.Insert(s.config.MigrationsTable,
 					[]string{"Version", "Dirty"},
-					[]interface{}{version, dirty},
+					[]any{version, dirty},
 				)}
 			return txn.BufferWrite(m)
 		})
