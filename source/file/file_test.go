@@ -156,7 +156,7 @@ func mustWriteFile(t testing.TB, dir, file string, body string) {
 func mustCreateBenchmarkDir(t *testing.B) (dir string) {
 	tmpDir := t.TempDir()
 
-	for i := 0; i < 1000; i++ {
+	for i := range 1000 {
 		mustWriteFile(t, tmpDir, fmt.Sprintf("%v_foobar.up.sql", i), "")
 		mustWriteFile(t, tmpDir, fmt.Sprintf("%v_foobar.down.sql", i), "")
 	}
@@ -171,8 +171,8 @@ func BenchmarkOpen(b *testing.B) {
 			b.Error(err)
 		}
 	}()
-	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
+
+	for b.Loop() {
 		f := &File{}
 		_, err := f.Open(scheme + dir)
 		if err != nil {
@@ -191,9 +191,9 @@ func BenchmarkNext(b *testing.B) {
 	}()
 	f := &File{}
 	d, _ := f.Open(scheme + dir)
-	b.ResetTimer()
+
 	v, err := d.First()
-	for n := 0; n < b.N; n++ {
+	for b.Loop() {
 		for !errors.Is(err, os.ErrNotExist) {
 			v, err = d.Next(v)
 		}

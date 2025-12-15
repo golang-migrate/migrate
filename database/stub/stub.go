@@ -14,7 +14,7 @@ func init() {
 
 type Stub struct {
 	Url               string
-	Instance          interface{}
+	Instance          any
 	CurrentVersion    int
 	MigrationSequence []string
 	LastRunMigration  []byte // todo: make []string
@@ -35,7 +35,7 @@ func (s *Stub) Open(url string) (database.Driver, error) {
 
 type Config struct{}
 
-func WithInstance(instance interface{}, config *Config) (database.Driver, error) {
+func WithInstance(instance any, config *Config) (database.Driver, error) {
 	return &Stub{
 		Instance:          instance,
 		CurrentVersion:    database.NilVersion,
