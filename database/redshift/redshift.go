@@ -1,22 +1,20 @@
 //go:build go1.9
-// +build go1.9
 
 package redshift
 
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"io"
 	nurl "net/url"
 	"strconv"
 	"strings"
-
-	"go.uber.org/atomic"
+	"sync/atomic"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
-	"github.com/hashicorp/go-multierror"
 	"github.com/lib/pq"
 )
 
@@ -128,14 +126,14 @@ func (p *Redshift) Close() error {
 
 // Redshift does not support advisory lock functions: https://docs.aws.amazon.com/redshift/latest/dg/c_unsupported-postgresql-functions.html
 func (p *Redshift) Lock() error {
-	if !p.isLocked.CAS(false, true) {
+	if !p.isLocked.CompareAndSwap(false, true) {
 		return database.ErrLocked
 	}
 	return nil
 }
 
 func (p *Redshift) Unlock() error {
-	if !p.isLocked.CAS(true, false) {
+	if !p.isLocked.CompareAndSwap(true, false) {
 		return database.ErrNotLocked
 	}
 	return nil
@@ -176,7 +174,7 @@ func (p *Redshift) Run(migration io.Reader) error {
 
 func computeLineFromPos(s string, pos int) (line uint, col uint, ok bool) {
 	// replace crlf with lf
-	s = strings.Replace(s, "\r\n", "\n", -1)
+	s = strings.ReplaceAll(s, "\r\n", "\n")
 	// pg docs: pos uses index 1 for the first character, and positions are measured in characters not bytes
 	runes := []rune(s)
 	if pos > len(runes) {
@@ -218,7 +216,7 @@ func (p *Redshift) SetVersion(version int, dirty bool) error {
 	query := `DELETE FROM "` + p.config.MigrationsTable + `"`
 	if _, err := tx.Exec(query); err != nil {
 		if errRollback := tx.Rollback(); errRollback != nil {
-			err = multierror.Append(err, errRollback)
+			err = errors.Join(err, errRollback)
 		}
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
@@ -230,7 +228,7 @@ func (p *Redshift) SetVersion(version int, dirty bool) error {
 		query = `INSERT INTO "` + p.config.MigrationsTable + `" (version, dirty) VALUES ($1, $2)`
 		if _, err := tx.Exec(query, version, dirty); err != nil {
 			if errRollback := tx.Rollback(); errRollback != nil {
-				err = multierror.Append(err, errRollback)
+				err = errors.Join(err, errRollback)
 			}
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
@@ -272,7 +270,7 @@ func (p *Redshift) Drop() (err error) {
 	}
 	defer func() {
 		if errClose := tables.Close(); errClose != nil {
-			err = multierror.Append(err, errClose)
+			err = errors.Join(err, errClose)
 		}
 	}()
 
@@ -314,11 +312,7 @@ func (p *Redshift) ensureVersionTable() (err error) {
 
 	defer func() {
 		if e := p.Unlock(); e != nil {
-			if err == nil {
-				err = e
-			} else {
-				err = multierror.Append(err, e)
-			}
+			err = errors.Join(err, e)
 		}
 	}()
 

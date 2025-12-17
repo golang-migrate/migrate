@@ -2,6 +2,7 @@ package migrate
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -118,7 +119,7 @@ func (m *Migration) LogString() string {
 
 // Buffer buffers Body up to BufferSize.
 // Calling this function blocks. Call with goroutine.
-func (m *Migration) Buffer() error {
+func (m *Migration) Buffer() (berr error) {
 	if m.Body == nil {
 		return nil
 	}
@@ -126,6 +127,21 @@ func (m *Migration) Buffer() error {
 	m.StartedBuffering = time.Now()
 
 	b := bufio.NewReaderSize(m.Body, int(m.BufferSize))
+
+	// defer closing buffer writer and body.
+	defer func() {
+		// close bufferWriter so Buffer knows that there is no
+		// more data coming.
+		if err := m.bufferWriter.Close(); err != nil {
+			berr = errors.Join(berr, err)
+		}
+
+		// it's safe to close the Body too.
+		if err := m.Body.Close(); err != nil {
+			berr = errors.Join(berr, err)
+		}
+
+	}()
 
 	// start reading from body, peek won't move the read pointer though
 	// poor man's solution?
@@ -144,17 +160,6 @@ func (m *Migration) Buffer() error {
 
 	m.FinishedReading = time.Now()
 	m.BytesRead = n
-
-	// close bufferWriter so Buffer knows that there is no
-	// more data coming
-	if err := m.bufferWriter.Close(); err != nil {
-		return err
-	}
-
-	// it's safe to close the Body too
-	if err := m.Body.Close(); err != nil {
-		return err
-	}
 
 	return nil
 }

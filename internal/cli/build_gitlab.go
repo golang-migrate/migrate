@@ -1,5 +1,4 @@
 //go:build gitlab
-// +build gitlab
 
 package cli
 

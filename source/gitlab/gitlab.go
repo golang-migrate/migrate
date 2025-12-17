@@ -130,7 +130,7 @@ func (g *Gitlab) readDirectory() error {
 		if response.CurrentPage >= response.TotalPages {
 			break
 		}
-		g.listOptions.ListOptions.Page = response.NextPage
+		g.listOptions.Page = response.NextPage
 	}
 
 	for i := range nodes {

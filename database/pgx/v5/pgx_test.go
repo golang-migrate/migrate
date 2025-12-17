@@ -35,11 +35,11 @@ var (
 		PortRequired: true, ReadyFunc: isReady}
 	// Supported versions: https://www.postgresql.org/support/versioning/
 	specs = []dktesting.ContainerSpec{
-		{ImageName: "postgres:12", Options: opts},
 		{ImageName: "postgres:13", Options: opts},
 		{ImageName: "postgres:14", Options: opts},
 		{ImageName: "postgres:15", Options: opts},
 		{ImageName: "postgres:16", Options: opts},
+		{ImageName: "postgres:17", Options: opts},
 	}
 )
 
@@ -730,10 +730,10 @@ func Test_computeLineFromPos(t *testing.T) {
 				t.Run(name, func(t *testing.T) {
 					input := tc.input
 					if crlf {
-						input = strings.Replace(input, "\n", "\r\n", -1)
+						input = strings.ReplaceAll(input, "\n", "\r\n")
 					}
 					if nonASCII {
-						input = strings.Replace(input, "FROM", "FRÖM", -1)
+						input = strings.ReplaceAll(input, "FROM", "FRÖM")
 					}
 					gotLine, gotCol, gotOK := computeLineFromPos(input, tc.pos)
 
