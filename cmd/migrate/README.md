@@ -33,6 +33,15 @@ $ apt-get update
 $ apt-get install -y migrate
 ```
 
+### Using mise-en-place
+
+If you are using [mise](https://github.com/jdx/mise), the polyglot tool version manager, you can install migrate cli using a command like this:
+
+```bash
+mise use -g migrate@latest
+```
+
+
 ### With Go toolchain
 
 #### Versioned
