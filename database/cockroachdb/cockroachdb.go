@@ -322,7 +322,6 @@ func (c *CockroachDb) ensureVersionTable() (err error) {
 		}
 	}()
 
-	// create table query is idempotent.
 	query := `CREATE TABLE IF NOT EXISTS "` + c.config.MigrationsTable + `" (version INT NOT NULL PRIMARY KEY, dirty BOOL NOT NULL)`
 	if _, err := c.db.Exec(query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
@@ -331,7 +330,6 @@ func (c *CockroachDb) ensureVersionTable() (err error) {
 }
 
 func (c *CockroachDb) ensureLockTable() error {
-	// create table query is idempotent. 
 	query := `CREATE TABLE IF NOT EXISTS "` + c.config.LockTable + `" (lock_id INT NOT NULL PRIMARY KEY)`
 	if _, err := c.db.Exec(query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
