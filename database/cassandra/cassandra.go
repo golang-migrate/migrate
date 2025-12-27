@@ -7,14 +7,12 @@ import (
 	nurl "net/url"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
-
-	"go.uber.org/atomic"
 
 	"github.com/gocql/gocql"
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/golang-migrate/migrate/v4/database/multistmt"
-	"github.com/hashicorp/go-multierror"
 )
 
 func init() {
@@ -199,14 +197,14 @@ func (c *Cassandra) Close() error {
 }
 
 func (c *Cassandra) Lock() error {
-	if !c.isLocked.CAS(false, true) {
+	if !c.isLocked.CompareAndSwap(false, true) {
 		return database.ErrLocked
 	}
 	return nil
 }
 
 func (c *Cassandra) Unlock() error {
-	if !c.isLocked.CAS(true, false) {
+	if !c.isLocked.CompareAndSwap(true, false) {
 		return database.ErrNotLocked
 	}
 	return nil
@@ -316,11 +314,7 @@ func (c *Cassandra) ensureVersionTable() (err error) {
 
 	defer func() {
 		if e := c.Unlock(); e != nil {
-			if err == nil {
-				err = e
-			} else {
-				err = multierror.Append(err, e)
-			}
+			err = errors.Join(err, e)
 		}
 	}()
 
@@ -342,7 +336,7 @@ func parseConsistency(consistencyStr string) (consistency gocql.Consistency, err
 			var ok bool
 			err, ok = r.(error)
 			if !ok {
-				err = fmt.Errorf("Failed to parse consistency \"%s\": %v", consistencyStr, r)
+				err = fmt.Errorf("failed to parse consistency \"%s\": %v", consistencyStr, r)
 			}
 		}
 	}()

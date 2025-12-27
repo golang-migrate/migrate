@@ -26,13 +26,13 @@ import (
 const defaultPort = 26257
 
 var (
-	opts = dktest.Options{Cmd: []string{"start", "--insecure"}, PortRequired: true, ReadyFunc: isReady}
-	// Released versions: https://www.cockroachlabs.com/docs/releases/
+	opts = dktest.Options{Cmd: []string{"start-single-node", "--insecure"}, PortRequired: true, ReadyFunc: isReady}
+	// Supported versions: https://www.cockroachlabs.com/docs/releases/release-support-policy#supported-versions
 	specs = []dktesting.ContainerSpec{
-		{ImageName: "cockroachdb/cockroach:v1.0.7", Options: opts},
-		{ImageName: "cockroachdb/cockroach:v1.1.9", Options: opts},
-		{ImageName: "cockroachdb/cockroach:v2.0.7", Options: opts},
-		{ImageName: "cockroachdb/cockroach:v2.1.3", Options: opts},
+		{ImageName: "cockroachdb/cockroach:latest-v24.3", Options: opts},
+		{ImageName: "cockroachdb/cockroach:latest-v24.1", Options: opts},
+		{ImageName: "cockroachdb/cockroach:latest-v23.2", Options: opts},
+		{ImageName: "cockroachdb/cockroach:latest-v23.1", Options: opts},
 	}
 )
 

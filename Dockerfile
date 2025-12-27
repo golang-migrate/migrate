@@ -1,4 +1,4 @@
-FROM golang:1.21-alpine3.19 AS builder
+FROM golang:1.25-alpine3.21 AS builder
 ARG VERSION
 
 RUN apk add --no-cache git gcc musl-dev make
@@ -15,7 +15,7 @@ COPY . ./
 
 RUN make build-docker
 
-FROM alpine:3.19
+FROM alpine:3.21
 
 RUN apk add --no-cache ca-certificates
 

@@ -1,18 +1,16 @@
 package rqlite
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	nurl "net/url"
 	"strconv"
 	"strings"
-
-	"go.uber.org/atomic"
+	"sync/atomic"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
-	"github.com/hashicorp/go-multierror"
-	"github.com/pkg/errors"
 	"github.com/rqlite/gorqlite"
 )
 
@@ -90,11 +88,7 @@ func (r *Rqlite) ensureVersionTable() (err error) {
 
 	defer func() {
 		if e := r.Unlock(); e != nil {
-			if err == nil {
-				err = e
-			} else {
-				err = multierror.Append(err, e)
-			}
+			err = errors.Join(err, e)
 		}
 	}()
 
@@ -144,7 +138,7 @@ func (r *Rqlite) Close() error {
 // If the implementation can't provide this functionality, return nil.
 // Return database.ErrLocked if database is already locked.
 func (r *Rqlite) Lock() error {
-	if !r.isLocked.CAS(false, true) {
+	if !r.isLocked.CompareAndSwap(false, true) {
 		return database.ErrLocked
 	}
 	return nil
@@ -153,7 +147,7 @@ func (r *Rqlite) Lock() error {
 // Unlock should release the lock. Migrate will call this function after
 // all migrations have been run.
 func (r *Rqlite) Unlock() error {
-	if !r.isLocked.CAS(true, false) {
+	if !r.isLocked.CompareAndSwap(true, false) {
 		return database.ErrNotLocked
 	}
 	return nil
@@ -292,7 +286,7 @@ func parseUrl(url string) (*nurl.URL, *Config, error) {
 	}
 
 	if parsedUrl.Scheme != "rqlite" {
-		return nil, nil, errors.Wrap(ErrBadConfig, "bad scheme")
+		return nil, nil, fmt.Errorf("bad scheme: %w", ErrBadConfig)
 	}
 
 	// adapt from rqlite to http/https schemes
@@ -316,7 +310,7 @@ func parseConfigFromQuery(queryVals nurl.Values) (*Config, error) {
 	migrationsTable := queryVals.Get("x-migrations-table")
 	if migrationsTable != "" {
 		if strings.HasPrefix(migrationsTable, "sqlite_") {
-			return nil, errors.Wrap(ErrBadConfig, "invalid value for x-migrations-table")
+			return nil, fmt.Errorf("invalid value for x-migrations-table: %w", ErrBadConfig)
 		}
 		c.MigrationsTable = migrationsTable
 	}
@@ -325,7 +319,7 @@ func parseConfigFromQuery(queryVals nurl.Values) (*Config, error) {
 	if connectInsecureStr != "" {
 		connectInsecure, err := strconv.ParseBool(connectInsecureStr)
 		if err != nil {
-			return nil, errors.Wrap(ErrBadConfig, "invalid value for x-connect-insecure")
+			return nil, fmt.Errorf("invalid value for x-connect-insecure: %w", ErrBadConfig)
 		}
 		c.ConnectInsecure = connectInsecure
 	}

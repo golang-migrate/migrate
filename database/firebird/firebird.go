@@ -1,20 +1,19 @@
 //go:build go1.9
-// +build go1.9
 
 package firebird
 
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"io"
 	nurl "net/url"
+	"sync/atomic"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
-	"github.com/hashicorp/go-multierror"
 	_ "github.com/nakagami/firebirdsql"
-	"go.uber.org/atomic"
 )
 
 func init() {
@@ -108,14 +107,14 @@ func (f *Firebird) Close() error {
 }
 
 func (f *Firebird) Lock() error {
-	if !f.isLocked.CAS(false, true) {
+	if !f.isLocked.CompareAndSwap(false, true) {
 		return database.ErrLocked
 	}
 	return nil
 }
 
 func (f *Firebird) Unlock() error {
-	if !f.isLocked.CAS(true, false) {
+	if !f.isLocked.CompareAndSwap(true, false) {
 		return database.ErrNotLocked
 	}
 	return nil
@@ -181,7 +180,7 @@ func (f *Firebird) Drop() (err error) {
 	}
 	defer func() {
 		if errClose := tables.Close(); errClose != nil {
-			err = multierror.Append(err, errClose)
+			err = errors.Join(err, errClose)
 		}
 	}()
 
@@ -224,11 +223,7 @@ func (f *Firebird) ensureVersionTable() (err error) {
 
 	defer func() {
 		if e := f.Unlock(); e != nil {
-			if err == nil {
-				err = e
-			} else {
-				err = multierror.Append(err, e)
-			}
+			err = errors.Join(err, e)
 		}
 	}()
 

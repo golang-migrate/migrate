@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync/atomic"
 
 	"cloud.google.com/go/spanner"
 	sdb "cloud.google.com/go/spanner/admin/database/apiv1"
@@ -19,8 +20,6 @@ import (
 	"github.com/golang-migrate/migrate/v4/database"
 
 	adminpb "cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
-	"github.com/hashicorp/go-multierror"
-	uatomic "go.uber.org/atomic"
 	"google.golang.org/api/iterator"
 )
 
@@ -31,11 +30,6 @@ func init() {
 
 // DefaultMigrationsTable is used if no custom table is specified
 const DefaultMigrationsTable = "SchemaMigrations"
-
-const (
-	unlockedVal = 0
-	lockedVal   = 1
-)
 
 // Driver errors
 var (
@@ -64,7 +58,7 @@ type Spanner struct {
 
 	config *Config
 
-	lock *uatomic.Uint32
+	lock atomic.Bool
 }
 
 type DB struct {
@@ -96,7 +90,6 @@ func WithInstance(instance *DB, config *Config) (database.Driver, error) {
 	sx := &Spanner{
 		db:     instance,
 		config: config,
-		lock:   uatomic.NewUint32(unlockedVal),
 	}
 
 	if err := sx.ensureVersionTable(); err != nil {
@@ -153,7 +146,7 @@ func (s *Spanner) Close() error {
 // Lock implements database.Driver but doesn't do anything because Spanner only
 // enqueues the UpdateDatabaseDdlRequest.
 func (s *Spanner) Lock() error {
-	if swapped := s.lock.CAS(unlockedVal, lockedVal); swapped {
+	if swapped := s.lock.CompareAndSwap(false, true); swapped {
 		return nil
 	}
 	return ErrLockHeld
@@ -161,7 +154,7 @@ func (s *Spanner) Lock() error {
 
 // Unlock implements database.Driver but no action required, see Lock.
 func (s *Spanner) Unlock() error {
-	if swapped := s.lock.CAS(lockedVal, unlockedVal); swapped {
+	if swapped := s.lock.CompareAndSwap(true, false); swapped {
 		return nil
 	}
 	return ErrLockNotHeld
@@ -305,11 +298,7 @@ func (s *Spanner) ensureVersionTable() (err error) {
 
 	defer func() {
 		if e := s.Unlock(); e != nil {
-			if err == nil {
-				err = e
-			} else {
-				err = multierror.Append(err, e)
-			}
+			err = errors.Join(err, e)
 		}
 	}()
 

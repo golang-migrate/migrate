@@ -1,5 +1,4 @@
 //go:build rqlite
-// +build rqlite
 
 package cli
 

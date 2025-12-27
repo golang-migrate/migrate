@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/dhui/dktest"
-	"github.com/docker/go-connections/nat"
 	"github.com/golang-migrate/migrate/v4"
 
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
@@ -25,27 +24,16 @@ const defaultPort = 1433
 const saPassword = "Root1234"
 
 var (
-	sqlEdgeOpts = dktest.Options{
-		Env: map[string]string{"ACCEPT_EULA": "Y", "MSSQL_SA_PASSWORD": saPassword},
-		PortBindings: map[nat.Port][]nat.PortBinding{
-			nat.Port(fmt.Sprintf("%d/tcp", defaultPort)): {
-				nat.PortBinding{
-					HostIP:   "0.0.0.0",
-					HostPort: "0/tcp",
-				},
-			},
-		},
-		PortRequired: true, ReadyFunc: isReady, PullTimeout: 2 * time.Minute,
-	}
 	sqlServerOpts = dktest.Options{
 		Env:          map[string]string{"ACCEPT_EULA": "Y", "MSSQL_SA_PASSWORD": saPassword, "MSSQL_PID": "Express"},
 		PortRequired: true, ReadyFunc: isReady, PullTimeout: 2 * time.Minute,
 	}
 	// Container versions: https://mcr.microsoft.com/v2/mssql/server/tags/list
 	specs = []dktesting.ContainerSpec{
-		{ImageName: "mcr.microsoft.com/azure-sql-edge:latest", Options: sqlEdgeOpts},
-		{ImageName: "mcr.microsoft.com/mssql/server:2017-latest", Options: sqlServerOpts},
+		{ImageName: "mcr.microsoft.com/mssql/server:2022-latest", Options: sqlServerOpts},
 		{ImageName: "mcr.microsoft.com/mssql/server:2019-latest", Options: sqlServerOpts},
+		// Add back support for 2017 version once the image is fixed: https://github.com/microsoft/mssql-docker/issues/899
+		// {ImageName: "mcr.microsoft.com/mssql/server:2017-latest", Options: sqlServerOpts},
 	}
 )
 
@@ -96,6 +84,26 @@ func SkipIfUnsupportedArch(t *testing.T, c dktest.ContainerInfo) {
 }
 
 func Test(t *testing.T) {
+	t.Run("test", test)
+	t.Run("testMigrate", testMigrate)
+	t.Run("testMultiStatement", testMultiStatement)
+	t.Run("testErrorParsing", testErrorParsing)
+	t.Run("testLockWorks", testLockWorks)
+	t.Run("testMsiTrue", testMsiTrue)
+	t.Run("testOpenWithPasswordAndMSI", testOpenWithPasswordAndMSI)
+	t.Run("testMsiFalse", testMsiFalse)
+
+	t.Cleanup(func() {
+		for _, spec := range specs {
+			t.Log("Cleaning up ", spec.ImageName)
+			if err := spec.Cleanup(); err != nil {
+				t.Error("Error removing ", spec.ImageName, "error:", err)
+			}
+		}
+	})
+}
+
+func test(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		SkipIfUnsupportedArch(t, c)
 		ip, port, err := c.Port(defaultPort)
@@ -120,7 +128,7 @@ func Test(t *testing.T) {
 	})
 }
 
-func TestMigrate(t *testing.T) {
+func testMigrate(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		SkipIfUnsupportedArch(t, c)
 		ip, port, err := c.Port(defaultPort)
@@ -149,7 +157,7 @@ func TestMigrate(t *testing.T) {
 	})
 }
 
-func TestMultiStatement(t *testing.T) {
+func testMultiStatement(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		SkipIfUnsupportedArch(t, c)
 		ip, port, err := c.Port(defaultPort)
@@ -183,7 +191,7 @@ func TestMultiStatement(t *testing.T) {
 	})
 }
 
-func TestErrorParsing(t *testing.T) {
+func testErrorParsing(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		SkipIfUnsupportedArch(t, c)
 		ip, port, err := c.Port(defaultPort)
@@ -215,7 +223,7 @@ func TestErrorParsing(t *testing.T) {
 	})
 }
 
-func TestLockWorks(t *testing.T) {
+func testLockWorks(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		SkipIfUnsupportedArch(t, c)
 		ip, port, err := c.Port(defaultPort)
@@ -254,7 +262,7 @@ func TestLockWorks(t *testing.T) {
 	})
 }
 
-func TestMsiTrue(t *testing.T) {
+func testMsiTrue(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		SkipIfUnsupportedArch(t, c)
 		ip, port, err := c.Port(defaultPort)
@@ -271,7 +279,7 @@ func TestMsiTrue(t *testing.T) {
 	})
 }
 
-func TestOpenWithPasswordAndMSI(t *testing.T) {
+func testOpenWithPasswordAndMSI(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		SkipIfUnsupportedArch(t, c)
 		ip, port, err := c.Port(defaultPort)
@@ -303,7 +311,7 @@ func TestOpenWithPasswordAndMSI(t *testing.T) {
 	})
 }
 
-func TestMsiFalse(t *testing.T) {
+func testMsiFalse(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		SkipIfUnsupportedArch(t, c)
 		ip, port, err := c.Port(defaultPort)

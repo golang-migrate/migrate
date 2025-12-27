@@ -3,16 +3,15 @@ package snowflake
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"io"
 	nurl "net/url"
 	"strconv"
 	"strings"
-
-	"go.uber.org/atomic"
+	"sync/atomic"
 
 	"github.com/golang-migrate/migrate/v4/database"
-	"github.com/hashicorp/go-multierror"
 	"github.com/lib/pq"
 	sf "github.com/snowflakedb/gosnowflake"
 )
@@ -159,14 +158,14 @@ func (p *Snowflake) Close() error {
 }
 
 func (p *Snowflake) Lock() error {
-	if !p.isLocked.CAS(false, true) {
+	if !p.isLocked.CompareAndSwap(false, true) {
 		return database.ErrLocked
 	}
 	return nil
 }
 
 func (p *Snowflake) Unlock() error {
-	if !p.isLocked.CAS(true, false) {
+	if !p.isLocked.CompareAndSwap(true, false) {
 		return database.ErrNotLocked
 	}
 	return nil
@@ -207,7 +206,7 @@ func (p *Snowflake) Run(migration io.Reader) error {
 
 func computeLineFromPos(s string, pos int) (line uint, col uint, ok bool) {
 	// replace crlf with lf
-	s = strings.Replace(s, "\r\n", "\n", -1)
+	s = strings.ReplaceAll(s, "\r\n", "\n")
 	// pg docs: pos uses index 1 for the first character, and positions are measured in characters not bytes
 	runes := []rune(s)
 	if pos > len(runes) {
@@ -249,7 +248,7 @@ func (p *Snowflake) SetVersion(version int, dirty bool) error {
 	query := `DELETE FROM "` + p.config.MigrationsTable + `"`
 	if _, err := tx.Exec(query); err != nil {
 		if errRollback := tx.Rollback(); errRollback != nil {
-			err = multierror.Append(err, errRollback)
+			err = errors.Join(err, errRollback)
 		}
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
@@ -263,7 +262,7 @@ func (p *Snowflake) SetVersion(version int, dirty bool) error {
 				` + strconv.FormatBool(dirty) + `)`
 		if _, err := tx.Exec(query); err != nil {
 			if errRollback := tx.Rollback(); errRollback != nil {
-				err = multierror.Append(err, errRollback)
+				err = errors.Join(err, errRollback)
 			}
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
@@ -305,7 +304,7 @@ func (p *Snowflake) Drop() (err error) {
 	}
 	defer func() {
 		if errClose := tables.Close(); errClose != nil {
-			err = multierror.Append(err, errClose)
+			err = errors.Join(err, errClose)
 		}
 	}()
 
@@ -347,11 +346,7 @@ func (p *Snowflake) ensureVersionTable() (err error) {
 
 	defer func() {
 		if e := p.Unlock(); e != nil {
-			if err == nil {
-				err = e
-			} else {
-				err = multierror.Append(err, e)
-			}
+			err = errors.Join(err, e)
 		}
 	}()
 
