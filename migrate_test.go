@@ -1169,8 +1169,8 @@ func TestReadUp(t *testing.T) {
 		{from: -1, limit: 1, expectErr: nil, expectMigrations: newMigSeq(M(1))},
 		{from: -1, limit: 2, expectErr: nil, expectMigrations: newMigSeq(M(1), M(3))},
 
-		{from: 0, limit: -1, expectErr: os.ErrNotExist},
-		{from: 0, limit: 0, expectErr: os.ErrNotExist},
+		{from: 0, limit: -1, expectErr: ErrNoChange},
+		{from: 0, limit: 0, expectErr: ErrNoChange},
 		{from: 0, limit: 1, expectErr: os.ErrNotExist},
 		{from: 0, limit: 2, expectErr: os.ErrNotExist},
 
@@ -1179,8 +1179,8 @@ func TestReadUp(t *testing.T) {
 		{from: 1, limit: 1, expectErr: nil, expectMigrations: newMigSeq(M(3))},
 		{from: 1, limit: 2, expectErr: nil, expectMigrations: newMigSeq(M(3), M(4))},
 
-		{from: 2, limit: -1, expectErr: os.ErrNotExist},
-		{from: 2, limit: 0, expectErr: os.ErrNotExist},
+		{from: 2, limit: -1, expectErr: ErrNoChange},
+		{from: 2, limit: 0, expectErr: ErrNoChange},
 		{from: 2, limit: 1, expectErr: os.ErrNotExist},
 		{from: 2, limit: 2, expectErr: os.ErrNotExist},
 
@@ -1199,8 +1199,8 @@ func TestReadUp(t *testing.T) {
 		{from: 5, limit: 1, expectErr: nil, expectMigrations: newMigSeq(M(7))},
 		{from: 5, limit: 2, expectErr: ErrShortLimit{1}, expectMigrations: newMigSeq(M(7))},
 
-		{from: 6, limit: -1, expectErr: os.ErrNotExist},
-		{from: 6, limit: 0, expectErr: os.ErrNotExist},
+		{from: 6, limit: -1, expectErr: ErrNoChange},
+		{from: 6, limit: 0, expectErr: ErrNoChange},
 		{from: 6, limit: 1, expectErr: os.ErrNotExist},
 		{from: 6, limit: 2, expectErr: os.ErrNotExist},
 
@@ -1209,8 +1209,8 @@ func TestReadUp(t *testing.T) {
 		{from: 7, limit: 1, expectErr: os.ErrNotExist},
 		{from: 7, limit: 2, expectErr: os.ErrNotExist},
 
-		{from: 8, limit: -1, expectErr: os.ErrNotExist},
-		{from: 8, limit: 0, expectErr: os.ErrNotExist},
+		{from: 8, limit: -1, expectErr: ErrNoChange},
+		{from: 8, limit: 0, expectErr: ErrNoChange},
 		{from: 8, limit: 1, expectErr: os.ErrNotExist},
 		{from: 8, limit: 2, expectErr: os.ErrNotExist},
 	}
