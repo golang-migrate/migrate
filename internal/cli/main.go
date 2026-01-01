@@ -68,6 +68,7 @@ func Main(version string) {
 	pathPtr := flag.String("path", "", "")
 	databasePtr := flag.String("database", "", "")
 	sourcePtr := flag.String("source", "", "")
+	envPtr := flag.String("env", "", "")
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr,
@@ -78,6 +79,7 @@ Options:
   -source          Location of the migrations (driver://url)
   -path            Shorthand for -source=file://path
   -database        Run migrations against this database (driver://url)
+  -env             Read database connection string from environment variable
   -prefetch N      Number of migrations to load in advance before executing (default 10)
   -lock-timeout N  Allow N seconds to acquire database lock (default 15)
   -verbose         Print verbose logging
@@ -117,6 +119,15 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 	// translate -path into -source if given
 	if *sourcePtr == "" && *pathPtr != "" {
 		*sourcePtr = fmt.Sprintf("file://%v", *pathPtr)
+	}
+
+	// read database connection string from environment variable if -env is given
+	if *envPtr != "" {
+		dbFromEnv, err := databaseFromEnv(*envPtr)
+		if err != nil {
+			log.fatalErr(err)
+		}
+		*databasePtr = dbFromEnv
 	}
 
 	// initialize migrate

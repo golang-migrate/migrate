@@ -20,6 +20,16 @@ var (
 	errInvalidTimeFormat        = errors.New("time format may not be empty")
 )
 
+// databaseFromEnv reads the database connection string from the specified environment variable.
+// Returns the value if set, or an error if the environment variable is not set or empty.
+func databaseFromEnv(envName string) (string, error) {
+	val := os.Getenv(envName)
+	if val == "" {
+		return "", fmt.Errorf("environment variable %s is not set or empty", envName)
+	}
+	return val, nil
+}
+
 func nextSeqVersion(matches []string, seqDigits int) (string, error) {
 	if seqDigits <= 0 {
 		return "", errInvalidSequenceWidth
