@@ -21,6 +21,7 @@
 | `sslkey` | | Key file location. The file must contain PEM encoded data. |
 | `sslrootcert` | | The location of the root certificate file. The file must contain PEM encoded data. | 
 | `sslmode` | | Whether or not to use SSL (disable\|require\|verify-ca\|verify-full) |
+| `sslnegotiation` | | How to negotiate SSL (postgres\|direct). Use `direct` to skip PostgreSQL's SSL negotiation and go directly to TLS handshake. Requires PostgreSQL 17+ or a proxy that supports direct SSL. (default: postgres) |
 
 
 ## Upgrading from v1
