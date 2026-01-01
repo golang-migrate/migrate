@@ -253,6 +253,47 @@ func (s *CreateCmdSuite) TestCreateCmd() {
 	}
 }
 
+func TestDatabaseFromEnv(t *testing.T) {
+	cases := []struct {
+		name           string
+		envName        string
+		envValue       string
+		setEnv         bool
+		expectedResult string
+		expectedErrStr string
+	}{
+		{"valid env var", "TEST_DB_URL", "postgres://localhost:5432/test", true, "postgres://localhost:5432/test", ""},
+		{"empty env var", "TEST_DB_URL_EMPTY", "", true, "", "environment variable TEST_DB_URL_EMPTY is not set or empty"},
+		{"unset env var", "TEST_DB_URL_UNSET", "", false, "", "environment variable TEST_DB_URL_UNSET is not set or empty"},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if c.setEnv {
+				os.Setenv(c.envName, c.envValue)
+				defer os.Unsetenv(c.envName)
+			}
+
+			result, err := databaseFromEnv(c.envName)
+
+			if c.expectedErrStr != "" {
+				if err == nil {
+					t.Errorf("Expected error: %s but got nil", c.expectedErrStr)
+				} else if err.Error() != c.expectedErrStr {
+					t.Errorf("Expected error: %s but got: %s", c.expectedErrStr, err.Error())
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Unexpected error: %s", err.Error())
+				}
+				if result != c.expectedResult {
+					t.Errorf("Expected result: %s but got: %s", c.expectedResult, result)
+				}
+			}
+		})
+	}
+}
+
 func TestNumDownFromArgs(t *testing.T) {
 	cases := []struct {
 		name                string
