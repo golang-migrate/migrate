@@ -55,7 +55,7 @@ var (
 		ReadyFunc:    isReady,
 	}
 	specs = []dktesting.ContainerSpec{
-		{ImageName: "surrealdb/surrealdb:v1.4.2", Options: opts},
+		{ImageName: "surrealdb/surrealdb:v2.4", Options: opts},
 	}
 )
 
