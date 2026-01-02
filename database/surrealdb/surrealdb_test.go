@@ -35,22 +35,16 @@ func (c *ConnInfo) connString(options ...string) string {
 	return fmt.Sprintf("surrealdb://%s:%s@%s:%s/%s/%s?%s", c.User, c.Pass, c.Host, c.Port, c.NS, c.DB, strings.Join(options, "&"))
 }
 
-func getPortBindings() map[nat.Port][]nat.PortBinding {
-	_, portBindings, err := nat.ParsePortSpecs([]string{"8000/tcp"})
-	if err != nil {
-		panic("Error setting up port bindings")
-	}
-	return portBindings
-}
-
 const user = "user"
 const pass = "pass"
 
 var (
 	opts = dktest.Options{
-		Entrypoint:   []string{""},
-		Cmd:          []string{"/surreal", "start", "--user", user, "--pass", pass, "memory"},
-		PortBindings: getPortBindings(),
+		Entrypoint: []string{""},
+		Cmd:        []string{"/surreal", "start", "--user", user, "--pass", pass, "memory"},
+		ExposedPorts: map[nat.Port]struct{}{
+			"8000/tcp": {},
+		},
 		PortRequired: true,
 		ReadyFunc:    isReady,
 	}
@@ -128,11 +122,11 @@ func TestErrorParsing(t *testing.T) {
 		}
 
 		badQuery := "DEFINE TABLEE user SCHEMALESS;"
-		wantErr := `sending request failed for method 'query': There was a problem with the database: Parse error: Failed to parse query at line 1 column 8 expected query to end`
+		wantErr := `There was a problem with the database: Parse error:`
 		if err := d.Run(strings.NewReader(badQuery)); err == nil {
 			t.Fatal("expected err but got nil")
-		} else if !strings.HasPrefix(err.Error(), wantErr) {
-			t.Fatalf("expected '%s' to start with '%s'", err.Error(), wantErr)
+		} else if !strings.Contains(err.Error(), wantErr) {
+			t.Fatalf("expected '%s' to contain '%s'", err.Error(), wantErr)
 		} else if !strings.Contains(err.Error(), badQuery) {
 			t.Fatalf("expected err to contain %s", badQuery)
 		}
@@ -189,26 +183,31 @@ func TestMigrationTable(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		db, err := surrealdb.New(connInfo.getUrl())
+		db, err := surrealdb.FromEndpointURLString(t.Context(), connInfo.getUrl())
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer db.Close()
+		defer func() {
+			err = db.Close(t.Context())
+			if err != nil {
+				t.Fatal(err)
+			}
+		}()
 
-		_, err = db.Signin(map[string]interface{}{
-			"user": connInfo.User,
-			"pass": connInfo.Pass,
+		_, err = db.SignIn(t.Context(), &surrealdb.Auth{
+			Username: "user",
+			Password: "pass",
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		_, err = db.Use(connInfo.NS, connInfo.DB)
+		err = db.Use(t.Context(), connInfo.NS, connInfo.DB)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		_, err = db.Query("SELECT * FROM schema_migrations:version", map[string]interface{}{})
+		_, err = surrealdb.Query[[]any](t.Context(), db, "SELECT * FROM schema_migrations:version", map[string]any{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -343,25 +342,30 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 	}
 
 	connInfo := getConnInfo(ip, port)
-	db, err := surrealdb.New(connInfo.getUrl())
+	db, err := surrealdb.FromEndpointURLString(ctx, connInfo.getUrl())
 	if err != nil {
 		return false
 	}
-	defer db.Close()
+	defer func() {
+		err = db.Close(ctx)
+		if err != nil {
+			panic(err)
+		}
+	}()
 
-	_, err = db.Signin(map[string]interface{}{
-		"user": connInfo.User,
-		"pass": connInfo.Pass,
+	_, err = db.SignIn(ctx, &surrealdb.Auth{
+		Username: "user",
+		Password: "pass",
 	})
 	if err != nil {
 		return false
 	}
 
-	_, err = db.Use(connInfo.NS, connInfo.DB)
+	err = db.Use(ctx, connInfo.NS, connInfo.DB)
 	if err != nil {
 		return false
 	}
 
-	_, err = db.Query(`SELECT * FROM 1;`, map[string]interface{}{})
+	_, err = surrealdb.Query[[]any](ctx, db, `SELECT * FROM 1;`, map[string]any{})
 	return err == nil
 }

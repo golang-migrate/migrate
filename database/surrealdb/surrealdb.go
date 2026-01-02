@@ -1,6 +1,7 @@
 package surrealdb
 
 import (
+	"context"
 	"fmt"
 	"io"
 	nurl "net/url"
@@ -11,6 +12,7 @@ import (
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/hashicorp/go-multierror"
 	"github.com/surrealdb/surrealdb.go"
+	"github.com/surrealdb/surrealdb.go/pkg/models"
 )
 
 func init() {
@@ -42,26 +44,10 @@ type SurrealDB struct {
 	config *Config
 }
 
-type DBInfo struct {
-	DL map[string]string `json:"dl"`
-	DT map[string]string `json:"dt"`
-	FC map[string]string `json:"fc"`
-	PA map[string]string `json:"pa"`
-	SC map[string]string `json:"sc"`
-	TB map[string]string `json:"tb"`
-}
-
 type VersionInfo struct {
 	ID      string `json:"id,omitempty"`
 	Version int    `json:"version,omitempty"`
 	Dirty   bool   `json:"dirty,omitempty"`
-}
-
-type LockDoc struct {
-	ID        string `json:"id,omitempty"`
-	Pid       int    `json:"pid,omitempty"`
-	Hostname  string `json:"hostname,omitempty"`
-	CreatedAt string `json:"created_at,omitempty"`
 }
 
 func WithInstance(instance *surrealdb.DB, config *Config) (database.Driver, error) {
@@ -69,8 +55,8 @@ func WithInstance(instance *surrealdb.DB, config *Config) (database.Driver, erro
 		return nil, ErrNilConfig
 	}
 
-	if _, err := instance.Info(); err != nil {
-		return nil, err
+	if instance == nil {
+		return nil, fmt.Errorf("instance is nil")
 	}
 
 	if len(config.MigrationsTable) == 0 {
@@ -115,6 +101,7 @@ func (m *SurrealDB) ensureVersionTable() (err error) {
 }
 
 func (m *SurrealDB) Open(url string) (database.Driver, error) {
+	ctx := context.Background()
 	purl, err := nurl.Parse(url)
 	if err != nil {
 		return nil, err
@@ -154,20 +141,20 @@ func (m *SurrealDB) Open(url string) (database.Driver, error) {
 
 	connUrl := fmt.Sprintf("%s://%s/rpc", scheme, host)
 
-	db, err := surrealdb.New(connUrl)
+	db, err := surrealdb.FromEndpointURLString(ctx, connUrl)
 	if err != nil {
 		return nil, err
 	}
 
-	_, err = db.Signin(map[string]interface{}{
-		"user": username,
-		"pass": password,
+	_, err = db.SignIn(ctx, &surrealdb.Auth{
+		Username: username,
+		Password: password,
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	_, err = db.Use(namespace, database_name)
+	err = db.Use(ctx, namespace, database_name)
 	if err != nil {
 		return nil, err
 	}
@@ -185,22 +172,28 @@ func (m *SurrealDB) Open(url string) (database.Driver, error) {
 }
 
 func (m *SurrealDB) Close() error {
-	m.db.Close()
-	return nil
+	return m.db.Close(context.Background())
 }
 
 func (m *SurrealDB) Drop() (err error) {
 	query := `INFO FOR DB;`
-	result, err := surrealdb.SmartUnmarshal[DBInfo](m.db.Query(query, map[string]interface{}{}))
+	results, err := surrealdb.Query[map[string]any](context.Background(), m.db, query, map[string]any{})
 	if err != nil {
 		return err
 	}
 
-	for tableName := range result.TB {
-		query := fmt.Sprintf(`REMOVE TABLE %s;`, tableName)
-		_, err := m.db.Query(query, map[string]interface{}{})
-		if err != nil {
-			return err
+	if results == nil || len(*results) == 0 {
+		return nil
+	}
+	result := (*results)[0].Result
+
+	if tables, ok := result["tb"].(map[string]any); ok {
+		for tableName := range tables {
+			query := fmt.Sprintf(`REMOVE TABLE %s;`, tableName)
+			_, err := surrealdb.Query[any](context.Background(), m.db, query, map[string]any{})
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -215,17 +208,25 @@ func (m *SurrealDB) Lock() error {
 	}
 
 	lock_doc_id := m.config.GetLockDocumentId()
+	parsed_id, err := models.ParseRecordID(lock_doc_id)
+	if err != nil {
+		return err
+	}
+
 	query := `BEGIN; CREATE $lock_doc_id SET pid = $pid, hostname = $hostname, created_at = $created_at; RETURN AFTER; COMMIT;`
 
-	// using m.db.Query looks to prevent a race condition that can occur when using m.db.Create
-	// if you use m.db.Create its possible for a second lock call shortly after first to not error as it should
-	_, err = surrealdb.SmartUnmarshal[[]LockDoc](
-		m.db.Query(query, map[string]interface{}{
-			"lock_doc_id": lock_doc_id,
+	// using surrealdb.Query looks to prevent a race condition that can occur when using surrealdb.Create
+	// if you use surrealdb.Create its possible for a second lock call shortly after first to not error as it should
+	_, err = surrealdb.Query[any](
+		context.Background(),
+		m.db,
+		query,
+		map[string]any{
+			"lock_doc_id": parsed_id,
 			"pid":         pid,
 			"hostname":    hostname,
 			"created_at":  time.Now().Format(time.RFC3339),
-		}),
+		},
 	)
 	if err != nil {
 		return err
@@ -236,10 +237,15 @@ func (m *SurrealDB) Lock() error {
 
 func (m *SurrealDB) Unlock() error {
 	lock_doc_id := m.config.GetLockDocumentId()
+	parsed_id, err := models.ParseRecordID(lock_doc_id)
+	if err != nil {
+		return err
+	}
+
 	query := `BEGIN; LET $lock = SELECT * FROM $lock_doc_id; DELETE $lock; COMMIT;`
 
 	// Delete will error if lock_doc_id does not exist because $lock ends up as NONE
-	_, err := m.db.Query(query, map[string]interface{}{"lock_doc_id": lock_doc_id})
+	_, err = surrealdb.Query[any](context.Background(), m.db, query, map[string]any{"lock_doc_id": parsed_id})
 	return err
 }
 
@@ -250,21 +256,26 @@ func (m *SurrealDB) Run(migration io.Reader) error {
 	}
 
 	query := string(mig[:])
-	_, err = m.db.Query(query, map[string]interface{}{})
+	_, err = surrealdb.Query[any](context.Background(), m.db, query, map[string]any{})
 	return err
 }
 
 func (m *SurrealDB) SetVersion(version int, dirty bool) error {
 	version_document_id := m.config.GetVersionDocumentId()
-	params := map[string]interface{}{"version_document_id": version_document_id}
+	parsed_id, err := models.ParseRecordID(version_document_id)
+	if err != nil {
+		return err
+	}
+
+	params := map[string]any{"version_document_id": parsed_id}
 	query := `BEGIN; DELETE $version_document_id; `
 
 	// Also re-write the schema version for nil dirty versions to prevent
 	// empty schema version for failed down migration on the first migration
 	// See: https://github.com/golang-migrate/migrate/issues/330
 	if version >= 0 || (version == database.NilVersion && dirty) {
-		params = map[string]interface{}{
-			"version_document_id": version_document_id,
+		params = map[string]any{
+			"version_document_id": parsed_id,
 			"version":             version,
 			"dirty":               dirty,
 		}
@@ -276,7 +287,7 @@ func (m *SurrealDB) SetVersion(version int, dirty bool) error {
 
 	query += `COMMIT;`
 
-	_, err := m.db.Query(query, params)
+	_, err = surrealdb.Query[any](context.Background(), m.db, query, params)
 	if err != nil {
 		return err
 	}
@@ -286,12 +297,23 @@ func (m *SurrealDB) SetVersion(version int, dirty bool) error {
 
 func (m *SurrealDB) Version() (version int, dirty bool, err error) {
 	version_document_id := m.config.GetVersionDocumentId()
-
-	query := fmt.Sprintf("SELECT * FROM %s;", version_document_id)
-	versionInfo, err := surrealdb.SmartUnmarshal[[]VersionInfo](m.db.Query(query, map[string]interface{}{}))
+	parsed_id, err := models.ParseRecordID(version_document_id)
 	if err != nil {
 		return database.NilVersion, false, err
-	} else if len(versionInfo) == 0 {
+	}
+
+	query := "SELECT * FROM $version_document_id;"
+	results, err := surrealdb.Query[[]VersionInfo](context.Background(), m.db, query, map[string]any{"version_document_id": parsed_id})
+	if err != nil {
+		return database.NilVersion, false, err
+	}
+
+	if results == nil || len(*results) == 0 {
+		return database.NilVersion, false, nil
+	}
+	versionInfo := (*results)[0].Result
+
+	if len(versionInfo) == 0 {
 		return database.NilVersion, false, nil
 	}
 

@@ -1,5 +1,4 @@
 //go:build surrealdb
-// +build surrealdb
 
 package cli
 
