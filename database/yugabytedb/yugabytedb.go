@@ -8,16 +8,15 @@ import (
 	"net/url"
 	"regexp"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
-	"github.com/hashicorp/go-multierror"
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgerrcode"
 	"github.com/lib/pq"
-	"go.uber.org/atomic"
 )
 
 const (
@@ -206,7 +205,7 @@ func (c *YugabyteDB) Lock() error {
 			}
 			defer func() {
 				if errClose := rows.Close(); errClose != nil {
-					err = multierror.Append(err, errClose)
+					err = errors.Join(err, errClose)
 				}
 			}()
 
@@ -320,7 +319,7 @@ func (c *YugabyteDB) Drop() (err error) {
 	}
 	defer func() {
 		if errClose := tables.Close(); errClose != nil {
-			err = multierror.Append(err, errClose)
+			err = errors.Join(err, errClose)
 		}
 	}()
 
@@ -360,11 +359,7 @@ func (c *YugabyteDB) ensureVersionTable() (err error) {
 
 	defer func() {
 		if e := c.Unlock(); e != nil {
-			if err == nil {
-				err = e
-			} else {
-				err = multierror.Append(err, e)
-			}
+			err = errors.Join(err, e)
 		}
 	}()
 
@@ -420,8 +415,9 @@ func (c *YugabyteDB) doTxWithRetry(
 		}
 
 		// If we've tried to commit the transaction Rollback just returns sql.ErrTxDone.
-		//nolint:errcheck
-		defer tx.Rollback()
+		defer func() {
+			_ = tx.Rollback()
+		}()
 
 		if err := fn(tx); err != nil {
 			if errIsRetryable(err) {

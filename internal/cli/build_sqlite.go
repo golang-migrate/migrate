@@ -1,5 +1,4 @@
 //go:build sqlite
-// +build sqlite
 
 package cli
 

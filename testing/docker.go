@@ -9,17 +9,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	dockertypes "github.com/docker/docker/api/types"
-	dockercontainer "github.com/docker/docker/api/types/container"
-	dockernetwork "github.com/docker/docker/api/types/network"
-	dockerclient "github.com/docker/docker/client"
-	"github.com/hashicorp/go-multierror"
 	"io"
-	"math/rand"
+	"math/rand/v2"
 	"strconv"
 	"strings"
 	"testing"
-	"time"
+
+	dockercontainer "github.com/docker/docker/api/types/container"
+	dockerimage "github.com/docker/docker/api/types/image"
+	dockernetwork "github.com/docker/docker/api/types/network"
+	dockerclient "github.com/docker/docker/client"
 )
 
 func NewDockerContainer(t testing.TB, image string, env []string, cmd []string) (*DockerContainer, error) {
@@ -63,23 +62,23 @@ type DockerContainer struct {
 	Cmd                []string
 	ContainerId        string
 	ContainerName      string
-	ContainerJSON      dockertypes.ContainerJSON
+	ContainerJSON      dockercontainer.InspectResponse
 	containerInspected bool
 	keepForDebugging   bool
 }
 
 func (d *DockerContainer) PullImage() (err error) {
 	if d == nil {
-		return errors.New("Cannot pull image on a nil *DockerContainer")
+		return errors.New("cannot pull image on a nil *DockerContainer")
 	}
 	d.t.Logf("Docker: Pull image %v", d.ImageName)
-	r, err := d.client.ImagePull(context.Background(), d.ImageName, dockertypes.ImagePullOptions{})
+	r, err := d.client.ImagePull(context.Background(), d.ImageName, dockerimage.PullOptions{})
 	if err != nil {
 		return err
 	}
 	defer func() {
 		if errClose := r.Close(); errClose != nil {
-			err = multierror.Append(errClose)
+			err = errors.Join(err, errClose)
 		}
 	}()
 
@@ -99,7 +98,7 @@ func (d *DockerContainer) PullImage() (err error) {
 
 func (d *DockerContainer) Start() error {
 	if d == nil {
-		return errors.New("Cannot start a nil *DockerContainer")
+		return errors.New("cannot start a nil *DockerContainer")
 	}
 
 	containerName := fmt.Sprintf("migrate_test_%s", pseudoRandStr(10))
@@ -126,7 +125,7 @@ func (d *DockerContainer) Start() error {
 	d.ContainerName = containerName
 
 	// then start it
-	if err := d.client.ContainerStart(context.Background(), resp.ID, dockertypes.ContainerStartOptions{}); err != nil {
+	if err := d.client.ContainerStart(context.Background(), resp.ID, dockercontainer.StartOptions{}); err != nil {
 		return err
 	}
 
@@ -147,7 +146,7 @@ func (d *DockerContainer) KeepForDebugging() {
 
 func (d *DockerContainer) Remove() error {
 	if d == nil {
-		return errors.New("Cannot remove a nil *DockerContainer")
+		return errors.New("cannot remove a nil *DockerContainer")
 	}
 
 	if d.keepForDebugging {
@@ -158,7 +157,7 @@ func (d *DockerContainer) Remove() error {
 		return errors.New("missing containerId")
 	}
 	if err := d.client.ContainerRemove(context.Background(), d.ContainerId,
-		dockertypes.ContainerRemoveOptions{
+		dockercontainer.RemoveOptions{
 			Force: true,
 		}); err != nil {
 		d.t.Log(err)
@@ -170,7 +169,7 @@ func (d *DockerContainer) Remove() error {
 
 func (d *DockerContainer) Inspect() error {
 	if d == nil {
-		return errors.New("Cannot inspect a nil *DockerContainer")
+		return errors.New("cannot inspect a nil *DockerContainer")
 	}
 
 	if len(d.ContainerId) == 0 {
@@ -188,19 +187,19 @@ func (d *DockerContainer) Inspect() error {
 
 func (d *DockerContainer) Logs() (io.ReadCloser, error) {
 	if d == nil {
-		return nil, errors.New("Cannot view logs for a nil *DockerContainer")
+		return nil, errors.New("cannot view logs for a nil *DockerContainer")
 	}
 	if len(d.ContainerId) == 0 {
 		return nil, errors.New("missing containerId")
 	}
 
-	return d.client.ContainerLogs(context.Background(), d.ContainerId, dockertypes.ContainerLogsOptions{
+	return d.client.ContainerLogs(context.Background(), d.ContainerId, dockercontainer.LogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
 	})
 }
 
-func (d *DockerContainer) portMapping(selectFirst bool, cPort int) (containerPort uint, hostIP string, hostPort uint, err error) { // nolint:unparam
+func (d *DockerContainer) portMapping(selectFirst bool, cPort int) (hostIP string, hostPort uint, err error) {
 	if !d.containerInspected {
 		if err := d.Inspect(); err != nil {
 			d.t.Fatal(err)
@@ -212,21 +211,20 @@ func (d *DockerContainer) portMapping(selectFirst bool, cPort int) (containerPor
 			// Skip ahead until we find the port we want
 			continue
 		}
-		for _, binding := range bindings {
-
+		if len(bindings) > 0 {
+			binding := bindings[0]
 			hostPortUint, err := strconv.ParseUint(binding.HostPort, 10, 64)
 			if err != nil {
-				return 0, "", 0, err
+				return "", 0, err
 			}
-
-			return uint(port.Int()), binding.HostIP, uint(hostPortUint), nil // nolint: staticcheck
+			return bindings[0].HostIP, uint(hostPortUint), nil
 		}
 	}
 
 	if selectFirst {
-		return 0, "", 0, errors.New("no port binding")
+		return "", 0, errors.New("no port binding")
 	} else {
-		return 0, "", 0, errors.New("specified port not bound")
+		return "", 0, errors.New("specified port not bound")
 	}
 }
 
@@ -234,7 +232,7 @@ func (d *DockerContainer) Host() string {
 	if d == nil {
 		panic("Cannot get host for a nil *DockerContainer")
 	}
-	_, hostIP, _, err := d.portMapping(true, -1)
+	hostIP, _, err := d.portMapping(true, -1)
 	if err != nil {
 		d.t.Fatal(err)
 	}
@@ -250,7 +248,7 @@ func (d *DockerContainer) Port() uint {
 	if d == nil {
 		panic("Cannot get port for a nil *DockerContainer")
 	}
-	_, _, port, err := d.portMapping(true, -1)
+	_, port, err := d.portMapping(true, -1)
 	if err != nil {
 		d.t.Fatal(err)
 	}
@@ -261,14 +259,14 @@ func (d *DockerContainer) PortFor(cPort int) uint {
 	if d == nil {
 		panic("Cannot get port for a nil *DockerContainer")
 	}
-	_, _, port, err := d.portMapping(false, cPort)
+	_, port, err := d.portMapping(false, cPort)
 	if err != nil {
 		d.t.Fatal(err)
 	}
 	return port
 }
 
-func (d *DockerContainer) NetworkSettings() dockertypes.NetworkSettings {
+func (d *DockerContainer) NetworkSettings() dockercontainer.NetworkSettings {
 	if d == nil {
 		panic("Cannot get network settings for a nil *DockerContainer")
 	}
@@ -286,15 +284,11 @@ type dockerImagePullOutput struct {
 	Progress string `json:"progress"`
 }
 
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
-
 func pseudoRandStr(n int) string {
 	var letterRunes = []rune("abcdefghijklmnopqrstuvwxyz0123456789")
 	b := make([]rune, n)
 	for i := range b {
-		b[i] = letterRunes[rand.Intn(len(letterRunes))]
+		b[i] = letterRunes[rand.IntN(len(letterRunes))]
 	}
 	return string(b)
 }

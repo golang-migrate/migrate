@@ -50,7 +50,7 @@ func TestLockAndUnlock(t *testing.T, d database.Driver) {
 			case <-done:
 				return
 			case <-timeout:
-				errs <- fmt.Errorf("Timeout after 15 seconds. Looks like a deadlock in Lock/UnLock.\n%#v", d)
+				errs <- fmt.Errorf("timeout after 15 seconds, looks like a deadlock in Lock/UnLock\n%#v", d)
 				return
 			}
 		}
@@ -116,7 +116,6 @@ func TestDrop(t *testing.T, d database.Driver) {
 }
 
 func TestSetVersion(t *testing.T, d database.Driver) {
-	// nolint:maligned
 	testCases := []struct {
 		name            string
 		version         int

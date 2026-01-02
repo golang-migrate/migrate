@@ -2,19 +2,18 @@ package clickhouse
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
-
-	"go.uber.org/atomic"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/golang-migrate/migrate/v4/database/multistmt"
-	"github.com/hashicorp/go-multierror"
 )
 
 var (
@@ -210,11 +209,7 @@ func (ch *ClickHouse) ensureVersionTable() (err error) {
 
 	defer func() {
 		if e := ch.Unlock(); e != nil {
-			if err == nil {
-				err = e
-			} else {
-				err = multierror.Append(err, e)
-			}
+			err = errors.Join(err, e)
 		}
 	}()
 
@@ -267,7 +262,7 @@ func (ch *ClickHouse) Drop() (err error) {
 	}
 	defer func() {
 		if errClose := tables.Close(); errClose != nil {
-			err = multierror.Append(err, errClose)
+			err = errors.Join(err, errClose)
 		}
 	}()
 
@@ -291,14 +286,14 @@ func (ch *ClickHouse) Drop() (err error) {
 }
 
 func (ch *ClickHouse) Lock() error {
-	if !ch.isLocked.CAS(false, true) {
+	if !ch.isLocked.CompareAndSwap(false, true) {
 		return database.ErrLocked
 	}
 
 	return nil
 }
 func (ch *ClickHouse) Unlock() error {
-	if !ch.isLocked.CAS(true, false) {
+	if !ch.isLocked.CompareAndSwap(true, false) {
 		return database.ErrNotLocked
 	}
 
@@ -312,5 +307,5 @@ func quoteIdentifier(name string) string {
 	if end > -1 {
 		name = name[:end]
 	}
-	return `"` + strings.Replace(name, `"`, `""`, -1) + `"`
+	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
 }
