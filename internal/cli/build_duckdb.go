@@ -1,5 +1,4 @@
 //go:build duckdb
-// +build duckdb
 
 package cli
 
