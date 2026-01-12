@@ -336,7 +336,7 @@ func parseConsistency(consistencyStr string) (consistency gocql.Consistency, err
 			var ok bool
 			err, ok = r.(error)
 			if !ok {
-				err = fmt.Errorf("Failed to parse consistency \"%s\": %v", consistencyStr, r)
+				err = fmt.Errorf("failed to parse consistency \"%s\": %v", consistencyStr, r)
 			}
 		}
 	}()

@@ -174,7 +174,7 @@ func (p *Redshift) Run(migration io.Reader) error {
 
 func computeLineFromPos(s string, pos int) (line uint, col uint, ok bool) {
 	// replace crlf with lf
-	s = strings.Replace(s, "\r\n", "\n", -1)
+	s = strings.ReplaceAll(s, "\r\n", "\n")
 	// pg docs: pos uses index 1 for the first character, and positions are measured in characters not bytes
 	runes := []rune(s)
 	if pos > len(runes) {

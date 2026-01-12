@@ -34,7 +34,7 @@ var (
 	ErrNilConfig        = fmt.Errorf("no config")
 	ErrNoDatabaseName   = fmt.Errorf("no database name")
 	ErrAppendPEM        = fmt.Errorf("failed to append PEM")
-	ErrTLSCertKeyConfig = fmt.Errorf("To use TLS client authentication, both x-tls-cert and x-tls-key must not be empty")
+	ErrTLSCertKeyConfig = fmt.Errorf("to use TLS client authentication, both x-tls-cert and x-tls-key must not be empty")
 )
 
 type Config struct {
