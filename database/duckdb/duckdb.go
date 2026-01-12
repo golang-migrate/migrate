@@ -217,11 +217,7 @@ func (d *DuckDB) ensureVersionTable() (err error) {
 
 	defer func() {
 		if e := d.Unlock(); e != nil {
-			if err == nil {
-				err = e
-			} else {
-				err = errors.Join(err, e)
-			}
+			err = errors.Join(err, e)
 		}
 	}()
 
