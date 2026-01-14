@@ -36,6 +36,7 @@ var (
 
 	DefaultLockInitialRetryInterval = 100 * time.Millisecond
 	DefaultLockMaxRetryInterval     = 1000 * time.Millisecond
+	DefaultLockMaxRetries           = uint64(5)
 )
 
 var (
@@ -66,6 +67,9 @@ type LockConfig struct {
 	// MaxRetryInterval the maximum retry interval. Once the exponential backoff reaches this limit,
 	// the retry interval remains the same
 	MaxRetryInterval time.Duration
+
+	// MaxRetries the maximum number of retries to acquire the lock
+	MaxRetries uint64
 }
 
 type Postgres struct {
@@ -218,6 +222,7 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 	lockConfig := LockConfig{
 		InitialRetryInterval: DefaultLockInitialRetryInterval,
 		MaxRetryInterval:     DefaultLockMaxRetryInterval,
+		MaxRetries:           DefaultLockMaxRetries,
 	}
 	if s := purl.Query().Get("x-lock-retry-max-interval"); len(s) > 0 {
 		maxRetryIntervalMillis, err := strconv.Atoi(s)
@@ -264,7 +269,7 @@ func (p *Postgres) Close() error {
 // https://www.postgresql.org/docs/9.6/static/explicit-locking.html#ADVISORY-LOCKS
 func (p *Postgres) Lock() error {
 	return database.CasRestoreOnErr(&p.isLocked, false, true, database.ErrLocked, func() error {
-		backOff := p.config.Locking.nonStopBackoff()
+		backOff := p.config.Locking.exponentialBackoff()
 		err := backoff.Retry(func() error {
 			ok, err := p.tryLock()
 			if err != nil {
@@ -538,12 +543,12 @@ func (p *Postgres) ensureVersionTable() (err error) {
 	return nil
 }
 
-func (l *LockConfig) nonStopBackoff() backoff.BackOff {
+func (l *LockConfig) exponentialBackoff() backoff.BackOff {
 	b := backoff.NewExponentialBackOff()
 	b.InitialInterval = l.InitialRetryInterval
 	b.MaxInterval = l.MaxRetryInterval
-	b.MaxElapsedTime = 0 // this backoff won't stop
+	b.MaxElapsedTime = 0 // rely on MaxRetries instead
 	b.Reset()
 
-	return b
+	return backoff.WithMaxRetries(b, l.MaxRetries)
 }
