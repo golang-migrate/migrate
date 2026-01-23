@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/go-sql-driver/mysql"
+
 	"github.com/golang-migrate/migrate/v4/database"
 )
 
@@ -44,7 +45,7 @@ type Config struct {
 	DatabaseName      string
 	NoLock            bool
 	StatementTimeout  time.Duration
-	TryLockTimeoutSec int
+	TryLockTimeoutSec *int
 }
 
 type Mysql struct {
@@ -255,12 +256,14 @@ func (m *Mysql) Open(url string) (database.Driver, error) {
 	}
 
 	tryLockTimeoutParam := customParams["x-try-lock-timeout"]
-	tryLockTimeout := DefaultTryLockTimeoutSec
+	var tryLockTimeoutSec *int
 	if tryLockTimeoutParam != "" {
-		tryLockTimeout, err = strconv.Atoi(tryLockTimeoutParam)
+		tryLockTimeout, err := strconv.Atoi(tryLockTimeoutParam)
 		if err != nil {
 			return nil, fmt.Errorf("could not parse x-try-lock-timeout as int: %w", err)
 		}
+
+		tryLockTimeoutSec = &tryLockTimeout
 	}
 
 	db, err := sql.Open("mysql", config.FormatDSN())
@@ -273,7 +276,7 @@ func (m *Mysql) Open(url string) (database.Driver, error) {
 		MigrationsTable:   customParams["x-migrations-table"],
 		NoLock:            noLock,
 		StatementTimeout:  time.Duration(statementTimeout) * time.Millisecond,
-		TryLockTimeoutSec: tryLockTimeout,
+		TryLockTimeoutSec: tryLockTimeoutSec,
 	})
 	if err != nil {
 		return nil, err
@@ -307,8 +310,8 @@ func (m *Mysql) Lock() error {
 		}
 
 		tryLockTimeout := DefaultTryLockTimeoutSec
-		if m.config.TryLockTimeoutSec != 0 {
-			tryLockTimeout = m.config.TryLockTimeoutSec
+		if m.config.TryLockTimeoutSec != nil {
+			tryLockTimeout = *m.config.TryLockTimeoutSec
 		}
 
 		query := "SELECT GET_LOCK(?, ?)"
