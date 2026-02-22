@@ -1,6 +1,6 @@
 module github.com/golang-migrate/migrate/v4
 
-go 1.24.0
+go 1.25.0
 
 require (
 	cloud.google.com/go/spanner v1.85.0
@@ -212,6 +212,7 @@ require (
 )
 
 require (
+	github.com/hashicorp/go-multierror v1.1.1
 	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.21.0
 )
@@ -221,6 +222,7 @@ require (
 	github.com/goccy/go-json v0.9.11 // indirect
 	github.com/godbus/dbus v0.0.0-20190726142602-4481cbc300e2 // indirect
 	github.com/gsterjov/go-libsecret v0.0.0-20161001094733-a6f4afe4910c // indirect
+	github.com/hashicorp/errwrap v1.0.0 // indirect
 	github.com/kardianos/osext v0.0.0-20190222173326-2bc1f35cddc0 // indirect
 	github.com/klauspost/asmfmt v1.3.2 // indirect
 	github.com/klauspost/compress v1.15.11 // indirect
