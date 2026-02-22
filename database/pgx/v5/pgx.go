@@ -5,6 +5,7 @@ package pgx
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"io"
 	nurl "net/url"
@@ -17,7 +18,6 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/golang-migrate/migrate/v4/database/multistmt"
-	"github.com/hashicorp/go-multierror"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5/pgconn"
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -157,7 +157,7 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 	if s := purl.Query().Get("x-migrations-table-quoted"); len(s) > 0 {
 		migrationsTableQuoted, err = strconv.ParseBool(s)
 		if err != nil {
-			return nil, fmt.Errorf("Unable to parse option x-migrations-table-quoted: %w", err)
+			return nil, fmt.Errorf("unable to parse option x-migrations-table-quoted: %w", err)
 		}
 	}
 	if (len(migrationsTable) > 0) && (migrationsTableQuoted) && ((migrationsTable[0] != '"') || (migrationsTable[len(migrationsTable)-1] != '"')) {
@@ -188,7 +188,7 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 	if s := purl.Query().Get("x-multi-statement"); len(s) > 0 {
 		multiStatementEnabled, err = strconv.ParseBool(s)
 		if err != nil {
-			return nil, fmt.Errorf("Unable to parse option x-multi-statement: %w", err)
+			return nil, fmt.Errorf("unable to parse option x-multi-statement: %w", err)
 		}
 	}
 
@@ -303,7 +303,7 @@ func (p *Postgres) runStatement(statement []byte) error {
 
 func computeLineFromPos(s string, pos int) (line uint, col uint, ok bool) {
 	// replace crlf with lf
-	s = strings.Replace(s, "\r\n", "\n", -1)
+	s = strings.ReplaceAll(s, "\r\n", "\n")
 	// pg docs: pos uses index 1 for the first character, and positions are measured in characters not bytes
 	runes := []rune(s)
 	if pos > len(runes) {
@@ -345,7 +345,7 @@ func (p *Postgres) SetVersion(version int, dirty bool) error {
 	query := `TRUNCATE ` + quoteIdentifier(p.config.migrationsSchemaName) + `.` + quoteIdentifier(p.config.migrationsTableName)
 	if _, err := tx.Exec(query); err != nil {
 		if errRollback := tx.Rollback(); errRollback != nil {
-			err = multierror.Append(err, errRollback)
+			err = errors.Join(err, errRollback)
 		}
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
@@ -357,7 +357,7 @@ func (p *Postgres) SetVersion(version int, dirty bool) error {
 		query = `INSERT INTO ` + quoteIdentifier(p.config.migrationsSchemaName) + `.` + quoteIdentifier(p.config.migrationsTableName) + ` (version, dirty) VALUES ($1, $2)`
 		if _, err := tx.Exec(query, version, dirty); err != nil {
 			if errRollback := tx.Rollback(); errRollback != nil {
-				err = multierror.Append(err, errRollback)
+				err = errors.Join(err, errRollback)
 			}
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
@@ -399,7 +399,7 @@ func (p *Postgres) Drop() (err error) {
 	}
 	defer func() {
 		if errClose := tables.Close(); errClose != nil {
-			err = multierror.Append(err, errClose)
+			err = errors.Join(err, errClose)
 		}
 	}()
 
@@ -441,11 +441,7 @@ func (p *Postgres) ensureVersionTable() (err error) {
 
 	defer func() {
 		if e := p.Unlock(); e != nil {
-			if err == nil {
-				err = e
-			} else {
-				err = multierror.Append(err, e)
-			}
+			err = errors.Join(err, e)
 		}
 	}()
 
@@ -480,5 +476,5 @@ func quoteIdentifier(name string) string {
 	if end > -1 {
 		name = name[:end]
 	}
-	return `"` + strings.Replace(name, `"`, `""`, -1) + `"`
+	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
 }

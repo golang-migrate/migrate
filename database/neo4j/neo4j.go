@@ -2,6 +2,7 @@ package neo4j
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	neturl "net/url"
@@ -10,7 +11,6 @@ import (
 
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/golang-migrate/migrate/v4/database/multistmt"
-	"github.com/hashicorp/go-multierror"
 	"github.com/neo4j/neo4j-go-driver/neo4j"
 )
 
@@ -141,7 +141,7 @@ func (n *Neo4j) Run(migration io.Reader) (err error) {
 	}
 	defer func() {
 		if cerr := session.Close(); cerr != nil {
-			err = multierror.Append(err, cerr)
+			err = errors.Join(err, cerr)
 		}
 	}()
 
@@ -188,7 +188,7 @@ func (n *Neo4j) SetVersion(version int, dirty bool) (err error) {
 	}
 	defer func() {
 		if cerr := session.Close(); cerr != nil {
-			err = multierror.Append(err, cerr)
+			err = errors.Join(err, cerr)
 		}
 	}()
 
@@ -213,7 +213,7 @@ func (n *Neo4j) Version() (version int, dirty bool, err error) {
 	}
 	defer func() {
 		if cerr := session.Close(); cerr != nil {
-			err = multierror.Append(err, cerr)
+			err = errors.Join(err, cerr)
 		}
 	}()
 
@@ -261,7 +261,7 @@ func (n *Neo4j) Drop() (err error) {
 	}
 	defer func() {
 		if cerr := session.Close(); cerr != nil {
-			err = multierror.Append(err, cerr)
+			err = errors.Join(err, cerr)
 		}
 	}()
 
@@ -278,7 +278,7 @@ func (n *Neo4j) ensureVersionConstraint() (err error) {
 	}
 	defer func() {
 		if cerr := session.Close(); cerr != nil {
-			err = multierror.Append(err, cerr)
+			err = errors.Join(err, cerr)
 		}
 	}()
 

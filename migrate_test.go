@@ -57,8 +57,8 @@ func TestNew(t *testing.T) {
 		t.Error("expected sourceDrv not to be nil")
 	}
 
-	if m.databaseName != dbDrvNameStub {
-		t.Errorf("expected stub, got %v", m.databaseName)
+	if m.databaseDriverName != dbDrvNameStub {
+		t.Errorf("expected stub, got %v", m.databaseDriverName)
 	}
 	if m.databaseDrv == nil {
 		t.Error("expected databaseDrv not to be nil")
@@ -97,8 +97,8 @@ func TestNewWithDatabaseInstance(t *testing.T) {
 		t.Error("expected sourceDrv not to be nil")
 	}
 
-	if m.databaseName != dbDrvNameStub {
-		t.Errorf("expected stub, got %v", m.databaseName)
+	if m.databaseDriverName != dbDrvNameStub {
+		t.Errorf("expected stub, got %v", m.databaseDriverName)
 	}
 	if m.databaseDrv == nil {
 		t.Error("expected databaseDrv not to be nil")
@@ -156,8 +156,8 @@ func TestNewWithSourceInstance(t *testing.T) {
 		t.Error("expected sourceDrv not to be nil")
 	}
 
-	if m.databaseName != dbDrvNameStub {
-		t.Errorf("expected stub, got %v", m.databaseName)
+	if m.databaseDriverName != dbDrvNameStub {
+		t.Errorf("expected stub, got %v", m.databaseDriverName)
 	}
 	if m.databaseDrv == nil {
 		t.Error("expected databaseDrv not to be nil")
@@ -212,8 +212,8 @@ func TestNewWithInstance(t *testing.T) {
 		t.Error("expected sourceDrv not to be nil")
 	}
 
-	if m.databaseName != dbDrvNameStub {
-		t.Errorf("expected stub, got %v", m.databaseName)
+	if m.databaseDriverName != dbDrvNameStub {
+		t.Errorf("expected stub, got %v", m.databaseDriverName)
 	}
 	if m.databaseDrv == nil {
 		t.Error("expected databaseDrv not to be nil")
@@ -1340,11 +1340,6 @@ type migrationSequence []*Migration
 
 func newMigSeq(migr ...*Migration) migrationSequence {
 	return migr
-}
-
-func (m *migrationSequence) add(migr ...*Migration) migrationSequence { // nolint:unused
-	*m = append(*m, migr...)
-	return *m
 }
 
 func (m *migrationSequence) bodySequence() []string {

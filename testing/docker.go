@@ -19,7 +19,6 @@ import (
 	dockerimage "github.com/docker/docker/api/types/image"
 	dockernetwork "github.com/docker/docker/api/types/network"
 	dockerclient "github.com/docker/docker/client"
-	"github.com/hashicorp/go-multierror"
 )
 
 func NewDockerContainer(t testing.TB, image string, env []string, cmd []string) (*DockerContainer, error) {
@@ -70,7 +69,7 @@ type DockerContainer struct {
 
 func (d *DockerContainer) PullImage() (err error) {
 	if d == nil {
-		return errors.New("Cannot pull image on a nil *DockerContainer")
+		return errors.New("cannot pull image on a nil *DockerContainer")
 	}
 	d.t.Logf("Docker: Pull image %v", d.ImageName)
 	r, err := d.client.ImagePull(context.Background(), d.ImageName, dockerimage.PullOptions{})
@@ -79,7 +78,7 @@ func (d *DockerContainer) PullImage() (err error) {
 	}
 	defer func() {
 		if errClose := r.Close(); errClose != nil {
-			err = multierror.Append(errClose)
+			err = errors.Join(err, errClose)
 		}
 	}()
 
@@ -99,7 +98,7 @@ func (d *DockerContainer) PullImage() (err error) {
 
 func (d *DockerContainer) Start() error {
 	if d == nil {
-		return errors.New("Cannot start a nil *DockerContainer")
+		return errors.New("cannot start a nil *DockerContainer")
 	}
 
 	containerName := fmt.Sprintf("migrate_test_%s", pseudoRandStr(10))
@@ -147,7 +146,7 @@ func (d *DockerContainer) KeepForDebugging() {
 
 func (d *DockerContainer) Remove() error {
 	if d == nil {
-		return errors.New("Cannot remove a nil *DockerContainer")
+		return errors.New("cannot remove a nil *DockerContainer")
 	}
 
 	if d.keepForDebugging {
@@ -170,7 +169,7 @@ func (d *DockerContainer) Remove() error {
 
 func (d *DockerContainer) Inspect() error {
 	if d == nil {
-		return errors.New("Cannot inspect a nil *DockerContainer")
+		return errors.New("cannot inspect a nil *DockerContainer")
 	}
 
 	if len(d.ContainerId) == 0 {
@@ -188,7 +187,7 @@ func (d *DockerContainer) Inspect() error {
 
 func (d *DockerContainer) Logs() (io.ReadCloser, error) {
 	if d == nil {
-		return nil, errors.New("Cannot view logs for a nil *DockerContainer")
+		return nil, errors.New("cannot view logs for a nil *DockerContainer")
 	}
 	if len(d.ContainerId) == 0 {
 		return nil, errors.New("missing containerId")
@@ -200,7 +199,7 @@ func (d *DockerContainer) Logs() (io.ReadCloser, error) {
 	})
 }
 
-func (d *DockerContainer) portMapping(selectFirst bool, cPort int) (containerPort uint, hostIP string, hostPort uint, err error) { // nolint:unparam
+func (d *DockerContainer) portMapping(selectFirst bool, cPort int) (hostIP string, hostPort uint, err error) {
 	if !d.containerInspected {
 		if err := d.Inspect(); err != nil {
 			d.t.Fatal(err)
@@ -212,21 +211,20 @@ func (d *DockerContainer) portMapping(selectFirst bool, cPort int) (containerPor
 			// Skip ahead until we find the port we want
 			continue
 		}
-		for _, binding := range bindings {
-
+		if len(bindings) > 0 {
+			binding := bindings[0]
 			hostPortUint, err := strconv.ParseUint(binding.HostPort, 10, 64)
 			if err != nil {
-				return 0, "", 0, err
+				return "", 0, err
 			}
-
-			return uint(port.Int()), binding.HostIP, uint(hostPortUint), nil // nolint: staticcheck
+			return bindings[0].HostIP, uint(hostPortUint), nil
 		}
 	}
 
 	if selectFirst {
-		return 0, "", 0, errors.New("no port binding")
+		return "", 0, errors.New("no port binding")
 	} else {
-		return 0, "", 0, errors.New("specified port not bound")
+		return "", 0, errors.New("specified port not bound")
 	}
 }
 
@@ -234,7 +232,7 @@ func (d *DockerContainer) Host() string {
 	if d == nil {
 		panic("Cannot get host for a nil *DockerContainer")
 	}
-	_, hostIP, _, err := d.portMapping(true, -1)
+	hostIP, _, err := d.portMapping(true, -1)
 	if err != nil {
 		d.t.Fatal(err)
 	}
@@ -250,7 +248,7 @@ func (d *DockerContainer) Port() uint {
 	if d == nil {
 		panic("Cannot get port for a nil *DockerContainer")
 	}
-	_, _, port, err := d.portMapping(true, -1)
+	_, port, err := d.portMapping(true, -1)
 	if err != nil {
 		d.t.Fatal(err)
 	}
@@ -261,7 +259,7 @@ func (d *DockerContainer) PortFor(cPort int) uint {
 	if d == nil {
 		panic("Cannot get port for a nil *DockerContainer")
 	}
-	_, _, port, err := d.portMapping(false, cPort)
+	_, port, err := d.portMapping(false, cPort)
 	if err != nil {
 		d.t.Fatal(err)
 	}

@@ -27,5 +27,5 @@ func New(fs http.FileSystem, path string) (source.Driver, error) {
 // Open completes the implementetion of source.Driver interface. Other methods
 // are implemented by the embedded PartialDriver struct.
 func (d *driver) Open(url string) (source.Driver, error) {
-	return nil, errors.New("Open() cannot be called on the httpfs passthrough driver")
+	return nil, errors.New("open() cannot be called on the httpfs passthrough driver")
 }

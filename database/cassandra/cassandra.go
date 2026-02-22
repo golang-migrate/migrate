@@ -13,7 +13,6 @@ import (
 	"github.com/gocql/gocql"
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/golang-migrate/migrate/v4/database/multistmt"
-	"github.com/hashicorp/go-multierror"
 )
 
 func init() {
@@ -315,11 +314,7 @@ func (c *Cassandra) ensureVersionTable() (err error) {
 
 	defer func() {
 		if e := c.Unlock(); e != nil {
-			if err == nil {
-				err = e
-			} else {
-				err = multierror.Append(err, e)
-			}
+			err = errors.Join(err, e)
 		}
 	}()
 
@@ -341,7 +336,7 @@ func parseConsistency(consistencyStr string) (consistency gocql.Consistency, err
 			var ok bool
 			err, ok = r.(error)
 			if !ok {
-				err = fmt.Errorf("Failed to parse consistency \"%s\": %v", consistencyStr, r)
+				err = fmt.Errorf("failed to parse consistency \"%s\": %v", consistencyStr, r)
 			}
 		}
 	}()
