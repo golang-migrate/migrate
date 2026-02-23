@@ -381,9 +381,8 @@ func (y *YDB) ensureVersionTable() (err error) {
 	query := "SELECT version, dirty FROM `" + y.config.MigrationsTable + "` LIMIT 1"
 	rows, scanErr := y.db.QueryContext(context.Background(), query)
 	if scanErr == nil {
-		rows.Close()
 		// Table exists
-		return nil
+		return rows.Close()
 	}
 
 	// If the table doesn't exist, create it
