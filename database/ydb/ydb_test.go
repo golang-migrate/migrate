@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/dhui/dktest"
+	"github.com/docker/go-connections/nat"
 	"github.com/golang-migrate/migrate/v4"
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
 	"github.com/golang-migrate/migrate/v4/dktesting"
@@ -23,6 +24,29 @@ const defaultPort = 2136
 
 var (
 	opts = dktest.Options{
+		Hostname:     "localhost",
+		PortRequired: true,
+		PortBindings: nat.PortMap{
+			nat.Port("2135"): []nat.PortBinding{
+				{
+					HostPort: "2135",
+				},
+			},
+			nat.Port("8765"): []nat.PortBinding{
+				{
+					HostPort: "8765",
+				},
+			},
+			nat.Port("2136"): []nat.PortBinding{
+				{
+					HostPort: "2136",
+				},
+			},
+		},
+		Volumes: []string{
+			"$(pwd)/ydb_certs:/ydb_certs",
+			"$(pwd)/ydb_data:/ydb_data",
+		},
 		Env: map[string]string{
 			"YDB_USE_IN_MEMORY_PDISKS": "true",
 			"GRPC_TLS_PORT":            "2135",
@@ -30,8 +54,7 @@ var (
 			"MON_PORT":                 "8765",
 			"YDB_DEFAULT_LOG_LEVEL":    "NOTICE",
 		},
-		PortRequired: true,
-		ReadyFunc:    isReady,
+		ReadyFunc: isReady,
 	}
 	specs = []dktesting.ContainerSpec{
 		{ImageName: "cr.yandex/yc/yandex-docker-local-ydb:latest", Options: opts},
@@ -39,10 +62,12 @@ var (
 )
 
 func ydbConnectionString(host, port string, options ...string) string {
-	if len(options) > 0 {
-		return fmt.Sprintf("grpc://%s:%s/local?%s", host, port, strings.Join(options, "&"))
-	}
-	return fmt.Sprintf("grpc://%s:%s/local", host, port)
+	// Use grpc:// (insecure) because Docker container exposes insecure gRPC on port 2136.
+	// Use go_balancer=single to skip YDB SDK's node discovery which returns
+	// Docker-internal hostnames that can't be resolved from the host.
+	baseOpts := []string{"go_balancer=single"}
+	baseOpts = append(baseOpts, options...)
+	return fmt.Sprintf("grpc://%s:%s/local?%s", host, port, strings.Join(baseOpts, "&"))
 }
 
 func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
