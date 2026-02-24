@@ -44,6 +44,7 @@ Database drivers run migrations. [Add a new database?](database/driver.go)
 * [Firebird](database/firebird)
 * [MS SQL Server](database/sqlserver)
 * [rqlite](database/rqlite)
+* [YDB](database/ydb) - uses `grpc://` (plain) or `grpcs://` (TLS) URL schemes; see [YDB README](database/ydb/README.md) for supported query parameters (`x-migrations-table`, `x-tls-certificate-file`, `x-multi-statement`, etc.)
 
 ### Database URLs
 
@@ -157,6 +158,7 @@ Go to [getting started](GETTING_STARTED.md)
 
 * [CockroachDB](database/cockroachdb/TUTORIAL.md)
 * [PostgreSQL](database/postgres/TUTORIAL.md)
+* [YDB](database/ydb/TUTORIAL.md)
 
 (more tutorials to come)
 

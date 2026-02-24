@@ -56,7 +56,9 @@ func init() {
 
 	// Clear ydb_data/ so the container always reinitialises from the fresh
 	// certs in ydb_certs/ rather than reusing stale state from a previous run.
-	if err := os.RemoveAll(dataDir); err != nil {
+	// The directory may contain root-owned files written by a previous container
+	// run, so we use a privileged Docker container to delete them.
+	if err := removeAsRoot(dataDir); err != nil {
 		panic("ydb_test: cannot clear ydb_data: " + err.Error())
 	}
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
@@ -133,6 +135,38 @@ func generateCerts(dir string) error {
 	cmd.Dir = dir
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("gen-ca.sh: %w\n%s", err, out)
+	}
+	return nil
+}
+
+// removeAsRoot deletes dir and all its contents by running a throwaway Alpine
+// container with the parent directory bind-mounted. This is necessary because
+// the YDB container writes files as root into bind-mounted volumes; on Linux
+// the host user cannot delete those root-owned files with os.RemoveAll.
+// Falls back to os.RemoveAll when Docker is unavailable (e.g. unit-test runs
+// without a daemon).
+func removeAsRoot(dir string) error {
+	// Fast path: if the directory doesn't exist there is nothing to do.
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		return nil
+	}
+
+	parent := filepath.Dir(dir)
+	base := filepath.Base(dir)
+
+	// docker run --rm -v <parent>:/mnt alpine sh -c "rm -rf /mnt/<base>"
+	cmd := exec.Command("docker", "run", "--rm",
+		"-v", parent+":/mnt",
+		"alpine",
+		"sh", "-c", "rm -rf /mnt/"+base,
+	)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		// Docker unavailable or image pull failed — fall back to os.RemoveAll.
+		// On macOS Docker Desktop mounts as the host user so RemoveAll works fine.
+		if rmErr := os.RemoveAll(dir); rmErr != nil {
+			return fmt.Errorf("docker rm failed (%w: %s), os.RemoveAll also failed: %v", err, out, rmErr)
+		}
+		return nil
 	}
 	return nil
 }
@@ -230,10 +264,13 @@ func Test(t *testing.T) {
 			}
 		}
 		// Remove generated certs and persistent data directories.
-		for _, dir := range []string{certsDir, dataDir} {
-			if err := os.RemoveAll(dir); err != nil {
-				t.Errorf("cleanup: failed to remove %s: %v", dir, err)
-			}
+		// ydb_data/ may contain root-owned files written by the container, so
+		// we delete it via a privileged Docker container rather than os.RemoveAll.
+		if err := removeAsRoot(dataDir); err != nil {
+			t.Errorf("cleanup: failed to remove %s: %v", dataDir, err)
+		}
+		if err := os.RemoveAll(certsDir); err != nil {
+			t.Errorf("cleanup: failed to remove %s: %v", certsDir, err)
 		}
 	})
 }
