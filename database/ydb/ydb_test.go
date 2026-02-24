@@ -127,7 +127,9 @@ func generateCerts(dir string) error {
 		return fmt.Errorf("getwd: %w", err)
 	}
 	script := filepath.Join(wd, "gen-ca.sh")
-	cmd := exec.Command("sh", script)
+	// Use bash explicitly — gen-ca.sh uses bash-specific options (pipefail, local)
+	// that are not supported by /bin/sh (dash) on Debian/Ubuntu CI runners.
+	cmd := exec.Command("bash", script)
 	cmd.Dir = dir
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("gen-ca.sh: %w\n%s", err, out)
@@ -135,7 +137,7 @@ func generateCerts(dir string) error {
 	return nil
 }
 
-func ydbConnectionString(host, port string, options ...string) string {
+func ydbConnectionString(host, port string, options ...string) string { //nolint:unparam
 	// grpcs:// using the CA certificate produced by gen-ca.sh (ydb_certs/ca.pem).
 	// go_balancer=single skips YDB SDK node discovery to avoid resolving
 	// Docker-internal hostnames from the host.
@@ -187,7 +189,7 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 	defer db.Close() //nolint:errcheck
 
 	// A plain Ping only checks that gRPC is up. YDB storage pools are
-	// initialised asynchronously and may not be ready for DDL immediately
+	// initialized asynchronously and may not be ready for DDL immediately
 	// after gRPC starts. Probe by actually executing a DDL statement; if YDB
 	// reports "database doesn't have storage pools" we return false and let
 	// dktest retry.

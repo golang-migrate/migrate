@@ -131,7 +131,8 @@ func (y *YDB) Open(url string) (database.Driver, error) {
 	// Open the native YDB driver first, then wrap it in a database/sql connector.
 	// This pattern (vs sql.Open("ydb", dsn)) is required to pass connector options
 	// like WithAutoDeclare() that are necessary for the table service to work.
-	ctx, _ := context.WithTimeout(context.Background(), 3*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
 	nativeDriver, err := ydb.Open(ctx, dbURL, driverOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("ydb: failed to open native driver: %w", err)
@@ -142,8 +143,8 @@ func (y *YDB) Open(url string) (database.Driver, error) {
 		ydb.WithPositionalArgs(),
 	)
 	if err != nil {
-		_ = nativeDriver.Close(ctx)
-		return nil, fmt.Errorf("ydb: failed to create connector: %w", err)
+		driverErr := nativeDriver.Close(ctx)
+		return nil, fmt.Errorf("ydb: failed to create connector: %w, driver: %v", err, driverErr)
 	}
 
 	db := sql.OpenDB(connector)
@@ -155,9 +156,9 @@ func (y *YDB) Open(url string) (database.Driver, error) {
 	if statementTimeoutString != "" {
 		statementTimeout, err = strconv.Atoi(statementTimeoutString)
 		if err != nil {
-			db.Close()
-			_ = nativeDriver.Close(ctx)
-			return nil, err
+			dbErr := db.Close()
+			driverErr := nativeDriver.Close(ctx)
+			return nil, fmt.Errorf("error: %v, driver: %v, db: %v", err, driverErr, dbErr)
 		}
 	}
 
@@ -165,9 +166,9 @@ func (y *YDB) Open(url string) (database.Driver, error) {
 	if s := purl.Query().Get("x-multi-statement-max-size"); len(s) > 0 {
 		multiStatementMaxSize, err = strconv.Atoi(s)
 		if err != nil {
-			db.Close()
-			_ = nativeDriver.Close(ctx)
-			return nil, err
+			dbErr := db.Close()
+			driverErr := nativeDriver.Close(ctx)
+			return nil, fmt.Errorf("error: %v, driver: %v, db: %v", err, driverErr, dbErr)
 		}
 		if multiStatementMaxSize <= 0 {
 			multiStatementMaxSize = DefaultMultiStatementMaxSize
@@ -178,9 +179,9 @@ func (y *YDB) Open(url string) (database.Driver, error) {
 	if s := purl.Query().Get("x-multi-statement"); len(s) > 0 {
 		multiStatementEnabled, err = strconv.ParseBool(s)
 		if err != nil {
-			db.Close()
-			_ = nativeDriver.Close(ctx)
-			return nil, fmt.Errorf("unable to parse option x-multi-statement: %w", err)
+			dbErr := db.Close()
+			driverErr := nativeDriver.Close(ctx)
+			return nil, fmt.Errorf("unable to parse option x-multi-statement: %w, driver: %v, db: %v", err, driverErr, dbErr)
 		}
 	}
 
@@ -198,9 +199,9 @@ func (y *YDB) Open(url string) (database.Driver, error) {
 		MultiStatementMaxSize: multiStatementMaxSize,
 	})
 	if err != nil {
-		db.Close()
-		_ = nativeDriver.Close(ctx)
-		return nil, err
+		dbErr := db.Close()
+		driverErr := nativeDriver.Close(ctx)
+		return nil, fmt.Errorf("error: %v, driver: %v, db: %v", err, driverErr, dbErr)
 	}
 
 	// Store the native driver so Close() can release its resources.
