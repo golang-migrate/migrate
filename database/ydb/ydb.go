@@ -4,10 +4,13 @@ package ydb
 
 import (
 	"context"
+	"crypto/x509"
 	"database/sql"
+	"encoding/pem"
 	"fmt"
 	"io"
 	nurl "net/url"
+	"os"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -46,8 +49,9 @@ type Config struct {
 }
 
 type YDB struct {
-	db       *sql.DB
-	isLocked atomic.Bool
+	db           *sql.DB
+	nativeDriver *ydb.Driver // owned when opened via Open(); nil when created via WithInstance()
+	isLocked     atomic.Bool
 
 	// Open and WithInstance need to guarantee that config is never nil
 	config *Config
@@ -58,7 +62,9 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		return nil, ErrNilConfig
 	}
 
-	if err := instance.Ping(); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := instance.PingContext(ctx); err != nil {
 		return nil, err
 	}
 
@@ -93,13 +99,54 @@ func (y *YDB) Open(url string) (database.Driver, error) {
 	}
 
 	// Build the YDB connection string: grpc[s]://host:port/dbname
-	// Strip custom x-* query params before passing to sql.Open
+	// Strip custom x-* query params before passing to ydb.Open
 	dbURL := migrate.FilterCustomQuery(purl).String()
 
-	db, err := sql.Open("ydb", dbURL)
-	if err != nil {
-		return nil, err
+	// Build native driver options. For grpcs:// connections a TLS certificate
+	// must be provided via x-tls-certificate (PEM string) or
+	// x-tls-certificate-file (path to PEM file).
+	isTLS := purl.Scheme == "grpcs"
+	driverOpts := []ydb.Option{ydb.WithDialTimeout(3 * time.Minute)}
+	if pemStr := purl.Query().Get("x-tls-certificate"); pemStr != "" {
+		cert, certErr := parsePEMCertificate([]byte(pemStr))
+		if certErr != nil {
+			return nil, fmt.Errorf("ydb: invalid x-tls-certificate: %w", certErr)
+		}
+		driverOpts = append(driverOpts, ydb.WithCertificate(cert))
+	} else if pemFile := purl.Query().Get("x-tls-certificate-file"); pemFile != "" {
+		pemBytes, readErr := os.ReadFile(pemFile)
+		if readErr != nil {
+			return nil, fmt.Errorf("ydb: cannot read x-tls-certificate-file %q: %w", pemFile, readErr)
+		}
+		cert, certErr := parsePEMCertificate(pemBytes)
+		if certErr != nil {
+			return nil, fmt.Errorf("ydb: invalid x-tls-certificate-file %q: %w", pemFile, certErr)
+		}
+		driverOpts = append(driverOpts, ydb.WithCertificate(cert))
+	} else if isTLS {
+		return nil, fmt.Errorf("ydb: grpcs:// scheme requires a TLS certificate; " +
+			"provide x-tls-certificate (PEM string) or x-tls-certificate-file (path to PEM file)")
 	}
+
+	// Open the native YDB driver first, then wrap it in a database/sql connector.
+	// This pattern (vs sql.Open("ydb", dsn)) is required to pass connector options
+	// like WithAutoDeclare() that are necessary for the table service to work.
+	ctx, _ := context.WithTimeout(context.Background(), 3*time.Minute)
+	nativeDriver, err := ydb.Open(ctx, dbURL, driverOpts...)
+	if err != nil {
+		return nil, fmt.Errorf("ydb: failed to open native driver: %w", err)
+	}
+
+	connector, err := ydb.Connector(nativeDriver,
+		ydb.WithAutoDeclare(),
+		ydb.WithPositionalArgs(),
+	)
+	if err != nil {
+		_ = nativeDriver.Close(ctx)
+		return nil, fmt.Errorf("ydb: failed to create connector: %w", err)
+	}
+
+	db := sql.OpenDB(connector)
 
 	migrationsTable := purl.Query().Get("x-migrations-table")
 
@@ -108,6 +155,8 @@ func (y *YDB) Open(url string) (database.Driver, error) {
 	if statementTimeoutString != "" {
 		statementTimeout, err = strconv.Atoi(statementTimeoutString)
 		if err != nil {
+			db.Close()
+			_ = nativeDriver.Close(ctx)
 			return nil, err
 		}
 	}
@@ -116,6 +165,8 @@ func (y *YDB) Open(url string) (database.Driver, error) {
 	if s := purl.Query().Get("x-multi-statement-max-size"); len(s) > 0 {
 		multiStatementMaxSize, err = strconv.Atoi(s)
 		if err != nil {
+			db.Close()
+			_ = nativeDriver.Close(ctx)
 			return nil, err
 		}
 		if multiStatementMaxSize <= 0 {
@@ -127,6 +178,8 @@ func (y *YDB) Open(url string) (database.Driver, error) {
 	if s := purl.Query().Get("x-multi-statement"); len(s) > 0 {
 		multiStatementEnabled, err = strconv.ParseBool(s)
 		if err != nil {
+			db.Close()
+			_ = nativeDriver.Close(ctx)
 			return nil, fmt.Errorf("unable to parse option x-multi-statement: %w", err)
 		}
 	}
@@ -145,20 +198,44 @@ func (y *YDB) Open(url string) (database.Driver, error) {
 		MultiStatementMaxSize: multiStatementMaxSize,
 	})
 	if err != nil {
-		if closeErr := db.Close(); closeErr != nil {
-			return nil, fmt.Errorf("failed to close db after WithInstance error: %v, original: %w", closeErr, err)
-		}
+		db.Close()
+		_ = nativeDriver.Close(ctx)
 		return nil, err
 	}
+
+	// Store the native driver so Close() can release its resources.
+	ydbDriver.(*YDB).nativeDriver = nativeDriver
 
 	return ydbDriver, nil
 }
 
-func (y *YDB) Close() error {
-	if y.db != nil {
-		return y.db.Close()
+// parsePEMCertificate decodes a PEM block and parses the DER-encoded certificate within.
+func parsePEMCertificate(pemBytes []byte) (*x509.Certificate, error) {
+	block, _ := pem.Decode(pemBytes)
+	if block == nil {
+		return nil, fmt.Errorf("no PEM block found")
 	}
-	return nil
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse certificate: %w", err)
+	}
+	return cert, nil
+}
+
+func (y *YDB) Close() error {
+	var dbErr, nativeErr error
+	if y.db != nil {
+		dbErr = y.db.Close()
+	}
+	// nativeDriver is only set when the driver was opened via Open() (not WithInstance).
+	// It must be closed after the sql.DB to allow in-flight connections to drain first.
+	if y.nativeDriver != nil {
+		nativeErr = y.nativeDriver.Close(context.Background())
+	}
+	if dbErr != nil {
+		return dbErr
+	}
+	return nativeErr
 }
 
 // Lock implements database.Driver. YDB does not support advisory locks,
@@ -207,6 +284,11 @@ func (y *YDB) runStatement(statement []byte) error {
 	if strings.TrimSpace(query) == "" {
 		return nil
 	}
+	// Skip migrations that consist entirely of SQL comments with no executable
+	// statement — YDB rejects a bare comment as an invalid query.
+	if stripComments(query) == "" {
+		return nil
+	}
 	// DDL statements in YDB require SchemeQueryMode
 	if isDDL(query) {
 		ctx = ydb.WithQueryMode(ctx, ydb.SchemeQueryMode)
@@ -217,29 +299,35 @@ func (y *YDB) runStatement(statement []byte) error {
 	return nil
 }
 
+// stripComments removes all leading SQL comments (-- and /* */) from query,
+// returning the remaining content trimmed of whitespace.
+// If the entire input is comments, it returns "".
+func stripComments(query string) string {
+	q := strings.TrimSpace(query)
+	for {
+		if strings.HasPrefix(q, "--") {
+			if idx := strings.Index(q, "\n"); idx >= 0 {
+				q = strings.TrimSpace(q[idx+1:])
+			} else {
+				return "" // entire remaining content is a line comment
+			}
+		} else if strings.HasPrefix(q, "/*") {
+			if idx := strings.Index(q, "*/"); idx >= 0 {
+				q = strings.TrimSpace(q[idx+2:])
+			} else {
+				return "" // unclosed block comment
+			}
+		} else {
+			break
+		}
+	}
+	return q
+}
+
 // isDDL checks if a query is a DDL statement that requires SchemeQueryMode in YDB.
 // It strips leading SQL comments (-- and /* */) before checking.
 func isDDL(query string) bool {
-	q := strings.TrimSpace(query)
-	// Strip leading single-line comments
-	for strings.HasPrefix(q, "--") {
-		if idx := strings.Index(q, "\n"); idx >= 0 {
-			q = strings.TrimSpace(q[idx+1:])
-		} else {
-			// entire query is a comment
-			return false
-		}
-	}
-	// Strip leading block comments
-	for strings.HasPrefix(q, "/*") {
-		if idx := strings.Index(q, "*/"); idx >= 0 {
-			q = strings.TrimSpace(q[idx+2:])
-		} else {
-			// unclosed block comment
-			return false
-		}
-	}
-	q = strings.ToUpper(q)
+	q := strings.ToUpper(stripComments(query))
 	return strings.HasPrefix(q, "CREATE ") ||
 		strings.HasPrefix(q, "DROP ") ||
 		strings.HasPrefix(q, "ALTER ")
@@ -309,12 +397,12 @@ func (y *YDB) Drop() (err error) {
 	query := "SELECT Path FROM `.sys/partition_stats`"
 	rows, err := y.db.QueryContext(ctx, query)
 	if err != nil {
-		// If the system table is not accessible, try a simpler approach
-		// Just try to drop the migrations table
+		// If the system table is not accessible, fall back to dropping only
+		// the migrations table (best-effort; ignore "not exists" errors).
 		schemeCtx := ydb.WithQueryMode(ctx, ydb.SchemeQueryMode)
 		dropQuery := "DROP TABLE `" + y.config.MigrationsTable + "`"
-		if _, dropErr := y.db.ExecContext(schemeCtx, dropQuery); dropErr != nil {
-			return &database.Error{OrigErr: err, Query: []byte(query)}
+		if _, dropErr := y.db.ExecContext(schemeCtx, dropQuery); dropErr != nil && !isTableNotExistsError(dropErr) {
+			return &database.Error{OrigErr: dropErr, Query: []byte(dropQuery)}
 		}
 		return nil
 	}
@@ -347,11 +435,15 @@ func (y *YDB) Drop() (err error) {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 
-	// Drop each table using SchemeQueryMode
+	// Drop each table using SchemeQueryMode.
+	// Skip tables that no longer exist (stale entries in partition_stats).
 	schemeCtx := ydb.WithQueryMode(ctx, ydb.SchemeQueryMode)
 	for tableName := range tableNames {
 		dropQuery := "DROP TABLE `" + tableName + "`"
 		if _, err := y.db.ExecContext(schemeCtx, dropQuery); err != nil {
+			if isTableNotExistsError(err) {
+				continue
+			}
 			return &database.Error{OrigErr: err, Query: []byte(dropQuery)}
 		}
 	}
@@ -412,9 +504,12 @@ func isTableNotExistsError(err error) bool {
 	if ydb.IsOperationErrorNotFoundError(err) {
 		return true
 	}
-	// Fallback to string matching for errors that may not be wrapped properly
+	// Fallback to string matching for SCHEME_ERROR (code 400070) and other
+	// path-not-found variants returned by different YDB versions.
 	errStr := err.Error()
-	return strings.Contains(errStr, "path not found") ||
+	return strings.Contains(errStr, "does not exist") ||
+		strings.Contains(errStr, "path not found") ||
 		strings.Contains(errStr, "Path not found") ||
-		strings.Contains(errStr, "scheme error: path not found")
+		strings.Contains(errStr, "scheme error: path not found") ||
+		strings.Contains(errStr, "SCHEME_ERROR")
 }
