@@ -24,11 +24,62 @@ func splitWithDelimiter(delimiter []byte) func(d []byte, atEOF bool) (int, []byt
 			}
 			return len(d), d, nil
 		}
-		if i := bytes.Index(d, delimiter); i >= 0 {
+		if i := findDelimiterOutsideQuotes(d, delimiter); i >= 0 {
 			return i + len(delimiter), d[:i+len(delimiter)], nil
 		}
 		return 0, nil, nil
 	}
+}
+
+// findDelimiterOutsideQuotes finds the first occurrence of delimiter in d
+// that is not inside a single-quoted or double-quoted string.
+// Returns -1 if not found.
+func findDelimiterOutsideQuotes(d []byte, delimiter []byte) int {
+	inSingleQuote := false
+	inDoubleQuote := false
+	delimLen := len(delimiter)
+
+	for i := 0; i < len(d); i++ {
+		c := d[i]
+
+		if inSingleQuote {
+			if c == '\'' {
+				// Check for escaped quote ('')
+				if i+1 < len(d) && d[i+1] == '\'' {
+					i++ // skip escaped quote
+				} else {
+					inSingleQuote = false
+				}
+			}
+			continue
+		}
+
+		if inDoubleQuote {
+			if c == '"' {
+				if i+1 < len(d) && d[i+1] == '"' {
+					i++ // skip escaped quote
+				} else {
+					inDoubleQuote = false
+				}
+			}
+			continue
+		}
+
+		if c == '\'' {
+			inSingleQuote = true
+			continue
+		}
+		if c == '"' {
+			inDoubleQuote = true
+			continue
+		}
+
+		// Check for delimiter match
+		if i+delimLen <= len(d) && bytes.Equal(d[i:i+delimLen], delimiter) {
+			return i
+		}
+	}
+	return -1
 }
 
 // Parse parses the given multi-statement migration
