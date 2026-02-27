@@ -19,7 +19,7 @@ type ContainerSpec struct {
 // Cleanup cleanups the ContainerSpec after a test run by removing the ContainerSpec's image
 func (s *ContainerSpec) Cleanup() (retErr error) {
 	// copied from dktest.RunContext()
-	dc, err := client.NewClientWithOpts(client.FromEnv, client.WithVersion("1.41"))
+	dc, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		return err
 	}

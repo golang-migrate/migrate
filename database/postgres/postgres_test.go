@@ -99,6 +99,9 @@ func Test(t *testing.T) {
 	t.Run("testPostgresLock", testPostgresLock)
 	t.Run("testWithInstanceConcurrent", testWithInstanceConcurrent)
 	t.Run("testWithConnection", testWithConnection)
+	t.Run("testUseTransactionLockUnlock", testUseTransactionLockUnlock)
+	t.Run("testUseTransactionSetVersion", testUseTransactionSetVersion)
+	t.Run("testUseTransactionMigrate", testUseTransactionMigrate)
 
 	t.Cleanup(func() {
 		for _, spec := range specs {
@@ -745,6 +748,154 @@ func testWithConnection(t *testing.T) {
 			}
 		}()
 		dt.Test(t, p, []byte("SELECT 1"))
+	})
+}
+
+func testUseTransactionLockUnlock(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := pgConnectionString(ip, port, "x-use-transaction=true")
+		p := &Postgres{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
+
+		ps := d.(*Postgres)
+
+		if !ps.config.UseTransaction {
+			t.Fatal("expected UseTransaction to be true")
+		}
+
+		// First lock/unlock cycle
+		if err := ps.Lock(); err != nil {
+			t.Fatal(err)
+		}
+		if ps.tx == nil {
+			t.Fatal("expected tx to be non-nil after Lock")
+		}
+		if err := ps.Unlock(); err != nil {
+			t.Fatal(err)
+		}
+		if ps.tx != nil {
+			t.Fatal("expected tx to be nil after Unlock")
+		}
+
+		// Second cycle to verify the transaction can be restarted
+		if err := ps.Lock(); err != nil {
+			t.Fatal(err)
+		}
+		if ps.tx == nil {
+			t.Fatal("expected tx to be non-nil after second Lock")
+		}
+		if err := ps.Unlock(); err != nil {
+			t.Fatal(err)
+		}
+		if ps.tx != nil {
+			t.Fatal("expected tx to be nil after second Unlock")
+		}
+	})
+}
+
+func testUseTransactionSetVersion(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := pgConnectionString(ip, port, "x-use-transaction=true")
+		p := &Postgres{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
+
+		ps := d.(*Postgres)
+
+		// Lock → SetVersion → Unlock: version must be visible only after Unlock commits
+		if err := ps.Lock(); err != nil {
+			t.Fatal(err)
+		}
+		if err := ps.SetVersion(7, false); err != nil {
+			t.Fatal(err)
+		}
+		if err := ps.Unlock(); err != nil {
+			t.Fatal(err)
+		}
+
+		version, dirty, err := ps.Version()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if version != 7 {
+			t.Fatalf("expected version 7, got %d", version)
+		}
+		if dirty {
+			t.Fatal("expected dirty to be false")
+		}
+
+		// Second round-trip to confirm the transaction resets cleanly
+		if err := ps.Lock(); err != nil {
+			t.Fatal(err)
+		}
+		if err := ps.SetVersion(42, false); err != nil {
+			t.Fatal(err)
+		}
+		if err := ps.Unlock(); err != nil {
+			t.Fatal(err)
+		}
+
+		version, _, err = ps.Version()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if version != 42 {
+			t.Fatalf("expected version 42, got %d", version)
+		}
+	})
+}
+
+func testUseTransactionMigrate(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := pgConnectionString(ip, port, "x-use-transaction=true")
+		p := &Postgres{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
+
+		// Use the transactional-safe migrations: same as the example migrations but
+		// without CREATE INDEX CONCURRENTLY, which cannot run inside a transaction block.
+		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations_transactional", "postgres", d)
+		if err != nil {
+			t.Fatal(err)
+		}
+		dt.TestMigrate(t, m)
 	})
 }
 

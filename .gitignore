@@ -8,3 +8,5 @@ vendor/
 .vscode/
 .idea
 dist/
+*.iml
+.claude
