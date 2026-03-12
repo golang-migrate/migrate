@@ -44,6 +44,7 @@ Database drivers run migrations. [Add a new database?](database/driver.go)
 * [Firebird](database/firebird)
 * [MS SQL Server](database/sqlserver)
 * [rqlite](database/rqlite)
+* [YDB](database/ydb)
 
 ### Database URLs
 
