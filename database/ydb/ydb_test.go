@@ -669,7 +669,9 @@ func TestOpenTLSErrors(t *testing.T) {
 		if _, err := f.WriteString("not a pem block"); err != nil {
 			t.Fatal(err)
 		}
-		f.Close()
+		if err := f.Close(); err != nil {
+			t.Fatal(err)
+		}
 
 		y := &YDB{}
 		_, err = y.Open("grpcs://localhost:2135/local?x-tls-certificate-file=" + nurl.QueryEscape(f.Name()))
