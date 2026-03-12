@@ -255,6 +255,7 @@ func Test(t *testing.T) {
 	t.Run("testMigrationTableOption", testMigrationTableOption)
 	t.Run("testLock", testLock)
 	t.Run("testWithInstanceConcurrent", testWithInstanceConcurrent)
+	t.Run("testTLSCertificateInline", testTLSCertificateInline)
 
 	t.Cleanup(func() {
 		for _, spec := range specs {
@@ -543,6 +544,140 @@ func testWithInstanceConcurrent(t *testing.T) {
 					t.Errorf("process %d error: %s", i, err)
 				}
 			}(i)
+		}
+	})
+}
+
+// testTLSCertificateInline connects using the x-tls-certificate query parameter
+// (inline PEM string) instead of x-tls-certificate-file, and verifies that a
+// full migration cycle works correctly.
+func testTLSCertificateInline(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		_, port, err := c.Port(defaultPort)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		pemBytes, err := os.ReadFile(filepath.Join(certsDir, "ca.pem"))
+		if err != nil {
+			t.Fatalf("cannot read ca.pem: %v", err)
+		}
+
+		// Build the URL properly so that net/url encodes the PEM value correctly.
+		// The PEM contains newlines and '+' characters that would be misinterpreted
+		// if the string were manually concatenated into a raw query.
+		q := nurl.Values{}
+		q.Set("go_balancer", "single")
+		q.Set("x-tls-certificate", string(pemBytes))
+		addr := fmt.Sprintf("grpcs://%s:%s/local?%s", defaultHost, port, q.Encode())
+
+		y := &YDB{}
+		d, err := y.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
+		dt.Test(t, d, []byte("SELECT 1"))
+	})
+}
+
+// TestParsePEMCertificate covers parsePEMCertificate directly (no Docker needed).
+func TestParsePEMCertificate(t *testing.T) {
+	t.Run("valid certificate", func(t *testing.T) {
+		pemBytes, err := os.ReadFile(filepath.Join(certsDir, "ca.pem"))
+		if err != nil {
+			t.Fatalf("cannot read ca.pem (run gen-ca.sh first): %v", err)
+		}
+		cert, err := parsePEMCertificate(pemBytes)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if cert == nil {
+			t.Fatal("expected non-nil certificate")
+		}
+	})
+
+	t.Run("empty input", func(t *testing.T) {
+		_, err := parsePEMCertificate([]byte{})
+		if err == nil {
+			t.Fatal("expected error for empty input, got nil")
+		}
+	})
+
+	t.Run("no PEM block", func(t *testing.T) {
+		_, err := parsePEMCertificate([]byte("not a pem block"))
+		if err == nil {
+			t.Fatal("expected error for non-PEM input, got nil")
+		}
+	})
+
+	t.Run("invalid DER inside PEM", func(t *testing.T) {
+		// A valid PEM envelope but with garbage DER content.
+		garbage := "-----BEGIN CERTIFICATE-----\naW52YWxpZA==\n-----END CERTIFICATE-----\n"
+		_, err := parsePEMCertificate([]byte(garbage))
+		if err == nil {
+			t.Fatal("expected error for invalid DER content, got nil")
+		}
+	})
+}
+
+// TestOpenTLSErrors covers the error paths in Open() for missing/invalid
+// x-tls-certificate and x-tls-certificate-file (no Docker needed).
+func TestOpenTLSErrors(t *testing.T) {
+	t.Run("grpcs without certificate returns error", func(t *testing.T) {
+		y := &YDB{}
+		_, err := y.Open("grpcs://localhost:2135/local?go_balancer=single")
+		if err == nil {
+			t.Fatal("expected error when no certificate is provided for grpcs://, got nil")
+		}
+		if !strings.Contains(err.Error(), "x-tls-certificate") {
+			t.Errorf("expected error to mention x-tls-certificate, got: %v", err)
+		}
+	})
+
+	t.Run("x-tls-certificate with invalid PEM returns error", func(t *testing.T) {
+		y := &YDB{}
+		_, err := y.Open("grpcs://localhost:2135/local?x-tls-certificate=notapem")
+		if err == nil {
+			t.Fatal("expected error for invalid x-tls-certificate PEM, got nil")
+		}
+		if !strings.Contains(err.Error(), "x-tls-certificate") {
+			t.Errorf("expected error to mention x-tls-certificate, got: %v", err)
+		}
+	})
+
+	t.Run("x-tls-certificate-file with missing file returns error", func(t *testing.T) {
+		y := &YDB{}
+		_, err := y.Open("grpcs://localhost:2135/local?x-tls-certificate-file=/nonexistent/ca.pem")
+		if err == nil {
+			t.Fatal("expected error for missing certificate file, got nil")
+		}
+		if !strings.Contains(err.Error(), "x-tls-certificate-file") {
+			t.Errorf("expected error to mention x-tls-certificate-file, got: %v", err)
+		}
+	})
+
+	t.Run("x-tls-certificate-file with invalid PEM returns error", func(t *testing.T) {
+		f, err := os.CreateTemp(t.TempDir(), "bad-cert-*.pem")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.WriteString("not a pem block"); err != nil {
+			t.Fatal(err)
+		}
+		f.Close()
+
+		y := &YDB{}
+		_, err = y.Open("grpcs://localhost:2135/local?x-tls-certificate-file=" + nurl.QueryEscape(f.Name()))
+		if err == nil {
+			t.Fatal("expected error for invalid PEM file, got nil")
+		}
+		if !strings.Contains(err.Error(), "x-tls-certificate-file") {
+			t.Errorf("expected error to mention x-tls-certificate-file, got: %v", err)
 		}
 	})
 }
