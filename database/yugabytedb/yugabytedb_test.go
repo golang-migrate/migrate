@@ -33,8 +33,10 @@ var (
 	}
 	// Released versions: https://docs.yugabyte.com/preview/releases/release-notes/
 	specs = []dktesting.ContainerSpec{
-		{ImageName: "yugabytedb/yugabyte:2.14.15.0-b57", Options: opts},
-		{ImageName: "yugabytedb/yugabyte:2.20.2.1-b3", Options: opts},
+		// only LTS versions
+		{ImageName: "quay.io/yugabyte/yugabyte-ubi:2.20.12.0-b30", Options: opts},
+		{ImageName: "quay.io/yugabyte/yugabyte-ubi:2024.2.7.0-b58", Options: opts},
+		{ImageName: "quay.io/yugabyte/yugabyte-ubi:2025.2.0.0-b131", Options: opts},
 	}
 )
 
