@@ -256,6 +256,7 @@ func Test(t *testing.T) {
 	t.Run("testLock", testLock)
 	t.Run("testWithInstanceConcurrent", testWithInstanceConcurrent)
 	t.Run("testTLSCertificateInline", testTLSCertificateInline)
+	t.Run("parseValidCertificate", testParseTLSCertificate)
 
 	t.Cleanup(func() {
 		for _, spec := range specs {
@@ -585,22 +586,22 @@ func testTLSCertificateInline(t *testing.T) {
 	})
 }
 
+func testParseTLSCertificate(t *testing.T) {
+	pemBytes, err := os.ReadFile(filepath.Join(certsDir, "ca.pem"))
+	if err != nil {
+		t.Fatalf("cannot read ca.pem (run gen-ca.sh first): %v", err)
+	}
+	cert, err := parsePEMCertificate(pemBytes)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cert == nil {
+		t.Fatal("expected non-nil certificate")
+	}
+}
+
 // TestParsePEMCertificate covers parsePEMCertificate directly (no Docker needed).
 func TestParsePEMCertificate(t *testing.T) {
-	t.Run("valid certificate", func(t *testing.T) {
-		pemBytes, err := os.ReadFile(filepath.Join(certsDir, "ca.pem"))
-		if err != nil {
-			t.Fatalf("cannot read ca.pem (run gen-ca.sh first): %v", err)
-		}
-		cert, err := parsePEMCertificate(pemBytes)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if cert == nil {
-			t.Fatal("expected non-nil certificate")
-		}
-	})
-
 	t.Run("empty input", func(t *testing.T) {
 		_, err := parsePEMCertificate([]byte{})
 		if err == nil {
