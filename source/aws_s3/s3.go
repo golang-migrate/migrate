@@ -81,24 +81,39 @@ func parseURI(uri string) (*Config, error) {
 }
 
 func (s *s3Driver) loadMigrations() error {
-	output, err := s.s3client.ListObjectsV2(context.Background(), &s3.ListObjectsV2Input{
-		Bucket:    aws.String(s.config.Bucket),
-		Prefix:    aws.String(s.config.Prefix),
-		Delimiter: aws.String("/"),
-	})
-	if err != nil {
-		return err
-	}
-	for _, object := range output.Contents {
-		_, fileName := path.Split(aws.ToString(object.Key))
-		m, err := source.DefaultParse(fileName)
+	// List all objects in the specified S3 bucket and prefix across all pages.
+	var continuationToken *string
+	for {
+		output, err := s.s3client.ListObjectsV2(context.Background(), &s3.ListObjectsV2Input{
+			Bucket:            aws.String(s.config.Bucket),
+			Prefix:            aws.String(s.config.Prefix),
+			Delimiter:         aws.String("/"),
+			ContinuationToken: continuationToken,
+		})
 		if err != nil {
-			continue
+			return err
 		}
-		if !s.migrations.Append(m) {
-			return fmt.Errorf("unable to parse file %v", aws.ToString(object.Key))
+
+		for _, object := range output.Contents {
+			_, fileName := path.Split(aws.ToString(object.Key))
+			m, err := source.DefaultParse(fileName)
+			if err != nil {
+				continue
+			}
+			if !s.migrations.Append(m) {
+				return fmt.Errorf("unable to parse file %v", aws.ToString(object.Key))
+			}
+		}
+
+		if !output.IsTruncated {
+			break
+		}
+		continuationToken = output.NextContinuationToken
+		if continuationToken == nil || aws.ToString(continuationToken) == "" {
+			return fmt.Errorf("s3 list response was truncated without a continuation token")
 		}
 	}
+
 	return nil
 }
 
