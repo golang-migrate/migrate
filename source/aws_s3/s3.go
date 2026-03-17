@@ -105,7 +105,7 @@ func (s *s3Driver) loadMigrations() error {
 			}
 		}
 
-		if !output.IsTruncated {
+		if !aws.ToBool(output.IsTruncated) {
 			break
 		}
 		continuationToken = output.NextContinuationToken
