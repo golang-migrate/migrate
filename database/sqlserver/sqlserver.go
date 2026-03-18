@@ -44,6 +44,7 @@ type Config struct {
 	MigrationsTable string
 	DatabaseName    string
 	SchemaName      string
+	NoLock          bool
 }
 
 // SQL Server connection
@@ -167,9 +168,18 @@ func (ss *SQLServer) Open(url string) (database.Driver, error) {
 
 	migrationsTable := purl.Query().Get("x-migrations-table")
 
+	noLock := false
+	if s := purl.Query().Get("x-no-lock"); len(s) > 0 {
+		noLock, err = strconv.ParseBool(s)
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse option x-no-lock: %w", err)
+		}
+	}
+
 	px, err := WithInstance(db, &Config{
 		DatabaseName:    purl.Path,
 		MigrationsTable: migrationsTable,
+		NoLock:          noLock,
 	})
 
 	if err != nil {
@@ -192,6 +202,10 @@ func (ss *SQLServer) Close() error {
 // Lock creates an advisory local on the database to prevent multiple migrations from running at the same time.
 func (ss *SQLServer) Lock() error {
 	return database.CasRestoreOnErr(&ss.isLocked, false, true, database.ErrLocked, func() error {
+		if ss.config.NoLock {
+			return nil
+		}
+
 		aid, err := database.GenerateAdvisoryLockId(ss.config.DatabaseName, ss.config.SchemaName)
 		if err != nil {
 			return err
@@ -222,6 +236,10 @@ func (ss *SQLServer) Lock() error {
 // Unlock froms the migration lock from the database
 func (ss *SQLServer) Unlock() error {
 	return database.CasRestoreOnErr(&ss.isLocked, true, false, database.ErrNotLocked, func() error {
+		if ss.config.NoLock {
+			return nil
+		}
+
 		aid, err := database.GenerateAdvisoryLockId(ss.config.DatabaseName, ss.config.SchemaName)
 		if err != nil {
 			return err

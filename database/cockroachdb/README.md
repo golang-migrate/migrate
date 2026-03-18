@@ -7,6 +7,7 @@
 | `x-migrations-table` | `MigrationsTable` | Name of the migrations table |
 | `x-lock-table` | `LockTable` | Name of the table which maintains the migration lock |
 | `x-force-lock` | `ForceLock` | Force lock acquisition to fix faulty migrations which may not have released the schema lock (Boolean, default is `false`) |
+| `x-no-lock` | `NoLock` | Set to `true` to skip lock table acquisition. Useful for read-only checks. Only run migrations from one host when this is enabled. |
 | `dbname` | `DatabaseName` | The name of the database to connect to |
 | `user` | | The user to sign in as |
 | `password` | | The user's password |
