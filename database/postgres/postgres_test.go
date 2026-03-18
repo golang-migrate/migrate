@@ -99,6 +99,7 @@ func Test(t *testing.T) {
 	t.Run("testPostgresLock", testPostgresLock)
 	t.Run("testWithInstanceConcurrent", testWithInstanceConcurrent)
 	t.Run("testWithConnection", testWithConnection)
+	t.Run("testNoLockWorks", testNoLockWorks)
 
 	t.Cleanup(func() {
 		for _, spec := range specs {
@@ -745,6 +746,53 @@ func testWithConnection(t *testing.T) {
 			}
 		}()
 		dt.Test(t, p, []byte("SELECT 1"))
+	})
+}
+
+func TestNoLockParamValidation(t *testing.T) {
+	p := &Postgres{}
+	_, err := p.Open("postgres://postgres@localhost/postgres?x-no-lock=not-a-bool")
+	if !errors.Is(err, strconv.ErrSyntax) {
+		t.Fatal("Expected syntax error when passing a non-bool as x-no-lock parameter")
+	}
+}
+
+func testNoLockWorks(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := pgConnectionString(ip, port)
+		p := &Postgres{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		lock := d.(*Postgres)
+
+		p = &Postgres{}
+		d, err = p.Open(pgConnectionString(ip, port, "x-no-lock=true"))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		noLock := d.(*Postgres)
+
+		if err = lock.Lock(); err != nil {
+			t.Fatal(err)
+		}
+		if err = noLock.Lock(); err != nil {
+			t.Fatal(err)
+		}
+		if err = lock.Unlock(); err != nil {
+			t.Fatal(err)
+		}
+		if err = noLock.Unlock(); err != nil {
+			t.Fatal(err)
+		}
 	})
 }
 

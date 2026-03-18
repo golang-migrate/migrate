@@ -4,9 +4,11 @@ import (
 	"context"
 	"database/sql"
 	sqldriver "database/sql/driver"
+	"errors"
 	"fmt"
 	"log"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -92,6 +94,7 @@ func Test(t *testing.T) {
 	t.Run("testMsiTrue", testMsiTrue)
 	t.Run("testOpenWithPasswordAndMSI", testOpenWithPasswordAndMSI)
 	t.Run("testMsiFalse", testMsiFalse)
+	t.Run("testNoLockWorks", testNoLockWorks)
 
 	t.Cleanup(func() {
 		for _, spec := range specs {
@@ -308,6 +311,54 @@ func testOpenWithPasswordAndMSI(t *testing.T) {
 		}()
 
 		dt.Test(t, d, []byte("SELECT 1"))
+	})
+}
+
+func TestNoLockParamValidation(t *testing.T) {
+	p := &SQLServer{}
+	_, err := p.Open("sqlserver://sa:password@localhost?x-no-lock=not-a-bool")
+	if !errors.Is(err, strconv.ErrSyntax) {
+		t.Fatal("Expected syntax error when passing a non-bool as x-no-lock parameter")
+	}
+}
+
+func testNoLockWorks(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		SkipIfUnsupportedArch(t, c)
+		ip, port, err := c.Port(defaultPort)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := msConnectionString(ip, port)
+		p := &SQLServer{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		lock := d.(*SQLServer)
+
+		p = &SQLServer{}
+		d, err = p.Open(addr + "&x-no-lock=true")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		noLock := d.(*SQLServer)
+
+		if err = lock.Lock(); err != nil {
+			t.Fatal(err)
+		}
+		if err = noLock.Lock(); err != nil {
+			t.Fatal(err)
+		}
+		if err = lock.Unlock(); err != nil {
+			t.Fatal(err)
+		}
+		if err = noLock.Unlock(); err != nil {
+			t.Fatal(err)
+		}
 	})
 }
 
