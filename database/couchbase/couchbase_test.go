@@ -26,8 +26,8 @@ import (
 
 const (
 	testBucket   = "testmigrate"
-	testUsername  = "Administrator"
-	testPassword  = "password"
+	testUsername = "Administrator"
+	testPassword = "password"
 )
 
 var (
@@ -77,7 +77,7 @@ func restReq(method, fullURL string, form url.Values, useAuth bool) ([]byte, err
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	body, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode >= 400 {
 		return body, fmt.Errorf("REST %s %s returned %d: %s", method, fullURL, resp.StatusCode, string(body))
@@ -91,7 +91,7 @@ func dockerExec(ctx context.Context, containerID string, cmd []string) (string, 
 	if err != nil {
 		return "", err
 	}
-	defer dc.Close()
+	defer func() { _ = dc.Close() }()
 
 	exec, err := dc.ContainerExecCreate(ctx, containerID, container.ExecOptions{
 		Cmd:          cmd,
@@ -191,7 +191,7 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 		log.Printf("gocb connect error: %v", err)
 		return false
 	}
-	defer cluster.Close(nil)
+	defer func() { _ = cluster.Close(nil) }()
 
 	if err := cluster.WaitUntilReady(5*time.Second, &gocb.WaitUntilReadyOptions{
 		ServiceTypes: []gocb.ServiceType{gocb.ServiceTypeManagement, gocb.ServiceTypeQuery},

@@ -21,6 +21,7 @@ func init() {
 }
 
 const (
+	DefaultScopeName            = "_default"
 	DefaultMigrationsCollection = "migrations"
 	DefaultLockingCollection    = "migrate_advisory_lock"
 	DefaultLockTimeout          = 15
@@ -67,8 +68,8 @@ type versionInfo struct {
 
 // N1QLMigration represents a single N1QL statement to execute.
 type N1QLMigration struct {
-	Query  string        `json:"query"`
-	Params []any `json:"params,omitempty"`
+	Query  string `json:"query"`
+	Params []any  `json:"params,omitempty"`
 }
 
 func WithInstance(cluster *gocb.Cluster, config *Config) (database.Driver, error) {
@@ -79,7 +80,7 @@ func WithInstance(cluster *gocb.Cluster, config *Config) (database.Driver, error
 		return nil, ErrNoBucketName
 	}
 	if len(config.ScopeName) == 0 {
-		config.ScopeName = "_default"
+		config.ScopeName = DefaultScopeName
 	}
 	if len(config.MigrationsCollection) == 0 {
 		config.MigrationsCollection = DefaultMigrationsCollection
@@ -350,7 +351,7 @@ func (cb *Couchbase) Drop() error {
 			continue
 		}
 		for _, col := range scope.Collections {
-			if col.Name == "_default" {
+			if col.Name == DefaultScopeName {
 				// Flush default collection documents via N1QL
 				_, qErr := cb.cluster.Query(
 					fmt.Sprintf("DELETE FROM `%s`.`%s`.`%s`", cb.config.BucketName, cb.config.ScopeName, col.Name),
@@ -379,7 +380,7 @@ func (cb *Couchbase) ensureCollections() error {
 	mgr := cb.bucket.Collections()
 
 	// Ensure scope exists (skip _default)
-	if cb.config.ScopeName != "_default" {
+	if cb.config.ScopeName != DefaultScopeName {
 		_ = mgr.CreateScope(cb.config.ScopeName, nil) // ignore already-exists errors
 	}
 
