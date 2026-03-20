@@ -141,15 +141,15 @@ func (cb *Couchbase) Open(dsn string) (database.Driver, error) {
 
 	advisoryLockingFlag, err := parseBoolean(q.Get("x-advisory-locking"), DefaultAdvisoryLockingFlag)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not parse x-advisory-locking: %w", err)
 	}
 	lockTimeout, err := parseInt(q.Get("x-advisory-lock-timeout"), DefaultLockTimeout)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not parse x-advisory-lock-timeout: %w", err)
 	}
 	lockInterval, err := parseInt(q.Get("x-advisory-lock-timeout-interval"), DefaultLockTimeoutInterval)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not parse x-advisory-lock-timeout-interval: %w", err)
 	}
 
 	// Extract credentials from URL
@@ -227,18 +227,20 @@ func (cb *Couchbase) Lock() error {
 				return nil
 			}
 
-			// If the document already exists, the lock is held
-			if !errors.Is(err, gocb.ErrDocumentExists) {
-				return database.ErrLocked
+			// If the document already exists, the lock is held — retry until timeout
+			if errors.Is(err, gocb.ErrDocumentExists) {
+				if time.Now().After(deadline) {
+					return database.ErrLocked
+				}
+
+				time.Sleep(interval)
+				// Exponential backoff
+				interval = min(interval*2, maxInterval)
+				continue
 			}
 
-			if time.Now().After(deadline) {
-				return database.ErrLocked
-			}
-
-			time.Sleep(interval)
-			// Exponential backoff
-			interval = min(interval*2, maxInterval)
+			// For non-lock-related errors, return the original error
+			return err
 		}
 	})
 }
@@ -381,7 +383,9 @@ func (cb *Couchbase) ensureCollections() error {
 
 	// Ensure scope exists (skip _default)
 	if cb.config.ScopeName != DefaultScopeName {
-		_ = mgr.CreateScope(cb.config.ScopeName, nil) // ignore already-exists errors
+		if err := mgr.CreateScope(cb.config.ScopeName, nil); err != nil && !errors.Is(err, gocb.ErrScopeExists) {
+			return fmt.Errorf("create scope: %w", err)
+		}
 	}
 
 	// Ensure migrations collection
