@@ -1,0 +1,6 @@
+[
+  {"query": "CREATE PRIMARY INDEX IF NOT EXISTS ON `testmigrate`.`_default`.`users`"},
+  {"query": "CREATE INDEX idx_users_email IF NOT EXISTS ON `testmigrate`.`_default`.`users`(email)"},
+  {"query": "CREATE INDEX idx_orders_user_id IF NOT EXISTS ON `testmigrate`.`_default`.`orders`(user_id)"},
+  {"query": "CREATE INDEX idx_orders_created_at IF NOT EXISTS ON `testmigrate`.`_default`.`orders`(created_at)"}
+]

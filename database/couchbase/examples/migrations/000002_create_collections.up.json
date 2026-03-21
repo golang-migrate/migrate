@@ -1,0 +1,4 @@
+[
+  {"query": "CREATE COLLECTION `testmigrate`.`_default`.`users` IF NOT EXISTS"},
+  {"query": "CREATE COLLECTION `testmigrate`.`_default`.`orders` IF NOT EXISTS"}
+]
