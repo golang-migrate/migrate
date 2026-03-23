@@ -5,17 +5,21 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"io"
 	nurl "net/url"
+	"regexp"
 	"strconv"
 	"strings"
+	"sync/atomic"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
-	"github.com/hashicorp/go-multierror"
 	_ "github.com/sijms/go-ora/v2"
 )
+
+var _ database.Driver = (*Oracle)(nil)
 
 func init() {
 	db := Oracle{}
@@ -39,6 +43,35 @@ var (
 	ErrNoDatabaseName = fmt.Errorf("no database name")
 )
 
+// lockNameSuffix is appended to the migrations table name to build the DBMS_LOCK lock name.
+// dbms_lock.allocate_unique accepts lock names up to 128 characters; we reserve these chars
+// for the suffix, capping the table-name prefix at 128 - len(lockNameSuffix) = 115 characters.
+const lockNameSuffix = "_migrate_lock"
+
+// validTableName matches Oracle identifiers: starts with a letter, followed by
+// letters, digits, underscores, dollar signs, or hash signs, max 128 chars.
+var validTableName = regexp.MustCompile(`^[A-Z][A-Z0-9_$#]{0,127}$`)
+
+func validateMigrationsTable(name string) error {
+	if !validTableName.MatchString(name) {
+		return fmt.Errorf("invalid migrations table name %q: must match ^[A-Z][A-Z0-9_$#]{0,127}$", name)
+	}
+	return nil
+}
+
+// dbmsLockName returns the DBMS_LOCK lock name for this driver instance.
+// Oracle's dbms_lock.allocate_unique accepts lock names up to 128 characters.
+// The table name is truncated to 115 chars (128 - len("_migrate_lock")) before
+// appending the suffix so the total never exceeds the Oracle limit.
+func (ora *Oracle) dbmsLockName() string {
+	const maxPrefix = 128 - len(lockNameSuffix) // 115
+	prefix := ora.config.MigrationsTable
+	if len(prefix) > maxPrefix {
+		prefix = prefix[:maxPrefix]
+	}
+	return prefix + lockNameSuffix
+}
+
 type Config struct {
 	MigrationsTable    string
 	MultiStmtEnabled   bool
@@ -51,7 +84,7 @@ type Oracle struct {
 	// Locking and unlocking need to use the same connection
 	conn     *sql.Conn
 	db       *sql.DB
-	isLocked bool
+	isLocked atomic.Bool
 
 	// Open and WithInstance need to guarantee that config is never nil
 	config *Config
@@ -80,6 +113,10 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 
 	if config.MigrationsTable == "" {
 		config.MigrationsTable = DefaultMigrationsTable
+	}
+
+	if err := validateMigrationsTable(config.MigrationsTable); err != nil {
+		return nil, err
 	}
 
 	if config.MultiStmtSeparator == "" {
@@ -111,41 +148,55 @@ func (ora *Oracle) Open(url string) (database.Driver, error) {
 		return nil, err
 	}
 
+	cfg, err := parseURLParams(purl)
+	if err != nil {
+		return nil, err
+	}
+
 	db, err := sql.Open("oracle", migrate.FilterCustomQuery(purl).String())
 	if err != nil {
 		return nil, err
 	}
 
-	migrationsTable := DefaultMigrationsTable
-	if s := purl.Query().Get(migrationsTableQueryKey); len(s) > 0 {
-		migrationsTable = strings.ToUpper(s)
-	}
-
-	multiStmtEnabled := DefaultMultiStmtEnabled
-	if s := purl.Query().Get(multiStmtEnableQueryKey); len(s) > 0 {
-		multiStmtEnabled, err = strconv.ParseBool(s)
-		if err != nil {
-			return nil, fmt.Errorf("unable to parse option %s: %w", multiStmtEnableQueryKey, err)
-		}
-	}
-
-	multiStmtSeparator := DefaultMultiStmtSeparator
-	if s := purl.Query().Get(multiStmtSeparatorQueryKey); len(s) > 0 {
-		multiStmtSeparator = s
-	}
-
-	oraInst, err := WithInstance(db, &Config{
-		databaseName:       purl.Path,
-		MigrationsTable:    migrationsTable,
-		MultiStmtEnabled:   multiStmtEnabled,
-		MultiStmtSeparator: multiStmtSeparator,
-	})
-
+	oraInst, err := WithInstance(db, cfg)
 	if err != nil {
+		_ = db.Close()
 		return nil, err
 	}
 
 	return oraInst, nil
+}
+
+// parseURLParams extracts x-* custom parameters from a parsed Oracle URL and returns a Config.
+func parseURLParams(purl *nurl.URL) (*Config, error) {
+	cfg := &Config{
+		databaseName:       purl.Path,
+		MigrationsTable:    DefaultMigrationsTable,
+		MultiStmtEnabled:   DefaultMultiStmtEnabled,
+		MultiStmtSeparator: DefaultMultiStmtSeparator,
+	}
+
+	if s := purl.Query().Get(migrationsTableQueryKey); len(s) > 0 {
+		upper := strings.ToUpper(s)
+		if err := validateMigrationsTable(upper); err != nil {
+			return nil, err
+		}
+		cfg.MigrationsTable = upper
+	}
+
+	if s := purl.Query().Get(multiStmtEnableQueryKey); len(s) > 0 {
+		enabled, err := strconv.ParseBool(s)
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse option %s: %w", multiStmtEnableQueryKey, err)
+		}
+		cfg.MultiStmtEnabled = enabled
+	}
+
+	if s := purl.Query().Get(multiStmtSeparatorQueryKey); len(s) > 0 {
+		cfg.MultiStmtSeparator = s
+	}
+
+	return cfg, nil
 }
 
 func (ora *Oracle) Close() error {
@@ -158,67 +209,62 @@ func (ora *Oracle) Close() error {
 }
 
 func (ora *Oracle) Lock() error {
-	if ora.isLocked {
-		return database.ErrLocked
-	}
-
-	// https://docs.oracle.com/cd/B28359_01/appdev.111/b28419/d_lock.htm#ARPLS021
-	query := `
+	return database.CasRestoreOnErr(&ora.isLocked, false, true, database.ErrLocked, func() error {
+		// https://docs.oracle.com/cd/B28359_01/appdev.111/b28419/d_lock.htm#ARPLS021
+		// Lock name is derived from the migrations table to avoid contention across independent migration sets.
+		query := fmt.Sprintf(`
 declare
     v_lockhandle varchar2(200);
     v_result     number;
 begin
-    dbms_lock.allocate_unique('control_lock', v_lockhandle);
+    dbms_lock.allocate_unique('%s', v_lockhandle);
     v_result := dbms_lock.request(v_lockhandle, dbms_lock.x_mode);
     if v_result <> 0 then
-        dbms_output.put_line(
-                case
-                    when v_result=1 then 'Timeout'
-                    when v_result=2 then 'Deadlock'
-                    when v_result=3 then 'Parameter Error'
-                    when v_result=4 then 'Already owned'
-                    when v_result=5 then 'Illegal Lock Handle'
-                    end);
+        raise_application_error(-20001,
+            case
+                when v_result=1 then 'Timeout acquiring migration lock'
+                when v_result=2 then 'Deadlock acquiring migration lock'
+                when v_result=3 then 'Parameter error acquiring migration lock'
+                when v_result=4 then 'Already owned migration lock'
+                when v_result=5 then 'Illegal lock handle'
+                else 'Unknown error acquiring migration lock: ' || v_result
+            end);
     end if;
 end;
-`
-	if _, err := ora.conn.ExecContext(context.Background(), query); err != nil {
-		return &database.Error{OrigErr: err, Err: "try lock failed", Query: []byte(query)}
-	}
-
-	ora.isLocked = true
-	return nil
+`, ora.dbmsLockName())
+		if _, err := ora.conn.ExecContext(context.Background(), query); err != nil {
+			return &database.Error{OrigErr: err, Err: "try lock failed", Query: []byte(query)}
+		}
+		return nil
+	})
 }
 
 func (ora *Oracle) Unlock() error {
-	if !ora.isLocked {
-		return nil
-	}
-
-	query := `
+	return database.CasRestoreOnErr(&ora.isLocked, true, false, database.ErrNotLocked, func() error {
+		query := fmt.Sprintf(`
 declare
   v_lockhandle varchar2(200);
   v_result     number;
 begin
-  dbms_lock.allocate_unique('control_lock', v_lockhandle);
+  dbms_lock.allocate_unique('%s', v_lockhandle);
   v_result := dbms_lock.release(v_lockhandle);
-  if v_result <> 0 then 
-    dbms_output.put_line(
-           case 
-              when v_result=1 then 'Timeout'
-              when v_result=2 then 'Deadlock'
-              when v_result=3 then 'Parameter Error'
-              when v_result=4 then 'Already owned'
-              when v_result=5 then 'Illegal Lock Handle'
-            end);
+  if v_result <> 0 then
+    raise_application_error(-20002,
+        case
+            when v_result=1 then 'Timeout releasing migration lock'
+            when v_result=3 then 'Parameter error releasing migration lock'
+            when v_result=4 then 'Do not own migration lock'
+            when v_result=5 then 'Illegal lock handle'
+            else 'Unknown error releasing migration lock: ' || v_result
+        end);
   end if;
 end;
-`
-	if _, err := ora.conn.ExecContext(context.Background(), query); err != nil {
-		return &database.Error{OrigErr: err, Query: []byte(query)}
-	}
-	ora.isLocked = false
-	return nil
+`, ora.dbmsLockName())
+		if _, err := ora.conn.ExecContext(context.Background(), query); err != nil {
+			return &database.Error{OrigErr: err, Query: []byte(query)}
+		}
+		return nil
+	})
 }
 
 func (ora *Oracle) Run(migration io.Reader) error {
@@ -261,10 +307,12 @@ func (ora *Oracle) SetVersion(version int, dirty bool) error {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
 	}
 
-	query := "TRUNCATE TABLE " + ora.config.MigrationsTable
+	// Use DELETE instead of TRUNCATE: TRUNCATE is DDL in Oracle and performs an implicit commit,
+	// which would break the transactional semantics of SetVersion.
+	query := "DELETE FROM " + ora.config.MigrationsTable
 	if _, err := tx.Exec(query); err != nil {
 		if errRollback := tx.Rollback(); errRollback != nil {
-			err = multierror.Append(err, errRollback)
+			err = errors.Join(err, errRollback)
 		}
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
@@ -273,7 +321,7 @@ func (ora *Oracle) SetVersion(version int, dirty bool) error {
 		query = `INSERT INTO ` + ora.config.MigrationsTable + ` (VERSION, DIRTY) VALUES (:1, :2)`
 		if _, err := tx.Exec(query, version, b2i(dirty)); err != nil {
 			if errRollback := tx.Rollback(); errRollback != nil {
-				err = multierror.Append(err, errRollback)
+				err = errors.Join(err, errRollback)
 			}
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
@@ -287,7 +335,7 @@ func (ora *Oracle) SetVersion(version int, dirty bool) error {
 }
 
 func (ora *Oracle) Version() (version int, dirty bool, err error) {
-	query := "SELECT VERSION, DIRTY FROM " + ora.config.MigrationsTable + " WHERE ROWNUM = 1 ORDER BY VERSION desc"
+	query := "SELECT VERSION, DIRTY FROM " + ora.config.MigrationsTable + " ORDER BY VERSION DESC FETCH FIRST 1 ROW ONLY"
 	err = ora.conn.QueryRowContext(context.Background(), query).Scan(&version, &dirty)
 	switch {
 	case err == sql.ErrNoRows:
@@ -308,7 +356,7 @@ func (ora *Oracle) Drop() (err error) {
 	}
 	defer func() {
 		if errClose := tables.Close(); errClose != nil {
-			err = multierror.Append(err, errClose)
+			err = errors.Join(err, errClose)
 		}
 	}()
 
@@ -322,6 +370,10 @@ func (ora *Oracle) Drop() (err error) {
 		if len(tableName) > 0 {
 			tableNames = append(tableNames, tableName)
 		}
+	}
+
+	if err := tables.Err(); err != nil {
+		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 
 	query = `DROP TABLE %s CASCADE CONSTRAINTS`
@@ -350,7 +402,7 @@ func (ora *Oracle) ensureVersionTable() (err error) {
 			if err == nil {
 				err = e
 			} else {
-				err = multierror.Append(err, e)
+				err = errors.Join(err, e)
 			}
 		}
 	}()
@@ -401,6 +453,9 @@ func removeComments(rd io.Reader) (string, error) {
 			return "", err
 		}
 	}
+	if err := scanner.Err(); err != nil {
+		return "", err
+	}
 	return buf.String(), nil
 }
 
@@ -425,6 +480,9 @@ func parseMultiStatements(rd io.Reader, plsqlStmtSeparator string) ([]string, er
 	if buf.Len() > 0 {
 		// append the final result if it's not empty
 		results = append(results, buf.String())
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
 	}
 
 	queries := make([]string, 0, len(results))

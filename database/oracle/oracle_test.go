@@ -8,8 +8,10 @@ import (
 	"fmt"
 	"io"
 	"log"
+	neturl "net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/dhui/dktest"
@@ -19,6 +21,7 @@ import (
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
 	"github.com/golang-migrate/migrate/v4/dktesting"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
@@ -59,7 +62,7 @@ func oracleOptions() dktest.Options {
 			nat.Port(fmt.Sprintf("%d/tcp", defaultPort)): {
 				nat.PortBinding{
 					HostIP:   "0.0.0.0",
-					HostPort: "0/tcp",
+					HostPort: "0",
 				},
 			},
 		},
@@ -187,6 +190,145 @@ func (s *oracleSuite) TestLockWorks() {
 
 	err = ora.Unlock()
 	s.Require().Nil(err)
+}
+
+func TestOpen_InvalidURL(t *testing.T) {
+	ora := &Oracle{}
+	_, err := ora.Open(":\x00invalid")
+	require.Error(t, err)
+}
+
+func TestOpen_CustomParams(t *testing.T) {
+	cases := []struct {
+		name          string
+		url           string
+		wantTable     string
+		wantMultiStmt bool
+		wantSeparator string
+	}{
+		{
+			name:          "default values when no params",
+			url:           "oracle://user:pass@localhost:1521/FREEPDB1",
+			wantTable:     DefaultMigrationsTable,
+			wantMultiStmt: DefaultMultiStmtEnabled,
+			wantSeparator: DefaultMultiStmtSeparator,
+		},
+		{
+			name:          "custom migrations table",
+			url:           "oracle://user:pass@localhost:1521/FREEPDB1?x-migrations-table=my_migrations",
+			wantTable:     "MY_MIGRATIONS",
+			wantMultiStmt: DefaultMultiStmtEnabled,
+			wantSeparator: DefaultMultiStmtSeparator,
+		},
+		{
+			name:          "multi stmt enabled",
+			url:           "oracle://user:pass@localhost:1521/FREEPDB1?x-multi-stmt-enabled=true",
+			wantTable:     DefaultMigrationsTable,
+			wantMultiStmt: true,
+			wantSeparator: DefaultMultiStmtSeparator,
+		},
+		{
+			// URL query string: "x-multi-stmt-separator===" — the first "=" is the
+			// key=value delimiter, so the parsed value is "==".
+			name:          "custom separator",
+			url:           "oracle://user:pass@localhost:1521/FREEPDB1?x-multi-stmt-separator===",
+			wantTable:     DefaultMigrationsTable,
+			wantMultiStmt: DefaultMultiStmtEnabled,
+			wantSeparator: "==",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			purl, err := neturl.Parse(tc.url)
+			require.NoError(t, err)
+			cfg, err := parseURLParams(purl)
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantTable, cfg.MigrationsTable)
+			assert.Equal(t, tc.wantMultiStmt, cfg.MultiStmtEnabled)
+			assert.Equal(t, tc.wantSeparator, cfg.MultiStmtSeparator)
+		})
+	}
+}
+
+func TestOpen_InvalidMultiStmtEnabled(t *testing.T) {
+	purl, err := neturl.Parse("oracle://user:pass@localhost:1521/FREEPDB1?x-multi-stmt-enabled=notabool")
+	require.NoError(t, err)
+	_, err = parseURLParams(purl)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "x-multi-stmt-enabled")
+}
+
+func TestOpen_InvalidMigrationsTable(t *testing.T) {
+	cases := []struct {
+		name string
+		url  string
+	}{
+		{
+			name: "single quote injection",
+			url:  "oracle://user:pass@localhost:1521/FREEPDB1?x-migrations-table=O'TABLE",
+		},
+		{
+			name: "starts with digit",
+			url:  "oracle://user:pass@localhost:1521/FREEPDB1?x-migrations-table=1TABLE",
+		},
+		{
+			name: "contains space",
+			url:  "oracle://user:pass@localhost:1521/FREEPDB1?x-migrations-table=MY%20TABLE",
+		},
+		{
+			name: "semicolon injection",
+			url:  "oracle://user:pass@localhost:1521/FREEPDB1?x-migrations-table=T%3BDROP",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			purl, err := neturl.Parse(tc.url)
+			require.NoError(t, err)
+			_, err = parseURLParams(purl)
+			require.Error(t, err)
+		})
+	}
+}
+
+func TestRemoveComments(t *testing.T) {
+	cases := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "empty input",
+			input:    "",
+			expected: "",
+		},
+		{
+			name:     "only comments",
+			input:    "-- comment\n-- another comment\n",
+			expected: "",
+		},
+		{
+			name:     "mix of comments and sql",
+			input:    "-- comment\nSELECT 1\n-- another\nFROM DUAL\n",
+			expected: "SELECT 1\nFROM DUAL\n",
+		},
+		{
+			name:     "no comments",
+			input:    "SELECT 1\nFROM DUAL\n",
+			expected: "SELECT 1\nFROM DUAL\n",
+		},
+		{
+			name:     "inline non-comment dash",
+			input:    "SELECT 1 - 1\n",
+			expected: "SELECT 1 - 1\n",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := removeComments(strings.NewReader(tc.input))
+			require.NoError(t, err)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
 }
 
 func TestParseStatements(t *testing.T) {

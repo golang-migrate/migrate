@@ -7,7 +7,7 @@ URL `oracle://user:password@host:port/ServiceName?query`
 |--------------------------|----------------------|-------------------------------------------------------------------------------------------------------------------------|
 | `x-migrations-table`     | `MigrationsTable`    | Name of the migrations table in UPPER case                                                                              |
 | `x-multi-stmt-enabled`   | `MultiStmtEnabled`   | If the migration files are in multi-statements style                                                                    |
-| `x-multi-stmt-separator` | `MultiStmtSeparator` | a single line which use as the token to spilt multiple statements in single migration file, triple-dash separator `---` |
+| `x-multi-stmt-separator` | `MultiStmtSeparator` | a single line used as the token to split multiple statements in a single migration file, triple-dash separator `---` |
 
 ## Write migration files
 
@@ -18,17 +18,17 @@ There are two ways to write the migration files,
 
 ### Single statement file
 
-Oracle godor driver support process one statement at a time, so it is natural to support single statement per file as
+Oracle driver ([sijms/go-ora](https://github.com/sijms/go-ora)) processes one statement at a time, so it is natural to support single statement per file as
 the default.
 Check the [single statement migration files](examples/migrations) as an example.
 
 ### Multi statements file
 
-Although the golang oracle driver [godror](https://github.com/godror/godror) does not natively support executing
+Although the golang oracle driver [sijms/go-ora](https://github.com/sijms/go-ora) does not natively support executing
 multiple
 statements in a single query, it's more friendly and handy to support multi statements in a single migration file in
-some case,
-so the multi statements can be separated with a line separator(default to triple-dash separator ---), for example:
+some cases,
+so the multi statements can be separated with a line separator (default to triple-dash separator ---), for example:
 
 ```
 statement 1
@@ -40,7 +40,7 @@ Check the [multi statements' migration files](examples/migrations-multistmt) as 
 
 ## Supported & tested version
 
-- 18-xe
+- Oracle 23c Free (23.5) — minimum Oracle 12c required for `FETCH FIRST` syntax
 
 ## Build cli
 
@@ -55,7 +55,7 @@ There are two ways to run the test code:
 
 - Run the test code locally with an existing Oracle Instance(Recommended)
 - Run the test code inside a container just like CI, It will require to start an Oracle container every time, and it's
-  very time expense.
+  very time-consuming.
 
 ### Run the test code locally with an existing Oracle Instance
 
@@ -86,7 +86,7 @@ services:
 2. Go into the sqlplus console
 
 ```bash
-$ docker exec -it orclxe bash
+$ docker exec -it oracle-db bash
 # su oracle
 $ sqlplus / as sysdba
 ```
