@@ -7,7 +7,6 @@ import (
 	"github.com/golang-migrate/migrate/v4/internal/cli"
 	"github.com/infobloxopen/hotload"
 	_ "github.com/infobloxopen/hotload/fsnotify"
-	"github.com/jackc/pgx/v4/stdlib"
 	"github.com/lib/pq"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
@@ -30,7 +29,9 @@ func init() {
 	customFormatter := new(logrus.JSONFormatter)
 	logrus.SetFormatter(customFormatter)
 
-	hotload.RegisterSQLDriver("pgx", stdlib.GetDefaultDriver())
+	hotload.RegisterSQLDriver("pgx", pq.Driver{})
+	hotload.RegisterSQLDriver("pgx4", pq.Driver{})
+	hotload.RegisterSQLDriver("pgx5", pq.Driver{})
 	hotload.RegisterSQLDriver("postgres", pq.Driver{})
 	hotload.RegisterSQLDriver("postgresql", pq.Driver{})
 }
