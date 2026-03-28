@@ -18,9 +18,6 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/golang-migrate/migrate/v4/database/multistmt"
-	"github.com/jackc/pgconn"
-	"github.com/jackc/pgerrcode"
-	_ "github.com/jackc/pgx/v4/stdlib"
 	"github.com/lib/pq"
 )
 
@@ -171,7 +168,7 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 	// i.e. pgx://user:password@host:port/db => postgres://user:password@host:port/db
 	purl.Scheme = "postgres"
 
-	db, err := sql.Open("pgx/v4", migrate.FilterCustomQuery(purl).String())
+	db, err := sql.Open("postgres", migrate.FilterCustomQuery(purl).String())
 	if err != nil {
 		return nil, err
 	}
@@ -390,12 +387,13 @@ func (p *Postgres) runStatement(statement []byte) error {
 		return nil
 	}
 	if _, err := p.conn.ExecContext(ctx, query); err != nil {
-
-		if pgErr, ok := err.(*pgconn.PgError); ok {
+		if pgErr, ok := err.(*pq.Error); ok {
 			var line uint
 			var col uint
 			var lineColOK bool
-			line, col, lineColOK = computeLineFromPos(query, int(pgErr.Position))
+			if pos, convErr := strconv.Atoi(string(pgErr.Position)); convErr == nil {
+				line, col, lineColOK = computeLineFromPos(query, pos)
+			}
 			message := fmt.Sprintf("migration failed: %s", pgErr.Message)
 			if lineColOK {
 				message = fmt.Sprintf("%s (column %d)", message, col)
@@ -487,8 +485,8 @@ func (p *Postgres) Version() (version int, dirty bool, err error) {
 		return database.NilVersion, false, nil
 
 	case err != nil:
-		if e, ok := err.(*pgconn.PgError); ok {
-			if e.SQLState() == pgerrcode.UndefinedTable {
+		if e, ok := err.(*pq.Error); ok {
+			if e.Code == "42P01" {
 				return database.NilVersion, false, nil
 			}
 		}
