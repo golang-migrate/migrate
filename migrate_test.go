@@ -15,6 +15,7 @@ import (
 
 	dStub "github.com/golang-migrate/migrate/v4/database/stub"
 	"github.com/golang-migrate/migrate/v4/source"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	sStub "github.com/golang-migrate/migrate/v4/source/stub"
 )
 
@@ -1730,6 +1731,509 @@ func TestWithDirtyStateConfig(t *testing.T) {
 				t.Errorf("dirtyStateConf = %v, want %v", m.dirtyStateConf, tt.wantConf)
 			}
 		})
+	}
+}
+
+// setupDirtyStateTest creates a Migrate instance with dirty state handling enabled,
+// real migration files in srcDir, and stub source/database drivers.
+// It returns the Migrate instance, database stub, srcDir, and destDir.
+func setupDirtyStateTest(t *testing.T) (*Migrate, *dStub.Stub, string, string) {
+	t.Helper()
+	srcDir := t.TempDir()
+	destDir := t.TempDir()
+
+	m, _ := New("stub://", "stub://")
+	m.sourceDrv.(*sStub.Stub).Migrations = sourceStubMigrations
+	m.dirtyStateConf = &dirtyStateConfig{
+		srcScheme:  "file://",
+		srcPath:    srcDir,
+		destScheme: "stub://",
+		destPath:   destDir,
+		enable:     true,
+	}
+	dbDrv := m.databaseDrv.(*dStub.Stub)
+
+	// Create migration files in srcDir matching sourceStubMigrations
+	migrationFiles := []string{
+		"1_create.up.sql",
+		"1_create.down.sql",
+		"3_create.up.sql",
+		"4_create.up.sql",
+		"4_create.down.sql",
+		"5_create.down.sql",
+		"7_create.up.sql",
+		"7_create.down.sql",
+	}
+	for _, f := range migrationFiles {
+		if err := os.WriteFile(filepath.Join(srcDir, f), []byte("migration"), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	return m, dbDrv, srcDir, destDir
+}
+
+func TestDownWithDirtyStateHandling(t *testing.T) {
+	m, dbDrv, _, destDir := setupDirtyStateTest(t)
+
+	// First migrate up to version 7
+	if err := m.Up(); err != nil {
+		t.Fatal(err)
+	}
+
+	expectedSequence := migrationSequence{
+		mr("CREATE 1"),
+		mr("CREATE 3"),
+		mr("CREATE 4"),
+		mr("CREATE 7"),
+	}
+	equalDbSeq(t, 0, expectedSequence, dbDrv)
+
+	// Verify files were copied to destDir
+	files, err := os.ReadDir(destDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) == 0 {
+		t.Fatal("expected files to be copied to destDir after Up()")
+	}
+
+	// Now go all the way down
+	if err := m.Down(); err != nil {
+		t.Fatal(err)
+	}
+
+	expectedSequence = migrationSequence{
+		mr("CREATE 1"),
+		mr("CREATE 3"),
+		mr("CREATE 4"),
+		mr("CREATE 7"),
+		mr("DROP 7"),
+		mr("DROP 5"),
+		mr("DROP 4"),
+		mr("DROP 1"),
+	}
+	equalDbSeq(t, 1, expectedSequence, dbDrv)
+
+	// Verify all migration files were cleaned up from destDir (cleanupFiles(0))
+	files, err = os.ReadDir(destDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range files {
+		if source.Regex.MatchString(f.Name()) {
+			t.Fatalf("expected all migration files to be removed from destDir after Down(), found: %s", f.Name())
+		}
+	}
+}
+
+func TestStepsDownWithDirtyStateHandling(t *testing.T) {
+	m, dbDrv, _, destDir := setupDirtyStateTest(t)
+
+	// First migrate up to version 7
+	if err := m.Up(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Step down 1 (from 7 to 5 — prev(7) is 5 in the stub migrations)
+	if err := m.Steps(-1); err != nil {
+		t.Fatal(err)
+	}
+
+	expectedSequence := migrationSequence{
+		mr("CREATE 1"),
+		mr("CREATE 3"),
+		mr("CREATE 4"),
+		mr("CREATE 7"),
+		mr("DROP 7"),
+	}
+	equalDbSeq(t, 0, expectedSequence, dbDrv)
+
+	// After stepping down 1 from 7, DB is at version 5.
+	// Verify files above version 5 were cleaned up.
+	files, err := os.ReadDir(destDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range files {
+		mig, parseErr := source.Parse(f.Name())
+		if parseErr != nil {
+			continue
+		}
+		if mig.Version > 5 {
+			t.Fatalf("expected files above version 5 to be removed, found: %s", f.Name())
+		}
+	}
+}
+
+func TestStepsUpWithDirtyStateHandling(t *testing.T) {
+	m, dbDrv, _, destDir := setupDirtyStateTest(t)
+
+	// Step up 2 (should go from nil to version 3: versions 1 and 3)
+	if err := m.Steps(2); err != nil {
+		t.Fatal(err)
+	}
+
+	expectedSequence := migrationSequence{
+		mr("CREATE 1"),
+		mr("CREATE 3"),
+	}
+	equalDbSeq(t, 0, expectedSequence, dbDrv)
+
+	// Verify files were copied to destDir
+	files, err := os.ReadDir(destDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) == 0 {
+		t.Fatal("expected files to be copied to destDir after Steps(2)")
+	}
+}
+
+func TestUpWithDirtyStateHandling(t *testing.T) {
+	m, dbDrv, _, destDir := setupDirtyStateTest(t)
+
+	if err := m.Up(); err != nil {
+		t.Fatal(err)
+	}
+
+	expectedSequence := migrationSequence{
+		mr("CREATE 1"),
+		mr("CREATE 3"),
+		mr("CREATE 4"),
+		mr("CREATE 7"),
+	}
+	equalDbSeq(t, 0, expectedSequence, dbDrv)
+
+	// Verify files were copied to destDir
+	files, err := os.ReadDir(destDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) == 0 {
+		t.Fatal("expected files to be copied to destDir after Up()")
+	}
+}
+
+func TestDownDirtyStateRecovery(t *testing.T) {
+	srcDir := t.TempDir()
+	destDir := t.TempDir()
+
+	m, _ := New("stub://", "stub://")
+	m.sourceDrv.(*sStub.Stub).Migrations = sourceStubMigrations
+	dbDrv := m.databaseDrv.(*dStub.Stub)
+	// Use file:// for destScheme so handleDirtyState can open a file-based source from destDir
+	m.dirtyStateConf = &dirtyStateConfig{
+		srcScheme:  "file://",
+		srcPath:    srcDir,
+		destScheme: "file://",
+		destPath:   destDir,
+		enable:     true,
+	}
+
+	// Simulate a previous run that failed: set DB dirty at version 7, with
+	// lastSuccessfulMigration file indicating version 4 was the last good one.
+	if err := dbDrv.SetVersion(7, true); err != nil {
+		t.Fatal(err)
+	}
+
+	// Write migration files to both srcDir and destDir (simulating a previous copyFiles)
+	migrationFiles := []string{
+		"1_create.up.sql",
+		"1_create.down.sql",
+		"3_create.up.sql",
+		"4_create.up.sql",
+		"4_create.down.sql",
+		"5_create.down.sql",
+		"7_create.up.sql",
+		"7_create.down.sql",
+	}
+	for _, f := range migrationFiles {
+		if err := os.WriteFile(filepath.Join(srcDir, f), []byte("migration"), 0644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(destDir, f), []byte("migration"), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Write the lastSuccessfulMigration file
+	if err := os.WriteFile(filepath.Join(destDir, lastSuccessfulMigrationFile), []byte("4"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Call Down - should recover from dirty state first, then migrate down
+	if err := m.Down(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify DB is no longer dirty
+	if dbDrv.IsDirty {
+		t.Fatal("expected DB to not be dirty after recovery and Down()")
+	}
+
+	// Verify lastSuccessfulMigration file was deleted
+	if _, err := os.Stat(filepath.Join(destDir, lastSuccessfulMigrationFile)); !os.IsNotExist(err) {
+		t.Fatal("expected lastSuccessfulMigration file to be deleted after recovery")
+	}
+}
+
+func TestStepsDirtyStateRecovery(t *testing.T) {
+	srcDir := t.TempDir()
+	destDir := t.TempDir()
+
+	m, _ := New("stub://", "stub://")
+	m.sourceDrv.(*sStub.Stub).Migrations = sourceStubMigrations
+	dbDrv := m.databaseDrv.(*dStub.Stub)
+	m.dirtyStateConf = &dirtyStateConfig{
+		srcScheme:  "file://",
+		srcPath:    srcDir,
+		destScheme: "file://",
+		destPath:   destDir,
+		enable:     true,
+	}
+
+	// Simulate dirty state at version 4, last successful was version 3
+	if err := dbDrv.SetVersion(4, true); err != nil {
+		t.Fatal(err)
+	}
+
+	// Write migration files to both dirs
+	migrationFiles := []string{
+		"1_create.up.sql",
+		"1_create.down.sql",
+		"3_create.up.sql",
+		"4_create.up.sql",
+		"4_create.down.sql",
+		"5_create.down.sql",
+		"7_create.up.sql",
+		"7_create.down.sql",
+	}
+	for _, f := range migrationFiles {
+		if err := os.WriteFile(filepath.Join(srcDir, f), []byte("migration"), 0644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(destDir, f), []byte("migration"), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := os.WriteFile(filepath.Join(destDir, lastSuccessfulMigrationFile), []byte("3"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Steps(1) should recover from dirty state, then step up one
+	if err := m.Steps(1); err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify DB is no longer dirty
+	if dbDrv.IsDirty {
+		t.Fatal("expected DB to not be dirty after recovery and Steps(1)")
+	}
+
+	// Verify lastSuccessfulMigration file was deleted
+	if _, err := os.Stat(filepath.Join(destDir, lastSuccessfulMigrationFile)); !os.IsNotExist(err) {
+		t.Fatal("expected lastSuccessfulMigration file to be deleted after recovery")
+	}
+}
+
+func TestUpDirtyStateRecovery(t *testing.T) {
+	srcDir := t.TempDir()
+	destDir := t.TempDir()
+
+	m, _ := New("stub://", "stub://")
+	m.sourceDrv.(*sStub.Stub).Migrations = sourceStubMigrations
+	dbDrv := m.databaseDrv.(*dStub.Stub)
+	m.dirtyStateConf = &dirtyStateConfig{
+		srcScheme:  "file://",
+		srcPath:    srcDir,
+		destScheme: "file://",
+		destPath:   destDir,
+		enable:     true,
+	}
+
+	// Simulate dirty state at version 3, last successful was version 1
+	if err := dbDrv.SetVersion(3, true); err != nil {
+		t.Fatal(err)
+	}
+
+	// Write migration files to both dirs
+	migrationFiles := []string{
+		"1_create.up.sql",
+		"1_create.down.sql",
+		"3_create.up.sql",
+		"4_create.up.sql",
+		"4_create.down.sql",
+		"5_create.down.sql",
+		"7_create.up.sql",
+		"7_create.down.sql",
+	}
+	for _, f := range migrationFiles {
+		if err := os.WriteFile(filepath.Join(srcDir, f), []byte("migration"), 0644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(destDir, f), []byte("migration"), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := os.WriteFile(filepath.Join(destDir, lastSuccessfulMigrationFile), []byte("1"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Up should recover from dirty state, then migrate all the way up
+	if err := m.Up(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify DB is no longer dirty
+	if dbDrv.IsDirty {
+		t.Fatal("expected DB to not be dirty after recovery and Up()")
+	}
+
+	// Verify lastSuccessfulMigration file was deleted
+	if _, err := os.Stat(filepath.Join(destDir, lastSuccessfulMigrationFile)); !os.IsNotExist(err) {
+		t.Fatal("expected lastSuccessfulMigration file to be deleted after recovery")
+	}
+}
+
+func TestUpThenDownWithDirtyHandling(t *testing.T) {
+	m, dbDrv, _, destDir := setupDirtyStateTest(t)
+
+	// Go all the way up
+	if err := m.Up(); err != nil {
+		t.Fatal(err)
+	}
+
+	expectedSequence := migrationSequence{
+		mr("CREATE 1"),
+		mr("CREATE 3"),
+		mr("CREATE 4"),
+		mr("CREATE 7"),
+	}
+	equalDbSeq(t, 0, expectedSequence, dbDrv)
+
+	// Verify files exist in destDir
+	files, err := os.ReadDir(destDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) == 0 {
+		t.Fatal("expected migration files in destDir after Up()")
+	}
+
+	// Go all the way down
+	if err := m.Down(); err != nil {
+		t.Fatal(err)
+	}
+
+	expectedSequence = migrationSequence{
+		mr("CREATE 1"),
+		mr("CREATE 3"),
+		mr("CREATE 4"),
+		mr("CREATE 7"),
+		mr("DROP 7"),
+		mr("DROP 5"),
+		mr("DROP 4"),
+		mr("DROP 1"),
+	}
+	equalDbSeq(t, 1, expectedSequence, dbDrv)
+
+	// Verify DB version is back to NilVersion
+	version, dirty, err := dbDrv.Version()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if version != -1 {
+		t.Fatalf("expected version -1 (NilVersion), got %d", version)
+	}
+	if dirty {
+		t.Fatal("expected DB to not be dirty")
+	}
+
+	// Verify all migration files cleaned up from destDir
+	files, err = os.ReadDir(destDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range files {
+		if source.Regex.MatchString(f.Name()) {
+			t.Fatalf("expected all migration files removed from destDir, found: %s", f.Name())
+		}
+	}
+}
+
+func TestCleanupFilesWithVersionZero(t *testing.T) {
+	tempDir := t.TempDir()
+	m, _ := setupMigrateInstance(tempDir)
+
+	// Create migration files
+	migrationFiles := []string{"1_name.up.sql", "2_name.up.sql", "3_name.up.sql"}
+	for _, file := range migrationFiles {
+		if err := os.WriteFile(filepath.Join(tempDir, file), []byte(""), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// cleanupFiles(0) should remove ALL migration files
+	if err := m.cleanupFiles(0); err != nil {
+		t.Fatal(err)
+	}
+
+	files, err := os.ReadDir(tempDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range files {
+		if source.Regex.MatchString(f.Name()) {
+			t.Fatalf("expected all migration files removed with cleanupFiles(0), found: %s", f.Name())
+		}
+	}
+}
+
+// TestDownDirtyWithoutHandling verifies backward compatibility:
+// without dirtyStateConf, Down() still returns ErrDirty.
+func TestDownDirtyWithoutHandling(t *testing.T) {
+	m, _ := New("stub://", "stub://")
+	dbDrv := m.databaseDrv.(*dStub.Stub)
+	if err := dbDrv.SetVersion(0, true); err != nil {
+		t.Fatal(err)
+	}
+
+	err := m.Down()
+	if _, ok := err.(ErrDirty); !ok {
+		t.Fatalf("expected ErrDirty, got %v", err)
+	}
+}
+
+// TestStepsDirtyWithoutHandling verifies backward compatibility:
+// without dirtyStateConf, Steps() still returns ErrDirty.
+func TestStepsDirtyWithoutHandling(t *testing.T) {
+	m, _ := New("stub://", "stub://")
+	dbDrv := m.databaseDrv.(*dStub.Stub)
+	if err := dbDrv.SetVersion(0, true); err != nil {
+		t.Fatal(err)
+	}
+
+	err := m.Steps(1)
+	if _, ok := err.(ErrDirty); !ok {
+		t.Fatalf("expected ErrDirty, got %v", err)
+	}
+}
+
+// TestUpDirtyWithoutHandling verifies backward compatibility:
+// without dirtyStateConf, Up() still returns ErrDirty.
+func TestUpDirtyWithoutHandling(t *testing.T) {
+	m, _ := New("stub://", "stub://")
+	dbDrv := m.databaseDrv.(*dStub.Stub)
+	if err := dbDrv.SetVersion(0, true); err != nil {
+		t.Fatal(err)
+	}
+
+	err := m.Up()
+	if _, ok := err.(ErrDirty); !ok {
+		t.Fatalf("expected ErrDirty, got %v", err)
 	}
 }
 
