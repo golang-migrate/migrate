@@ -155,7 +155,22 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 		return nil, err
 	}
 
-	db, err := sql.Open("postgres", migrate.FilterCustomQuery(purl).String())
+	filteredURL := migrate.FilterCustomQuery(purl)
+	connStr := filteredURL.String()
+
+	// When host is specified as a query parameter (e.g., for unix socket
+	// connections via ?host=/var/run/postgresql) and the URL has no host in
+	// the authority section, convert to a key-value connection string so
+	// lib/pq reliably uses the host parameter. Without this, the driver
+	// may silently connect to localhost:5432 instead of the specified host.
+	if purl.Host == "" && purl.Query().Get("host") != "" {
+		connStr, err = pq.ParseURL(connStr)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	db, err := sql.Open("postgres", connStr)
 	if err != nil {
 		return nil, err
 	}
