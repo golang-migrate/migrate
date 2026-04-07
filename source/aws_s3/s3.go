@@ -36,7 +36,7 @@ type Config struct {
 }
 
 func (s *s3Driver) Open(folder string) (source.Driver, error) {
-	parsedConfig, err := parseURI(folder)
+	config, err := parseURI(folder)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +46,7 @@ func (s *s3Driver) Open(folder string) (source.Driver, error) {
 		return nil, err
 	}
 
-	return WithInstance(s3.NewFromConfig(cfg), parsedConfig)
+	return WithInstance(s3.NewFromConfig(cfg), config)
 }
 
 func WithInstance(s3client s3Client, config *Config) (source.Driver, error) {
