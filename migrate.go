@@ -338,7 +338,17 @@ func (m *Migrate) Steps(n int) error {
 	}
 
 	if dirty {
-		return m.unlockErr(ErrDirty{curVersion})
+		if m.IsDirtyHandlingEnabled() {
+			if err = m.handleDirtyState(); err != nil {
+				return m.unlockErr(err)
+			}
+		} else {
+			return m.unlockErr(ErrDirty{curVersion})
+		}
+	}
+
+	if err = m.copyFiles(); err != nil {
+		return m.unlockErr(err)
 	}
 
 	ret := make(chan interface{}, m.PrefetchMigrations)
@@ -349,7 +359,23 @@ func (m *Migrate) Steps(n int) error {
 		go m.readDown(curVersion, -n, ret)
 	}
 
-	return m.unlockErr(m.runMigrations(ret))
+	if err = m.runMigrations(ret); err != nil {
+		return m.unlockErr(err)
+	}
+
+	finalVersion, _, err := m.databaseDrv.Version()
+	if err != nil {
+		return m.unlockErr(err)
+	}
+	var cleanupVersion uint
+	if finalVersion >= 0 {
+		cleanupVersion = uint(finalVersion)
+	}
+	if err = m.cleanupFiles(cleanupVersion); err != nil {
+		return m.unlockErr(err)
+	}
+
+	return m.unlock()
 }
 
 // Up looks at the currently active migration version
@@ -365,13 +391,39 @@ func (m *Migrate) Up() error {
 	}
 
 	if dirty {
-		return m.unlockErr(ErrDirty{curVersion})
+		if m.IsDirtyHandlingEnabled() {
+			if err = m.handleDirtyState(); err != nil {
+				return m.unlockErr(err)
+			}
+		} else {
+			return m.unlockErr(ErrDirty{curVersion})
+		}
+	}
+
+	if err = m.copyFiles(); err != nil {
+		return m.unlockErr(err)
 	}
 
 	ret := make(chan interface{}, m.PrefetchMigrations)
-
 	go m.readUp(curVersion, -1, ret)
-	return m.unlockErr(m.runMigrations(ret))
+
+	if err = m.runMigrations(ret); err != nil {
+		return m.unlockErr(err)
+	}
+
+	finalVersion, _, err := m.databaseDrv.Version()
+	if err != nil {
+		return m.unlockErr(err)
+	}
+	var cleanupVersion uint
+	if finalVersion >= 0 {
+		cleanupVersion = uint(finalVersion)
+	}
+	if err = m.cleanupFiles(cleanupVersion); err != nil {
+		return m.unlockErr(err)
+	}
+
+	return m.unlock()
 }
 
 // Down looks at the currently active migration version
@@ -387,12 +439,31 @@ func (m *Migrate) Down() error {
 	}
 
 	if dirty {
-		return m.unlockErr(ErrDirty{curVersion})
+		if m.IsDirtyHandlingEnabled() {
+			if err = m.handleDirtyState(); err != nil {
+				return m.unlockErr(err)
+			}
+		} else {
+			return m.unlockErr(ErrDirty{curVersion})
+		}
+	}
+
+	if err = m.copyFiles(); err != nil {
+		return m.unlockErr(err)
 	}
 
 	ret := make(chan interface{}, m.PrefetchMigrations)
 	go m.readDown(curVersion, -1, ret)
-	return m.unlockErr(m.runMigrations(ret))
+
+	if err = m.runMigrations(ret); err != nil {
+		return m.unlockErr(err)
+	}
+
+	if err = m.cleanupFiles(0); err != nil {
+		return m.unlockErr(err)
+	}
+
+	return m.unlock()
 }
 
 // Drop deletes everything in the database.
