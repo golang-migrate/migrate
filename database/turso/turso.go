@@ -263,11 +263,9 @@ func (m *Turso) Drop() (err error) {
 				return &database.Error{OrigErr: err, Query: []byte(query)}
 			}
 		}
-		query := "VACUUM"
-		_, err = m.db.Query(query)
-		if err != nil {
-			return &database.Error{OrigErr: err, Query: []byte(query)}
-		}
+		// Turso does not support plain VACUUM (only VACUUM INTO).
+		// Omitted here; the sqlite3 driver runs VACUUM to reclaim space
+		// after dropping all tables, but Turso rejects it with a parse error.
 	}
 
 	return nil
