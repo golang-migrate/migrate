@@ -47,7 +47,11 @@ type Config struct {
 	// BusyTimeout in milliseconds. 0 = use turso default (5000ms). -1 = disabled.
 	BusyTimeout int
 	// Experimental is a comma-separated list of turso-go experimental features.
-	// Known values: encryption, custom_types, index_method, fts, mvcc.
+	// Known values as of April 2026, v0.5.0:
+	// views, custom_types, triggers, encryption, index_methods, autovaccuum,
+	// attach.
+	// See: https://docs.turso.tech/sql-reference/experimental-features
+	// for the most up to date list on experimental features.
 	Experimental string
 	// EncryptionCipher is the cipher for encryption at rest (e.g. "aegis256").
 	// Requires "encryption" in Experimental.
@@ -92,7 +96,7 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 
 // ensureVersionTable checks if versions table exists and, if not, creates it.
 // Note that this function locks the database, which deviates from the usual
-// convention of "caller locks" in the Turso type.
+// convention of "caller locks" in the Turso/sqlite type.
 func (m *Turso) ensureVersionTable() (err error) {
 	if err = m.Lock(); err != nil {
 		return err
@@ -124,12 +128,8 @@ func (m *Turso) Open(url string) (database.Driver, error) {
 	}
 
 	// Build the turso-go DSN from the URL.
-	// 1. Strip x-* params (consumed by the migration driver).
-	// 2. Translate x-* params to turso-go DSN params.
-	// 3. Append translated params to the filtered URL.
 	qv := purl.Query()
 
-	// Parse migration-driver params first.
 	migrationsTable := qv.Get("x-migrations-table")
 	if len(migrationsTable) == 0 {
 		migrationsTable = DefaultMigrationsTable
@@ -185,7 +185,7 @@ func (m *Turso) Open(url string) (database.Driver, error) {
 	if busyTimeout != 0 {
 		dsnParams.Set("_busy_timeout", strconv.Itoa(busyTimeout))
 	}
-	// Verified: turso-go uses "vfs" without underscore prefix (driver_db.go:638).
+	// turso-go uses "vfs" without underscore prefix (driver_db.go:638).
 	if vfs != "" {
 		dsnParams.Set("vfs", vfs)
 	}
@@ -229,7 +229,7 @@ func (m *Turso) Close() error {
 }
 
 func (m *Turso) Drop() (err error) {
-	// Verified: turso-go supports sqlite_master (SQLite compatibility).
+	// turso-go supports sqlite_master (SQLite compatibility).
 	query := `SELECT name FROM sqlite_master WHERE type = 'table';`
 	tables, err := m.db.Query(query)
 	if err != nil {

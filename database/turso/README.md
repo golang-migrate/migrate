@@ -19,11 +19,17 @@ Unlike most migrate database drivers, the turso driver wraps each migration in a
 | `x-vfs` | `Vfs` | VFS backend: `memory`, `syscall`, `io_uring` (Linux), `experimental_win_iocp` (Windows). Maps to `vfs` in the turso-go DSN. |
 | `x-async` | `AsyncIO` | Enable async IO mode (`true`/`false`). Maps to `async` in the turso-go DSN. |
 
+
+**Note:** The experimental flags list is valid as of [Turso v0.5.3](https://github.com/tursodatabase/turso/releases/tag/v0.5.3) in April 2026.
+Turso is still in Beta, and the list of experimental features may have changed
+since then. See [Turso Docs](https://docs.turso.tech/sql-reference/experimental-features) for the most up to date list of experimental feature flags.
+
 ## Notes
 
 - **CGO-free.** Uses `turso.tech/database/tursogo`, which calls into Rust via [purego](https://github.com/ebitengine/purego). No `gcc` required, no build flags.
 - **Beta software.** Turso is in beta. Use caution with production data and ensure backups.
 - **Custom types** like `uuid`, `boolean`, `varchar`, `timestamp`, `json`, `jsonb`, `date`, `time`, `smallint`, `bigint`, `inet` are stable in Turso v0.5.0 but **still require `x-experimental=custom_types`** in turso-go v0.5.3. Verified: without the flag, custom types fail with `"unknown datatype"`.
+- **MVCC** removes the concurrent writes limitation of Sqlite, however, as of v0.5.3, it does not work with custom types and strict tables. See [Turso Docs](https://docs.turso.tech/tursodb/concurrent-writes) for more information.
 - **STRICT tables** are supported (verified with turso-go v0.5.3).
 - **VACUUM** is not supported by Turso (`"VACUUM is not supported yet"`). The driver's `Drop()` method omits the `VACUUM` step that the sqlite3 driver includes. Use `VACUUM INTO 'filename'` if you need to compact a database.
 - **In-memory databases:** use `turso://:memory:`.
@@ -33,10 +39,17 @@ Unlike most migrate database drivers, the turso driver wraps each migration in a
 ## Custom types example
 
 ```sql
+
+-- A type that stores monetary values as cents
+CREATE TYPE cents BASE integer
+    ENCODE value * 100
+    DECODE value / 100;
+
 CREATE TABLE users (
     id uuid PRIMARY KEY,
     email varchar(255) NOT NULL,
-    created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    account_balance cents NOT NULL DEFAULT 0
 ) STRICT;
 ```
 
@@ -44,6 +57,9 @@ CREATE TABLE users (
 migrate -database "turso:///path/to/db?x-experimental=custom_types" \
   -path ./migrations up
 ```
+
+See [Data Types Documentation](https://docs.turso.tech/sql-reference/data-types)
+for more information on usage, creating custom types, and built in custom types.
 
 ## Encryption
 
@@ -72,6 +88,9 @@ driver, _ := turso.WithInstance(db, &turso.Config{})
 m, _ := migrate.NewWithDatabaseInstance("file://./migrations", "turso", driver)
 m.Up()
 ```
+
+See [Encryption Docs](https://docs.turso.tech/tursodb/encryption) for more
+information and list of supported ciphers.
 
 ## MVCC concurrent writes
 
