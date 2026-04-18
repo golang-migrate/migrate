@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/golang-migrate/migrate/v4/database"
 	dStub "github.com/golang-migrate/migrate/v4/database/stub"
 	"github.com/golang-migrate/migrate/v4/source"
 	sStub "github.com/golang-migrate/migrate/v4/source/stub"
@@ -41,6 +42,16 @@ func init() {
 }
 
 type DummyInstance struct{ Name string }
+
+// sourceStub unwraps the OTel wrapper to return the underlying *sStub.Stub.
+func sourceStub(m *Migrate) *sStub.Stub {
+	return m.sourceDrv.(*source.OTelDriver).Unwrap().(*sStub.Stub)
+}
+
+// databaseStub unwraps the OTel wrapper to return the underlying *dStub.Stub.
+func databaseStub(m *Migrate) *dStub.Stub {
+	return m.databaseDrv.(*database.OTelDriver).Unwrap().(*dStub.Stub)
+}
 
 func TestNew(t *testing.T) {
 	ctx := context.Background()
@@ -245,8 +256,8 @@ func TestClose(t *testing.T) {
 func TestMigrate(t *testing.T) {
 	ctx := context.Background()
 	m, _ := New(ctx, "stub://", "stub://")
-	m.sourceDrv.(*sStub.Stub).Migrations = sourceStubMigrations
-	dbDrv := m.databaseDrv.(*dStub.Stub)
+	sourceStub(m).Migrations = sourceStubMigrations
+	dbDrv := databaseStub(m)
 
 	tt := []struct {
 		version       uint
@@ -499,7 +510,7 @@ func TestMigrate(t *testing.T) {
 func TestMigrateDirty(t *testing.T) {
 	ctx := context.Background()
 	m, _ := New(ctx, "stub://", "stub://")
-	dbDrv := m.databaseDrv.(*dStub.Stub)
+	dbDrv := databaseStub(m)
 	if err := dbDrv.SetVersion(ctx, 0, true); err != nil {
 		t.Fatal(err)
 	}
@@ -513,8 +524,8 @@ func TestMigrateDirty(t *testing.T) {
 func TestSteps(t *testing.T) {
 	ctx := context.Background()
 	m, _ := New(ctx, "stub://", "stub://")
-	m.sourceDrv.(*sStub.Stub).Migrations = sourceStubMigrations
-	dbDrv := m.databaseDrv.(*dStub.Stub)
+	sourceStub(m).Migrations = sourceStubMigrations
+	dbDrv := databaseStub(m)
 
 	tt := []struct {
 		steps         int
@@ -767,7 +778,7 @@ func TestSteps(t *testing.T) {
 func TestStepsDirty(t *testing.T) {
 	ctx := context.Background()
 	m, _ := New(ctx, "stub://", "stub://")
-	dbDrv := m.databaseDrv.(*dStub.Stub)
+	dbDrv := databaseStub(m)
 	if err := dbDrv.SetVersion(ctx, 0, true); err != nil {
 		t.Fatal(err)
 	}
@@ -781,8 +792,8 @@ func TestStepsDirty(t *testing.T) {
 func TestUpAndDown(t *testing.T) {
 	ctx := context.Background()
 	m, _ := New(ctx, "stub://", "stub://")
-	m.sourceDrv.(*sStub.Stub).Migrations = sourceStubMigrations
-	dbDrv := m.databaseDrv.(*dStub.Stub)
+	sourceStub(m).Migrations = sourceStubMigrations
+	dbDrv := databaseStub(m)
 
 	// go Up first
 	if err := m.Up(ctx); err != nil {
@@ -896,7 +907,7 @@ func TestUpAndDown(t *testing.T) {
 func TestUpDirty(t *testing.T) {
 	ctx := context.Background()
 	m, _ := New(ctx, "stub://", "stub://")
-	dbDrv := m.databaseDrv.(*dStub.Stub)
+	dbDrv := databaseStub(m)
 	if err := dbDrv.SetVersion(ctx, 0, true); err != nil {
 		t.Fatal(err)
 	}
@@ -910,7 +921,7 @@ func TestUpDirty(t *testing.T) {
 func TestDownDirty(t *testing.T) {
 	ctx := context.Background()
 	m, _ := New(ctx, "stub://", "stub://")
-	dbDrv := m.databaseDrv.(*dStub.Stub)
+	dbDrv := databaseStub(m)
 	if err := dbDrv.SetVersion(ctx, 0, true); err != nil {
 		t.Fatal(err)
 	}
@@ -924,8 +935,8 @@ func TestDownDirty(t *testing.T) {
 func TestDrop(t *testing.T) {
 	ctx := context.Background()
 	m, _ := New(ctx, "stub://", "stub://")
-	m.sourceDrv.(*sStub.Stub).Migrations = sourceStubMigrations
-	dbDrv := m.databaseDrv.(*dStub.Stub)
+	sourceStub(m).Migrations = sourceStubMigrations
+	dbDrv := databaseStub(m)
 
 	if err := m.Drop(ctx); err != nil {
 		t.Fatal(err)
@@ -939,7 +950,7 @@ func TestDrop(t *testing.T) {
 func TestVersion(t *testing.T) {
 	ctx := context.Background()
 	m, _ := New(ctx, "stub://", "stub://")
-	dbDrv := m.databaseDrv.(*dStub.Stub)
+	dbDrv := databaseStub(m)
 
 	_, _, err := m.Version(ctx)
 	if err != ErrNilVersion {
@@ -990,7 +1001,7 @@ func TestRun(t *testing.T) {
 func TestRunDirty(t *testing.T) {
 	ctx := context.Background()
 	m, _ := New(ctx, "stub://", "stub://")
-	dbDrv := m.databaseDrv.(*dStub.Stub)
+	dbDrv := databaseStub(m)
 	if err := dbDrv.SetVersion(ctx, 0, true); err != nil {
 		t.Fatal(err)
 	}
@@ -1009,7 +1020,7 @@ func TestRunDirty(t *testing.T) {
 func TestForce(t *testing.T) {
 	ctx := context.Background()
 	m, _ := New(ctx, "stub://", "stub://")
-	m.sourceDrv.(*sStub.Stub).Migrations = sourceStubMigrations
+	sourceStub(m).Migrations = sourceStubMigrations
 
 	if err := m.Force(ctx, 7); err != nil {
 		t.Fatal(err)
@@ -1030,7 +1041,7 @@ func TestForce(t *testing.T) {
 func TestForceDirty(t *testing.T) {
 	ctx := context.Background()
 	m, _ := New(ctx, "stub://", "stub://")
-	dbDrv := m.databaseDrv.(*dStub.Stub)
+	dbDrv := databaseStub(m)
 	if err := dbDrv.SetVersion(ctx, 0, true); err != nil {
 		t.Fatal(err)
 	}
@@ -1043,7 +1054,7 @@ func TestForceDirty(t *testing.T) {
 func TestRead(t *testing.T) {
 	ctx := context.Background()
 	m, _ := New(ctx, "stub://", "stub://")
-	m.sourceDrv.(*sStub.Stub).Migrations = sourceStubMigrations
+	sourceStub(m).Migrations = sourceStubMigrations
 
 	tt := []struct {
 		from             int
@@ -1181,7 +1192,7 @@ func TestRead(t *testing.T) {
 func TestReadUp(t *testing.T) {
 	ctx := context.Background()
 	m, _ := New(ctx, "stub://", "stub://")
-	m.sourceDrv.(*sStub.Stub).Migrations = sourceStubMigrations
+	sourceStub(m).Migrations = sourceStubMigrations
 
 	tt := []struct {
 		from             int
@@ -1259,7 +1270,7 @@ func TestReadUp(t *testing.T) {
 func TestReadDown(t *testing.T) {
 	ctx := context.Background()
 	m, _ := New(ctx, "stub://", "stub://")
-	m.sourceDrv.(*sStub.Stub).Migrations = sourceStubMigrations
+	sourceStub(m).Migrations = sourceStubMigrations
 
 	tt := []struct {
 		from             int
@@ -1398,7 +1409,7 @@ func M(ctx context.Context, version uint, targetVersion ...int) *Migration {
 	}
 
 	m, _ := New(ctx, "stub://", "stub://")
-	m.sourceDrv.(*sStub.Stub).Migrations = sourceStubMigrations
+	sourceStub(m).Migrations = sourceStubMigrations
 	migr, err := m.newMigration(ctx, version, ts)
 	if err != nil {
 		panic(err)

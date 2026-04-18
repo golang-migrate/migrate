@@ -112,13 +112,13 @@ func New(ctx context.Context, sourceURL, databaseURL string) (*Migrate, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open source, %q: %w", sourceURL, err)
 	}
-	m.sourceDrv = sourceDrv
+	m.sourceDrv = source.NewOTelDriver(sourceDrv, sourceName)
 
 	databaseDrv, err := database.Open(ctx, databaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
-	m.databaseDrv = databaseDrv
+	m.databaseDrv = database.NewOTelDriver(databaseDrv, databaseDriverName)
 
 	return m, nil
 }
@@ -142,9 +142,9 @@ func NewWithDatabaseInstance(ctx context.Context, sourceURL string, databaseDriv
 	if err != nil {
 		return nil, fmt.Errorf("failed to open source, %q: %w", sourceURL, err)
 	}
-	m.sourceDrv = sourceDrv
+	m.sourceDrv = source.NewOTelDriver(sourceDrv, sourceName)
 
-	m.databaseDrv = databaseInstance
+	m.databaseDrv = database.NewOTelDriver(databaseInstance, databaseDriverName)
 
 	return m, nil
 }
@@ -168,9 +168,9 @@ func NewWithSourceInstance(ctx context.Context, sourceName string, sourceInstanc
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
-	m.databaseDrv = databaseDrv
+	m.databaseDrv = database.NewOTelDriver(databaseDrv, databaseDriverName)
 
-	m.sourceDrv = sourceInstance
+	m.sourceDrv = source.NewOTelDriver(sourceInstance, sourceName)
 
 	return m, nil
 }
@@ -185,8 +185,8 @@ func NewWithInstance(ctx context.Context, sourceName string, sourceInstance sour
 	m.sourceName = sourceName
 	m.databaseDriverName = databaseDriverName
 
-	m.sourceDrv = sourceInstance
-	m.databaseDrv = databaseInstance
+	m.sourceDrv = source.NewOTelDriver(sourceInstance, sourceName)
+	m.databaseDrv = database.NewOTelDriver(databaseInstance, databaseDriverName)
 
 	return m, nil
 }
@@ -850,14 +850,14 @@ func (m *Migrate) runMigrations(ctx context.Context, ret <-chan interface{}) err
 			metricAttrs := metric.WithAttributes(append(m.otelAttrs(),
 				attribute.String("migrate.direction", direction),
 			)...)
-			_, childSpan := m.otelTracer.Start(ctx, "migrate.run_migration",
+			childCtx, childSpan := m.otelTracer.Start(ctx, "migrate.run_migration",
 				trace.WithSpanKind(trace.SpanKindInternal),
 				trace.WithAttributes(migrAttrs...),
 			)
 
 			// set version with dirty state
-			if err := m.databaseDrv.SetVersion(ctx, migr.TargetVersion, true); err != nil {
-				m.otelInstruments.migrationsFailed.Add(ctx, 1, metricAttrs)
+			if err := m.databaseDrv.SetVersion(childCtx, migr.TargetVersion, true); err != nil {
+				m.otelInstruments.migrationsFailed.Add(childCtx, 1, metricAttrs)
 				childSpan.RecordError(err)
 				childSpan.SetStatus(codes.Error, err.Error())
 				childSpan.End()
@@ -867,10 +867,10 @@ func (m *Migrate) runMigrations(ctx context.Context, ret <-chan interface{}) err
 			runStart := time.Now()
 			if migr.Body != nil {
 				m.logVerbosePrintf("Read and execute %v\n", migr.LogString())
-				if err := m.databaseDrv.Run(ctx, migr.BufferedBody); err != nil {
+				if err := m.databaseDrv.Run(childCtx, migr.BufferedBody); err != nil {
 					dur := time.Since(runStart).Seconds()
-					m.otelInstruments.migrationRunDuration.Record(ctx, dur, metricAttrs)
-					m.otelInstruments.migrationsFailed.Add(ctx, 1, metricAttrs)
+					m.otelInstruments.migrationRunDuration.Record(childCtx, dur, metricAttrs)
+					m.otelInstruments.migrationsFailed.Add(childCtx, 1, metricAttrs)
 					childSpan.RecordError(err)
 					childSpan.SetStatus(codes.Error, err.Error())
 					childSpan.End()
@@ -878,18 +878,18 @@ func (m *Migrate) runMigrations(ctx context.Context, ret <-chan interface{}) err
 				}
 			}
 			dur := time.Since(runStart).Seconds()
-			m.otelInstruments.migrationRunDuration.Record(ctx, dur, metricAttrs)
+			m.otelInstruments.migrationRunDuration.Record(childCtx, dur, metricAttrs)
 
 			// set clean state
-			if err := m.databaseDrv.SetVersion(ctx, migr.TargetVersion, false); err != nil {
-				m.otelInstruments.migrationsFailed.Add(ctx, 1, metricAttrs)
+			if err := m.databaseDrv.SetVersion(childCtx, migr.TargetVersion, false); err != nil {
+				m.otelInstruments.migrationsFailed.Add(childCtx, 1, metricAttrs)
 				childSpan.RecordError(err)
 				childSpan.SetStatus(codes.Error, err.Error())
 				childSpan.End()
 				return err
 			}
 
-			m.otelInstruments.migrationsApplied.Add(ctx, 1, metricAttrs)
+			m.otelInstruments.migrationsApplied.Add(childCtx, 1, metricAttrs)
 			childSpan.SetStatus(codes.Ok, "")
 			childSpan.End()
 

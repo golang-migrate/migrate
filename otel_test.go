@@ -6,13 +6,13 @@ import (
 
 "github.com/stretchr/testify/assert"
 "github.com/stretchr/testify/require"
+"go.opentelemetry.io/otel"
 "go.opentelemetry.io/otel/attribute"
 sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 "go.opentelemetry.io/otel/sdk/metric/metricdata"
 sdktrace "go.opentelemetry.io/otel/sdk/trace"
 "go.opentelemetry.io/otel/sdk/trace/tracetest"
-
-sStub "github.com/golang-migrate/migrate/v4/source/stub"
+"go.opentelemetry.io/otel/trace"
 )
 
 // setupOtelTest creates a *Migrate instance wired to in-process OTel SDK providers
@@ -38,7 +38,7 @@ m, err = New(context.Background(), "stub://", "stub://")
 require.NoError(t, err)
 
 // Use the shared stub migrations (versions 1, 3, 4, 5, 7).
-m.sourceDrv.(*sStub.Stub).Migrations = sourceStubMigrations
+sourceStub(m).Migrations = sourceStubMigrations
 
 // Replace global-provider instruments with test-provider instruments so
 // assertions are isolated to this test run.
@@ -284,3 +284,104 @@ assert.NotEqual(t, sdktrace.Status{Code: 2}, s.Status(),
 }
 }
 }
+
+// setupOtelTopologyTest sets the global OTel provider to an in-memory exporter,
+// then creates a Migrate instance so that both the core tracer and the
+// database/source OTelDriver wrappers all emit to the same exporter.
+func setupOtelTopologyTest(t *testing.T) (m *Migrate, exp *tracetest.InMemoryExporter) {
+t.Helper()
+
+exp = tracetest.NewInMemoryExporter()
+tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exp))
+prevTP := otel.GetTracerProvider()
+otel.SetTracerProvider(tp)
+t.Cleanup(func() {
+_ = tp.Shutdown(context.Background())
+otel.SetTracerProvider(prevTP)
+})
+
+var err error
+m, err = New(context.Background(), "stub://", "stub://")
+require.NoError(t, err)
+
+sourceStub(m).Migrations = sourceStubMigrations
+
+// Replace the core tracer so it uses the same test provider.
+m.otelTracer = tp.Tracer(tracerName)
+return m, exp
+}
+
+// TestOtelTraceTopology verifies that db.set_version and db.run spans are
+// children of the migrate.run_migration span, and that migrate.run_migration
+// is a child of migrate.up.
+func TestOtelTraceTopology(t *testing.T) {
+m, exp := setupOtelTopologyTest(t)
+
+require.NoError(t, m.Up(context.Background()))
+
+snaps := exp.GetSpans().Snapshots()
+
+// Index spans by spanID for parent lookup.
+type spanInfo struct {
+name     string
+spanID   trace.SpanID
+parentID trace.SpanID
+}
+var byID = make(map[trace.SpanID]spanInfo)
+for _, s := range snaps {
+byID[s.SpanContext().SpanID()] = spanInfo{
+name:     s.Name(),
+spanID:   s.SpanContext().SpanID(),
+parentID: s.Parent().SpanID(),
+}
+}
+
+// Find migrate.up span.
+var upSpanID trace.SpanID
+for _, info := range byID {
+if info.name == "migrate.up" {
+upSpanID = info.spanID
+break
+}
+}
+require.NotEqual(t, trace.SpanID{}, upSpanID, "migrate.up span must exist")
+
+// Every migrate.run_migration must be a direct child of migrate.up.
+// Collect children of each migrate.run_migration to verify db.* nesting.
+var foundRunMigr int
+var foundRunMigrWithDBRun int
+for _, info := range byID {
+if info.name != "migrate.run_migration" {
+continue
+}
+foundRunMigr++
+assert.Equal(t, upSpanID, info.parentID,
+"migrate.run_migration must be a child of migrate.up")
+
+runMigrSpanID := info.spanID
+var childNames []string
+for _, child := range byID {
+if child.parentID == runMigrSpanID {
+childNames = append(childNames, child.name)
+}
+}
+
+// All run_migration spans emit at least two db.set_version calls
+// (dirty=true before, dirty=false after). db.run is only present
+// when the migration has a body (version 5 has no Up body).
+assert.Contains(t, childNames, "db.set_version",
+"db.set_version must be a child of migrate.run_migration")
+
+// Track how many have db.run to assert at least one does.
+for _, n := range childNames {
+if n == "db.run" {
+foundRunMigrWithDBRun++
+break
+}
+}
+}
+require.Greater(t, foundRunMigr, 0, "at least one migrate.run_migration span expected")
+assert.Greater(t, foundRunMigrWithDBRun, 0,
+"at least one migrate.run_migration must have db.run as a child")
+}
+

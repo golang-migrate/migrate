@@ -163,7 +163,36 @@ migrate emits [OpenTelemetry](https://opentelemetry.io) traces and metrics throu
 
 ### Signals
 
-**Traces** — one parent span per public operation (`migrate.up`, `migrate.down`, `migrate.migrate`, etc.) and one child span per migration execution (`migrate.run_migration`).
+**Traces** — one parent span per public operation (`migrate.up`, `migrate.down`, `migrate.migrate`, etc.), one child span per migration execution (`migrate.run_migration`), and driver-level spans for every database and source operation.
+
+#### Operation spans (SpanKind: INTERNAL)
+
+| Span name | Emitted by |
+|-----------|-----------|
+| `migrate.up` | `Up` / `Steps` (positive) |
+| `migrate.down` | `Down` / `Steps` (negative) |
+| `migrate.migrate` | `Migrate` |
+| `migrate.force` | `Force` |
+| `migrate.drop` | `Drop` |
+| `migrate.run_migration` | Per-migration child of the above |
+
+#### Database driver spans (SpanKind: CLIENT)
+
+| Span name | Method | Key attributes |
+|-----------|--------|----------------|
+| `db.lock` | Lock | `db.system` |
+| `db.unlock` | Unlock | `db.system` |
+| `db.run` | Run | `db.system` |
+| `db.set_version` | SetVersion | `db.system`, `migrate.version`, `migrate.dirty` |
+| `db.version` | Version | `db.system` |
+| `db.drop` | Drop | `db.system` |
+
+#### Source driver spans (SpanKind: INTERNAL)
+
+| Span name | Method | Key attributes |
+|-----------|--------|----------------|
+| `source.read_up` | ReadUp | `migrate.source`, `migrate.version` |
+| `source.read_down` | ReadDown | `migrate.source`, `migrate.version` |
 
 **Metrics:**
 
