@@ -11,10 +11,12 @@ import (
 	"strconv"
 	"sync/atomic"
 
+	"github.com/XSAM/otelsql"
 	"github.com/cockroachdb/cockroach-go/v2/crdb"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/lib/pq"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 func init() {
@@ -106,7 +108,9 @@ func (c *CockroachDb) Open(ctx context.Context, url string) (database.Driver, er
 	re := regexp.MustCompile("^(cockroach(db)?|crdb-postgres)")
 	connectString := re.ReplaceAllString(migrate.FilterCustomQuery(purl).String(), "postgres")
 
-	db, err := sql.Open("postgres", connectString)
+	db, err := otelsql.Open("postgres", connectString,
+		otelsql.WithAttributes(attribute.String("db.system", "cockroachdb")),
+	)
 	if err != nil {
 		return nil, err
 	}

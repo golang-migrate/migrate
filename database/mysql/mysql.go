@@ -17,8 +17,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/XSAM/otelsql"
 	"github.com/go-sql-driver/mysql"
 	"github.com/golang-migrate/migrate/v4/database"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 var _ database.Driver = (*Mysql)(nil) // explicit compile time type check
@@ -249,7 +251,9 @@ func (m *Mysql) Open(ctx context.Context, url string) (database.Driver, error) {
 		}
 	}
 
-	db, err := sql.Open("mysql", config.FormatDSN())
+	db, err := otelsql.Open("mysql", config.FormatDSN(),
+		otelsql.WithAttributes(attribute.String("db.system", "mysql")),
+	)
 	if err != nil {
 		return nil, err
 	}

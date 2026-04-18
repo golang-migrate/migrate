@@ -11,8 +11,10 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"github.com/XSAM/otelsql"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
+	"go.opentelemetry.io/otel/attribute"
 	_ "modernc.org/sqlite"
 )
 
@@ -94,7 +96,9 @@ func (m *Sqlite) Open(ctx context.Context, url string) (database.Driver, error) 
 		return nil, err
 	}
 	dbfile := strings.Replace(migrate.FilterCustomQuery(purl).String(), "sqlite://", "", 1)
-	db, err := sql.Open("sqlite", dbfile)
+	db, err := otelsql.Open("sqlite", dbfile,
+		otelsql.WithAttributes(attribute.String("db.system", "sqlite")),
+	)
 	if err != nil {
 		return nil, err
 	}
