@@ -14,6 +14,7 @@ import (
 	"github.com/gocql/gocql"
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/golang-migrate/migrate/v4/database/multistmt"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gocql/gocql/otelgocql"
 )
 
 func init() {
@@ -171,7 +172,7 @@ func (c *Cassandra) Open(ctx context.Context, url string) (database.Driver, erro
 		}
 	}
 
-	session, err := cluster.CreateSession()
+	session, err := otelgocql.NewSessionWithTracing(ctx, cluster)
 	if err != nil {
 		return nil, err
 	}
