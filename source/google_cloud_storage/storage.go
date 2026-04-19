@@ -1,14 +1,13 @@
 package googlecloudstorage
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/url"
 	"os"
 	"path"
 	"strings"
-
-	"context"
 
 	"cloud.google.com/go/storage"
 	"github.com/golang-migrate/migrate/v4/source"

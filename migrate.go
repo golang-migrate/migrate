@@ -218,7 +218,14 @@ func otelSpanSetError(span trace.Span, err error) {
 		return
 	}
 	span.RecordError(err)
-	span.SetStatus(codes.Error, err.Error())
+	// Avoid leaking migration SQL (from database.Error.Query) into traces.
+	// Record only the underlying cause when available.
+	msg := err.Error()
+	var dbErr database.Error
+	if errors.As(err, &dbErr) && dbErr.OrigErr != nil {
+		msg = dbErr.OrigErr.Error()
+	}
+	span.SetStatus(codes.Error, msg)
 }
 
 // Close closes the source and the database.
@@ -244,7 +251,7 @@ func (m *Migrate) Close(ctx context.Context) (source error, database error) {
 func (m *Migrate) Migrate(ctx context.Context, version uint) (retErr error) {
 	ctx, span := m.otelTracer.Start(ctx, "migrate.migrate",
 		trace.WithSpanKind(trace.SpanKindInternal),
-		trace.WithAttributes(append(m.otelAttrs(), attribute.Int("migrate.version", int(version)))...),
+		trace.WithAttributes(append(m.otelAttrs(), attribute.Int64("migrate.version", int64(version)))...),
 	)
 	defer func() {
 		otelSpanSetError(span, retErr)
@@ -841,7 +848,7 @@ func (m *Migrate) runMigrations(ctx context.Context, ret <-chan interface{}) err
 				direction = "down"
 			}
 			migrAttrs := append(m.otelAttrs(),
-				attribute.Int("migrate.version", int(migr.Version)),
+				attribute.Int64("migrate.version", int64(migr.Version)),
 				attribute.Int("migrate.target_version", migr.TargetVersion),
 				attribute.String("migrate.direction", direction),
 				attribute.String("migrate.identifier", migr.Identifier),

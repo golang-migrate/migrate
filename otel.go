@@ -29,24 +29,33 @@ type otelInstruments struct {
 // and the corresponding instrument is replaced with a no-op (the OTel API
 // guarantees no-op instruments are returned on error, so callers are safe).
 func newOtelInstruments(meter metric.Meter) otelInstruments {
-	applied, _ := meter.Int64Counter(
+	applied, err := meter.Int64Counter(
 		"migrate.migrations.applied",
 		metric.WithDescription("Number of migrations successfully applied."),
 		metric.WithUnit("{migration}"),
 	)
+	if err != nil {
+		otel.Handle(err)
+	}
 
-	failed, _ := meter.Int64Counter(
+	failed, err := meter.Int64Counter(
 		"migrate.migrations.failed",
 		metric.WithDescription("Number of migrations that failed to apply."),
 		metric.WithUnit("{migration}"),
 	)
+	if err != nil {
+		otel.Handle(err)
+	}
 
-	duration, _ := meter.Float64Histogram(
+	duration, err := meter.Float64Histogram(
 		"migrate.migration.run.duration",
 		metric.WithDescription("Execution duration of a single migration run against the database."),
 		metric.WithUnit("s"),
 		metric.WithExplicitBucketBoundaries(0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 5, 10),
 	)
+	if err != nil {
+		otel.Handle(err)
+	}
 
 	return otelInstruments{
 		migrationsApplied:    applied,

@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	"go.opentelemetry.io/otel/trace"
@@ -157,7 +158,7 @@ func TestOTelDriver_ErrNotExistIsNotErrorSpan(t *testing.T) {
 	require.True(t, ok)
 
 	// Span status must NOT be Error for os.ErrNotExist.
-	assert.NotEqual(t, sdktrace.Status{Code: 2}, span.Status(),
+	assert.NotEqual(t, codes.Error, span.Status().Code,
 		"os.ErrNotExist must not produce an error span")
 }
 

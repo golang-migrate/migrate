@@ -75,7 +75,7 @@ func (d *OTelDriver) Next(ctx context.Context, version uint) (uint, error) {
 func (d *OTelDriver) ReadUp(ctx context.Context, version uint) (io.ReadCloser, string, error) {
 	ctx, span := d.tracer.Start(ctx, "source.read_up",
 		trace.WithSpanKind(trace.SpanKindInternal),
-		trace.WithAttributes(append(d.attrs(), attribute.Int("migrate.version", int(version)))...),
+		trace.WithAttributes(append(d.attrs(), attribute.Int64("migrate.version", int64(version)))...),
 	)
 	r, identifier, err := d.driver.ReadUp(ctx, version)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -89,7 +89,7 @@ func (d *OTelDriver) ReadUp(ctx context.Context, version uint) (io.ReadCloser, s
 func (d *OTelDriver) ReadDown(ctx context.Context, version uint) (io.ReadCloser, string, error) {
 	ctx, span := d.tracer.Start(ctx, "source.read_down",
 		trace.WithSpanKind(trace.SpanKindInternal),
-		trace.WithAttributes(append(d.attrs(), attribute.Int("migrate.version", int(version)))...),
+		trace.WithAttributes(append(d.attrs(), attribute.Int64("migrate.version", int64(version)))...),
 	)
 	r, identifier, err := d.driver.ReadDown(ctx, version)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {

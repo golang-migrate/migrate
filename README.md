@@ -180,12 +180,12 @@ migrate emits [OpenTelemetry](https://opentelemetry.io) traces and metrics throu
 
 | Span name | Method | Key attributes |
 |-----------|--------|----------------|
-| `db.lock` | Lock | `db.system` |
-| `db.unlock` | Unlock | `db.system` |
-| `db.run` | Run | `db.system` |
-| `db.set_version` | SetVersion | `db.system`, `migrate.version`, `migrate.dirty` |
-| `db.version` | Version | `db.system` |
-| `db.drop` | Drop | `db.system` |
+| `db.lock` | Lock | `db.system.name` |
+| `db.unlock` | Unlock | `db.system.name` |
+| `db.run` | Run | `db.system.name` |
+| `db.set_version` | SetVersion | `db.system.name`, `migrate.version`, `migrate.dirty` |
+| `db.version` | Version | `db.system.name` |
+| `db.drop` | Drop | `db.system.name` |
 
 #### Source driver spans (SpanKind: INTERNAL)
 

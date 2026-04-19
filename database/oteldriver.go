@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"errors"
 	"io"
 
 	"go.opentelemetry.io/otel"
@@ -49,7 +50,14 @@ func (d *OTelDriver) startSpan(ctx context.Context, name string, extra ...attrib
 func endSpan(span trace.Span, err error) {
 	if err != nil {
 		span.RecordError(err)
-		span.SetStatus(codes.Error, err.Error())
+		// Avoid leaking migration SQL (from Error.Query) into traces.
+		// Record only the underlying cause when available.
+		msg := err.Error()
+		var dbErr Error
+		if errors.As(err, &dbErr) && dbErr.OrigErr != nil {
+			msg = dbErr.OrigErr.Error()
+		}
+		span.SetStatus(codes.Error, msg)
 	}
 	span.End()
 }
