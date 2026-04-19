@@ -9,6 +9,7 @@ import (
 	neturl "net/url"
 	"strconv"
 	"sync/atomic"
+	"time"
 
 	"golang.org/x/mod/semver"
 
@@ -97,7 +98,11 @@ func (n *Neo4j) Open(url string) (database.Driver, error) {
 		return nil, err
 	}
 
-	if err = driver.VerifyConnectivity(context.Background()); err != nil {
+	if err = func() error {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		return driver.VerifyConnectivity(ctx)
+	}(); err != nil {
 		_ = driver.Close(context.Background())
 		return nil, err
 	}
@@ -287,7 +292,7 @@ func (n *Neo4j) ensureVersionConstraint() (err error) {
 	}()
 
 	var neo4jVersion string
-	result, err := session.Run(ctx, "call dbms.components() yield versions unwind versions as version return version", nil)
+	result, err := session.Run(ctx, "CALL dbms.components() YIELD name, versions UNWIND versions AS version WHERE name = 'Neo4j Kernel' RETURN version LIMIT 1", nil)
 	res, err := neo4j.CollectWithContext(ctx, result, err)
 	if err != nil {
 		return err
@@ -298,25 +303,14 @@ func (n *Neo4j) ensureVersionConstraint() (err error) {
 		}
 	}
 
-	/**
-	Get constraint and check to avoid error duplicate.
-	Using db.labels() to support both Neo4j v4.4 LTS and v5+.
-	*/
-	result, err = session.Run(ctx, fmt.Sprintf("CALL db.labels() YIELD label WHERE label=\"%s\" RETURN label", n.config.MigrationsLabel), nil)
-	res, err = neo4j.CollectWithContext(ctx, result, err)
-	if err != nil {
-		return err
-	}
-	if len(res) == 1 {
-		return nil
-	}
-
+	// Use IF NOT EXISTS to avoid duplicate constraint errors and to correctly
+	// detect whether the constraint exists independent of the label's existence.
 	var query string
 	switch neo4jVersion {
 	case "v5":
-		query = fmt.Sprintf("CREATE CONSTRAINT FOR (a:%s) REQUIRE a.version IS UNIQUE", n.config.MigrationsLabel)
+		query = fmt.Sprintf("CREATE CONSTRAINT IF NOT EXISTS FOR (a:%s) REQUIRE a.version IS UNIQUE", n.config.MigrationsLabel)
 	case "v4":
-		query = fmt.Sprintf("CREATE CONSTRAINT ON (a:%s) ASSERT a.version IS UNIQUE", n.config.MigrationsLabel)
+		query = fmt.Sprintf("CREATE CONSTRAINT IF NOT EXISTS ON (a:%s) ASSERT a.version IS UNIQUE", n.config.MigrationsLabel)
 	default:
 		return fmt.Errorf("unsupported neo4j version %v", neo4jVersion)
 	}
