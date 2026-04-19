@@ -1,13 +1,13 @@
 module github.com/golang-migrate/migrate/v4
 
-go 1.25.0
+go 1.24.0
 
 require (
 	cloud.google.com/go/spanner v1.85.0
 	cloud.google.com/go/storage v1.56.0
 	github.com/Azure/go-autorest/autorest/adal v0.9.16
 	github.com/ClickHouse/clickhouse-go v1.4.3
-	github.com/XSAM/otelsql v0.42.0
+	github.com/XSAM/otelsql v0.41.0
 	github.com/aws/aws-sdk-go-v2/config v1.32.16
 	github.com/cenkalti/backoff/v4 v4.1.2
 	github.com/cockroachdb/cockroach-go/v2 v2.1.1
@@ -34,16 +34,16 @@ require (
 	github.com/stretchr/testify v1.11.1
 	github.com/xanzy/go-gitlab v0.15.0
 	go.mongodb.org/mongo-driver v1.17.9
-	go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-sdk-go-v2/otelaws v0.68.0
+	go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-sdk-go-v2/otelaws v0.64.0
 	go.opentelemetry.io/contrib/instrumentation/github.com/gocql/gocql/otelgocql v0.43.0
-	go.opentelemetry.io/contrib/instrumentation/go.mongodb.org/mongo-driver/mongo/otelmongo v0.68.0
+	go.opentelemetry.io/contrib/instrumentation/go.mongodb.org/mongo-driver/mongo/otelmongo v0.64.0
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.61.0
-	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.68.0
-	go.opentelemetry.io/otel v1.43.0
-	go.opentelemetry.io/otel/metric v1.43.0
-	go.opentelemetry.io/otel/sdk v1.43.0
-	go.opentelemetry.io/otel/sdk/metric v1.43.0
-	go.opentelemetry.io/otel/trace v1.43.0
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.64.0
+	go.opentelemetry.io/otel v1.40.0
+	go.opentelemetry.io/otel/metric v1.40.0
+	go.opentelemetry.io/otel/sdk v1.40.0
+	go.opentelemetry.io/otel/sdk/metric v1.40.0
+	go.opentelemetry.io/otel/trace v1.40.0
 	golang.org/x/oauth2 v0.30.0
 	golang.org/x/tools/godoc v0.1.0-deprecated
 	google.golang.org/api v0.247.0
@@ -198,14 +198,14 @@ require (
 	github.com/zeebo/xxh3 v1.0.2 // indirect
 	gitlab.com/nyarla/go-crypt v0.0.0-20160106005555-d9a5dc2b789b // indirect
 	go.opencensus.io v0.24.0 // indirect
-	golang.org/x/crypto v0.49.0 // indirect
+	golang.org/x/crypto v0.48.0 // indirect
 	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0 // indirect
 	golang.org/x/mod v0.33.0 // indirect
-	golang.org/x/net v0.51.0 // indirect
-	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/sys v0.42.0 // indirect
-	golang.org/x/term v0.41.0 // indirect
-	golang.org/x/text v0.35.0 // indirect
+	golang.org/x/net v0.50.0 // indirect
+	golang.org/x/sync v0.19.0 // indirect
+	golang.org/x/sys v0.41.0 // indirect
+	golang.org/x/term v0.40.0 // indirect
+	golang.org/x/text v0.34.0 // indirect
 	golang.org/x/time v0.12.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	google.golang.org/genproto v0.0.0-20250603155806-513f23925822 // indirect

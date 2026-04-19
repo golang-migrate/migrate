@@ -20,7 +20,7 @@ import (
 	"github.com/XSAM/otelsql"
 	"github.com/go-sql-driver/mysql"
 	"github.com/golang-migrate/migrate/v4/database"
-	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.39.0"
 )
 
 var _ database.Driver = (*Mysql)(nil) // explicit compile time type check

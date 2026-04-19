@@ -16,7 +16,7 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 	mssql "github.com/microsoft/go-mssqldb" // mssql support
-	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.39.0"
 )
 
 func init() {
