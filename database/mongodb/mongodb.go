@@ -17,6 +17,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/x/mongo/driver/connstring"
+	"go.opentelemetry.io/contrib/instrumentation/go.mongodb.org/mongo-driver/mongo/otelmongo"
 )
 
 func init() {
@@ -157,7 +158,7 @@ func (m *Mongo) Open(ctx context.Context, dsn string) (database.Driver, error) {
 	if err != nil {
 		return nil, err
 	}
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(dsn))
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(dsn).SetMonitor(otelmongo.NewMonitor()))
 	if err != nil {
 		return nil, err
 	}
