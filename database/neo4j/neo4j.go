@@ -144,7 +144,7 @@ func (n *Neo4j) Run(migration io.Reader) (err error) {
 		}
 		defer func() {
 			if cerr := tx.Close(ctx); cerr != nil {
-				err = multierror.Append(err, cerr)
+				err = errors.Join(err, cerr)
 			}
 		}()
 
