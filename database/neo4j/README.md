@@ -18,7 +18,7 @@ Here are possible connection URLs:
 
 | URL Query           | WithInstance Config           | Description                                                                                          |
 |---------------------|-------------------------------|------------------------------------------------------------------------------------------------------|
-| `x-multi-statement` | `MultiStatement`              | Enable multiple statements to be ran in a single migration (See note above)                          |
+| `x-multi-statement` | `MultiStatement`              | Enable multiple statements to be run in a single migration (See note above)                          |
 | `user`              | Contained within `AuthConfig` | The user to sign in as                                                                               |
 | `password`          | Contained within `AuthConfig` | The user's password                                                                                  |
 | `host`              |                               | The host to connect to. Values that start with / are for unix domain sockets. (default is localhost) |
@@ -28,6 +28,6 @@ Here are possible connection URLs:
 
 ## Supported versions
 
-Neo4j v4.4 LTS and v5+ is supported.
+Neo4j v4.4 LTS and v5+ are supported.
 
 Make sure to check [End Of Life dates](https://neo4j.com/developer/kb/neo4j-supported-versions/) of Neo4j versions.

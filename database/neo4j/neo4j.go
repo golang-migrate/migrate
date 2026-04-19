@@ -98,6 +98,7 @@ func (n *Neo4j) Open(url string) (database.Driver, error) {
 	}
 
 	if err = driver.VerifyConnectivity(context.Background()); err != nil {
+		_ = driver.Close(context.Background())
 		return nil, err
 	}
 
@@ -168,7 +169,10 @@ func (n *Neo4j) Run(migration io.Reader) (err error) {
 		}); err != nil {
 			return err
 		}
-		return stmtRunErr
+		if stmtRunErr != nil {
+			return stmtRunErr
+		}
+		return tx.Commit(ctx)
 	}
 
 	body, err := io.ReadAll(migration)
@@ -219,6 +223,14 @@ ORDER BY COALESCE(sm.ts, datetime({year: 0})) DESC, sm.version DESC LIMIT 1`,
 		n.config.MigrationsLabel)
 
 	tx, err := session.BeginTransaction(ctx)
+	if err != nil {
+		return database.NilVersion, false, err
+	}
+	defer func() {
+		if cerr := tx.Close(ctx); cerr != nil {
+			err = errors.Join(err, cerr)
+		}
+	}()
 
 	result, err := tx.Run(ctx, query, nil)
 	if err != nil {
@@ -240,6 +252,10 @@ ORDER BY COALESCE(sm.ts, datetime({year: 0})) DESC, sm.version DESC LIMIT 1`,
 		}
 
 		return mr.Version, mr.Dirty, nil
+	}
+
+	if err := result.Err(); err != nil {
+		return database.NilVersion, false, err
 	}
 
 	return database.NilVersion, false, err
@@ -283,9 +299,8 @@ func (n *Neo4j) ensureVersionConstraint() (err error) {
 	}
 
 	/**
-	Get constraint and check to avoid error duplicate
-	using db.labels() to support Neo4j 3 and 4.
-	Neo4J 3 doesn't support db.constraints() YIELD name
+	Get constraint and check to avoid error duplicate.
+	Using db.labels() to support both Neo4j v4.4 LTS and v5+.
 	*/
 	result, err = session.Run(ctx, fmt.Sprintf("CALL db.labels() YIELD label WHERE label=\"%s\" RETURN label", n.config.MigrationsLabel), nil)
 	res, err = neo4j.CollectWithContext(ctx, result, err)
