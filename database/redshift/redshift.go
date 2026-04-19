@@ -13,9 +13,11 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"github.com/XSAM/otelsql"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/lib/pq"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 func init() {
@@ -97,7 +99,9 @@ func (p *Redshift) Open(ctx context.Context, url string) (database.Driver, error
 	}
 	purl.Scheme = "postgres"
 
-	db, err := sql.Open("postgres", migrate.FilterCustomQuery(purl).String())
+	db, err := otelsql.Open("postgres", migrate.FilterCustomQuery(purl).String(),
+		otelsql.WithAttributes(attribute.String("db.system", "redshift")),
+	)
 	if err != nil {
 		return nil, err
 	}

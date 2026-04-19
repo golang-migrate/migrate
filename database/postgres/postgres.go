@@ -15,10 +15,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/XSAM/otelsql"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/golang-migrate/migrate/v4/database/multistmt"
 	"github.com/lib/pq"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 func init() {
@@ -153,7 +155,9 @@ func (p *Postgres) Open(ctx context.Context, url string) (database.Driver, error
 		return nil, err
 	}
 
-	db, err := sql.Open("postgres", migrate.FilterCustomQuery(purl).String())
+	db, err := otelsql.Open("postgres", migrate.FilterCustomQuery(purl).String(),
+		otelsql.WithAttributes(attribute.String("db.system", "postgresql")),
+	)
 	if err != nil {
 		return nil, err
 	}

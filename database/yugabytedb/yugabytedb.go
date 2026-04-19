@@ -11,12 +11,14 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/XSAM/otelsql"
 	"github.com/cenkalti/backoff/v4"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgerrcode"
 	"github.com/lib/pq"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 const (
@@ -129,7 +131,9 @@ func (c *YugabyteDB) Open(ctx context.Context, dbURL string) (database.Driver, e
 	re := regexp.MustCompile("^(yugabyte(db)?|ysql)")
 	connectString := re.ReplaceAllString(migrate.FilterCustomQuery(purl).String(), "postgres")
 
-	db, err := sql.Open("postgres", connectString)
+	db, err := otelsql.Open("postgres", connectString,
+		otelsql.WithAttributes(attribute.String("db.system", "yugabytedb")),
+	)
 	if err != nil {
 		return nil, err
 	}

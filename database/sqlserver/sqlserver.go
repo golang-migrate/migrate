@@ -11,10 +11,12 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"github.com/XSAM/otelsql"
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 	mssql "github.com/microsoft/go-mssqldb" // mssql support
+	"go.opentelemetry.io/otel/attribute"
 )
 
 func init() {
@@ -156,10 +158,14 @@ func (ss *SQLServer) Open(ctx context.Context, url string) (database.Driver, err
 			return nil, err
 		}
 
-		db = sql.OpenDB(connector)
+		db = otelsql.OpenDB(connector,
+			otelsql.WithAttributes(attribute.String("db.system", "mssql")),
+		)
 
 	} else {
-		db, err = sql.Open("sqlserver", filteredURL)
+		db, err = otelsql.Open("sqlserver", filteredURL,
+			otelsql.WithAttributes(attribute.String("db.system", "mssql")),
+		)
 		if err != nil {
 			return nil, err
 		}

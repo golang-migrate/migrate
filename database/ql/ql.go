@@ -10,8 +10,10 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"github.com/XSAM/otelsql"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
+	"go.opentelemetry.io/otel/attribute"
 	_ "modernc.org/ql/driver"
 )
 
@@ -101,7 +103,9 @@ func (m *Ql) Open(ctx context.Context, url string) (database.Driver, error) {
 		return nil, err
 	}
 	dbfile := strings.Replace(migrate.FilterCustomQuery(purl).String(), "ql://", "", 1)
-	db, err := sql.Open("ql", dbfile)
+	db, err := otelsql.Open("ql", dbfile,
+		otelsql.WithAttributes(attribute.String("db.system", "ql")),
+	)
 	if err != nil {
 		return nil, err
 	}
