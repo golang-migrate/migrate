@@ -119,8 +119,8 @@ func TestOTelDriver_DbSystemAttribute(t *testing.T) {
 
 	snaps := exp.GetSpans().Snapshots()
 	require.Len(t, snaps, 1)
-	v, ok := attrVal(snaps[0], "db.system")
-	require.True(t, ok, "db.system attribute must be present on db.lock span")
+	v, ok := attrVal(snaps[0], "db.system.name")
+	require.True(t, ok, "db.system.name attribute must be present on db.lock span")
 	assert.Equal(t, "testdb", v)
 }
 
