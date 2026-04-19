@@ -20,7 +20,10 @@ import (
 	"github.com/golang-migrate/migrate/v4/database"
 
 	adminpb "cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/api/iterator"
+	"google.golang.org/api/option"
+	"google.golang.org/grpc"
 )
 
 func init() {
@@ -106,12 +109,12 @@ func (s *Spanner) Open(ctx context.Context, url string) (database.Driver, error)
 		return nil, err
 	}
 
-	adminClient, err := sdb.NewDatabaseAdminClient(ctx)
+	adminClient, err := sdb.NewDatabaseAdminClient(ctx, option.WithGRPCDialOption(grpc.WithStatsHandler(otelgrpc.NewClientHandler())))
 	if err != nil {
 		return nil, err
 	}
 	dbname := strings.Replace(migrate.FilterCustomQuery(purl).String(), "spanner://", "", 1)
-	dataClient, err := spanner.NewClient(ctx, dbname)
+	dataClient, err := spanner.NewClient(ctx, dbname, option.WithGRPCDialOption(grpc.WithStatsHandler(otelgrpc.NewClientHandler())))
 	if err != nil {
 		log.Fatal(err)
 	}
