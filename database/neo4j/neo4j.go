@@ -292,7 +292,7 @@ func (n *Neo4j) ensureVersionConstraint() (err error) {
 	}()
 
 	var neo4jVersion string
-	result, err := session.Run(ctx, "CALL dbms.components() YIELD name, versions UNWIND versions AS version WHERE name = 'Neo4j Kernel' RETURN version LIMIT 1", nil)
+	result, err := session.Run(ctx, "CALL dbms.components() YIELD name, versions UNWIND versions AS version WITH name, version WHERE name = 'Neo4j Kernel' RETURN version LIMIT 1", nil)
 	res, err := neo4j.CollectWithContext(ctx, result, err)
 	if err != nil {
 		return err
