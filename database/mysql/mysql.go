@@ -99,7 +99,7 @@ func WithConnection(ctx context.Context, conn *sql.Conn, config *Config) (*Mysql
 
 // instance must have `multiStatements` set to true
 func WithInstance(ctx context.Context, instance *sql.DB, config *Config) (database.Driver, error) {
-	if err := instance.Ping(); err != nil {
+	if err := instance.PingContext(ctx); err != nil {
 		return nil, err
 	}
 

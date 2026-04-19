@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	nurl "net/url"
 	"regexp"
 	"strconv"
@@ -116,7 +115,8 @@ func (s *Spanner) Open(ctx context.Context, url string) (database.Driver, error)
 	dbname := strings.Replace(migrate.FilterCustomQuery(purl).String(), "spanner://", "", 1)
 	dataClient, err := spanner.NewClient(ctx, dbname, option.WithGRPCDialOption(grpc.WithStatsHandler(otelgrpc.NewClientHandler())))
 	if err != nil {
-		log.Fatal(err)
+		_ = adminClient.Close()
+		return nil, err
 	}
 
 	migrationsTable := purl.Query().Get("x-migrations-table")

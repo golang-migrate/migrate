@@ -202,25 +202,29 @@ migrate emits [OpenTelemetry](https://opentelemetry.io) traces and metrics throu
 | `migrate.migrations.failed` | Counter | `{migration}` | Number of migrations that failed to apply |
 | `migrate.migration.run.duration` | Histogram | `s` | Execution duration of a single migration |
 
-**Common attributes:** `db.system`, `migrate.source`, `migrate.direction`, `migrate.version`, `migrate.target_version`, `migrate.identifier`.
+**Common attributes:** `db.system.name`, `migrate.source`, `migrate.direction`, `migrate.version`, `migrate.target_version`, `migrate.identifier`.
 
 ### Example
 
 ```go
 import (
+    "context"
+
+    "github.com/golang-migrate/migrate/v4"
     "go.opentelemetry.io/otel"
     sdktrace "go.opentelemetry.io/otel/sdk/trace"
     // ... your exporter of choice
 )
 
 // In your application setup:
+ctx := context.Background()
 tp := sdktrace.NewTracerProvider(
     sdktrace.WithBatcher(yourExporter),
 )
 otel.SetTracerProvider(tp)
 
 // migrate will now automatically emit spans and metrics.
-m, _ := migrate.New("file:///migrations", "postgres://...")
+m, _ := migrate.New(ctx, "file:///migrations", "postgres://...")
 m.Up(ctx) // emits traces and metrics
 ```
 
