@@ -9,10 +9,11 @@ import (
 	"path"
 	"strings"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/aws/aws-sdk-go/service/s3/s3iface"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-sdk-go-v2/otelaws"
+
 	"github.com/golang-migrate/migrate/v4/source"
 )
 
@@ -20,8 +21,14 @@ func init() {
 	source.Register("s3", &s3Driver{})
 }
 
+// s3APIClient is the subset of the S3 API used by this driver.
+type s3APIClient interface {
+	ListObjects(ctx context.Context, params *s3.ListObjectsInput, optFns ...func(*s3.Options)) (*s3.ListObjectsOutput, error)
+	GetObject(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options)) (*s3.GetObjectOutput, error)
+}
+
 type s3Driver struct {
-	s3client   s3iface.S3API
+	s3client   s3APIClient
 	config     *Config
 	migrations *source.Migrations
 }
@@ -37,15 +44,16 @@ func (s *s3Driver) Open(ctx context.Context, folder string) (source.Driver, erro
 		return nil, err
 	}
 
-	sess, err := session.NewSession()
+	cfg, err := awsconfig.LoadDefaultConfig(ctx)
 	if err != nil {
 		return nil, err
 	}
+	otelaws.AppendMiddlewares(&cfg.APIOptions)
 
-	return WithInstance(ctx, s3.New(sess), config)
+	return WithInstance(ctx, s3.NewFromConfig(cfg), config)
 }
 
-func WithInstance(ctx context.Context, s3client s3iface.S3API, config *Config) (source.Driver, error) {
+func WithInstance(ctx context.Context, s3client s3APIClient, config *Config) (source.Driver, error) {
 	driver := &s3Driver{
 		config:     config,
 		s3client:   s3client,
@@ -77,7 +85,7 @@ func parseURI(uri string) (*Config, error) {
 }
 
 func (s *s3Driver) loadMigrations(ctx context.Context) error {
-	output, err := s.s3client.ListObjectsWithContext(ctx, &s3.ListObjectsInput{
+	output, err := s.s3client.ListObjects(ctx, &s3.ListObjectsInput{
 		Bucket:    aws.String(s.config.Bucket),
 		Prefix:    aws.String(s.config.Prefix),
 		Delimiter: aws.String("/"),
@@ -86,13 +94,13 @@ func (s *s3Driver) loadMigrations(ctx context.Context) error {
 		return err
 	}
 	for _, object := range output.Contents {
-		_, fileName := path.Split(aws.StringValue(object.Key))
+		_, fileName := path.Split(aws.ToString(object.Key))
 		m, err := source.DefaultParse(fileName)
 		if err != nil {
 			continue
 		}
 		if !s.migrations.Append(m) {
-			return fmt.Errorf("unable to parse file %v", aws.StringValue(object.Key))
+			return fmt.Errorf("unable to parse file %v", aws.ToString(object.Key))
 		}
 	}
 	return nil
@@ -142,7 +150,7 @@ func (s *s3Driver) ReadDown(ctx context.Context, version uint) (io.ReadCloser, s
 
 func (s *s3Driver) open(ctx context.Context, m *source.Migration) (io.ReadCloser, string, error) {
 	key := path.Join(s.config.Prefix, m.Raw)
-	object, err := s.s3client.GetObjectWithContext(ctx, &s3.GetObjectInput{
+	object, err := s.s3client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(s.config.Bucket),
 		Key:    aws.String(key),
 	})
