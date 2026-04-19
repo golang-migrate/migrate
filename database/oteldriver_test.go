@@ -31,7 +31,7 @@ func setGlobalTP(t *testing.T, tp *sdktrace.TracerProvider) {
 // newTestDriver installs tp as the global provider, then returns an OTelDriver
 // wrapping a fresh in-memory stub. The inner *dStub.Stub is also returned for
 // state inspection.
-func newTestDriver(t *testing.T, tp *sdktrace.TracerProvider) (database.Driver, *dStub.Stub) {
+func newTestDriver(t *testing.T, tp *sdktrace.TracerProvider) database.Driver {
 	t.Helper()
 	setGlobalTP(t, tp)
 
@@ -39,8 +39,7 @@ func newTestDriver(t *testing.T, tp *sdktrace.TracerProvider) (database.Driver, 
 	inner, err := (&dStub.Stub{}).Open(ctx, "stub://")
 	require.NoError(t, err)
 
-	drv := database.NewOTelDriver(inner, "testdb")
-	return drv, inner.(*dStub.Stub)
+	return database.NewOTelDriver(inner, "testdb")
 }
 
 func spanNames(spans []sdktrace.ReadOnlySpan) []string {
@@ -80,7 +79,7 @@ func TestOTelDriver_Unwrap(t *testing.T) {
 func TestOTelDriver_SpanNamesAndKind(t *testing.T) {
 	exp := tracetest.NewInMemoryExporter()
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exp))
-	drv, _ := newTestDriver(t, tp)
+	drv := newTestDriver(t, tp)
 	ctx := context.Background()
 
 	require.NoError(t, drv.Lock(ctx))
@@ -112,7 +111,7 @@ func TestOTelDriver_SpanNamesAndKind(t *testing.T) {
 func TestOTelDriver_DbSystemAttribute(t *testing.T) {
 	exp := tracetest.NewInMemoryExporter()
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exp))
-	drv, _ := newTestDriver(t, tp)
+	drv := newTestDriver(t, tp)
 	ctx := context.Background()
 
 	require.NoError(t, drv.Lock(ctx))
@@ -127,7 +126,7 @@ func TestOTelDriver_DbSystemAttribute(t *testing.T) {
 func TestOTelDriver_SetVersionAttributes(t *testing.T) {
 	exp := tracetest.NewInMemoryExporter()
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exp))
-	drv, _ := newTestDriver(t, tp)
+	drv := newTestDriver(t, tp)
 	ctx := context.Background()
 
 	require.NoError(t, drv.SetVersion(ctx, 42, true))
@@ -150,7 +149,7 @@ func TestOTelDriver_SetVersionAttributes(t *testing.T) {
 func TestOTelDriver_NoSpanForOpenAndClose(t *testing.T) {
 	exp := tracetest.NewInMemoryExporter()
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exp))
-	drv, _ := newTestDriver(t, tp)
+	drv := newTestDriver(t, tp)
 	ctx := context.Background()
 
 	// Open and Close must not emit spans.

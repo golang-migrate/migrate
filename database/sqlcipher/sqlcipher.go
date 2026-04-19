@@ -29,7 +29,7 @@ import (
 
 type execerContextConn struct {
 	driver.Conn
-	execer driver.Execer
+	execer driver.Execer //nolint:staticcheck
 }
 
 func (c *execerContextConn) ExecContext(_ context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
@@ -49,7 +49,7 @@ func (d *execerContextDriver) Open(name string) (driver.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	if execer, ok := conn.(driver.Execer); ok {
+	if execer, ok := conn.(driver.Execer); ok { //nolint:staticcheck
 		return &execerContextConn{Conn: conn, execer: execer}, nil
 	}
 	return conn, nil

@@ -15,6 +15,12 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+const (
+	spanNameUp           = "migrate.up"
+	spanNameDown         = "migrate.down"
+	spanNameRunMigration = "migrate.run_migration"
+)
+
 // setupOtelTest creates a *Migrate instance wired to in-process OTel SDK providers
 // (in-memory span exporter + manual metric reader). It reuses sourceStubMigrations
 // defined in migrate_test.go (versions 1, 3, 4, 5, 7 — 4 up-migrations). The
@@ -116,13 +122,13 @@ func TestOtelUp_Spans(t *testing.T) {
 	spans := spanExporter.GetSpans().Snapshots()
 	names := spanNames(spans)
 
-	assert.Contains(t, names, "migrate.up")
-	assert.Contains(t, names, "migrate.run_migration")
+	assert.Contains(t, names, spanNameUp)
+	assert.Contains(t, names, spanNameRunMigration)
 
 	// sourceStubMigrations yields 5 migration attempts (versions 1, 3, 4, 5-empty, 7).
 	var runCount int
 	for _, s := range spans {
-		if s.Name() == "migrate.run_migration" {
+		if s.Name() == spanNameRunMigration {
 			runCount++
 		}
 	}
@@ -139,7 +145,7 @@ func TestOtelUp_ParentSpanAttributes(t *testing.T) {
 	spans := spanExporter.GetSpans().Snapshots()
 	var parentSpan sdktrace.ReadOnlySpan
 	for _, s := range spans {
-		if s.Name() == "migrate.up" {
+		if s.Name() == spanNameUp {
 			parentSpan = s
 			break
 		}
@@ -185,8 +191,8 @@ func TestOtelDown_Spans(t *testing.T) {
 	require.NoError(t, m.Down(context.Background()))
 
 	names := spanNames(spanExporter.GetSpans().Snapshots())
-	assert.Contains(t, names, "migrate.down")
-	assert.Contains(t, names, "migrate.run_migration")
+	assert.Contains(t, names, spanNameDown)
+	assert.Contains(t, names, spanNameRunMigration)
 }
 
 // TestOtelMigrate_Spans verifies Migrate() emits "migrate.migrate" with a version attribute.
@@ -277,7 +283,7 @@ func TestOtelNoChange_NoErrorSpan(t *testing.T) {
 	assert.Equal(t, ErrNoChange, err)
 
 	for _, s := range spanExporter.GetSpans().Snapshots() {
-		if s.Name() == "migrate.up" {
+		if s.Name() == spanNameUp {
 			// codes.Error == 2; must NOT be set for ErrNoChange.
 			assert.NotEqual(t, sdktrace.Status{Code: 2}, s.Status(),
 				"ErrNoChange must not produce an error span")
@@ -339,7 +345,7 @@ func TestOtelTraceTopology(t *testing.T) {
 	// Find migrate.up span.
 	var upSpanID trace.SpanID
 	for _, info := range byID {
-		if info.name == "migrate.up" {
+		if info.name == spanNameUp {
 			upSpanID = info.spanID
 			break
 		}
@@ -351,7 +357,7 @@ func TestOtelTraceTopology(t *testing.T) {
 	var foundRunMigr int
 	var foundRunMigrWithDBRun int
 	for _, info := range byID {
-		if info.name != "migrate.run_migration" {
+		if info.name != spanNameRunMigration {
 			continue
 		}
 		foundRunMigr++
