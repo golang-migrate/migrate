@@ -13,6 +13,7 @@ import (
 
 	"github.com/golang-migrate/migrate/v4/source"
 	"github.com/xanzy/go-gitlab"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 func init() {
@@ -59,7 +60,7 @@ func (g *Gitlab) Open(ctx context.Context, url string) (source.Driver, error) {
 	}
 
 	gn := &Gitlab{
-		client:     gitlab.NewClient(nil, password),
+		client:     gitlab.NewClient(&http.Client{Transport: otelhttp.NewTransport(http.DefaultTransport)}, password),
 		url:        url,
 		migrations: source.NewMigrations(),
 	}

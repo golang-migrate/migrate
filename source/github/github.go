@@ -14,6 +14,7 @@ import (
 
 	"github.com/golang-migrate/migrate/v4/source"
 	"github.com/google/go-github/v39/github"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 func init() {
@@ -48,7 +49,8 @@ func (g *Github) Open(ctx context.Context, url string) (source.Driver, error) {
 		return nil, err
 	}
 
-	// client defaults to http.DefaultClient
+	// client defaults to an otelhttp-instrumented client
+	base := &http.Client{Transport: otelhttp.NewTransport(http.DefaultTransport)}
 	var client *http.Client
 	if u.User != nil {
 		password, ok := u.User.Password()
@@ -58,8 +60,11 @@ func (g *Github) Open(ctx context.Context, url string) (source.Driver, error) {
 		ts := oauth2.StaticTokenSource(
 			&oauth2.Token{AccessToken: password},
 		)
+		ctx = context.WithValue(ctx, oauth2.HTTPClient, base)
 		client = oauth2.NewClient(ctx, ts)
 
+	} else {
+		client = base
 	}
 
 	gn := &Github{

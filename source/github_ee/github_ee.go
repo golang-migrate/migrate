@@ -13,6 +13,7 @@ import (
 	gh "github.com/golang-migrate/migrate/v4/source/github"
 
 	"github.com/google/go-github/v39/github"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 func init() {
@@ -85,7 +86,7 @@ func (g *GithubEE) createGithubClient(host, username, password string, verifyTLS
 	apiHost := fmt.Sprintf("https://%s/api/v3", host)
 	uploadHost := fmt.Sprintf("https://uploads.%s", host)
 
-	return github.NewEnterpriseClient(apiHost, uploadHost, tr.Client())
+	return github.NewEnterpriseClient(apiHost, uploadHost, &http.Client{Transport: otelhttp.NewTransport(tr)})
 }
 
 func parseBool(val string, fallback bool) bool {
