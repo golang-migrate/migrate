@@ -15,6 +15,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/metric"
+	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/golang-migrate/migrate/v4/database"
@@ -85,9 +86,8 @@ type Migrate struct {
 	// but can be set per Migrate instance.
 	LockTimeout time.Duration
 
-	// otel holds the tracer, meter, and pre-created metric instruments.
+	// otel holds the tracer and pre-created metric instruments.
 	otelTracer      trace.Tracer
-	otelMeter       metric.Meter
 	otelInstruments otelInstruments
 }
 
@@ -199,7 +199,6 @@ func newCommon() *Migrate {
 		LockTimeout:        DefaultLockTimeout,
 		isLockedMu:         &sync.Mutex{},
 		otelTracer:         newTracer(),
-		otelMeter:          meter,
 		otelInstruments:    newOtelInstruments(meter),
 	}
 }
@@ -207,7 +206,7 @@ func newCommon() *Migrate {
 // otelAttrs returns the common OTel attributes shared by all spans and metrics.
 func (m *Migrate) otelAttrs() []attribute.KeyValue {
 	return []attribute.KeyValue{
-		attribute.String("db.system", m.databaseDriverName),
+		semconv.DBSystemNameKey.String(m.databaseDriverName),
 		attribute.String("migrate.source", m.sourceName),
 	}
 }
@@ -876,9 +875,9 @@ func (m *Migrate) runMigrations(ctx context.Context, ret <-chan interface{}) err
 					childSpan.End()
 					return err
 				}
+				dur := time.Since(runStart).Seconds()
+				m.otelInstruments.migrationRunDuration.Record(childCtx, dur, metricAttrs)
 			}
-			dur := time.Since(runStart).Seconds()
-			m.otelInstruments.migrationRunDuration.Record(childCtx, dur, metricAttrs)
 
 			// set clean state
 			if err := m.databaseDrv.SetVersion(childCtx, migr.TargetVersion, false); err != nil {

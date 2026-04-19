@@ -7,11 +7,9 @@ import (
 )
 
 const (
-	// tracerName is the instrumentation scope name used when creating the tracer.
-	tracerName = "github.com/golang-migrate/migrate/v4"
-
-	// meterName is the instrumentation scope name used when creating the meter.
-	meterName = "github.com/golang-migrate/migrate/v4"
+	// instrumentationName is the instrumentation scope name used when creating
+	// the tracer and meter.
+	instrumentationName = "github.com/golang-migrate/migrate/v4"
 )
 
 // otelInstruments holds pre-created OTel metric instruments for a Migrate instance.
@@ -59,10 +57,10 @@ func newOtelInstruments(meter metric.Meter) otelInstruments {
 
 // newTracer returns a tracer from the global TracerProvider.
 func newTracer() trace.Tracer {
-	return otel.GetTracerProvider().Tracer(tracerName)
+	return otel.GetTracerProvider().Tracer(instrumentationName)
 }
 
 // newMeter returns a meter from the global MeterProvider.
 func newMeter() metric.Meter {
-	return otel.GetMeterProvider().Meter(meterName)
+	return otel.GetMeterProvider().Meter(instrumentationName)
 }

@@ -42,9 +42,9 @@ sourceStub(m).Migrations = sourceStubMigrations
 
 // Replace global-provider instruments with test-provider instruments so
 // assertions are isolated to this test run.
-m.otelTracer = tp.Tracer(tracerName)
-m.otelMeter = mp.Meter(meterName)
-m.otelInstruments = newOtelInstruments(m.otelMeter)
+m.otelTracer = tp.Tracer(instrumentationName)
+meter := mp.Meter(instrumentationName)
+m.otelInstruments = newOtelInstruments(meter)
 
 cleanup = func() {
 _ = tp.Shutdown(context.Background())
@@ -307,7 +307,7 @@ require.NoError(t, err)
 sourceStub(m).Migrations = sourceStubMigrations
 
 // Replace the core tracer so it uses the same test provider.
-m.otelTracer = tp.Tracer(tracerName)
+m.otelTracer = tp.Tracer(instrumentationName)
 return m, exp
 }
 
