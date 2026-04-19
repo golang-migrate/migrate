@@ -16,7 +16,7 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/golang-migrate/migrate/v4/database/multistmt"
-	"go.opentelemetry.io/otel/attribute"
+	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 )
 
 var (
@@ -77,7 +77,7 @@ func (ch *ClickHouse) Open(ctx context.Context, dsn string) (database.Driver, er
 	q := migrate.FilterCustomQuery(purl)
 	q.Scheme = "tcp"
 	conn, err := otelsql.Open("clickhouse", q.String(),
-		otelsql.WithAttributes(attribute.String("db.system", "clickhouse")),
+		otelsql.WithAttributes(semconv.DBSystemNameClickHouse),
 	)
 	if err != nil {
 		return nil, err

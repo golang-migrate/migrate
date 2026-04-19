@@ -20,7 +20,7 @@ import (
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/golang-migrate/migrate/v4/database/multistmt"
 	"github.com/lib/pq"
-	"go.opentelemetry.io/otel/attribute"
+	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 )
 
 func init() {
@@ -156,7 +156,7 @@ func (p *Postgres) Open(ctx context.Context, url string) (database.Driver, error
 	}
 
 	db, err := otelsql.Open("postgres", migrate.FilterCustomQuery(purl).String(),
-		otelsql.WithAttributes(attribute.String("db.system", "postgresql")),
+		otelsql.WithAttributes(semconv.DBSystemNamePostgreSQL),
 	)
 	if err != nil {
 		return nil, err

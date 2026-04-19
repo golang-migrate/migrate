@@ -22,7 +22,7 @@ import (
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5/pgconn"
 	_ "github.com/jackc/pgx/v5/stdlib"
-	"go.opentelemetry.io/otel/attribute"
+	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 )
 
 func init() {
@@ -150,7 +150,7 @@ func (p *Postgres) Open(ctx context.Context, url string) (database.Driver, error
 	purl.Scheme = "postgres"
 
 	db, err := otelsql.Open("pgx/v5", migrate.FilterCustomQuery(purl).String(),
-		otelsql.WithAttributes(attribute.String("db.system", "postgresql")),
+		otelsql.WithAttributes(semconv.DBSystemNamePostgreSQL),
 	)
 	if err != nil {
 		return nil, err

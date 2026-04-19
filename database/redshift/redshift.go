@@ -17,7 +17,7 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/lib/pq"
-	"go.opentelemetry.io/otel/attribute"
+	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 )
 
 func init() {
@@ -100,7 +100,7 @@ func (p *Redshift) Open(ctx context.Context, url string) (database.Driver, error
 	purl.Scheme = "postgres"
 
 	db, err := otelsql.Open("postgres", migrate.FilterCustomQuery(purl).String(),
-		otelsql.WithAttributes(attribute.String("db.system", "redshift")),
+		otelsql.WithAttributes(semconv.DBSystemNameAWSRedshift),
 	)
 	if err != nil {
 		return nil, err

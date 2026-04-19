@@ -14,7 +14,7 @@ import (
 	"github.com/XSAM/otelsql"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
-	"go.opentelemetry.io/otel/attribute"
+	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 	_ "github.com/nakagami/firebirdsql"
 )
 
@@ -83,7 +83,7 @@ func (f *Firebird) Open(ctx context.Context, dsn string) (database.Driver, error
 	}
 
 	db, err := otelsql.Open("firebirdsql", migrate.FilterCustomQuery(purl).String(),
-		otelsql.WithAttributes(attribute.String("db.system", "firebird")),
+		otelsql.WithAttributes(semconv.DBSystemNameFirebirdSQL),
 	)
 	if err != nil {
 		return nil, err

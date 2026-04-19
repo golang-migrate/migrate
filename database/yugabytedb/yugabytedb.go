@@ -18,7 +18,7 @@ import (
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgerrcode"
 	"github.com/lib/pq"
-	"go.opentelemetry.io/otel/attribute"
+	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 )
 
 const (
@@ -132,7 +132,7 @@ func (c *YugabyteDB) Open(ctx context.Context, dbURL string) (database.Driver, e
 	connectString := re.ReplaceAllString(migrate.FilterCustomQuery(purl).String(), "postgres")
 
 	db, err := otelsql.Open("postgres", connectString,
-		otelsql.WithAttributes(attribute.String("db.system", "yugabytedb")),
+		otelsql.WithAttributes(semconv.DBSystemNameKey.String("yugabytedb")),
 	)
 	if err != nil {
 		return nil, err
