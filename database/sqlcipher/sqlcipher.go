@@ -3,18 +3,74 @@ package sqlcipher
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"fmt"
 	"io"
 	nurl "net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 
+	"github.com/XSAM/otelsql"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
+	"go.opentelemetry.io/otel/attribute"
 	_ "github.com/mutecomm/go-sqlcipher/v4"
 )
+
+// go-sqlcipher/v4 implements the deprecated driver.Execer interface but not
+// driver.ExecerContext. Without ExecerContext, database/sql falls back to
+// Prepare+Exec which only prepares the first statement in a multi-statement
+// query string, breaking NoTxWrap migrations (e.g. "BEGIN; ...; COMMIT;").
+// execerContextConn and execerContextDriver promote Execer → ExecerContext so
+// that otelsql can wrap the connection while preserving multi-statement support.
+
+type execerContextConn struct {
+	driver.Conn
+	execer driver.Execer
+}
+
+func (c *execerContextConn) ExecContext(_ context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
+	dargs := make([]driver.Value, len(args))
+	for i, nv := range args {
+		dargs[i] = nv.Value
+	}
+	return c.execer.Exec(query, dargs)
+}
+
+type execerContextDriver struct {
+	driver.Driver
+}
+
+func (d *execerContextDriver) Open(name string) (driver.Conn, error) {
+	conn, err := d.Driver.Open(name)
+	if err != nil {
+		return nil, err
+	}
+	if execer, ok := conn.(driver.Execer); ok {
+		return &execerContextConn{Conn: conn, execer: execer}, nil
+	}
+	return conn, nil
+}
+
+const sqlcipherWrappedDriver = "sqlite3-sqlcipher-otel"
+
+var registerDriverOnce sync.Once
+
+// wrappedSQLCipherDriverName returns the name of the go-sqlcipher driver wrapped
+// with execerContextDriver, registering it on the first call.
+func wrappedSQLCipherDriverName() string {
+	registerDriverOnce.Do(func() {
+		// sql.Open is lazy; it does not open a connection, just resolves the driver.
+		db, _ := sql.Open("sqlite3", ":memory:")
+		drv := db.Driver()
+		_ = db.Close()
+		sql.Register(sqlcipherWrappedDriver, &execerContextDriver{drv})
+	})
+	return sqlcipherWrappedDriver
+}
 
 func init() {
 	database.Register("sqlcipher", &Sqlite{})
@@ -94,7 +150,9 @@ func (m *Sqlite) Open(ctx context.Context, url string) (database.Driver, error) 
 		return nil, err
 	}
 	dbfile := strings.Replace(migrate.FilterCustomQuery(purl).String(), "sqlite3://", "", 1)
-	db, err := sql.Open("sqlite3", dbfile)
+	db, err := otelsql.Open(wrappedSQLCipherDriverName(), dbfile,
+		otelsql.WithAttributes(attribute.String("db.system", "sqlite")),
+	)
 	if err != nil {
 		return nil, err
 	}
