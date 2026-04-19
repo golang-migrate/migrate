@@ -1,6 +1,7 @@
 package googlecloudstorage
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/url"
@@ -9,9 +10,11 @@ import (
 	"strings"
 
 	"cloud.google.com/go/storage"
-	"context"
 	"github.com/golang-migrate/migrate/v4/source"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/api/iterator"
+	"google.golang.org/api/option"
+	"google.golang.org/grpc"
 )
 
 func init() {
@@ -19,34 +22,36 @@ func init() {
 }
 
 type gcs struct {
+	client     *storage.Client
 	bucket     *storage.BucketHandle
 	prefix     string
 	migrations *source.Migrations
 }
 
-func (g *gcs) Open(folder string) (source.Driver, error) {
+func (g *gcs) Open(ctx context.Context, folder string) (source.Driver, error) {
 	u, err := url.Parse(folder)
 	if err != nil {
 		return nil, err
 	}
-	client, err := storage.NewClient(context.Background())
+	client, err := storage.NewClient(ctx, option.WithGRPCDialOption(grpc.WithStatsHandler(otelgrpc.NewClientHandler())))
 	if err != nil {
 		return nil, err
 	}
 	driver := gcs{
+		client:     client,
 		bucket:     client.Bucket(u.Host),
 		prefix:     strings.Trim(u.Path, "/") + "/",
 		migrations: source.NewMigrations(),
 	}
-	err = driver.loadMigrations()
-	if err != nil {
+	if err = driver.loadMigrations(ctx); err != nil {
+		_ = client.Close()
 		return nil, err
 	}
 	return &driver, nil
 }
 
-func (g *gcs) loadMigrations() error {
-	iter := g.bucket.Objects(context.Background(), &storage.Query{
+func (g *gcs) loadMigrations(ctx context.Context) error {
+	iter := g.bucket.Objects(ctx, &storage.Query{
 		Prefix:    g.prefix,
 		Delimiter: "/",
 	})
@@ -67,51 +72,51 @@ func (g *gcs) loadMigrations() error {
 	return nil
 }
 
-func (g *gcs) Close() error {
-	return nil
+func (g *gcs) Close(ctx context.Context) error {
+	return g.client.Close()
 }
 
-func (g *gcs) First() (uint, error) {
-	v, ok := g.migrations.First()
+func (g *gcs) First(ctx context.Context) (uint, error) {
+	v, ok := g.migrations.First(ctx)
 	if !ok {
 		return 0, os.ErrNotExist
 	}
 	return v, nil
 }
 
-func (g *gcs) Prev(version uint) (uint, error) {
-	v, ok := g.migrations.Prev(version)
+func (g *gcs) Prev(ctx context.Context, version uint) (uint, error) {
+	v, ok := g.migrations.Prev(ctx, version)
 	if !ok {
 		return 0, os.ErrNotExist
 	}
 	return v, nil
 }
 
-func (g *gcs) Next(version uint) (uint, error) {
-	v, ok := g.migrations.Next(version)
+func (g *gcs) Next(ctx context.Context, version uint) (uint, error) {
+	v, ok := g.migrations.Next(ctx, version)
 	if !ok {
 		return 0, os.ErrNotExist
 	}
 	return v, nil
 }
 
-func (g *gcs) ReadUp(version uint) (io.ReadCloser, string, error) {
-	if m, ok := g.migrations.Up(version); ok {
-		return g.open(m)
+func (g *gcs) ReadUp(ctx context.Context, version uint) (io.ReadCloser, string, error) {
+	if m, ok := g.migrations.Up(ctx, version); ok {
+		return g.open(ctx, m)
 	}
 	return nil, "", os.ErrNotExist
 }
 
-func (g *gcs) ReadDown(version uint) (io.ReadCloser, string, error) {
-	if m, ok := g.migrations.Down(version); ok {
-		return g.open(m)
+func (g *gcs) ReadDown(ctx context.Context, version uint) (io.ReadCloser, string, error) {
+	if m, ok := g.migrations.Down(ctx, version); ok {
+		return g.open(ctx, m)
 	}
 	return nil, "", os.ErrNotExist
 }
 
-func (g *gcs) open(m *source.Migration) (io.ReadCloser, string, error) {
+func (g *gcs) open(ctx context.Context, m *source.Migration) (io.ReadCloser, string, error) {
 	objectPath := path.Join(g.prefix, m.Raw)
-	reader, err := g.bucket.Object(objectPath).NewReader(context.Background())
+	reader, err := g.bucket.Object(objectPath).NewReader(ctx)
 	if err != nil {
 		return nil, "", err
 	}

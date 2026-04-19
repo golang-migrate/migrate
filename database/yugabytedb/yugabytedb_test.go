@@ -79,7 +79,7 @@ func createDB(t *testing.T, c dktest.ContainerInfo) {
 		}
 	}()
 
-	if _, err = db.Exec("CREATE DATABASE migrate"); err != nil {
+	if _, err = db.ExecContext(context.Background(), "CREATE DATABASE migrate"); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -110,6 +110,7 @@ func test(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, ci dktest.ContainerInfo) {
 		createDB(t, ci)
 
+		ctx := context.Background()
 		ip, port, err := ci.Port(defaultPort)
 		if err != nil {
 			t.Fatal(err)
@@ -117,7 +118,7 @@ func test(t *testing.T) {
 
 		addr := getConnectionString(ip, port)
 		c := &YugabyteDB{}
-		d, err := c.Open(addr)
+		d, err := c.Open(ctx, addr)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -129,6 +130,7 @@ func testMigrate(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, ci dktest.ContainerInfo) {
 		createDB(t, ci)
 
+		ctx := context.Background()
 		ip, port, err := ci.Port(defaultPort)
 		if err != nil {
 			t.Fatal(err)
@@ -136,12 +138,12 @@ func testMigrate(t *testing.T) {
 
 		addr := getConnectionString(ip, port)
 		c := &YugabyteDB{}
-		d, err := c.Open(addr)
+		d, err := c.Open(ctx, addr)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "migrate", d)
+		m, err := migrate.NewWithDatabaseInstance(ctx, "file://./examples/migrations", "migrate", d)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -153,6 +155,7 @@ func testMultiStatement(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, ci dktest.ContainerInfo) {
 		createDB(t, ci)
 
+		ctx := context.Background()
 		ip, port, err := ci.Port(defaultPort)
 		if err != nil {
 			t.Fatal(err)
@@ -160,11 +163,11 @@ func testMultiStatement(t *testing.T) {
 
 		addr := getConnectionString(ip, port)
 		c := &YugabyteDB{}
-		d, err := c.Open(addr)
+		d, err := c.Open(ctx, addr)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := d.Run(strings.NewReader("CREATE TABLE foo (foo text); CREATE TABLE bar (bar text);")); err != nil {
+		if err := d.Run(ctx, strings.NewReader("CREATE TABLE foo (foo text); CREATE TABLE bar (bar text);")); err != nil {
 			t.Fatalf("expected err to be nil, got %v", err)
 		}
 
@@ -183,6 +186,7 @@ func testFilterCustomQuery(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, ci dktest.ContainerInfo) {
 		createDB(t, ci)
 
+		ctx := context.Background()
 		ip, port, err := ci.Port(defaultPort)
 		if err != nil {
 			t.Fatal(err)
@@ -190,7 +194,7 @@ func testFilterCustomQuery(t *testing.T) {
 
 		addr := getConnectionString(ip, port, "x-custom=foobar")
 		c := &YugabyteDB{}
-		d, err := c.Open(addr)
+		d, err := c.Open(ctx, addr)
 		if err != nil {
 			t.Fatal(err)
 		}

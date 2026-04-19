@@ -5,6 +5,7 @@
 package source
 
 import (
+	"context"
 	"fmt"
 	"io"
 	nurl "net/url"
@@ -36,44 +37,44 @@ type Driver interface {
 	// Open returns a new driver instance configured with parameters
 	// coming from the URL string. Migrate will call this function
 	// only once per instance.
-	Open(url string) (Driver, error)
+	Open(ctx context.Context, url string) (Driver, error)
 
 	// Close closes the underlying source instance managed by the driver.
 	// Migrate will call this function only once per instance.
-	Close() error
+	Close(ctx context.Context) error
 
 	// First returns the very first migration version available to the driver.
 	// Migrate will call this function multiple times.
 	// If there is no version available, it must return os.ErrNotExist.
-	First() (version uint, err error)
+	First(ctx context.Context) (version uint, err error)
 
 	// Prev returns the previous version for a given version available to the driver.
 	// Migrate will call this function multiple times.
 	// If there is no previous version available, it must return os.ErrNotExist.
-	Prev(version uint) (prevVersion uint, err error)
+	Prev(ctx context.Context, version uint) (prevVersion uint, err error)
 
 	// Next returns the next version for a given version available to the driver.
 	// Migrate will call this function multiple times.
 	// If there is no next version available, it must return os.ErrNotExist.
-	Next(version uint) (nextVersion uint, err error)
+	Next(ctx context.Context, version uint) (nextVersion uint, err error)
 
 	// ReadUp returns the UP migration body and an identifier that helps
 	// finding this migration in the source for a given version.
 	// If there is no up migration available for this version,
 	// it must return os.ErrNotExist.
 	// Do not start reading, just return the ReadCloser!
-	ReadUp(version uint) (r io.ReadCloser, identifier string, err error)
+	ReadUp(ctx context.Context, version uint) (r io.ReadCloser, identifier string, err error)
 
 	// ReadDown returns the DOWN migration body and an identifier that helps
 	// finding this migration in the source for a given version.
 	// If there is no down migration available for this version,
 	// it must return os.ErrNotExist.
 	// Do not start reading, just return the ReadCloser!
-	ReadDown(version uint) (r io.ReadCloser, identifier string, err error)
+	ReadDown(ctx context.Context, version uint) (r io.ReadCloser, identifier string, err error)
 }
 
 // Open returns a new driver instance.
-func Open(url string) (Driver, error) {
+func Open(ctx context.Context, url string) (Driver, error) {
 	u, err := nurl.Parse(url)
 	if err != nil {
 		return nil, err
@@ -90,7 +91,7 @@ func Open(url string) (Driver, error) {
 		return nil, fmt.Errorf("source driver: unknown driver '%s' (forgotten import?)", u.Scheme)
 	}
 
-	return d.Open(url)
+	return d.Open(ctx, url)
 }
 
 // Register globally registers a driver.

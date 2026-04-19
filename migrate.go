@@ -5,11 +5,18 @@
 package migrate
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"sync"
 	"time"
+
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/metric"
+	semconv "go.opentelemetry.io/otel/semconv/v1.39.0"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/golang-migrate/migrate/v4/database"
 	iurl "github.com/golang-migrate/migrate/v4/internal/url"
@@ -78,11 +85,15 @@ type Migrate struct {
 	// LockTimeout defaults to DefaultLockTimeout,
 	// but can be set per Migrate instance.
 	LockTimeout time.Duration
+
+	// otel holds the tracer and pre-created metric instruments.
+	otelTracer      trace.Tracer
+	otelInstruments otelInstruments
 }
 
 // New returns a new Migrate instance from a source URL and a database URL.
 // The URL scheme is defined by each driver.
-func New(sourceURL, databaseURL string) (*Migrate, error) {
+func New(ctx context.Context, sourceURL, databaseURL string) (*Migrate, error) {
 	m := newCommon()
 
 	sourceName, err := iurl.SchemeFromURL(sourceURL)
@@ -97,17 +108,17 @@ func New(sourceURL, databaseURL string) (*Migrate, error) {
 	}
 	m.databaseDriverName = databaseDriverName
 
-	sourceDrv, err := source.Open(sourceURL)
+	sourceDrv, err := source.Open(ctx, sourceURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open source, %q: %w", sourceURL, err)
 	}
-	m.sourceDrv = sourceDrv
+	m.sourceDrv = source.NewOTelDriver(sourceDrv, sourceName)
 
-	databaseDrv, err := database.Open(databaseURL)
+	databaseDrv, err := database.Open(ctx, databaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
-	m.databaseDrv = databaseDrv
+	m.databaseDrv = database.NewOTelDriver(databaseDrv, databaseDriverName)
 
 	return m, nil
 }
@@ -116,7 +127,7 @@ func New(sourceURL, databaseURL string) (*Migrate, error) {
 // and an existing database instance. The source URL scheme is defined by each driver.
 // Use any string that can serve as an identifier during logging as databaseDriverName.
 // You are responsible for closing the underlying database client if necessary.
-func NewWithDatabaseInstance(sourceURL string, databaseDriverName string, databaseInstance database.Driver) (*Migrate, error) {
+func NewWithDatabaseInstance(ctx context.Context, sourceURL string, databaseDriverName string, databaseInstance database.Driver) (*Migrate, error) {
 	m := newCommon()
 
 	sourceName, err := iurl.SchemeFromURL(sourceURL)
@@ -127,13 +138,13 @@ func NewWithDatabaseInstance(sourceURL string, databaseDriverName string, databa
 
 	m.databaseDriverName = databaseDriverName
 
-	sourceDrv, err := source.Open(sourceURL)
+	sourceDrv, err := source.Open(ctx, sourceURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open source, %q: %w", sourceURL, err)
 	}
-	m.sourceDrv = sourceDrv
+	m.sourceDrv = source.NewOTelDriver(sourceDrv, sourceName)
 
-	m.databaseDrv = databaseInstance
+	m.databaseDrv = database.NewOTelDriver(databaseInstance, databaseDriverName)
 
 	return m, nil
 }
@@ -142,7 +153,7 @@ func NewWithDatabaseInstance(sourceURL string, databaseDriverName string, databa
 // and a database URL. The database URL scheme is defined by each driver.
 // Use any string that can serve as an identifier during logging as sourceName.
 // You are responsible for closing the underlying source client if necessary.
-func NewWithSourceInstance(sourceName string, sourceInstance source.Driver, databaseURL string) (*Migrate, error) {
+func NewWithSourceInstance(ctx context.Context, sourceName string, sourceInstance source.Driver, databaseURL string) (*Migrate, error) {
 	m := newCommon()
 
 	databaseDriverName, err := iurl.SchemeFromURL(databaseURL)
@@ -153,13 +164,13 @@ func NewWithSourceInstance(sourceName string, sourceInstance source.Driver, data
 
 	m.sourceName = sourceName
 
-	databaseDrv, err := database.Open(databaseURL)
+	databaseDrv, err := database.Open(ctx, databaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
-	m.databaseDrv = databaseDrv
+	m.databaseDrv = database.NewOTelDriver(databaseDrv, databaseDriverName)
 
-	m.sourceDrv = sourceInstance
+	m.sourceDrv = source.NewOTelDriver(sourceInstance, sourceName)
 
 	return m, nil
 }
@@ -168,40 +179,68 @@ func NewWithSourceInstance(sourceName string, sourceInstance source.Driver, data
 // database instance. Use any string that can serve as an identifier during logging
 // as sourceName and databaseDriverName. You are responsible for closing down
 // the underlying source and database client if necessary.
-func NewWithInstance(sourceName string, sourceInstance source.Driver, databaseDriverName string, databaseInstance database.Driver) (*Migrate, error) {
+func NewWithInstance(ctx context.Context, sourceName string, sourceInstance source.Driver, databaseDriverName string, databaseInstance database.Driver) (*Migrate, error) {
 	m := newCommon()
 
 	m.sourceName = sourceName
 	m.databaseDriverName = databaseDriverName
 
-	m.sourceDrv = sourceInstance
-	m.databaseDrv = databaseInstance
+	m.sourceDrv = source.NewOTelDriver(sourceInstance, sourceName)
+	m.databaseDrv = database.NewOTelDriver(databaseInstance, databaseDriverName)
 
 	return m, nil
 }
 
 func newCommon() *Migrate {
+	meter := newMeter()
 	return &Migrate{
 		GracefulStop:       make(chan bool, 1),
 		PrefetchMigrations: DefaultPrefetchMigrations,
 		LockTimeout:        DefaultLockTimeout,
 		isLockedMu:         &sync.Mutex{},
+		otelTracer:         newTracer(),
+		otelInstruments:    newOtelInstruments(meter),
 	}
 }
 
+// otelAttrs returns the common OTel attributes shared by all spans and metrics.
+func (m *Migrate) otelAttrs() []attribute.KeyValue {
+	return []attribute.KeyValue{
+		semconv.DBSystemNameKey.String(m.databaseDriverName),
+		attribute.String("migrate.source", m.sourceName),
+	}
+}
+
+// otelSpanSetError records the error on the span unless it is a benign sentinel
+// value (ErrNoChange, ErrNilVersion) that does not indicate a system failure.
+func otelSpanSetError(span trace.Span, err error) {
+	if err == nil || errors.Is(err, ErrNoChange) || errors.Is(err, ErrNilVersion) {
+		return
+	}
+	span.RecordError(err)
+	// Avoid leaking migration SQL (from database.Error.Query) into traces.
+	// Record only the underlying cause when available.
+	msg := err.Error()
+	var dbErr database.Error
+	if errors.As(err, &dbErr) && dbErr.OrigErr != nil {
+		msg = dbErr.OrigErr.Error()
+	}
+	span.SetStatus(codes.Error, msg)
+}
+
 // Close closes the source and the database.
-func (m *Migrate) Close() (source error, database error) {
+func (m *Migrate) Close(ctx context.Context) (source error, database error) {
 	databaseSrvClose := make(chan error)
 	sourceSrvClose := make(chan error)
 
 	m.logVerbosePrintf("Closing source and database\n")
 
 	go func() {
-		databaseSrvClose <- m.databaseDrv.Close()
+		databaseSrvClose <- m.databaseDrv.Close(ctx)
 	}()
 
 	go func() {
-		sourceSrvClose <- m.sourceDrv.Close()
+		sourceSrvClose <- m.sourceDrv.Close(ctx)
 	}()
 
 	return <-sourceSrvClose, <-databaseSrvClose
@@ -209,131 +248,192 @@ func (m *Migrate) Close() (source error, database error) {
 
 // Migrate looks at the currently active migration version,
 // then migrates either up or down to the specified version.
-func (m *Migrate) Migrate(version uint) error {
-	if err := m.lock(); err != nil {
+func (m *Migrate) Migrate(ctx context.Context, version uint) (retErr error) {
+	ctx, span := m.otelTracer.Start(ctx, "migrate.migrate",
+		trace.WithSpanKind(trace.SpanKindInternal),
+		trace.WithAttributes(append(m.otelAttrs(), attribute.Int64("migrate.version", int64(version)))...),
+	)
+	defer func() {
+		otelSpanSetError(span, retErr)
+		span.End()
+	}()
+
+	if err := m.lock(ctx); err != nil {
 		return err
 	}
 
-	curVersion, dirty, err := m.databaseDrv.Version()
+	curVersion, dirty, err := m.databaseDrv.Version(ctx)
 	if err != nil {
-		return m.unlockErr(err)
+		return m.unlockErr(ctx, err)
 	}
 
 	if dirty {
-		return m.unlockErr(ErrDirty{curVersion})
+		return m.unlockErr(ctx, ErrDirty{curVersion})
 	}
 
 	ret := make(chan interface{}, m.PrefetchMigrations)
-	go m.read(curVersion, int(version), ret)
+	go m.read(ctx, curVersion, int(version), ret)
 
-	return m.unlockErr(m.runMigrations(ret))
+	return m.unlockErr(ctx, m.runMigrations(ctx, ret))
 }
 
 // Steps looks at the currently active migration version.
 // It will migrate up if n > 0, and down if n < 0.
-func (m *Migrate) Steps(n int) error {
+func (m *Migrate) Steps(ctx context.Context, n int) (retErr error) {
 	if n == 0 {
 		return ErrNoChange
 	}
 
-	if err := m.lock(); err != nil {
+	direction := "up"
+	if n < 0 {
+		direction = "down"
+	}
+	ctx, span := m.otelTracer.Start(ctx, "migrate.steps",
+		trace.WithSpanKind(trace.SpanKindInternal),
+		trace.WithAttributes(append(m.otelAttrs(),
+			attribute.String("migrate.direction", direction),
+			attribute.Int("migrate.steps", n),
+		)...),
+	)
+	defer func() {
+		otelSpanSetError(span, retErr)
+		span.End()
+	}()
+
+	if err := m.lock(ctx); err != nil {
 		return err
 	}
 
-	curVersion, dirty, err := m.databaseDrv.Version()
+	curVersion, dirty, err := m.databaseDrv.Version(ctx)
 	if err != nil {
-		return m.unlockErr(err)
+		return m.unlockErr(ctx, err)
 	}
 
 	if dirty {
-		return m.unlockErr(ErrDirty{curVersion})
+		return m.unlockErr(ctx, ErrDirty{curVersion})
 	}
 
 	ret := make(chan interface{}, m.PrefetchMigrations)
 
 	if n > 0 {
-		go m.readUp(curVersion, n, ret)
+		go m.readUp(ctx, curVersion, n, ret)
 	} else {
-		go m.readDown(curVersion, -n, ret)
+		go m.readDown(ctx, curVersion, -n, ret)
 	}
 
-	return m.unlockErr(m.runMigrations(ret))
+	return m.unlockErr(ctx, m.runMigrations(ctx, ret))
 }
 
 // Up looks at the currently active migration version
 // and will migrate all the way up (applying all up migrations).
-func (m *Migrate) Up() error {
-	if err := m.lock(); err != nil {
+func (m *Migrate) Up(ctx context.Context) (retErr error) {
+	ctx, span := m.otelTracer.Start(ctx, "migrate.up",
+		trace.WithSpanKind(trace.SpanKindInternal),
+		trace.WithAttributes(append(m.otelAttrs(), attribute.String("migrate.direction", "up"))...),
+	)
+	defer func() {
+		otelSpanSetError(span, retErr)
+		span.End()
+	}()
+
+	if err := m.lock(ctx); err != nil {
 		return err
 	}
 
-	curVersion, dirty, err := m.databaseDrv.Version()
+	curVersion, dirty, err := m.databaseDrv.Version(ctx)
 	if err != nil {
-		return m.unlockErr(err)
+		return m.unlockErr(ctx, err)
 	}
 
 	if dirty {
-		return m.unlockErr(ErrDirty{curVersion})
+		return m.unlockErr(ctx, ErrDirty{curVersion})
 	}
 
 	ret := make(chan interface{}, m.PrefetchMigrations)
 
-	go m.readUp(curVersion, -1, ret)
-	return m.unlockErr(m.runMigrations(ret))
+	go m.readUp(ctx, curVersion, -1, ret)
+	return m.unlockErr(ctx, m.runMigrations(ctx, ret))
 }
 
 // Down looks at the currently active migration version
 // and will migrate all the way down (applying all down migrations).
-func (m *Migrate) Down() error {
-	if err := m.lock(); err != nil {
+func (m *Migrate) Down(ctx context.Context) (retErr error) {
+	ctx, span := m.otelTracer.Start(ctx, "migrate.down",
+		trace.WithSpanKind(trace.SpanKindInternal),
+		trace.WithAttributes(append(m.otelAttrs(), attribute.String("migrate.direction", "down"))...),
+	)
+	defer func() {
+		otelSpanSetError(span, retErr)
+		span.End()
+	}()
+
+	if err := m.lock(ctx); err != nil {
 		return err
 	}
 
-	curVersion, dirty, err := m.databaseDrv.Version()
+	curVersion, dirty, err := m.databaseDrv.Version(ctx)
 	if err != nil {
-		return m.unlockErr(err)
+		return m.unlockErr(ctx, err)
 	}
 
 	if dirty {
-		return m.unlockErr(ErrDirty{curVersion})
+		return m.unlockErr(ctx, ErrDirty{curVersion})
 	}
 
 	ret := make(chan interface{}, m.PrefetchMigrations)
-	go m.readDown(curVersion, -1, ret)
-	return m.unlockErr(m.runMigrations(ret))
+	go m.readDown(ctx, curVersion, -1, ret)
+	return m.unlockErr(ctx, m.runMigrations(ctx, ret))
 }
 
 // Drop deletes everything in the database.
-func (m *Migrate) Drop() error {
-	if err := m.lock(); err != nil {
+func (m *Migrate) Drop(ctx context.Context) (retErr error) {
+	ctx, span := m.otelTracer.Start(ctx, "migrate.drop",
+		trace.WithSpanKind(trace.SpanKindInternal),
+		trace.WithAttributes(m.otelAttrs()...),
+	)
+	defer func() {
+		otelSpanSetError(span, retErr)
+		span.End()
+	}()
+
+	if err := m.lock(ctx); err != nil {
 		return err
 	}
-	if err := m.databaseDrv.Drop(); err != nil {
-		return m.unlockErr(err)
+	if err := m.databaseDrv.Drop(ctx); err != nil {
+		return m.unlockErr(ctx, err)
 	}
-	return m.unlock()
+	return m.unlock(ctx)
 }
 
 // Run runs any migration provided by you against the database.
 // It does not check any currently active version in database.
 // Usually you don't need this function at all. Use Migrate,
 // Steps, Up or Down instead.
-func (m *Migrate) Run(migration ...*Migration) error {
+func (m *Migrate) Run(ctx context.Context, migration ...*Migration) (retErr error) {
 	if len(migration) == 0 {
 		return ErrNoChange
 	}
 
-	if err := m.lock(); err != nil {
+	ctx, span := m.otelTracer.Start(ctx, "migrate.run",
+		trace.WithSpanKind(trace.SpanKindInternal),
+		trace.WithAttributes(m.otelAttrs()...),
+	)
+	defer func() {
+		otelSpanSetError(span, retErr)
+		span.End()
+	}()
+
+	if err := m.lock(ctx); err != nil {
 		return err
 	}
 
-	curVersion, dirty, err := m.databaseDrv.Version()
+	curVersion, dirty, err := m.databaseDrv.Version(ctx)
 	if err != nil {
-		return m.unlockErr(err)
+		return m.unlockErr(ctx, err)
 	}
 
 	if dirty {
-		return m.unlockErr(ErrDirty{curVersion})
+		return m.unlockErr(ctx, ErrDirty{curVersion})
 	}
 
 	ret := make(chan interface{}, m.PrefetchMigrations)
@@ -356,32 +456,41 @@ func (m *Migrate) Run(migration ...*Migration) error {
 		}
 	}()
 
-	return m.unlockErr(m.runMigrations(ret))
+	return m.unlockErr(ctx, m.runMigrations(ctx, ret))
 }
 
 // Force sets a migration version.
 // It does not check any currently active version in database.
 // It resets the dirty state to false.
-func (m *Migrate) Force(version int) error {
+func (m *Migrate) Force(ctx context.Context, version int) (retErr error) {
 	if version < -1 {
 		return ErrInvalidVersion
 	}
 
-	if err := m.lock(); err != nil {
+	ctx, span := m.otelTracer.Start(ctx, "migrate.force",
+		trace.WithSpanKind(trace.SpanKindInternal),
+		trace.WithAttributes(append(m.otelAttrs(), attribute.Int("migrate.version", version))...),
+	)
+	defer func() {
+		otelSpanSetError(span, retErr)
+		span.End()
+	}()
+
+	if err := m.lock(ctx); err != nil {
 		return err
 	}
 
-	if err := m.databaseDrv.SetVersion(version, false); err != nil {
-		return m.unlockErr(err)
+	if err := m.databaseDrv.SetVersion(ctx, version, false); err != nil {
+		return m.unlockErr(ctx, err)
 	}
 
-	return m.unlock()
+	return m.unlock(ctx)
 }
 
 // Version returns the currently active migration version.
 // If no migration has been applied, yet, it will return ErrNilVersion.
-func (m *Migrate) Version() (version uint, dirty bool, err error) {
-	v, d, err := m.databaseDrv.Version()
+func (m *Migrate) Version(ctx context.Context) (version uint, dirty bool, err error) {
+	v, d, err := m.databaseDrv.Version(ctx)
 	if err != nil {
 		return 0, false, err
 	}
@@ -397,12 +506,12 @@ func (m *Migrate) Version() (version uint, dirty bool, err error) {
 // Each migration is then written to the ret channel.
 // If an error occurs during reading, that error is written to the ret channel, too.
 // Once read is done reading it will close the ret channel.
-func (m *Migrate) read(from int, to int, ret chan<- interface{}) {
+func (m *Migrate) read(ctx context.Context, from int, to int, ret chan<- interface{}) {
 	defer close(ret)
 
 	// check if from version exists
 	if from >= 0 {
-		if err := m.versionExists(suint(from)); err != nil {
+		if err := m.versionExists(ctx, suint(from)); err != nil {
 			ret <- err
 			return
 		}
@@ -410,7 +519,7 @@ func (m *Migrate) read(from int, to int, ret chan<- interface{}) {
 
 	// check if to version exists
 	if to >= 0 {
-		if err := m.versionExists(suint(to)); err != nil {
+		if err := m.versionExists(ctx, suint(to)); err != nil {
 			ret <- err
 			return
 		}
@@ -426,13 +535,13 @@ func (m *Migrate) read(from int, to int, ret chan<- interface{}) {
 		// it's going up
 		// apply first migration if from is nil version
 		if from == -1 {
-			firstVersion, err := m.sourceDrv.First()
+			firstVersion, err := m.sourceDrv.First(ctx)
 			if err != nil {
 				ret <- err
 				return
 			}
 
-			migr, err := m.newMigration(firstVersion, int(firstVersion))
+			migr, err := m.newMigration(ctx, firstVersion, int(firstVersion))
 			if err != nil {
 				ret <- err
 				return
@@ -454,13 +563,13 @@ func (m *Migrate) read(from int, to int, ret chan<- interface{}) {
 				return
 			}
 
-			next, err := m.sourceDrv.Next(suint(from))
+			next, err := m.sourceDrv.Next(ctx, suint(from))
 			if err != nil {
 				ret <- err
 				return
 			}
 
-			migr, err := m.newMigration(next, int(next))
+			migr, err := m.newMigration(ctx, next, int(next))
 			if err != nil {
 				ret <- err
 				return
@@ -484,10 +593,10 @@ func (m *Migrate) read(from int, to int, ret chan<- interface{}) {
 				return
 			}
 
-			prev, err := m.sourceDrv.Prev(suint(from))
+			prev, err := m.sourceDrv.Prev(ctx, suint(from))
 			if errors.Is(err, os.ErrNotExist) && to == -1 {
 				// apply nil migration
-				migr, err := m.newMigration(suint(from), -1)
+				migr, err := m.newMigration(ctx, suint(from), -1)
 				if err != nil {
 					ret <- err
 					return
@@ -506,7 +615,7 @@ func (m *Migrate) read(from int, to int, ret chan<- interface{}) {
 				return
 			}
 
-			migr, err := m.newMigration(suint(from), int(prev))
+			migr, err := m.newMigration(ctx, suint(from), int(prev))
 			if err != nil {
 				ret <- err
 				return
@@ -529,12 +638,12 @@ func (m *Migrate) read(from int, to int, ret chan<- interface{}) {
 // Each migration is then written to the ret channel.
 // If an error occurs during reading, that error is written to the ret channel, too.
 // Once readUp is done reading it will close the ret channel.
-func (m *Migrate) readUp(from int, limit int, ret chan<- interface{}) {
+func (m *Migrate) readUp(ctx context.Context, from int, limit int, ret chan<- interface{}) {
 	defer close(ret)
 
 	// check if from version exists
 	if from >= 0 {
-		if err := m.versionExists(suint(from)); err != nil {
+		if err := m.versionExists(ctx, suint(from)); err != nil {
 			ret <- err
 			return
 		}
@@ -553,13 +662,13 @@ func (m *Migrate) readUp(from int, limit int, ret chan<- interface{}) {
 
 		// apply first migration if from is nil version
 		if from == -1 {
-			firstVersion, err := m.sourceDrv.First()
+			firstVersion, err := m.sourceDrv.First(ctx)
 			if err != nil {
 				ret <- err
 				return
 			}
 
-			migr, err := m.newMigration(firstVersion, int(firstVersion))
+			migr, err := m.newMigration(ctx, firstVersion, int(firstVersion))
 			if err != nil {
 				ret <- err
 				return
@@ -577,7 +686,7 @@ func (m *Migrate) readUp(from int, limit int, ret chan<- interface{}) {
 		}
 
 		// apply next migration
-		next, err := m.sourceDrv.Next(suint(from))
+		next, err := m.sourceDrv.Next(ctx, suint(from))
 		if errors.Is(err, os.ErrNotExist) {
 			// no limit, but no migrations applied?
 			if limit == -1 && count == 0 {
@@ -607,7 +716,7 @@ func (m *Migrate) readUp(from int, limit int, ret chan<- interface{}) {
 			return
 		}
 
-		migr, err := m.newMigration(next, int(next))
+		migr, err := m.newMigration(ctx, next, int(next))
 		if err != nil {
 			ret <- err
 			return
@@ -629,12 +738,12 @@ func (m *Migrate) readUp(from int, limit int, ret chan<- interface{}) {
 // Each migration is then written to the ret channel.
 // If an error occurs during reading, that error is written to the ret channel, too.
 // Once readDown is done reading it will close the ret channel.
-func (m *Migrate) readDown(from int, limit int, ret chan<- interface{}) {
+func (m *Migrate) readDown(ctx context.Context, from int, limit int, ret chan<- interface{}) {
 	defer close(ret)
 
 	// check if from version exists
 	if from >= 0 {
-		if err := m.versionExists(suint(from)); err != nil {
+		if err := m.versionExists(ctx, suint(from)); err != nil {
 			ret <- err
 			return
 		}
@@ -663,17 +772,17 @@ func (m *Migrate) readDown(from int, limit int, ret chan<- interface{}) {
 			return
 		}
 
-		prev, err := m.sourceDrv.Prev(suint(from))
+		prev, err := m.sourceDrv.Prev(ctx, suint(from))
 		if errors.Is(err, os.ErrNotExist) {
 			// no limit or haven't reached limit, apply "first" migration
 			if limit == -1 || limit-count > 0 {
-				firstVersion, err := m.sourceDrv.First()
+				firstVersion, err := m.sourceDrv.First(ctx)
 				if err != nil {
 					ret <- err
 					return
 				}
 
-				migr, err := m.newMigration(firstVersion, -1)
+				migr, err := m.newMigration(ctx, firstVersion, -1)
 				if err != nil {
 					ret <- err
 					return
@@ -697,7 +806,7 @@ func (m *Migrate) readDown(from int, limit int, ret chan<- interface{}) {
 			return
 		}
 
-		migr, err := m.newMigration(suint(from), int(prev))
+		migr, err := m.newMigration(ctx, suint(from), int(prev))
 		if err != nil {
 			ret <- err
 			return
@@ -720,7 +829,7 @@ func (m *Migrate) readDown(from int, limit int, ret chan<- interface{}) {
 // Before running a newly received migration it will check if it's supposed
 // to stop execution because it might have received a stop signal on the
 // GracefulStop channel.
-func (m *Migrate) runMigrations(ret <-chan interface{}) error {
+func (m *Migrate) runMigrations(ctx context.Context, ret <-chan interface{}) error {
 	for r := range ret {
 
 		if m.stop() {
@@ -734,22 +843,61 @@ func (m *Migrate) runMigrations(ret <-chan interface{}) error {
 		case *Migration:
 			migr := r
 
+			direction := "up"
+			if migr.TargetVersion < int(migr.Version) {
+				direction = "down"
+			}
+			migrAttrs := append(m.otelAttrs(),
+				attribute.Int64("migrate.version", int64(migr.Version)),
+				attribute.Int("migrate.target_version", migr.TargetVersion),
+				attribute.String("migrate.direction", direction),
+				attribute.String("migrate.identifier", migr.Identifier),
+			)
+			metricAttrs := metric.WithAttributes(append(m.otelAttrs(),
+				attribute.String("migrate.direction", direction),
+			)...)
+			childCtx, childSpan := m.otelTracer.Start(ctx, "migrate.run_migration",
+				trace.WithSpanKind(trace.SpanKindInternal),
+				trace.WithAttributes(migrAttrs...),
+			)
+
 			// set version with dirty state
-			if err := m.databaseDrv.SetVersion(migr.TargetVersion, true); err != nil {
+			if err := m.databaseDrv.SetVersion(childCtx, migr.TargetVersion, true); err != nil {
+				m.otelInstruments.migrationsFailed.Add(childCtx, 1, metricAttrs)
+				childSpan.RecordError(err)
+				childSpan.SetStatus(codes.Error, err.Error())
+				childSpan.End()
 				return err
 			}
 
+			runStart := time.Now()
 			if migr.Body != nil {
 				m.logVerbosePrintf("Read and execute %v\n", migr.LogString())
-				if err := m.databaseDrv.Run(migr.BufferedBody); err != nil {
+				if err := m.databaseDrv.Run(childCtx, migr.BufferedBody); err != nil {
+					dur := time.Since(runStart).Seconds()
+					m.otelInstruments.migrationRunDuration.Record(childCtx, dur, metricAttrs)
+					m.otelInstruments.migrationsFailed.Add(childCtx, 1, metricAttrs)
+					childSpan.RecordError(err)
+					childSpan.SetStatus(codes.Error, err.Error())
+					childSpan.End()
 					return err
 				}
+				dur := time.Since(runStart).Seconds()
+				m.otelInstruments.migrationRunDuration.Record(childCtx, dur, metricAttrs)
 			}
 
 			// set clean state
-			if err := m.databaseDrv.SetVersion(migr.TargetVersion, false); err != nil {
+			if err := m.databaseDrv.SetVersion(childCtx, migr.TargetVersion, false); err != nil {
+				m.otelInstruments.migrationsFailed.Add(childCtx, 1, metricAttrs)
+				childSpan.RecordError(err)
+				childSpan.SetStatus(codes.Error, err.Error())
+				childSpan.End()
 				return err
 			}
+
+			m.otelInstruments.migrationsApplied.Add(childCtx, 1, metricAttrs)
+			childSpan.SetStatus(codes.Ok, "")
+			childSpan.End()
 
 			endTime := time.Now()
 			readTime := migr.FinishedReading.Sub(migr.StartedBuffering)
@@ -773,9 +921,9 @@ func (m *Migrate) runMigrations(ret <-chan interface{}) error {
 
 // versionExists checks the source if either the up or down migration for
 // the specified migration version exists.
-func (m *Migrate) versionExists(version uint) (result error) {
+func (m *Migrate) versionExists(ctx context.Context, version uint) (result error) {
 	// try up migration first
-	up, _, err := m.sourceDrv.ReadUp(version)
+	up, _, err := m.sourceDrv.ReadUp(ctx, version)
 	if err == nil {
 		defer func() {
 			if errClose := up.Close(); errClose != nil {
@@ -790,7 +938,7 @@ func (m *Migrate) versionExists(version uint) (result error) {
 	}
 
 	// then try down migration
-	down, _, err := m.sourceDrv.ReadDown(version)
+	down, _, err := m.sourceDrv.ReadDown(ctx, version)
 	if err == nil {
 		defer func() {
 			if errClose := down.Close(); errClose != nil {
@@ -829,11 +977,11 @@ func (m *Migrate) stop() bool {
 
 // newMigration is a helper func that returns a *Migration for the
 // specified version and targetVersion.
-func (m *Migrate) newMigration(version uint, targetVersion int) (*Migration, error) {
+func (m *Migrate) newMigration(ctx context.Context, version uint, targetVersion int) (*Migration, error) {
 	var migr *Migration
 
 	if targetVersion >= int(version) {
-		r, identifier, err := m.sourceDrv.ReadUp(version)
+		r, identifier, err := m.sourceDrv.ReadUp(ctx, version)
 		if errors.Is(err, os.ErrNotExist) {
 			// create "empty" migration
 			migr, err = NewMigration(nil, "", version, targetVersion)
@@ -853,7 +1001,7 @@ func (m *Migrate) newMigration(version uint, targetVersion int) (*Migration, err
 		}
 
 	} else {
-		r, identifier, err := m.sourceDrv.ReadDown(version)
+		r, identifier, err := m.sourceDrv.ReadDown(ctx, version)
 		if errors.Is(err, os.ErrNotExist) {
 			// create "empty" migration
 			migr, err = NewMigration(nil, "", version, targetVersion)
@@ -884,7 +1032,7 @@ func (m *Migrate) newMigration(version uint, targetVersion int) (*Migration, err
 
 // lock is a thread safe helper function to lock the database.
 // It should be called as late as possible when running migrations.
-func (m *Migrate) lock() error {
+func (m *Migrate) lock(ctx context.Context) error {
 	m.isLockedMu.Lock()
 	defer m.isLockedMu.Unlock()
 
@@ -917,7 +1065,7 @@ func (m *Migrate) lock() error {
 
 	// now try to acquire the lock
 	go func() {
-		if err := m.databaseDrv.Lock(); err != nil {
+		if err := m.databaseDrv.Lock(ctx); err != nil {
 			errchan <- err
 		} else {
 			errchan <- nil
@@ -935,11 +1083,11 @@ func (m *Migrate) lock() error {
 // unlock is a thread safe helper function to unlock the database.
 // It should be called as early as possible when no more migrations are
 // expected to be executed.
-func (m *Migrate) unlock() error {
+func (m *Migrate) unlock(ctx context.Context) error {
 	m.isLockedMu.Lock()
 	defer m.isLockedMu.Unlock()
 
-	if err := m.databaseDrv.Unlock(); err != nil {
+	if err := m.databaseDrv.Unlock(ctx); err != nil {
 		// BUG: Can potentially create a deadlock. Add a timeout.
 		return err
 	}
@@ -950,8 +1098,8 @@ func (m *Migrate) unlock() error {
 
 // unlockErr calls unlock and returns a combined error
 // if a prevErr is not nil.
-func (m *Migrate) unlockErr(prevErr error) error {
-	if err := m.unlock(); err != nil {
+func (m *Migrate) unlockErr(ctx context.Context, prevErr error) error {
+	if err := m.unlock(ctx); err != nil {
 		prevErr = errors.Join(prevErr, err)
 	}
 	return prevErr

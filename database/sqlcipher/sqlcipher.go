@@ -1,19 +1,76 @@
 package sqlcipher
 
 import (
+	"context"
 	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"fmt"
 	"io"
 	nurl "net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 
+	"github.com/XSAM/otelsql"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 	_ "github.com/mutecomm/go-sqlcipher/v4"
+	semconv "go.opentelemetry.io/otel/semconv/v1.39.0"
 )
+
+// go-sqlcipher/v4 implements the deprecated driver.Execer interface but not
+// driver.ExecerContext. Without ExecerContext, database/sql falls back to
+// Prepare+Exec which only prepares the first statement in a multi-statement
+// query string, breaking NoTxWrap migrations (e.g. "BEGIN; ...; COMMIT;").
+// execerContextConn and execerContextDriver promote Execer → ExecerContext so
+// that otelsql can wrap the connection while preserving multi-statement support.
+
+type execerContextConn struct {
+	driver.Conn
+	execer driver.Execer //nolint:staticcheck
+}
+
+func (c *execerContextConn) ExecContext(_ context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
+	dargs := make([]driver.Value, len(args))
+	for i, nv := range args {
+		dargs[i] = nv.Value
+	}
+	return c.execer.Exec(query, dargs)
+}
+
+type execerContextDriver struct {
+	driver.Driver
+}
+
+func (d *execerContextDriver) Open(name string) (driver.Conn, error) {
+	conn, err := d.Driver.Open(name)
+	if err != nil {
+		return nil, err
+	}
+	if execer, ok := conn.(driver.Execer); ok { //nolint:staticcheck
+		return &execerContextConn{Conn: conn, execer: execer}, nil
+	}
+	return conn, nil
+}
+
+const sqlcipherWrappedDriver = "sqlite3-sqlcipher-otel"
+
+var registerDriverOnce sync.Once
+
+// wrappedSQLCipherDriverName returns the name of the go-sqlcipher driver wrapped
+// with execerContextDriver, registering it on the first call.
+func wrappedSQLCipherDriverName() string {
+	registerDriverOnce.Do(func() {
+		// sql.Open is lazy; it does not open a connection, just resolves the driver.
+		db, _ := sql.Open("sqlite3", ":memory:")
+		drv := db.Driver()
+		_ = db.Close()
+		sql.Register(sqlcipherWrappedDriver, &execerContextDriver{drv})
+	})
+	return sqlcipherWrappedDriver
+}
 
 func init() {
 	database.Register("sqlcipher", &Sqlite{})
@@ -39,7 +96,7 @@ type Sqlite struct {
 	config *Config
 }
 
-func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
+func WithInstance(ctx context.Context, instance *sql.DB, config *Config) (database.Driver, error) {
 	if config == nil {
 		return nil, ErrNilConfig
 	}
@@ -56,7 +113,7 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 		db:     instance,
 		config: config,
 	}
-	if err := mx.ensureVersionTable(); err != nil {
+	if err := mx.ensureVersionTable(ctx); err != nil {
 		return nil, err
 	}
 	return mx, nil
@@ -65,13 +122,13 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 // ensureVersionTable checks if versions table exists and, if not, creates it.
 // Note that this function locks the database, which deviates from the usual
 // convention of "caller locks" in the Sqlite type.
-func (m *Sqlite) ensureVersionTable() (err error) {
-	if err = m.Lock(); err != nil {
+func (m *Sqlite) ensureVersionTable(ctx context.Context) (err error) {
+	if err = m.Lock(ctx); err != nil {
 		return err
 	}
 
 	defer func() {
-		if e := m.Unlock(); e != nil {
+		if e := m.Unlock(ctx); e != nil {
 			err = errors.Join(err, e)
 		}
 	}()
@@ -81,19 +138,21 @@ func (m *Sqlite) ensureVersionTable() (err error) {
   CREATE UNIQUE INDEX IF NOT EXISTS version_unique ON %s (version);
   `, m.config.MigrationsTable, m.config.MigrationsTable)
 
-	if _, err := m.db.Exec(query); err != nil {
+	if _, err := m.db.ExecContext(ctx, query); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (m *Sqlite) Open(url string) (database.Driver, error) {
+func (m *Sqlite) Open(ctx context.Context, url string) (database.Driver, error) {
 	purl, err := nurl.Parse(url)
 	if err != nil {
 		return nil, err
 	}
 	dbfile := strings.Replace(migrate.FilterCustomQuery(purl).String(), "sqlite3://", "", 1)
-	db, err := sql.Open("sqlite3", dbfile)
+	db, err := otelsql.Open(wrappedSQLCipherDriverName(), dbfile,
+		otelsql.WithAttributes(semconv.DBSystemNameSQLite),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +172,7 @@ func (m *Sqlite) Open(url string) (database.Driver, error) {
 		}
 	}
 
-	mx, err := WithInstance(db, &Config{
+	mx, err := WithInstance(ctx, db, &Config{
 		DatabaseName:    purl.Path,
 		MigrationsTable: migrationsTable,
 		NoTxWrap:        noTxWrap,
@@ -124,13 +183,13 @@ func (m *Sqlite) Open(url string) (database.Driver, error) {
 	return mx, nil
 }
 
-func (m *Sqlite) Close() error {
+func (m *Sqlite) Close(ctx context.Context) error {
 	return m.db.Close()
 }
 
-func (m *Sqlite) Drop() (err error) {
+func (m *Sqlite) Drop(ctx context.Context) (err error) {
 	query := `SELECT name FROM sqlite_master WHERE type = 'table';`
-	tables, err := m.db.Query(query)
+	tables, err := m.db.QueryContext(ctx, query)
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
@@ -157,13 +216,13 @@ func (m *Sqlite) Drop() (err error) {
 	if len(tableNames) > 0 {
 		for _, t := range tableNames {
 			query := "DROP TABLE " + t
-			err = m.executeQuery(query)
+			err = m.executeQuery(ctx, query)
 			if err != nil {
 				return &database.Error{OrigErr: err, Query: []byte(query)}
 			}
 		}
 		query := "VACUUM"
-		_, err = m.db.Query(query)
+		_, err = m.db.QueryContext(ctx, query)
 		if err != nil {
 			return &database.Error{OrigErr: err, Query: []byte(query)}
 		}
@@ -172,21 +231,21 @@ func (m *Sqlite) Drop() (err error) {
 	return nil
 }
 
-func (m *Sqlite) Lock() error {
+func (m *Sqlite) Lock(ctx context.Context) error {
 	if !m.isLocked.CompareAndSwap(false, true) {
 		return database.ErrLocked
 	}
 	return nil
 }
 
-func (m *Sqlite) Unlock() error {
+func (m *Sqlite) Unlock(ctx context.Context) error {
 	if !m.isLocked.CompareAndSwap(true, false) {
 		return database.ErrNotLocked
 	}
 	return nil
 }
 
-func (m *Sqlite) Run(migration io.Reader) error {
+func (m *Sqlite) Run(ctx context.Context, migration io.Reader) error {
 	migr, err := io.ReadAll(migration)
 	if err != nil {
 		return err
@@ -194,17 +253,17 @@ func (m *Sqlite) Run(migration io.Reader) error {
 	query := string(migr[:])
 
 	if m.config.NoTxWrap {
-		return m.executeQueryNoTx(query)
+		return m.executeQueryNoTx(ctx, query)
 	}
-	return m.executeQuery(query)
+	return m.executeQuery(ctx, query)
 }
 
-func (m *Sqlite) executeQuery(query string) error {
-	tx, err := m.db.Begin()
+func (m *Sqlite) executeQuery(ctx context.Context, query string) error {
+	tx, err := m.db.BeginTx(ctx, nil)
 	if err != nil {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
 	}
-	if _, err := tx.Exec(query); err != nil {
+	if _, err := tx.ExecContext(ctx, query); err != nil {
 		if errRollback := tx.Rollback(); errRollback != nil {
 			err = errors.Join(err, errRollback)
 		}
@@ -216,21 +275,21 @@ func (m *Sqlite) executeQuery(query string) error {
 	return nil
 }
 
-func (m *Sqlite) executeQueryNoTx(query string) error {
-	if _, err := m.db.Exec(query); err != nil {
+func (m *Sqlite) executeQueryNoTx(ctx context.Context, query string) error {
+	if _, err := m.db.ExecContext(ctx, query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 	return nil
 }
 
-func (m *Sqlite) SetVersion(version int, dirty bool) error {
-	tx, err := m.db.Begin()
+func (m *Sqlite) SetVersion(ctx context.Context, version int, dirty bool) error {
+	tx, err := m.db.BeginTx(ctx, nil)
 	if err != nil {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
 	}
 
 	query := "DELETE FROM " + m.config.MigrationsTable
-	if _, err := tx.Exec(query); err != nil {
+	if _, err := tx.ExecContext(ctx, query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 
@@ -239,7 +298,7 @@ func (m *Sqlite) SetVersion(version int, dirty bool) error {
 	// See: https://github.com/golang-migrate/migrate/issues/330
 	if version >= 0 || (version == database.NilVersion && dirty) {
 		query := fmt.Sprintf(`INSERT INTO %s (version, dirty) VALUES (?, ?)`, m.config.MigrationsTable)
-		if _, err := tx.Exec(query, version, dirty); err != nil {
+		if _, err := tx.ExecContext(ctx, query, version, dirty); err != nil {
 			if errRollback := tx.Rollback(); errRollback != nil {
 				err = errors.Join(err, errRollback)
 			}
@@ -254,9 +313,9 @@ func (m *Sqlite) SetVersion(version int, dirty bool) error {
 	return nil
 }
 
-func (m *Sqlite) Version() (version int, dirty bool, err error) {
+func (m *Sqlite) Version(ctx context.Context) (version int, dirty bool, err error) {
 	query := "SELECT version, dirty FROM " + m.config.MigrationsTable + " LIMIT 1"
-	err = m.db.QueryRow(query).Scan(&version, &dirty)
+	err = m.db.QueryRowContext(ctx, query).Scan(&version, &dirty)
 	if err != nil {
 		return database.NilVersion, false, nil
 	}

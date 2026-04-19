@@ -1,6 +1,7 @@
 package github_ee
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	gh "github.com/golang-migrate/migrate/v4/source/github"
 
 	"github.com/google/go-github/v39/github"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 func init() {
@@ -22,7 +24,7 @@ type GithubEE struct {
 	source.Driver
 }
 
-func (g *GithubEE) Open(url string) (source.Driver, error) {
+func (g *GithubEE) Open(ctx context.Context, url string) (source.Driver, error) {
 	verifyTLS := true
 
 	u, err := nurl.Parse(url)
@@ -64,7 +66,7 @@ func (g *GithubEE) Open(url string) (source.Driver, error) {
 		cfg.Path = strings.Join(pe[2:], "/")
 	}
 
-	i, err := gh.WithInstance(ghc, cfg)
+	i, err := gh.WithInstance(ctx, ghc, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +86,7 @@ func (g *GithubEE) createGithubClient(host, username, password string, verifyTLS
 	apiHost := fmt.Sprintf("https://%s/api/v3", host)
 	uploadHost := fmt.Sprintf("https://uploads.%s", host)
 
-	return github.NewEnterpriseClient(apiHost, uploadHost, tr.Client())
+	return github.NewEnterpriseClient(apiHost, uploadHost, &http.Client{Transport: otelhttp.NewTransport(tr)})
 }
 
 func parseBool(val string, fallback bool) bool {

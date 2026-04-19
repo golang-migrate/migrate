@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	nurl "net/url"
 	"regexp"
 	"strconv"
@@ -20,7 +19,10 @@ import (
 	"github.com/golang-migrate/migrate/v4/database"
 
 	adminpb "cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/api/iterator"
+	"google.golang.org/api/option"
+	"google.golang.org/grpc"
 )
 
 func init() {
@@ -74,7 +76,7 @@ func NewDB(admin sdb.DatabaseAdminClient, data spanner.Client) *DB {
 }
 
 // WithInstance implements database.Driver
-func WithInstance(instance *DB, config *Config) (database.Driver, error) {
+func WithInstance(ctx context.Context, instance *DB, config *Config) (database.Driver, error) {
 	if config == nil {
 		return nil, ErrNilConfig
 	}
@@ -92,7 +94,7 @@ func WithInstance(instance *DB, config *Config) (database.Driver, error) {
 		config: config,
 	}
 
-	if err := sx.ensureVersionTable(); err != nil {
+	if err := sx.ensureVersionTable(ctx); err != nil {
 		return nil, err
 	}
 
@@ -100,22 +102,21 @@ func WithInstance(instance *DB, config *Config) (database.Driver, error) {
 }
 
 // Open implements database.Driver
-func (s *Spanner) Open(url string) (database.Driver, error) {
+func (s *Spanner) Open(ctx context.Context, url string) (database.Driver, error) {
 	purl, err := nurl.Parse(url)
 	if err != nil {
 		return nil, err
 	}
 
-	ctx := context.Background()
-
-	adminClient, err := sdb.NewDatabaseAdminClient(ctx)
+	adminClient, err := sdb.NewDatabaseAdminClient(ctx, option.WithGRPCDialOption(grpc.WithStatsHandler(otelgrpc.NewClientHandler())))
 	if err != nil {
 		return nil, err
 	}
 	dbname := strings.Replace(migrate.FilterCustomQuery(purl).String(), "spanner://", "", 1)
-	dataClient, err := spanner.NewClient(ctx, dbname)
+	dataClient, err := spanner.NewClient(ctx, dbname, option.WithGRPCDialOption(grpc.WithStatsHandler(otelgrpc.NewClientHandler())))
 	if err != nil {
-		log.Fatal(err)
+		_ = adminClient.Close()
+		return nil, err
 	}
 
 	migrationsTable := purl.Query().Get("x-migrations-table")
@@ -130,7 +131,7 @@ func (s *Spanner) Open(url string) (database.Driver, error) {
 	}
 
 	db := &DB{admin: adminClient, data: dataClient}
-	return WithInstance(db, &Config{
+	return WithInstance(ctx, db, &Config{
 		DatabaseName:    dbname,
 		MigrationsTable: migrationsTable,
 		CleanStatements: clean,
@@ -138,14 +139,14 @@ func (s *Spanner) Open(url string) (database.Driver, error) {
 }
 
 // Close implements database.Driver
-func (s *Spanner) Close() error {
+func (s *Spanner) Close(ctx context.Context) error {
 	s.db.data.Close()
 	return s.db.admin.Close()
 }
 
 // Lock implements database.Driver but doesn't do anything because Spanner only
 // enqueues the UpdateDatabaseDdlRequest.
-func (s *Spanner) Lock() error {
+func (s *Spanner) Lock(ctx context.Context) error {
 	if swapped := s.lock.CompareAndSwap(false, true); swapped {
 		return nil
 	}
@@ -153,7 +154,7 @@ func (s *Spanner) Lock() error {
 }
 
 // Unlock implements database.Driver but no action required, see Lock.
-func (s *Spanner) Unlock() error {
+func (s *Spanner) Unlock(ctx context.Context) error {
 	if swapped := s.lock.CompareAndSwap(true, false); swapped {
 		return nil
 	}
@@ -161,7 +162,7 @@ func (s *Spanner) Unlock() error {
 }
 
 // Run implements database.Driver
-func (s *Spanner) Run(migration io.Reader) error {
+func (s *Spanner) Run(ctx context.Context, migration io.Reader) error {
 	migr, err := io.ReadAll(migration)
 	if err != nil {
 		return err
@@ -175,7 +176,6 @@ func (s *Spanner) Run(migration io.Reader) error {
 		}
 	}
 
-	ctx := context.Background()
 	op, err := s.db.admin.UpdateDatabaseDdl(ctx, &adminpb.UpdateDatabaseDdlRequest{
 		Database:   s.config.DatabaseName,
 		Statements: stmts,
@@ -193,9 +193,7 @@ func (s *Spanner) Run(migration io.Reader) error {
 }
 
 // SetVersion implements database.Driver
-func (s *Spanner) SetVersion(version int, dirty bool) error {
-	ctx := context.Background()
-
+func (s *Spanner) SetVersion(ctx context.Context, version int, dirty bool) error {
 	_, err := s.db.data.ReadWriteTransaction(ctx,
 		func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
 			m := []*spanner.Mutation{
@@ -214,9 +212,7 @@ func (s *Spanner) SetVersion(version int, dirty bool) error {
 }
 
 // Version implements database.Driver
-func (s *Spanner) Version() (version int, dirty bool, err error) {
-	ctx := context.Background()
-
+func (s *Spanner) Version(ctx context.Context) (version int, dirty bool, err error) {
 	stmt := spanner.Statement{
 		SQL: `SELECT Version, Dirty FROM ` + s.config.MigrationsTable + ` LIMIT 1`,
 	}
@@ -248,8 +244,7 @@ var nameMatcher = regexp.MustCompile(`(CREATE TABLE\s(\S+)\s)|(CREATE.+INDEX\s(\
 // provided in the schema. Assuming the schema describes how the database can
 // be "build up", it seems logical to "unbuild" the database simply by going the
 // opposite direction. More testing
-func (s *Spanner) Drop() error {
-	ctx := context.Background()
+func (s *Spanner) Drop(ctx context.Context) error {
 	res, err := s.db.admin.GetDatabaseDdl(ctx, &adminpb.GetDatabaseDdlRequest{
 		Database: s.config.DatabaseName,
 	})
@@ -291,18 +286,17 @@ func (s *Spanner) Drop() error {
 // ensureVersionTable checks if versions table exists and, if not, creates it.
 // Note that this function locks the database, which deviates from the usual
 // convention of "caller locks" in the Spanner type.
-func (s *Spanner) ensureVersionTable() (err error) {
-	if err = s.Lock(); err != nil {
+func (s *Spanner) ensureVersionTable(ctx context.Context) (err error) {
+	if err = s.Lock(ctx); err != nil {
 		return err
 	}
 
 	defer func() {
-		if e := s.Unlock(); e != nil {
+		if e := s.Unlock(ctx); e != nil {
 			err = errors.Join(err, e)
 		}
 	}()
 
-	ctx := context.Background()
 	tbl := s.config.MigrationsTable
 	iter := s.db.data.Single().Read(ctx, tbl, spanner.AllKeys(), []string{"Version"})
 	if err := iter.Do(func(r *spanner.Row) error { return nil }); err == nil {

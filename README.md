@@ -110,6 +110,7 @@ $ docker run -v {{ migration dir }}:/migrations --network host migrate/migrate
 * Bring your own logger.
 * Uses `io.Reader` streams internally for low memory overhead.
 * Thread-safe and no goroutine leaks.
+* Emits [OpenTelemetry](https://opentelemetry.io) traces and metrics automatically when a global provider is configured by the host application (see [OpenTelemetry](#opentelemetry) below).
 
 __[Go Documentation](https://pkg.go.dev/github.com/golang-migrate/migrate/v4)__
 
@@ -152,6 +153,80 @@ func main() {
 ## Getting started
 
 Go to [getting started](GETTING_STARTED.md)
+
+## OpenTelemetry
+
+migrate emits [OpenTelemetry](https://opentelemetry.io) traces and metrics through the OTel **API** only — it does **not** initialize an SDK, configure exporters, or set up resources. This means:
+
+- **Zero overhead** when no OTel SDK is configured (global no-op providers are used).
+- **Automatic telemetry** when the host application configures OTel global providers (e.g. via `go.opentelemetry.io/otel/sdk`).
+
+### Signals
+
+**Traces** — one parent span per public operation (`migrate.up`, `migrate.down`, `migrate.migrate`, etc.), one child span per migration execution (`migrate.run_migration`), and driver-level spans for every database and source operation.
+
+#### Operation spans (SpanKind: INTERNAL)
+
+| Span name | Emitted by |
+|-----------|-----------|
+| `migrate.up` | `Up` / `Steps` (positive) |
+| `migrate.down` | `Down` / `Steps` (negative) |
+| `migrate.migrate` | `Migrate` |
+| `migrate.force` | `Force` |
+| `migrate.drop` | `Drop` |
+| `migrate.run_migration` | Per-migration child of the above |
+
+#### Database driver spans (SpanKind: CLIENT)
+
+| Span name | Method | Key attributes |
+|-----------|--------|----------------|
+| `db.lock` | Lock | `db.system.name` |
+| `db.unlock` | Unlock | `db.system.name` |
+| `db.run` | Run | `db.system.name` |
+| `db.set_version` | SetVersion | `db.system.name`, `migrate.version`, `migrate.dirty` |
+| `db.version` | Version | `db.system.name` |
+| `db.drop` | Drop | `db.system.name` |
+
+#### Source driver spans (SpanKind: INTERNAL)
+
+| Span name | Method | Key attributes |
+|-----------|--------|----------------|
+| `source.read_up` | ReadUp | `migrate.source`, `migrate.version` |
+| `source.read_down` | ReadDown | `migrate.source`, `migrate.version` |
+
+**Metrics:**
+
+| Metric | Type | Unit | Description |
+|--------|------|------|-------------|
+| `migrate.migrations.applied` | Counter | `{migration}` | Number of migrations successfully applied |
+| `migrate.migrations.failed` | Counter | `{migration}` | Number of migrations that failed to apply |
+| `migrate.migration.run.duration` | Histogram | `s` | Execution duration of a single migration |
+
+**Common attributes:** `db.system.name`, `migrate.source`, `migrate.direction`, `migrate.version`, `migrate.target_version`, `migrate.identifier`.
+
+### Example
+
+```go
+import (
+    "context"
+
+    "github.com/golang-migrate/migrate/v4"
+    "go.opentelemetry.io/otel"
+    sdktrace "go.opentelemetry.io/otel/sdk/trace"
+    // ... your exporter of choice
+)
+
+// In your application setup:
+ctx := context.Background()
+tp := sdktrace.NewTracerProvider(
+    sdktrace.WithBatcher(yourExporter),
+)
+otel.SetTracerProvider(tp)
+
+// migrate will now automatically emit spans and metrics.
+m, _ := migrate.New(ctx, "file:///migrations", "postgres://...")
+m.Up(ctx) // emits traces and metrics
+```
 
 ## Tutorials
 

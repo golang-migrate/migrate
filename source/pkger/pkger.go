@@ -1,6 +1,7 @@
 package pkger
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	stdurl "net/url"
@@ -26,7 +27,7 @@ type Pkger struct {
 // scoped pkger.Open to access migrations.  The relative root and any
 // migrations must be added to the global pkger.Pkger instance by calling
 // pkger.Apply. Refer to Pkger documentation for more information.
-func (p *Pkger) Open(url string) (source.Driver, error) {
+func (p *Pkger) Open(ctx context.Context, url string) (source.Driver, error) {
 	u, err := stdurl.Parse(url)
 	if err != nil {
 		return nil, err
@@ -52,7 +53,7 @@ func (p *Pkger) Open(url string) (source.Driver, error) {
 // pkging.Pkger. The relative location of migrations is indicated by path. The
 // path must exist on the pkging.Pkger instance for the driver to initialize
 // successfully.
-func WithInstance(instance pkging.Pkger, path string) (source.Driver, error) {
+func WithInstance(ctx context.Context, instance pkging.Pkger, path string) (source.Driver, error) {
 	if instance == nil {
 		return nil, fmt.Errorf("expected instance of pkging.Pkger")
 	}

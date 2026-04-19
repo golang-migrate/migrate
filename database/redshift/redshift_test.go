@@ -86,6 +86,7 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 
 func Test(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ctx := context.Background()
 		ip, port, err := c.FirstPort()
 		if err != nil {
 			t.Fatal(err)
@@ -93,12 +94,12 @@ func Test(t *testing.T) {
 
 		addr := redshiftConnectionString(ip, port)
 		p := &Redshift{}
-		d, err := p.Open(addr)
+		d, err := p.Open(ctx, addr)
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer func() {
-			if err := d.Close(); err != nil {
+			if err := d.Close(ctx); err != nil {
 				t.Error(err)
 			}
 		}()
@@ -108,6 +109,7 @@ func Test(t *testing.T) {
 
 func TestMigrate(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ctx := context.Background()
 		ip, port, err := c.FirstPort()
 		if err != nil {
 			t.Fatal(err)
@@ -115,16 +117,16 @@ func TestMigrate(t *testing.T) {
 
 		addr := redshiftConnectionString(ip, port)
 		p := &Redshift{}
-		d, err := p.Open(addr)
+		d, err := p.Open(ctx, addr)
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer func() {
-			if err := d.Close(); err != nil {
+			if err := d.Close(ctx); err != nil {
 				t.Error(err)
 			}
 		}()
-		m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "postgres", d)
+		m, err := migrate.NewWithDatabaseInstance(ctx, "file://./examples/migrations", "postgres", d)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -134,6 +136,7 @@ func TestMigrate(t *testing.T) {
 
 func TestMultiStatement(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ctx := context.Background()
 		ip, port, err := c.FirstPort()
 		if err != nil {
 			t.Fatal(err)
@@ -141,16 +144,16 @@ func TestMultiStatement(t *testing.T) {
 
 		addr := redshiftConnectionString(ip, port)
 		p := &Redshift{}
-		d, err := p.Open(addr)
+		d, err := p.Open(ctx, addr)
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer func() {
-			if err := d.Close(); err != nil {
+			if err := d.Close(ctx); err != nil {
 				t.Error(err)
 			}
 		}()
-		if err := d.Run(bytes.NewReader([]byte("CREATE TABLE foo (foo text); CREATE TABLE bar (bar text);"))); err != nil {
+		if err := d.Run(ctx, bytes.NewReader([]byte("CREATE TABLE foo (foo text); CREATE TABLE bar (bar text);"))); err != nil {
 			t.Fatalf("expected err to be nil, got %v", err)
 		}
 
@@ -167,6 +170,7 @@ func TestMultiStatement(t *testing.T) {
 
 func TestErrorParsing(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ctx := context.Background()
 		ip, port, err := c.FirstPort()
 		if err != nil {
 			t.Fatal(err)
@@ -174,19 +178,19 @@ func TestErrorParsing(t *testing.T) {
 
 		addr := redshiftConnectionString(ip, port)
 		p := &Redshift{}
-		d, err := p.Open(addr)
+		d, err := p.Open(ctx, addr)
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer func() {
-			if err := d.Close(); err != nil {
+			if err := d.Close(ctx); err != nil {
 				t.Error(err)
 			}
 		}()
 
 		wantErr := `migration failed: syntax error at or near "TABLEE" (column 37) in line 1: CREATE TABLE foo ` +
 			`(foo text); CREATE TABLEE bar (bar text); (details: pq: syntax error at or near "TABLEE")`
-		if err := d.Run(bytes.NewReader([]byte("CREATE TABLE foo (foo text); CREATE TABLEE bar (bar text);"))); err == nil {
+		if err := d.Run(ctx, bytes.NewReader([]byte("CREATE TABLE foo (foo text); CREATE TABLEE bar (bar text);"))); err == nil {
 			t.Fatal("expected err but got nil")
 		} else if err.Error() != wantErr {
 			t.Fatalf("expected '%s' but got '%s'", wantErr, err.Error())
@@ -196,6 +200,7 @@ func TestErrorParsing(t *testing.T) {
 
 func TestFilterCustomQuery(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ctx := context.Background()
 		ip, port, err := c.FirstPort()
 		if err != nil {
 			t.Fatal(err)
@@ -203,12 +208,12 @@ func TestFilterCustomQuery(t *testing.T) {
 
 		addr := fmt.Sprintf("postgres://postgres:%s@%v:%v/postgres?sslmode=disable&x-custom=foobar", pgPassword, ip, port)
 		p := &Redshift{}
-		d, err := p.Open(addr)
+		d, err := p.Open(ctx, addr)
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer func() {
-			if err := d.Close(); err != nil {
+			if err := d.Close(ctx); err != nil {
 				t.Error(err)
 			}
 		}()
@@ -217,6 +222,7 @@ func TestFilterCustomQuery(t *testing.T) {
 
 func TestWithSchema(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ctx := context.Background()
 		ip, port, err := c.FirstPort()
 		if err != nil {
 			t.Fatal(err)
@@ -224,36 +230,36 @@ func TestWithSchema(t *testing.T) {
 
 		addr := redshiftConnectionString(ip, port)
 		p := &Redshift{}
-		d, err := p.Open(addr)
+		d, err := p.Open(ctx, addr)
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer func() {
-			if err := d.Close(); err != nil {
+			if err := d.Close(ctx); err != nil {
 				t.Error(err)
 			}
 		}()
 
 		// create foobar schema
-		if err := d.Run(bytes.NewReader([]byte("CREATE SCHEMA foobar AUTHORIZATION postgres"))); err != nil {
+		if err := d.Run(ctx, bytes.NewReader([]byte("CREATE SCHEMA foobar AUTHORIZATION postgres"))); err != nil {
 			t.Fatal(err)
 		}
-		if err := d.SetVersion(1, false); err != nil {
+		if err := d.SetVersion(ctx, 1, false); err != nil {
 			t.Fatal(err)
 		}
 
 		// re-connect using that schema
-		d2, err := p.Open(fmt.Sprintf("postgres://postgres:%s@%v:%v/postgres?sslmode=disable&search_path=foobar", pgPassword, ip, port))
+		d2, err := p.Open(ctx, fmt.Sprintf("postgres://postgres:%s@%v:%v/postgres?sslmode=disable&search_path=foobar", pgPassword, ip, port))
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer func() {
-			if err := d2.Close(); err != nil {
+			if err := d2.Close(ctx); err != nil {
 				t.Error(err)
 			}
 		}()
 
-		version, _, err := d2.Version()
+		version, _, err := d2.Version(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -262,10 +268,10 @@ func TestWithSchema(t *testing.T) {
 		}
 
 		// now update version and compare
-		if err := d2.SetVersion(2, false); err != nil {
+		if err := d2.SetVersion(ctx, 2, false); err != nil {
 			t.Fatal(err)
 		}
-		version, _, err = d2.Version()
+		version, _, err = d2.Version(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -274,7 +280,7 @@ func TestWithSchema(t *testing.T) {
 		}
 
 		// meanwhile, the public schema still has the other version
-		version, _, err = d.Version()
+		version, _, err = d.Version(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -290,6 +296,7 @@ func TestWithInstance(t *testing.T) {
 
 func TestRedshift_Lock(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ctx := context.Background()
 		ip, port, err := c.FirstPort()
 		if err != nil {
 			t.Fatal(err)
@@ -297,7 +304,7 @@ func TestRedshift_Lock(t *testing.T) {
 
 		addr := pgConnectionString(ip, port)
 		p := &Redshift{}
-		d, err := p.Open(addr)
+		d, err := p.Open(ctx, addr)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -306,22 +313,22 @@ func TestRedshift_Lock(t *testing.T) {
 
 		ps := d.(*Redshift)
 
-		err = ps.Lock()
+		err = ps.Lock(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		err = ps.Unlock()
+		err = ps.Unlock(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		err = ps.Lock()
+		err = ps.Lock(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		err = ps.Unlock()
+		err = ps.Unlock(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}

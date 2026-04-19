@@ -1,6 +1,7 @@
 package gitlab
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"io"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/golang-migrate/migrate/v4/source"
 	"github.com/xanzy/go-gitlab"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 func init() {
@@ -42,7 +44,7 @@ type Gitlab struct {
 type Config struct {
 }
 
-func (g *Gitlab) Open(url string) (source.Driver, error) {
+func (g *Gitlab) Open(ctx context.Context, url string) (source.Driver, error) {
 	u, err := nurl.Parse(url)
 	if err != nil {
 		return nil, err
@@ -58,7 +60,7 @@ func (g *Gitlab) Open(url string) (source.Driver, error) {
 	}
 
 	gn := &Gitlab{
-		client:     gitlab.NewClient(nil, password),
+		client:     gitlab.NewClient(&http.Client{Transport: otelhttp.NewTransport(http.DefaultTransport)}, password),
 		url:        url,
 		migrations: source.NewMigrations(),
 	}
@@ -96,25 +98,28 @@ func (g *Gitlab) Open(url string) (source.Driver, error) {
 		Ref: &u.Fragment,
 	}
 
-	if err := gn.readDirectory(); err != nil {
+	if err := gn.readDirectory(ctx); err != nil {
 		return nil, err
 	}
 
 	return gn, nil
 }
 
-func WithInstance(client *gitlab.Client, config *Config) (source.Driver, error) {
+func WithInstance(ctx context.Context, client *gitlab.Client, config *Config) (source.Driver, error) {
 	gn := &Gitlab{
 		client:     client,
 		migrations: source.NewMigrations(),
 	}
-	if err := gn.readDirectory(); err != nil {
+	if err := gn.readDirectory(ctx); err != nil {
 		return nil, err
 	}
 	return gn, nil
 }
 
-func (g *Gitlab) readDirectory() error {
+func (g *Gitlab) readDirectory(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	var nodes []*gitlab.TreeNode
 	for {
 		n, response, err := g.client.Repositories.ListTree(g.projectID, g.listOptions)
@@ -164,36 +169,36 @@ func (g *Gitlab) nodeToMigration(node *gitlab.TreeNode) (*source.Migration, erro
 	return nil, source.ErrParse
 }
 
-func (g *Gitlab) Close() error {
+func (g *Gitlab) Close(ctx context.Context) error {
 	return nil
 }
 
-func (g *Gitlab) First() (version uint, er error) {
-	if v, ok := g.migrations.First(); !ok {
+func (g *Gitlab) First(ctx context.Context) (version uint, er error) {
+	if v, ok := g.migrations.First(ctx); !ok {
 		return 0, &os.PathError{Op: "first", Path: g.path, Err: os.ErrNotExist}
 	} else {
 		return v, nil
 	}
 }
 
-func (g *Gitlab) Prev(version uint) (prevVersion uint, err error) {
-	if v, ok := g.migrations.Prev(version); !ok {
+func (g *Gitlab) Prev(ctx context.Context, version uint) (prevVersion uint, err error) {
+	if v, ok := g.migrations.Prev(ctx, version); !ok {
 		return 0, &os.PathError{Op: fmt.Sprintf("prev for version %v", version), Path: g.path, Err: os.ErrNotExist}
 	} else {
 		return v, nil
 	}
 }
 
-func (g *Gitlab) Next(version uint) (nextVersion uint, err error) {
-	if v, ok := g.migrations.Next(version); !ok {
+func (g *Gitlab) Next(ctx context.Context, version uint) (nextVersion uint, err error) {
+	if v, ok := g.migrations.Next(ctx, version); !ok {
 		return 0, &os.PathError{Op: fmt.Sprintf("next for version %v", version), Path: g.path, Err: os.ErrNotExist}
 	} else {
 		return v, nil
 	}
 }
 
-func (g *Gitlab) ReadUp(version uint) (r io.ReadCloser, identifier string, err error) {
-	if m, ok := g.migrations.Up(version); ok {
+func (g *Gitlab) ReadUp(ctx context.Context, version uint) (r io.ReadCloser, identifier string, err error) {
+	if m, ok := g.migrations.Up(ctx, version); ok {
 		f, response, err := g.client.RepositoryFiles.GetFile(g.projectID, m.Raw, g.getOptions)
 		if err != nil {
 			return nil, "", err
@@ -214,8 +219,8 @@ func (g *Gitlab) ReadUp(version uint) (r io.ReadCloser, identifier string, err e
 	return nil, "", &os.PathError{Op: fmt.Sprintf("read version %v", version), Path: g.path, Err: os.ErrNotExist}
 }
 
-func (g *Gitlab) ReadDown(version uint) (r io.ReadCloser, identifier string, err error) {
-	if m, ok := g.migrations.Down(version); ok {
+func (g *Gitlab) ReadDown(ctx context.Context, version uint) (r io.ReadCloser, identifier string, err error) {
+	if m, ok := g.migrations.Down(ctx, version); ok {
 		f, response, err := g.client.RepositoryFiles.GetFile(g.projectID, m.Raw, g.getOptions)
 		if err != nil {
 			return nil, "", err
