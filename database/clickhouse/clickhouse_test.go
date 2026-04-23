@@ -242,6 +242,10 @@ const clusterXML = `<clickhouse>
         </shard>
     </test_cluster>
 </remote_servers>
+<macros>
+    <shard>1</shard>
+    <replica>replica1</replica>
+</macros>
 <keeper_server>
     <tcp_port>9181</tcp_port>
     <server_id>1</server_id>
