@@ -146,7 +146,6 @@ func TestMultipleStatementsInMultiStatementMode(t *testing.T) {
 				t.Error(err)
 			}
 		}()
-		// Use CREATE INDEX instead of CONCURRENTLY (Firebird doesn't support CREATE INDEX CONCURRENTLY)
 		if err := d.Run(strings.NewReader("CREATE TABLE foo (foo VARCHAR(40)); CREATE INDEX idx_foo ON foo (foo);")); err != nil {
 			t.Fatalf("expected err to be nil, got %v", err)
 		}
