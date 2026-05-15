@@ -84,8 +84,42 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	return fb, nil
 }
 
+func parseConfig(purl *nurl.URL) (*Config, error) {
+	maxSize := DefaultMultiStatementMaxSize
+	if s := purl.Query().Get("x-multi-statement-max-size"); len(s) > 0 {
+		n, err := strconv.Atoi(s)
+		if err != nil {
+			return nil, err
+		}
+		if n > 0 {
+			maxSize = n
+		}
+	}
+
+	enabled := false
+	if s := purl.Query().Get("x-multi-statement"); len(s) > 0 {
+		b, err := strconv.ParseBool(s)
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse option x-multi-statement: %w", err)
+		}
+		enabled = b
+	}
+
+	return &Config{
+		MigrationsTable:       purl.Query().Get("x-migrations-table"),
+		DatabaseName:          purl.Path,
+		MultiStatementEnabled: enabled,
+		MultiStatementMaxSize: maxSize,
+	}, nil
+}
+
 func (f *Firebird) Open(dsn string) (database.Driver, error) {
 	purl, err := nurl.Parse(dsn)
+	if err != nil {
+		return nil, err
+	}
+
+	cfg, err := parseConfig(purl)
 	if err != nil {
 		return nil, err
 	}
@@ -95,37 +129,7 @@ func (f *Firebird) Open(dsn string) (database.Driver, error) {
 		return nil, err
 	}
 
-	multiStatementMaxSize := DefaultMultiStatementMaxSize
-	if s := purl.Query().Get("x-multi-statement-max-size"); len(s) > 0 {
-		multiStatementMaxSize, err = strconv.Atoi(s)
-		if err != nil {
-			return nil, err
-		}
-		if multiStatementMaxSize <= 0 {
-			multiStatementMaxSize = DefaultMultiStatementMaxSize
-		}
-	}
-
-	multiStatementEnabled := false
-	if s := purl.Query().Get("x-multi-statement"); len(s) > 0 {
-		multiStatementEnabled, err = strconv.ParseBool(s)
-		if err != nil {
-			return nil, fmt.Errorf("unable to parse option x-multi-statement: %w", err)
-		}
-	}
-
-	px, err := WithInstance(db, &Config{
-		MigrationsTable:       purl.Query().Get("x-migrations-table"),
-		DatabaseName:          purl.Path,
-		MultiStatementEnabled: multiStatementEnabled,
-		MultiStatementMaxSize: multiStatementMaxSize,
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	return px, nil
+	return WithInstance(db, cfg)
 }
 
 func (f *Firebird) Close() error {

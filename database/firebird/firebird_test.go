@@ -8,7 +8,6 @@ import (
 	"io"
 	"log"
 	nurl "net/url"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -316,53 +315,28 @@ func TestMultiStatementURLParsing(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// We can't actually open a database connection without Docker,
-			// but we can test the URL parsing logic by examining how Open would behave
 			purl, err := nurl.Parse(tt.url)
 			if err != nil {
-				if !tt.shouldError {
-					t.Fatalf("parseURL failed: %v", err)
+				t.Fatalf("parseURL failed: %v", err)
+			}
+
+			cfg, err := parseConfig(purl)
+			if tt.shouldError {
+				if err == nil {
+					t.Fatalf("expected error but got none")
 				}
 				return
 			}
-
-			// Test multi-statement parameter parsing
-			multiStatementEnabled := false
-			multiStatementMaxSize := DefaultMultiStatementMaxSize
-
-			if s := purl.Query().Get("x-multi-statement"); len(s) > 0 {
-				multiStatementEnabled, err = strconv.ParseBool(s)
-				if err != nil {
-					if tt.shouldError {
-						return // Expected error
-					}
-					t.Fatalf("unable to parse option x-multi-statement: %v", err)
-				}
+			if err != nil {
+				t.Fatalf("parseConfig failed: %v", err)
 			}
 
-			if s := purl.Query().Get("x-multi-statement-max-size"); len(s) > 0 {
-				multiStatementMaxSize, err = strconv.Atoi(s)
-				if err != nil {
-					if tt.shouldError {
-						return // Expected error
-					}
-					t.Fatalf("unable to parse x-multi-statement-max-size: %v", err)
-				}
-				if multiStatementMaxSize <= 0 {
-					multiStatementMaxSize = DefaultMultiStatementMaxSize
-				}
+			if cfg.MultiStatementEnabled != tt.expectedMultiStmt {
+				t.Errorf("expected MultiStatementEnabled to be %v, got %v", tt.expectedMultiStmt, cfg.MultiStatementEnabled)
 			}
 
-			if tt.shouldError {
-				t.Fatalf("expected error but got none")
-			}
-
-			if multiStatementEnabled != tt.expectedMultiStmt {
-				t.Errorf("expected MultiStatementEnabled to be %v, got %v", tt.expectedMultiStmt, multiStatementEnabled)
-			}
-
-			if multiStatementMaxSize != tt.expectedMultiStmtSize {
-				t.Errorf("expected MultiStatementMaxSize to be %d, got %d", tt.expectedMultiStmtSize, multiStatementMaxSize)
+			if cfg.MultiStatementMaxSize != tt.expectedMultiStmtSize {
+				t.Errorf("expected MultiStatementMaxSize to be %d, got %d", tt.expectedMultiStmtSize, cfg.MultiStatementMaxSize)
 			}
 		})
 	}
