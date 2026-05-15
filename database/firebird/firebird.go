@@ -154,6 +154,7 @@ func (f *Firebird) Unlock() error {
 func (f *Firebird) Run(migration io.Reader) error {
 	if f.config.MultiStatementEnabled {
 		var err error
+		var failedQuery []byte
 
 		if e := multistmt.Parse(migration, multiStmtDelimiter, f.config.MultiStatementMaxSize, func(m []byte) bool {
 			query := strings.TrimSpace(string(m))
@@ -161,6 +162,7 @@ func (f *Firebird) Run(migration io.Reader) error {
 				return true
 			}
 			if _, err = f.conn.ExecContext(context.Background(), query); err != nil {
+				failedQuery = append(failedQuery[:0], m...)
 				return false // stop parsing on error
 			}
 			return true // continue parsing
@@ -168,7 +170,7 @@ func (f *Firebird) Run(migration io.Reader) error {
 			return &database.Error{OrigErr: e, Err: "error parsing multi-statement migration"}
 		}
 		if err != nil {
-			return &database.Error{OrigErr: err, Err: "error executing multi-statement migration"}
+			return &database.Error{OrigErr: err, Err: "migration failed", Query: failedQuery}
 		}
 		return nil
 	}
