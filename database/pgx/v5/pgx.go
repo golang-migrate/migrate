@@ -130,6 +130,9 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	}
 
 	if err := px.ensureVersionTable(); err != nil {
+		// Release the connection back to the pool so we don't leak
+		// it when WithInstance returns the error.
+		_ = conn.Close()
 		return nil, err
 	}
 
