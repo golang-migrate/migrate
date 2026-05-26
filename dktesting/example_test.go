@@ -6,7 +6,7 @@ import (
 )
 
 import (
-	"github.com/dhui/dktest"
+	"github.com/golang-migrate/migrate/v4/dktest"
 )
 
 import (

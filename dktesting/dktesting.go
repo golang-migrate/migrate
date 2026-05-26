@@ -5,9 +5,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/dhui/dktest"
-	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/client"
+	"github.com/golang-migrate/migrate/v4/dktest"
+	"github.com/moby/moby/client"
 )
 
 // ContainerSpec holds Docker testing setup specifications
@@ -34,7 +33,7 @@ func (s *ContainerSpec) Cleanup() (retErr error) {
 	}
 	ctx, timeoutCancelFunc := context.WithTimeout(context.Background(), cleanupTimeout)
 	defer timeoutCancelFunc()
-	if _, err := dc.ImageRemove(ctx, s.ImageName, image.RemoveOptions{Force: true, PruneChildren: true}); err != nil {
+	if _, err := dc.ImageRemove(ctx, s.ImageName, client.ImageRemoveOptions{Force: true, PruneChildren: true}); err != nil {
 		return err
 	}
 	return nil

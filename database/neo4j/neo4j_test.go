@@ -7,7 +7,7 @@ import (
 	"log"
 	"testing"
 
-	"github.com/dhui/dktest"
+	"github.com/golang-migrate/migrate/v4/dktest"
 	"github.com/neo4j/neo4j-go-driver/neo4j"
 
 	"github.com/golang-migrate/migrate/v4"
