@@ -16,7 +16,7 @@ import (
 )
 
 import (
-	"github.com/dhui/dktest"
+	"github.com/golang-migrate/migrate/v4/dktest"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"

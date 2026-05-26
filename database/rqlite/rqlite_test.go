@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/dhui/dktest"
+	"github.com/golang-migrate/migrate/v4/dktest"
 	"github.com/rqlite/gorqlite"
 	"github.com/stretchr/testify/assert"
 

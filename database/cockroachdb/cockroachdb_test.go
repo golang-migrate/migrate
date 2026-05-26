@@ -13,7 +13,7 @@ import (
 )
 
 import (
-	"github.com/dhui/dktest"
+	"github.com/golang-migrate/migrate/v4/dktest"
 	_ "github.com/lib/pq"
 )
 
