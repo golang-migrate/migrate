@@ -31,6 +31,16 @@ func TestOpen(t *testing.T) {
 			inputURL:    "hdb://user:pass@localhost:443?x-migrations-schema=TEST&x-isolation-level=999",
 			expectedErr: ErrInvalidIsolationLevel,
 		},
+		{
+			name:        "unparseable isolation level",
+			inputURL:    "hdb://user:pass@localhost:443?x-migrations-schema=TEST&x-isolation-level=INVALID",
+			expectedErr: ErrParseIsolationLevel,
+		},
+		{
+			name:        "unparseable lock timeout",
+			inputURL:    "hdb://user:pass@localhost:443?x-migrations-schema=TEST&x-lock-timeout=INVALID",
+			expectedErr: ErrParseLockTimeout,
+		},
 	}
 
 	for _, tc := range testcases {
@@ -59,6 +69,24 @@ func TestWithInstance(t *testing.T) {
 			db:          nil,
 			config:      nil,
 			expectedErr: ErrNilConfig,
+		},
+		{
+			name:        "missing schema name",
+			db:          nil,
+			config:      &Config{SchemaName: ""},
+			expectedErr: ErrNoSchemaName,
+		},
+		{
+			name:        "invalid isolation level",
+			db:          nil,
+			config:      &Config{SchemaName: "TEST", IsolationLevel: 999},
+			expectedErr: ErrInvalidIsolationLevel,
+		},
+		{
+			name:        "negative lock timeout",
+			db:          nil,
+			config:      &Config{SchemaName: "TEST", LockTimeout: -1},
+			expectedErr: ErrInvalidLockTimeout,
 		},
 	}
 
