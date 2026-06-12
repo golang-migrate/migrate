@@ -1,0 +1,1 @@
+[{"query": "DROP PRIMARY INDEX IF EXISTS ON `testmigrate`._default._default"}]

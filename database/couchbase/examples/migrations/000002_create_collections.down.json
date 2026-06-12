@@ -1,0 +1,4 @@
+[
+  {"query": "DROP COLLECTION `testmigrate`.`_default`.`orders` IF EXISTS"},
+  {"query": "DROP COLLECTION `testmigrate`.`_default`.`users` IF EXISTS"}
+]

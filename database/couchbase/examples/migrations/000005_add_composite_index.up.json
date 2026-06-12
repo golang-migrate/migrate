@@ -1,0 +1,3 @@
+[
+  {"query": "CREATE INDEX idx_users_name_email IF NOT EXISTS ON `testmigrate`.`_default`.`users`(name, email) WHERE type = 'user'"}
+]

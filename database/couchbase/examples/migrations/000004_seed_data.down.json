@@ -1,0 +1,3 @@
+[
+  {"query": "DELETE FROM `testmigrate`.`_default`.`users` WHERE META().id IN ['user::1', 'user::2']"}
+]

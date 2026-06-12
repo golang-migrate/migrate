@@ -1,0 +1,6 @@
+[
+  {"query": "DROP INDEX `testmigrate`.`_default`.`orders`.idx_orders_created_at IF EXISTS"},
+  {"query": "DROP INDEX `testmigrate`.`_default`.`orders`.idx_orders_user_id IF EXISTS"},
+  {"query": "DROP INDEX `testmigrate`.`_default`.`users`.idx_users_email IF EXISTS"},
+  {"query": "DROP PRIMARY INDEX IF EXISTS ON `testmigrate`.`_default`.`users`"}
+]

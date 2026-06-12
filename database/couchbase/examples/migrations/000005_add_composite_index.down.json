@@ -1,0 +1,3 @@
+[
+  {"query": "DROP INDEX `testmigrate`.`_default`.`users`.idx_users_name_email IF EXISTS"}
+]

@@ -1,0 +1,4 @@
+[
+  {"query": "UPSERT INTO `testmigrate`.`_default`.`users` (KEY, VALUE) VALUES ($1, {\"name\": $2, \"email\": $3, \"type\": \"user\", \"created_at\": NOW_STR()})", "params": ["user::1", "Alice Smith", "alice@example.com"]},
+  {"query": "UPSERT INTO `testmigrate`.`_default`.`users` (KEY, VALUE) VALUES ($1, {\"name\": $2, \"email\": $3, \"type\": \"user\", \"created_at\": NOW_STR()})", "params": ["user::2", "Bob Jones", "bob@example.com"]}
+]
