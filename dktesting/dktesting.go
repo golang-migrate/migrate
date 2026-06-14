@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/containerd/errdefs"
 	"github.com/dhui/dktest"
-	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/client"
+	"github.com/moby/moby/client"
 )
 
 // ContainerSpec holds Docker testing setup specifications
@@ -34,9 +34,8 @@ func (s *ContainerSpec) Cleanup() (retErr error) {
 	}
 	ctx, timeoutCancelFunc := context.WithTimeout(context.Background(), cleanupTimeout)
 	defer timeoutCancelFunc()
-	if _, err := dc.ImageRemove(ctx, s.ImageName, image.RemoveOptions{Force: true, PruneChildren: true}); err != nil {
-		// ignoring the deprecation warning, since it is intended for docker/docker internal use
-		if client.IsErrNotFound(err) {
+	if _, err := dc.ImageRemove(ctx, s.ImageName, client.ImageRemoveOptions{Force: true, PruneChildren: true}); err != nil {
+		if errdefs.IsNotFound(err) {
 			return nil
 		}
 		return err
