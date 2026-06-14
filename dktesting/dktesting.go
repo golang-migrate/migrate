@@ -35,6 +35,10 @@ func (s *ContainerSpec) Cleanup() (retErr error) {
 	ctx, timeoutCancelFunc := context.WithTimeout(context.Background(), cleanupTimeout)
 	defer timeoutCancelFunc()
 	if _, err := dc.ImageRemove(ctx, s.ImageName, image.RemoveOptions{Force: true, PruneChildren: true}); err != nil {
+		// ignoring the deprecation warning, since it is intended for docker/docker internal use
+		if client.IsErrNotFound(err) {
+			return nil
+		}
 		return err
 	}
 	return nil
