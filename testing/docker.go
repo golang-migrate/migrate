@@ -102,17 +102,6 @@ func (d *DockerContainer) Start() error {
 	containerName := fmt.Sprintf("migrate_test_%s", pseudoRandStr(10))
 
 	// create container first
-	// resp, err := d.client.ContainerCreate(context.Background(),
-	// &dockercontainer.Config{
-	// 	Image:  d.ImageName,
-	// 	Labels: map[string]string{"migrate_test": "true"},
-	// 	Env:    d.ENV,
-	// 	Cmd:    d.Cmd,
-	// },
-	// 	&dockercontainer.HostConfig{PublishAllPorts: true},
-	// 	&dockernetwork.NetworkingConfig{},
-	// 	nil,
-	// 	containerName)
 	resp, err := d.client.ContainerCreate(context.Background(),
 		dockerclient.ContainerCreateOptions{
 			Config: &dockercontainer.Config{
