@@ -232,6 +232,24 @@ func TestClose(t *testing.T) {
 	}
 }
 
+func TestUpWithNoMigrationFiles(t *testing.T) {
+	// A fresh database with an empty source used to fail with the cryptic
+	// "first .: file does not exist". It should now report that no migration
+	// files were found, while still satisfying errors.Is(os.ErrNotExist).
+	m, err := New("stub://", "stub://")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = m.Up()
+	if !errors.Is(err, ErrNoMigrationFiles) {
+		t.Fatalf("expected ErrNoMigrationFiles, got %v", err)
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected error to wrap os.ErrNotExist, got %v", err)
+	}
+}
+
 func TestMigrate(t *testing.T) {
 	m, _ := New("stub://", "stub://")
 	m.sourceDrv.(*sStub.Stub).Migrations = sourceStubMigrations
