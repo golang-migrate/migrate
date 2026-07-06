@@ -65,7 +65,11 @@ func ensureTestSchema(t *testing.T, rawURL string, schemaName string) {
 	t.Helper()
 
 	db := openWithoutSchema(t, rawURL)
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	var count int
 	if err := db.QueryRow(`SELECT COUNT(*) FROM SYS.SCHEMAS WHERE SCHEMA_NAME = ?`, schemaName).Scan(&count); err != nil {
@@ -140,7 +144,11 @@ func TestSchemaMismatch(t *testing.T) {
 
 	connector.SetDefaultSchema(schemaName)
 	db := sql.OpenDB(connector)
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	// pass a different schema name in config
 	_, err = WithInstance(db, &Config{
@@ -161,8 +169,16 @@ func TestMultiStatement(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer d.Close()
-	defer d.Drop()
+	defer func() {
+		if err := d.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
+	defer func() {
+		if err := d.Drop(); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations_multi", "hdb", d)
 	if err != nil {
@@ -197,8 +213,16 @@ func TestMultiStatementCustomDelimiter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer d.Close()
-	defer d.Drop()
+	defer func() {
+		if err := d.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
+	defer func() {
+		if err := d.Drop(); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations_split", "hdb", d)
 	if err != nil {
@@ -226,8 +250,16 @@ func TestMultiStatementRollback(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer d.Close()
-	defer d.Drop()
+	defer func() {
+		if err := d.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
+	defer func() {
+		if err := d.Drop(); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations_rollback", "hdb", d)
 	if err != nil {
