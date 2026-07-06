@@ -1,0 +1,13 @@
+{
+    "nodes": [
+        {
+            "host": "localhost"
+        }
+    ],
+    "config": {
+        "enable_shufflepuff": false,
+        "enable_distributed_shuffle": false,
+        "logger_use_files": false,
+        "logger_console": true
+    }
+}
