@@ -1,7 +1,9 @@
 package database
 
 import (
+	"errors"
 	"fmt"
+	"regexp"
 )
 
 // Error should be used for errors involving queries ran against the database
@@ -24,4 +26,26 @@ func (e Error) Error() string {
 		return fmt.Sprintf("%v in line %v: %s", e.OrigErr, e.Line, e.Query)
 	}
 	return fmt.Sprintf("%v in line %v: %s (details: %v)", e.Err, e.Line, e.Query, e.OrigErr)
+}
+
+var (
+	quotedKVRegex  = regexp.MustCompile(`password='[^']*'`)
+	plainKVRegex   = regexp.MustCompile(`password=[^ ]*`)
+	brokenURLRegex = regexp.MustCompile(`:[^:@]+?@`)
+)
+
+func RedactPassword(err error) error {
+	input := err.Error()
+
+	// Check if this error message contains password information
+	hasPassword := quotedKVRegex.MatchString(input) || plainKVRegex.MatchString(input) || brokenURLRegex.MatchString(input)
+
+	if !hasPassword {
+		return err
+	}
+	input = quotedKVRegex.ReplaceAllLiteralString(input, "password=xxxxx")
+	input = plainKVRegex.ReplaceAllLiteralString(input, "password=xxxxx")
+	input = brokenURLRegex.ReplaceAllLiteralString(input, ":xxxxxx@")
+
+	return errors.New(input)
 }
