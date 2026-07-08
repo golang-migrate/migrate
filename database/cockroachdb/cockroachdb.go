@@ -37,6 +37,7 @@ type Config struct {
 	LockTable       string
 	ForceLock       bool
 	DatabaseName    string
+	NoLock          bool
 }
 
 type CockroachDb struct {
@@ -127,11 +128,20 @@ func (c *CockroachDb) Open(url string) (database.Driver, error) {
 		forceLock = false
 	}
 
+	noLock := false
+	if s := purl.Query().Get("x-no-lock"); len(s) > 0 {
+		noLock, err = strconv.ParseBool(s)
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse option x-no-lock: %w", err)
+		}
+	}
+
 	px, err := WithInstance(db, &Config{
 		DatabaseName:    purl.Path,
 		MigrationsTable: migrationsTable,
 		LockTable:       lockTable,
 		ForceLock:       forceLock,
+		NoLock:          noLock,
 	})
 	if err != nil {
 		return nil, err
@@ -148,6 +158,10 @@ func (c *CockroachDb) Close() error {
 // See: https://github.com/cockroachdb/cockroach/issues/13546
 func (c *CockroachDb) Lock() error {
 	return database.CasRestoreOnErr(&c.isLocked, false, true, database.ErrLocked, func() (err error) {
+		if c.config.NoLock {
+			return nil
+		}
+
 		return crdb.ExecuteTx(context.Background(), c.db, nil, func(tx *sql.Tx) (err error) {
 			aid, err := database.GenerateAdvisoryLockId(c.config.DatabaseName)
 			if err != nil {
@@ -185,6 +199,10 @@ func (c *CockroachDb) Lock() error {
 // See: https://github.com/cockroachdb/cockroach/issues/13546
 func (c *CockroachDb) Unlock() error {
 	return database.CasRestoreOnErr(&c.isLocked, true, false, database.ErrNotLocked, func() (err error) {
+		if c.config.NoLock {
+			return nil
+		}
+
 		aid, err := database.GenerateAdvisoryLockId(c.config.DatabaseName)
 		if err != nil {
 			return err

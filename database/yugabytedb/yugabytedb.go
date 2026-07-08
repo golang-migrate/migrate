@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"io"
 	"net/url"
 	"regexp"
@@ -48,6 +49,7 @@ type Config struct {
 	MaxRetryInterval    time.Duration
 	MaxRetryElapsedTime time.Duration
 	MaxRetries          int
+	NoLock              bool
 }
 
 type YugabyteDB struct {
@@ -168,6 +170,14 @@ func (c *YugabyteDB) Open(dbURL string) (database.Driver, error) {
 		maxRetries = DefaultMaxRetries
 	}
 
+	noLock := false
+	if s := purl.Query().Get("x-no-lock"); len(s) > 0 {
+		noLock, err = strconv.ParseBool(s)
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse option x-no-lock: %w", err)
+		}
+	}
+
 	px, err := WithInstance(db, &Config{
 		DatabaseName:        purl.Path,
 		MigrationsTable:     migrationsTable,
@@ -176,6 +186,7 @@ func (c *YugabyteDB) Open(dbURL string) (database.Driver, error) {
 		MaxRetryInterval:    maxInterval,
 		MaxRetryElapsedTime: maxElapsedTime,
 		MaxRetries:          maxRetries,
+		NoLock:              noLock,
 	})
 	if err != nil {
 		return nil, err
@@ -192,6 +203,10 @@ func (c *YugabyteDB) Close() error {
 // See: https://github.com/yugabyte/yugabyte-db/issues/3642
 func (c *YugabyteDB) Lock() error {
 	return database.CasRestoreOnErr(&c.isLocked, false, true, database.ErrLocked, func() (err error) {
+		if c.config.NoLock {
+			return nil
+		}
+
 		return c.doTxWithRetry(context.Background(), &sql.TxOptions{Isolation: sql.LevelSerializable}, func(tx *sql.Tx) (err error) {
 			aid, err := database.GenerateAdvisoryLockId(c.config.DatabaseName)
 			if err != nil {
@@ -229,6 +244,10 @@ func (c *YugabyteDB) Lock() error {
 // See: https://github.com/yugabyte/yugabyte-db/issues/3642
 func (c *YugabyteDB) Unlock() error {
 	return database.CasRestoreOnErr(&c.isLocked, true, false, database.ErrNotLocked, func() (err error) {
+		if c.config.NoLock {
+			return nil
+		}
+
 		aid, err := database.GenerateAdvisoryLockId(c.config.DatabaseName)
 		if err != nil {
 			return err
