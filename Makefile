@@ -38,6 +38,9 @@ test:
 	@mkdir $(COVERAGE_DIR)
 	make test-with-flags TEST_FLAGS='-v -race -covermode atomic -coverprofile $$(COVERAGE_DIR)/combined.txt -bench=. -benchmem -timeout 20m'
 
+verify-dependency-security:
+	bash scripts/verify-dependency-security.sh
+
 
 test-with-flags:
 	@echo SOURCE: $(SOURCE)
@@ -111,10 +114,9 @@ define external_deps
 endef
 
 
-.PHONY: build build-docker build-cli clean test-short test test-with-flags html-coverage \
+.PHONY: build build-docker build-cli clean test-short test test-with-flags verify-dependency-security html-coverage \
         restore-import-paths rewrite-import-paths list-external-deps release \
 		docs kill-docs open-docs kill-orphaned-docker-containers echo-source echo-database
 
 SHELL = /bin/sh
 RAND = $(shell echo $$RANDOM)
-

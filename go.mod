@@ -178,6 +178,7 @@ require (
 	go.opencensus.io v0.24.0 // indirect
 	golang.org/x/crypto v0.53.0 // indirect
 	golang.org/x/exp v0.0.0-20230315142452-642cacee5cc0 // indirect
+	golang.org/x/image v0.43.0
 	golang.org/x/mod v0.36.0 // indirect
 	golang.org/x/net v0.55.0 // indirect
 	golang.org/x/sync v0.21.0 // indirect
@@ -214,3 +215,5 @@ require (
 )
 
 replace github.com/dhui/dktest => ./internal/dktest
+
+exclude github.com/docker/docker v28.0.1+incompatible
