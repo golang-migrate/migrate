@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/dhui/dktest"
-	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/client"
+	"github.com/moby/moby/api/types/image"
+	"github.com/moby/moby/client"
 )
 
 // ContainerSpec holds Docker testing setup specifications
