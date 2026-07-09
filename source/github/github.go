@@ -4,16 +4,13 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"net/http"
 	nurl "net/url"
 	"os"
 	"path"
 	"strings"
 
-	"golang.org/x/oauth2"
-
 	"github.com/golang-migrate/migrate/v4/source"
-	"github.com/google/go-github/v39/github"
+	"github.com/google/go-github/v89/github"
 )
 
 func init() {
@@ -48,22 +45,22 @@ func (g *Github) Open(url string) (source.Driver, error) {
 		return nil, err
 	}
 
-	// client defaults to http.DefaultClient
-	var client *http.Client
+	var opts []github.ClientOptionsFunc
 	if u.User != nil {
 		password, ok := u.User.Password()
 		if !ok {
 			return nil, ErrNoUserInfo
 		}
-		ts := oauth2.StaticTokenSource(
-			&oauth2.Token{AccessToken: password},
-		)
-		client = oauth2.NewClient(context.Background(), ts)
+		opts = append(opts, github.WithAuthToken(password))
+	}
 
+	client, err := github.NewClient(opts...)
+	if err != nil {
+		return nil, err
 	}
 
 	gn := &Github{
-		client:     github.NewClient(client),
+		client:     client,
 		migrations: source.NewMigrations(),
 		options:    &github.RepositoryContentGetOptions{Ref: u.Fragment},
 	}
