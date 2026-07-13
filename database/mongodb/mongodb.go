@@ -217,12 +217,16 @@ func parseInt(urlParam string, defaultValue int) (int, error) {
 }
 func (m *Mongo) SetVersion(version int, dirty bool) error {
 	migrationsCollection := m.db.Collection(m.config.MigrationsCollection)
-	if err := migrationsCollection.Drop(context.TODO()); err != nil {
-		return &database.Error{OrigErr: err, Err: "drop migrations collection failed"}
-	}
-	_, err := migrationsCollection.InsertOne(context.TODO(), bson.M{"version": version, "dirty": dirty})
-	if err != nil {
-		return &database.Error{OrigErr: err, Err: "save version failed"}
+	filt := bson.D{{"version", bson.D{{"$exists", true}}}}
+	upd := bson.D{{"$set", bson.D{
+		{"version", int32(version)},
+		{"dirty", dirty},
+	}}}
+	var tr = true
+	if res := migrationsCollection.FindOneAndUpdate(context.TODO(), filt, upd, &options.FindOneAndUpdateOptions{Upsert: &tr}); res.Err() != nil {
+		if res.Err() != mongo.ErrNoDocuments {
+			return &database.Error{OrigErr: res.Err(), Err: "FindOneAndUpdate failed"}
+		}
 	}
 	return nil
 }
