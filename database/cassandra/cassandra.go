@@ -123,6 +123,14 @@ func (c *Cassandra) Open(url string) (database.Driver, error) {
 		}
 		cluster.ProtoVersion = protoversion
 	}
+	if len(u.Query().Get("port")) > 0 {
+		var port int
+		port, err = strconv.Atoi(u.Query().Get("port"))
+		if err != nil {
+			return nil, err
+		}
+		cluster.Port = port
+	}
 	if len(u.Query().Get("timeout")) > 0 {
 		var timeout time.Duration
 		timeout, err = time.ParseDuration(u.Query().Get("timeout"))
