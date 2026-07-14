@@ -322,18 +322,7 @@ func (c *CockroachDb) ensureVersionTable() (err error) {
 		}
 	}()
 
-	// check if migration table exists
-	var count int
-	query := `SELECT COUNT(1) FROM information_schema.tables WHERE table_name = $1 AND table_schema = (SELECT current_schema()) LIMIT 1`
-	if err := c.db.QueryRow(query, c.config.MigrationsTable).Scan(&count); err != nil {
-		return &database.Error{OrigErr: err, Query: []byte(query)}
-	}
-	if count == 1 {
-		return nil
-	}
-
-	// if not, create the empty migration table
-	query = `CREATE TABLE "` + c.config.MigrationsTable + `" (version INT NOT NULL PRIMARY KEY, dirty BOOL NOT NULL)`
+	query := `CREATE TABLE IF NOT EXISTS "` + c.config.MigrationsTable + `" (version INT NOT NULL PRIMARY KEY, dirty BOOL NOT NULL)`
 	if _, err := c.db.Exec(query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
@@ -341,18 +330,7 @@ func (c *CockroachDb) ensureVersionTable() (err error) {
 }
 
 func (c *CockroachDb) ensureLockTable() error {
-	// check if lock table exists
-	var count int
-	query := `SELECT COUNT(1) FROM information_schema.tables WHERE table_name = $1 AND table_schema = (SELECT current_schema()) LIMIT 1`
-	if err := c.db.QueryRow(query, c.config.LockTable).Scan(&count); err != nil {
-		return &database.Error{OrigErr: err, Query: []byte(query)}
-	}
-	if count == 1 {
-		return nil
-	}
-
-	// if not, create the empty lock table
-	query = `CREATE TABLE "` + c.config.LockTable + `" (lock_id INT NOT NULL PRIMARY KEY)`
+	query := `CREATE TABLE IF NOT EXISTS "` + c.config.LockTable + `" (lock_id INT NOT NULL PRIMARY KEY)`
 	if _, err := c.db.Exec(query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
