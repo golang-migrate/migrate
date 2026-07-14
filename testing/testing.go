@@ -27,7 +27,6 @@ func ParallelTest(t *testing.T, versions []Version, readyFn IsReadyFunc, testFn 
 	}
 
 	for i, version := range versions {
-		version := version // capture range variable, see https://goo.gl/60w3p2
 
 		// Only test against one version in short mode
 		// TODO: order is random, maybe always pick first version instead?
