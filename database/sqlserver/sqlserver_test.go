@@ -37,8 +37,9 @@ var (
 	}
 )
 
-func msConnectionString(host, port string) string {
-	return fmt.Sprintf("sqlserver://sa:%v@%v:%v?database=master", saPassword, host, port)
+func msConnectionString(host, port string, options ...string) string {
+	options = append(options, "database=master")
+	return fmt.Sprintf("sqlserver://sa:%v@%v:%v?%s", saPassword, host, port, strings.Join(options, "&"))
 }
 
 func msConnectionStringMsiWithPassword(host, port string, useMsi bool) string {
@@ -87,6 +88,7 @@ func Test(t *testing.T) {
 	t.Run("test", test)
 	t.Run("testMigrate", testMigrate)
 	t.Run("testMultiStatement", testMultiStatement)
+	t.Run("testBatchedStatement", testBatchedStatement)
 	t.Run("testErrorParsing", testErrorParsing)
 	t.Run("testLockWorks", testLockWorks)
 	t.Run("testMsiTrue", testMsiTrue)
@@ -187,6 +189,49 @@ func testMultiStatement(t *testing.T) {
 		}
 		if exists != 1 {
 			t.Fatalf("expected table bar to exist")
+		}
+	})
+}
+
+func testBatchedStatement(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.Port(defaultPort)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := msConnectionString(ip, port, "x-batch=true")
+		ms := &SQLServer{}
+		d, err := ms.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
+		if err := d.Run(strings.NewReader(`CREATE PROCEDURE uspA
+AS
+BEGIN
+    SELECT 1;
+END;
+GO
+CREATE PROCEDURE uspB
+AS
+BEGIN
+    SELECT 2;
+END`)); err != nil {
+			t.Fatalf("expected err to be nil, got %v", err)
+		}
+
+		// make sure second proc exists
+		var exists int
+		if err := d.(*SQLServer).conn.QueryRowContext(context.Background(), "Select COUNT(1) from sysobjects where type = 'P' and category = 0 and [NAME] = 'uspB'").Scan(&exists); err != nil {
+			t.Fatal(err)
+		}
+		if exists != 1 {
+			t.Fatalf("expected proc uspB to exist")
 		}
 	})
 }
