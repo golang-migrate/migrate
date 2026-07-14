@@ -124,7 +124,7 @@ func main() {
     m, err := migrate.New(
         "github://mattes:personal-access-token@mattes/migrate_test",
         "postgres://localhost:5432/database?sslmode=enable")
-    m.Steps(2)
+    m.Up() // or m.Steps(2) if you want to explicitly set the number of migrations to run
 }
 ```
 
