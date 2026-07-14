@@ -289,32 +289,52 @@ func (p *Postgres) runStatement(statement []byte) error {
 		ctx, cancel = context.WithTimeout(ctx, p.config.StatementTimeout)
 		defer cancel()
 	}
+
 	query := string(statement)
 	if strings.TrimSpace(query) == "" {
 		return nil
 	}
-	if _, err := p.conn.ExecContext(ctx, query); err != nil {
-		if pgErr, ok := err.(*pq.Error); ok {
-			var line uint
-			var col uint
-			var lineColOK bool
-			if pgErr.Position != "" {
-				if pos, err := strconv.ParseUint(pgErr.Position, 10, 64); err == nil {
-					line, col, lineColOK = computeLineFromPos(query, int(pos))
-				}
-			}
-			message := fmt.Sprintf("migration failed: %s", pgErr.Message)
-			if lineColOK {
-				message = fmt.Sprintf("%s (column %d)", message, col)
-			}
-			if pgErr.Detail != "" {
-				message = fmt.Sprintf("%s, %s", message, pgErr.Detail)
-			}
-			return database.Error{OrigErr: err, Err: message, Query: statement, Line: line}
-		}
-		return database.Error{OrigErr: err, Err: "migration failed", Query: statement}
+
+	tx, err := p.db.BeginTx(ctx, &sql.TxOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %v", err)
 	}
+
+	if _, err := tx.ExecContext(ctx, query); err != nil {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			return fmt.Errorf("failed to rollback transaction after error: %v, rollback error: %v", err, rollbackErr)
+		}
+		return handleError(err, query, statement)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %v", err)
+	}
+
 	return nil
+}
+
+func handleError(err error, query string, statement []byte) error {
+	if pgErr, ok := err.(*pq.Error); ok {
+		var line uint
+		var col uint
+		var lineColOK bool
+		if pgErr.Position != "" {
+			if pos, err := strconv.ParseUint(pgErr.Position, 10, 64); err == nil {
+				line, col, lineColOK = computeLineFromPos(query, int(pos))
+			}
+		}
+
+		message := fmt.Sprintf("migration failed: %s", pgErr.Message)
+		if lineColOK {
+			message = fmt.Sprintf("%s (column %d)", message, col)
+		}
+		if pgErr.Detail != "" {
+			message = fmt.Sprintf("%s, %s", message, pgErr.Detail)
+		}
+		return database.Error{OrigErr: err, Err: message, Query: statement, Line: line}
+	}
+	return database.Error{OrigErr: err, Err: "migration failed", Query: statement}
 }
 
 func computeLineFromPos(s string, pos int) (line uint, col uint, ok bool) {
