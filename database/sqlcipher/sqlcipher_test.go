@@ -1,6 +1,7 @@
 package sqlcipher
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"path/filepath"
@@ -17,9 +18,10 @@ import (
 func Test(t *testing.T) {
 	dir := t.TempDir()
 	t.Logf("DB path : %s\n", filepath.Join(dir, "sqlite3.db"))
+	ctx := context.Background()
 	p := &Sqlite{}
 	addr := fmt.Sprintf("sqlite3://%s", filepath.Join(dir, "sqlite3.db"))
-	d, err := p.Open(addr)
+	d, err := p.Open(ctx, addr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -30,6 +32,7 @@ func TestMigrate(t *testing.T) {
 	dir := t.TempDir()
 	t.Logf("DB path : %s\n", filepath.Join(dir, "sqlite3.db"))
 
+	ctx := context.Background()
 	db, err := sql.Open("sqlite3", filepath.Join(dir, "sqlite3.db"))
 	if err != nil {
 		return
@@ -39,12 +42,12 @@ func TestMigrate(t *testing.T) {
 			return
 		}
 	}()
-	driver, err := WithInstance(db, &Config{})
+	driver, err := WithInstance(ctx, db, &Config{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	m, err := migrate.NewWithDatabaseInstance(
+	m, err := migrate.NewWithDatabaseInstance(ctx,
 		"file://./examples/migrations",
 		"ql", driver)
 	if err != nil {
@@ -58,6 +61,7 @@ func TestMigrationTable(t *testing.T) {
 
 	t.Logf("DB path : %s\n", filepath.Join(dir, "sqlite3.db"))
 
+	ctx := context.Background()
 	db, err := sql.Open("sqlite3", filepath.Join(dir, "sqlite3.db"))
 	if err != nil {
 		return
@@ -71,23 +75,23 @@ func TestMigrationTable(t *testing.T) {
 	config := &Config{
 		MigrationsTable: "my_migration_table",
 	}
-	driver, err := WithInstance(db, config)
+	driver, err := WithInstance(ctx, db, config)
 	if err != nil {
 		t.Fatal(err)
 	}
-	m, err := migrate.NewWithDatabaseInstance(
+	m, err := migrate.NewWithDatabaseInstance(ctx,
 		"file://./examples/migrations",
 		"ql", driver)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Log("UP")
-	err = m.Up()
+	err = m.Up(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = db.Query(fmt.Sprintf("SELECT * FROM %s", config.MigrationsTable))
+	_, err = db.QueryContext(ctx, fmt.Sprintf("SELECT * FROM %s", config.MigrationsTable))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,9 +100,10 @@ func TestMigrationTable(t *testing.T) {
 func TestNoTxWrap(t *testing.T) {
 	dir := t.TempDir()
 	t.Logf("DB path : %s\n", filepath.Join(dir, "sqlite3.db"))
+	ctx := context.Background()
 	p := &Sqlite{}
 	addr := fmt.Sprintf("sqlite3://%s?x-no-tx-wrap=true", filepath.Join(dir, "sqlite3.db"))
-	d, err := p.Open(addr)
+	d, err := p.Open(ctx, addr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,9 +115,10 @@ func TestNoTxWrap(t *testing.T) {
 func TestNoTxWrapInvalidValue(t *testing.T) {
 	dir := t.TempDir()
 	t.Logf("DB path : %s\n", filepath.Join(dir, "sqlite3.db"))
+	ctx := context.Background()
 	p := &Sqlite{}
 	addr := fmt.Sprintf("sqlite3://%s?x-no-tx-wrap=yeppers", filepath.Join(dir, "sqlite3.db"))
-	_, err := p.Open(addr)
+	_, err := p.Open(ctx, addr)
 	if assert.Error(t, err) {
 		assert.Contains(t, err.Error(), "x-no-tx-wrap")
 		assert.Contains(t, err.Error(), "invalid syntax")

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -122,10 +123,11 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 	// initialize migrate
 	// don't catch migraterErr here and let each command decide
 	// how it wants to handle the error
-	migrater, migraterErr := migrate.New(*sourcePtr, *databasePtr)
+	ctx := context.Background()
+	migrater, migraterErr := migrate.New(ctx, *sourcePtr, *databasePtr)
 	defer func() {
 		if migraterErr == nil {
-			if _, err := migrater.Close(); err != nil {
+			if _, err := migrater.Close(ctx); err != nil {
 				log.Println(err)
 			}
 		}
@@ -215,7 +217,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 			log.fatal("error: can't read version argument V")
 		}
 
-		if err := gotoCmd(migrater, uint(v)); err != nil {
+		if err := gotoCmd(ctx, migrater, uint(v)); err != nil {
 			log.fatalErr(err)
 		}
 
@@ -245,7 +247,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 			limit = int(n)
 		}
 
-		if err := upCmd(migrater, limit); err != nil {
+		if err := upCmd(ctx, migrater, limit); err != nil {
 			log.fatalErr(err)
 		}
 
@@ -285,7 +287,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 			}
 		}
 
-		if err := downCmd(migrater, num); err != nil {
+		if err := downCmd(ctx, migrater, num); err != nil {
 			log.fatalErr(err)
 		}
 
@@ -320,7 +322,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 			log.fatalErr(migraterErr)
 		}
 
-		if err := dropCmd(migrater); err != nil {
+		if err := dropCmd(ctx, migrater); err != nil {
 			log.fatalErr(err)
 		}
 
@@ -354,7 +356,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 			log.fatal("error: argument V must be >= -1")
 		}
 
-		if err := forceCmd(migrater, int(v)); err != nil {
+		if err := forceCmd(ctx, migrater, int(v)); err != nil {
 			log.fatalErr(err)
 		}
 
@@ -367,7 +369,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 			log.fatalErr(migraterErr)
 		}
 
-		if err := versionCmd(migrater); err != nil {
+		if err := versionCmd(ctx, migrater); err != nil {
 			log.fatalErr(err)
 		}
 

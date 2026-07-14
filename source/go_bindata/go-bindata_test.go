@@ -1,6 +1,7 @@
 package bindata
 
 import (
+	"context"
 	"testing"
 
 	"github.com/golang-migrate/migrate/v4/source/go_bindata/testdata"
@@ -14,7 +15,7 @@ func Test(t *testing.T) {
 			return testdata.Asset(name)
 		})
 
-	d, err := WithInstance(s)
+	d, err := WithInstance(context.Background(), s)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -28,7 +29,7 @@ func TestWithInstance(t *testing.T) {
 			return testdata.Asset(name)
 		})
 
-	_, err := WithInstance(s)
+	_, err := WithInstance(context.Background(), s)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,7 +37,7 @@ func TestWithInstance(t *testing.T) {
 
 func TestOpen(t *testing.T) {
 	b := &Bindata{}
-	_, err := b.Open("")
+	_, err := b.Open(context.Background(), "")
 	if err == nil {
 		t.Fatal("expected err, because it's not implemented yet")
 	}
