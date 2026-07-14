@@ -51,7 +51,7 @@ $ go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@$
 
 ```bash
 $ # Go 1.15 and below
-$ go get -tags 'postgres' -u github.com/golang-migrate/migrate/cmd/migrate
+$ go get -tags 'postgres' -u github.com/golang-migrate/migrate/v4/cmd/migrate
 $ # Go 1.16+
 $ go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 ```
