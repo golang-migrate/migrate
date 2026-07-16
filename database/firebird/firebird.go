@@ -9,10 +9,13 @@ import (
 	"fmt"
 	"io"
 	nurl "net/url"
+	"strconv"
+	"strings"
 	"sync/atomic"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
+	"github.com/golang-migrate/migrate/v4/database/multistmt"
 	_ "github.com/nakagami/firebirdsql"
 )
 
@@ -22,15 +25,22 @@ func init() {
 	database.Register("firebirdsql", &db)
 }
 
-var DefaultMigrationsTable = "schema_migrations"
+var (
+	multiStmtDelimiter = []byte(";")
+
+	DefaultMigrationsTable       = "schema_migrations"
+	DefaultMultiStatementMaxSize = 10 * 1 << 20 // 10 MB
+)
 
 var (
 	ErrNilConfig = fmt.Errorf("no config")
 )
 
 type Config struct {
-	DatabaseName    string
-	MigrationsTable string
+	DatabaseName          string
+	MigrationsTable       string
+	MultiStatementEnabled bool
+	MultiStatementMaxSize int
 }
 
 type Firebird struct {
@@ -74,8 +84,42 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	return fb, nil
 }
 
+func parseConfig(purl *nurl.URL) (*Config, error) {
+	maxSize := DefaultMultiStatementMaxSize
+	if s := purl.Query().Get("x-multi-statement-max-size"); len(s) > 0 {
+		n, err := strconv.Atoi(s)
+		if err != nil {
+			return nil, err
+		}
+		if n > 0 {
+			maxSize = n
+		}
+	}
+
+	enabled := false
+	if s := purl.Query().Get("x-multi-statement"); len(s) > 0 {
+		b, err := strconv.ParseBool(s)
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse option x-multi-statement: %w", err)
+		}
+		enabled = b
+	}
+
+	return &Config{
+		MigrationsTable:       purl.Query().Get("x-migrations-table"),
+		DatabaseName:          purl.Path,
+		MultiStatementEnabled: enabled,
+		MultiStatementMaxSize: maxSize,
+	}, nil
+}
+
 func (f *Firebird) Open(dsn string) (database.Driver, error) {
 	purl, err := nurl.Parse(dsn)
+	if err != nil {
+		return nil, err
+	}
+
+	cfg, err := parseConfig(purl)
 	if err != nil {
 		return nil, err
 	}
@@ -85,16 +129,7 @@ func (f *Firebird) Open(dsn string) (database.Driver, error) {
 		return nil, err
 	}
 
-	px, err := WithInstance(db, &Config{
-		MigrationsTable: purl.Query().Get("x-migrations-table"),
-		DatabaseName:    purl.Path,
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	return px, nil
+	return WithInstance(db, cfg)
 }
 
 func (f *Firebird) Close() error {
@@ -121,6 +156,28 @@ func (f *Firebird) Unlock() error {
 }
 
 func (f *Firebird) Run(migration io.Reader) error {
+	if f.config.MultiStatementEnabled {
+		var err error
+		var failedQuery []byte
+
+		if e := multistmt.Parse(migration, multiStmtDelimiter, f.config.MultiStatementMaxSize, func(m []byte) bool {
+			query := strings.TrimSpace(string(m))
+			if len(query) == 0 {
+				return true
+			}
+			if _, err = f.conn.ExecContext(context.Background(), query); err != nil {
+				failedQuery = append(failedQuery[:0], m...)
+				return false // stop parsing on error
+			}
+			return true // continue parsing
+		}); e != nil {
+			return &database.Error{OrigErr: e, Err: "error parsing multi-statement migration"}
+		}
+		if err != nil {
+			return &database.Error{OrigErr: err, Err: "migration failed", Query: failedQuery}
+		}
+		return nil
+	}
 	migr, err := io.ReadAll(migration)
 	if err != nil {
 		return err
