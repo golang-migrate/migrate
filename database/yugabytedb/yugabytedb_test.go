@@ -31,10 +31,12 @@ var (
 		ReadyFunc:    isReady,
 		Timeout:      time.Duration(60) * time.Second,
 	}
-	// Released versions: https://docs.yugabyte.com/preview/releases/release-notes/
+	// Released versions: https://docs.yugabyte.com/stable/releases/ybdb-releases/
 	specs = []dktesting.ContainerSpec{
-		{ImageName: "yugabytedb/yugabyte:2.14.15.0-b57", Options: opts},
-		{ImageName: "yugabytedb/yugabyte:2.20.2.1-b3", Options: opts},
+		{ImageName: "yugabytedb/yugabyte:2025.2.2.2-b11", Options: opts},
+		{ImageName: "yugabytedb/yugabyte:2025.1.4.0-b103", Options: opts},
+		{ImageName: "yugabytedb/yugabyte:2024.2.9.0-b55", Options: opts},
+		{ImageName: "yugabytedb/yugabyte:2.20.12.0-b30", Options: opts},
 	}
 )
 
