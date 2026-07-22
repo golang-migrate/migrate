@@ -75,7 +75,8 @@ type Migration struct {
 // last down migration, there is no next down migration, the targetVersion should
 // be nil. Nil in this case is represented by -1 (because type int).
 func NewMigration(body io.ReadCloser, identifier string,
-	version uint, targetVersion int) (*Migration, error) {
+	version uint, targetVersion int,
+) (*Migration, error) {
 	tnow := time.Now()
 	m := &Migration{
 		Identifier:    identifier,
@@ -124,8 +125,8 @@ func (m *Migration) Direction() string {
 
 // LogArgs returns the migration's fields as alternating key/value pairs for
 // structured logging (version, direction, identifier).
-func (m *Migration) LogArgs() []interface{} {
-	return []interface{}{
+func (m *Migration) LogArgs() []any {
+	return []any{
 		"version", m.Version,
 		"direction", m.Direction(),
 		"identifier", m.Identifier,
@@ -155,7 +156,6 @@ func (m *Migration) Buffer() (berr error) {
 		if err := m.Body.Close(); err != nil {
 			berr = errors.Join(berr, err)
 		}
-
 	}()
 
 	// start reading from body, peek won't move the read pointer though

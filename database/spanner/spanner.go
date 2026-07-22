@@ -180,7 +180,6 @@ func (s *Spanner) Run(migration io.Reader) error {
 		Database:   s.config.DatabaseName,
 		Statements: stmts,
 	})
-
 	if err != nil {
 		return &database.Error{OrigErr: err, Err: "migration failed", Query: migr}
 	}
@@ -200,10 +199,12 @@ func (s *Spanner) SetVersion(version int, dirty bool) error {
 		func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
 			m := []*spanner.Mutation{
 				spanner.Delete(s.config.MigrationsTable, spanner.AllKeys()),
-				spanner.Insert(s.config.MigrationsTable,
+				spanner.Insert(
+					s.config.MigrationsTable,
 					[]string{"Version", "Dirty"},
-					[]interface{}{version, dirty},
-				)}
+					[]any{version, dirty},
+				),
+			}
 			return txn.BufferWrite(m)
 		})
 	if err != nil {
@@ -318,7 +319,6 @@ func (s *Spanner) ensureVersionTable() (err error) {
 		Database:   s.config.DatabaseName,
 		Statements: []string{stmt},
 	})
-
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(stmt)}
 	}

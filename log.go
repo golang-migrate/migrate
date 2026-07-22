@@ -10,7 +10,7 @@ import (
 // logging implementation.
 type Logger interface {
 	// Printf is like fmt.Printf
-	Printf(format string, v ...interface{})
+	Printf(format string, v ...any)
 
 	// Verbose should return true when verbose logging output is wanted
 	Verbose() bool
@@ -36,7 +36,7 @@ type StructuredLogger interface {
 
 	// Log emits a single record. args are alternating key/value pairs in the
 	// same shape as slog.Logger.Log's args (e.g. "version", 4, "took", d).
-	Log(ctx context.Context, level slog.Level, msg string, args ...interface{})
+	Log(ctx context.Context, level slog.Level, msg string, args ...any)
 }
 
 // Message strings passed to [StructuredLogger.Log]. They double as the record
@@ -85,7 +85,7 @@ func NewSlogLogger(logger *slog.Logger) *SlogLogger {
 }
 
 // Log emits a structured record at level.
-func (s *SlogLogger) Log(ctx context.Context, level slog.Level, msg string, args ...interface{}) {
+func (s *SlogLogger) Log(ctx context.Context, level slog.Level, msg string, args ...any) {
 	s.logger.Log(ctx, level, msg, args...)
 }
 
@@ -93,7 +93,7 @@ func (s *SlogLogger) Log(ctx context.Context, level slog.Level, msg string, args
 // [SlogLogger] where a plain [Logger] is expected. The formatted message is
 // logged at [slog.LevelInfo], except messages prefixed with "error: " which are
 // logged at [slog.LevelError] to match migrate's own error convention.
-func (s *SlogLogger) Printf(format string, v ...interface{}) {
+func (s *SlogLogger) Printf(format string, v ...any) {
 	msg := fmt.Sprintf(format, v...)
 
 	level := slog.LevelInfo
@@ -125,7 +125,7 @@ var _ StructuredLogger = printfLogger{}
 
 // arg returns the value stored under key in the alternating key/value args, or
 // nil when the key is absent.
-func arg(key string, args []interface{}) interface{} {
+func arg(key string, args []any) any {
 	for i := 0; i+1 < len(args); i += 2 {
 		if k, ok := args[i].(string); ok && k == key {
 			return args[i+1]
@@ -139,7 +139,7 @@ func arg(key string, args []interface{}) interface{} {
 // before structured logging existed. Verbose (Debug) lines are suppressed unless
 // the wrapped [Logger] asks for verbose output; the applied-migration line also
 // gains its read/ran breakdown only when verbose.
-func (p printfLogger) Log(_ context.Context, level slog.Level, msg string, args ...interface{}) {
+func (p printfLogger) Log(_ context.Context, level slog.Level, msg string, args ...any) {
 	if level == slog.LevelDebug && !p.Verbose() {
 		return
 	}

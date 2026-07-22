@@ -235,14 +235,14 @@ func TestMigrateLegacyLogger(t *testing.T) {
 // TestPrintfLoggerLog checks the compatibility shim rebuilds the historical
 // Printf lines from structured records, including the verbose gate.
 func TestPrintfLoggerLog(t *testing.T) {
-	migArgs := []interface{}{"version", uint(4), "direction", "u", "identifier", "widgets"}
+	migArgs := []any{"version", uint(4), "direction", "u", "identifier", "widgets"}
 
 	tests := []struct {
 		name    string
 		verbose bool
 		level   slog.Level
 		msg     string
-		args    []interface{}
+		args    []any
 		want    string // "" means nothing should be logged
 	}{
 		{"scheduled non-verbose suppressed", false, slog.LevelDebug, msgScheduled, migArgs, ""},
@@ -252,15 +252,15 @@ func TestPrintfLoggerLog(t *testing.T) {
 		{"closing verbose", true, slog.LevelDebug, msgClosing, nil, "Closing source and database"},
 		{
 			"applied normal", false, slog.LevelInfo, msgApplied,
-			append(append([]interface{}{}, migArgs...), "read", "1ms", "ran", "2ms", "took", "3ms"),
+			append(append([]any{}, migArgs...), "read", "1ms", "ran", "2ms", "took", "3ms"),
 			"4/u widgets (3ms)",
 		},
 		{
 			"applied verbose", true, slog.LevelInfo, msgApplied,
-			append(append([]interface{}{}, migArgs...), "read", "1ms", "ran", "2ms", "took", "3ms"),
+			append(append([]any{}, migArgs...), "read", "1ms", "ran", "2ms", "took", "3ms"),
 			"Finished 4/u widgets (read 1ms, ran 2ms)",
 		},
-		{"error", false, slog.LevelError, msgError, []interface{}{"error", "boom"}, "error: boom"},
+		{"error", false, slog.LevelError, msgError, []any{"error", "boom"}, "error: boom"},
 	}
 
 	for _, tt := range tests {

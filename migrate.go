@@ -225,7 +225,7 @@ func (m *Migrate) Migrate(version uint) error {
 		return m.unlockErr(ErrDirty{curVersion})
 	}
 
-	ret := make(chan interface{}, m.PrefetchMigrations)
+	ret := make(chan any, m.PrefetchMigrations)
 	go m.read(curVersion, int(version), ret)
 
 	return m.unlockErr(m.runMigrations(ret))
@@ -251,7 +251,7 @@ func (m *Migrate) Steps(n int) error {
 		return m.unlockErr(ErrDirty{curVersion})
 	}
 
-	ret := make(chan interface{}, m.PrefetchMigrations)
+	ret := make(chan any, m.PrefetchMigrations)
 
 	if n > 0 {
 		go m.readUp(curVersion, n, ret)
@@ -278,7 +278,7 @@ func (m *Migrate) Up() error {
 		return m.unlockErr(ErrDirty{curVersion})
 	}
 
-	ret := make(chan interface{}, m.PrefetchMigrations)
+	ret := make(chan any, m.PrefetchMigrations)
 
 	go m.readUp(curVersion, -1, ret)
 	return m.unlockErr(m.runMigrations(ret))
@@ -300,7 +300,7 @@ func (m *Migrate) Down() error {
 		return m.unlockErr(ErrDirty{curVersion})
 	}
 
-	ret := make(chan interface{}, m.PrefetchMigrations)
+	ret := make(chan any, m.PrefetchMigrations)
 	go m.readDown(curVersion, -1, ret)
 	return m.unlockErr(m.runMigrations(ret))
 }
@@ -338,7 +338,7 @@ func (m *Migrate) Run(migration ...*Migration) error {
 		return m.unlockErr(ErrDirty{curVersion})
 	}
 
-	ret := make(chan interface{}, m.PrefetchMigrations)
+	ret := make(chan any, m.PrefetchMigrations)
 
 	go func() {
 		defer close(ret)
@@ -399,7 +399,7 @@ func (m *Migrate) Version() (version uint, dirty bool, err error) {
 // Each migration is then written to the ret channel.
 // If an error occurs during reading, that error is written to the ret channel, too.
 // Once read is done reading it will close the ret channel.
-func (m *Migrate) read(from int, to int, ret chan<- interface{}) {
+func (m *Migrate) read(from int, to int, ret chan<- any) {
 	defer close(ret)
 
 	// check if from version exists
@@ -531,7 +531,7 @@ func (m *Migrate) read(from int, to int, ret chan<- interface{}) {
 // Each migration is then written to the ret channel.
 // If an error occurs during reading, that error is written to the ret channel, too.
 // Once readUp is done reading it will close the ret channel.
-func (m *Migrate) readUp(from int, limit int, ret chan<- interface{}) {
+func (m *Migrate) readUp(from int, limit int, ret chan<- any) {
 	defer close(ret)
 
 	// check if from version exists
@@ -631,7 +631,7 @@ func (m *Migrate) readUp(from int, limit int, ret chan<- interface{}) {
 // Each migration is then written to the ret channel.
 // If an error occurs during reading, that error is written to the ret channel, too.
 // Once readDown is done reading it will close the ret channel.
-func (m *Migrate) readDown(from int, limit int, ret chan<- interface{}) {
+func (m *Migrate) readDown(from int, limit int, ret chan<- any) {
 	defer close(ret)
 
 	// check if from version exists
@@ -722,7 +722,7 @@ func (m *Migrate) readDown(from int, limit int, ret chan<- interface{}) {
 // Before running a newly received migration it will check if it's supposed
 // to stop execution because it might have received a stop signal on the
 // GracefulStop channel.
-func (m *Migrate) runMigrations(ret <-chan interface{}) error {
+func (m *Migrate) runMigrations(ret <-chan any) error {
 	for r := range ret {
 
 		if m.stop() {
@@ -958,7 +958,7 @@ func (m *Migrate) unlockErr(prevErr error) error {
 // trunk: a structured-capable Logger receives the record directly, while a
 // plain Printf-only Logger is wrapped in printfLogger, which rebuilds the
 // historical Printf line. A nil m.Log is a no-op.
-func (m *Migrate) logRecord(level slog.Level, msg string, args ...interface{}) {
+func (m *Migrate) logRecord(level slog.Level, msg string, args ...any) {
 	if m.Log == nil {
 		return
 	}
