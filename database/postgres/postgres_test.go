@@ -32,7 +32,8 @@ const (
 var (
 	opts = dktest.Options{
 		Env:          map[string]string{"POSTGRES_PASSWORD": pgPassword},
-		PortRequired: true, ReadyFunc: isReady}
+		PortRequired: true, ReadyFunc: isReady,
+	}
 	// Supported versions: https://www.postgresql.org/support/versioning/
 	specs = []dktesting.ContainerSpec{
 		{ImageName: "postgres:13", Options: opts},
@@ -409,7 +410,6 @@ func testMigrationTableOption(t *testing.T) {
 		if !exists {
 			t.Fatalf("expected table 'migrate.schema_migrations' to exist")
 		}
-
 	})
 }
 
@@ -426,7 +426,6 @@ func testFailToCreateTableWithoutPermissions(t *testing.T) {
 		p := &Postgres{}
 
 		d, err := p.Open(addr)
-
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -496,7 +495,6 @@ func testCheckBeforeCreateTable(t *testing.T) {
 		p := &Postgres{}
 
 		d, err := p.Open(addr)
-
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -519,7 +517,6 @@ func testCheckBeforeCreateTable(t *testing.T) {
 		// re-connect using that schema
 		d2, err := p.Open(fmt.Sprintf("postgres://not_owner:%s@%v:%v/postgres?sslmode=disable&search_path=barfoo",
 			pgPassword, ip, port))
-
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -537,13 +534,11 @@ func testCheckBeforeCreateTable(t *testing.T) {
 		// re-connect using that schema
 		d3, err := p.Open(fmt.Sprintf("postgres://not_owner:%s@%v:%v/postgres?sslmode=disable&search_path=barfoo",
 			pgPassword, ip, port))
-
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		version, _, err := d3.Version()
-
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -699,7 +694,7 @@ func testWithInstanceConcurrent(t *testing.T) {
 		defer wg.Wait()
 
 		wg.Add(concurrency)
-		for i := 0; i < concurrency; i++ {
+		for i := range concurrency {
 			go func(i int) {
 				defer wg.Done()
 				_, err := WithInstance(db, &Config{})

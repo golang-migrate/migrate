@@ -20,7 +20,7 @@ type Config struct{}
 
 type Stub struct {
 	Url        string
-	Instance   interface{}
+	Instance   any
 	Migrations *source.Migrations
 	Config     *Config
 }
@@ -33,7 +33,7 @@ func (s *Stub) Open(url string) (source.Driver, error) {
 	}, nil
 }
 
-func WithInstance(instance interface{}, config *Config) (source.Driver, error) {
+func WithInstance(instance any, config *Config) (source.Driver, error) {
 	return &Stub{
 		Instance:   instance,
 		Migrations: source.NewMigrations(),

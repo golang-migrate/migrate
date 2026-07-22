@@ -27,13 +27,10 @@ func ParallelTest(t *testing.T, versions []Version, readyFn IsReadyFunc, testFn 
 	}
 
 	for i, version := range versions {
-		version := version // capture range variable, see https://goo.gl/60w3p2
-
 		// Only test against one version in short mode
 		// TODO: order is random, maybe always pick first version instead?
 		if i > 0 && testing.Short() {
 			t.Logf("Skipping %v in short mode", version)
-
 		} else {
 			t.Run(version.Image, func(t *testing.T) {
 				t.Parallel()

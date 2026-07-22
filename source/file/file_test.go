@@ -148,7 +148,7 @@ func TestClose(t *testing.T) {
 }
 
 func mustWriteFile(t testing.TB, dir, file string, body string) {
-	if err := os.WriteFile(path.Join(dir, file), []byte(body), 06444); err != nil {
+	if err := os.WriteFile(path.Join(dir, file), []byte(body), 0o6444); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -156,7 +156,7 @@ func mustWriteFile(t testing.TB, dir, file string, body string) {
 func mustCreateBenchmarkDir(t *testing.B) (dir string) {
 	tmpDir := t.TempDir()
 
-	for i := 0; i < 1000; i++ {
+	for i := range 1000 {
 		mustWriteFile(t, tmpDir, fmt.Sprintf("%v_foobar.up.sql", i), "")
 		mustWriteFile(t, tmpDir, fmt.Sprintf("%v_foobar.down.sql", i), "")
 	}

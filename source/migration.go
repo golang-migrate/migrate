@@ -1,6 +1,7 @@
 package source
 
 import (
+	"slices"
 	"sort"
 )
 
@@ -70,9 +71,7 @@ func (i *Migrations) buildIndex() {
 	for version := range i.migrations {
 		i.index = append(i.index, version)
 	}
-	sort.Slice(i.index, func(x, y int) bool {
-		return i.index[x] < i.index[y]
-	})
+	slices.Sort(i.index)
 }
 
 func (i *Migrations) First() (version uint, ok bool) {
