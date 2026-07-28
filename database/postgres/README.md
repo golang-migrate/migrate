@@ -51,5 +51,4 @@ migrate -database "$DATABASE_URL" -source "file://migrations" \
 
 Place a line containing only `---` between each step in your migration file. The splitter matches when
 a whole line exactly equals the token (supports both LF and CRLF line endings), and each step is
-executed sequentially in a separate database call. This works with any database driver — no URL
-modification required.
+executed sequentially in a separate database call.

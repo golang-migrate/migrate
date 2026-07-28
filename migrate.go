@@ -799,7 +799,10 @@ func splitMigrationSteps(content, splitter []byte) [][]byte {
 	if len(splitter) == 0 {
 		return [][]byte{content}
 	}
+	return splitMigrationStepsByLine(content, splitter)
+}
 
+func splitMigrationStepsByLine(content, splitter []byte) [][]byte {
 	steps := make([][]byte, 0, 1)
 	currentStep := make([]byte, 0, len(content))
 
