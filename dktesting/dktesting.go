@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/containerd/errdefs"
 	"github.com/dhui/dktest"
-	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/client"
+	"github.com/moby/moby/client"
 )
 
 // ContainerSpec holds Docker testing setup specifications
@@ -19,7 +19,7 @@ type ContainerSpec struct {
 // Cleanup cleanups the ContainerSpec after a test run by removing the ContainerSpec's image
 func (s *ContainerSpec) Cleanup() (retErr error) {
 	// copied from dktest.RunContext()
-	dc, err := client.NewClientWithOpts(client.FromEnv, client.WithVersion("1.41"))
+	dc, err := client.New(client.FromEnv, client.WithAPIVersion("1.41"))
 	if err != nil {
 		return err
 	}
@@ -34,7 +34,10 @@ func (s *ContainerSpec) Cleanup() (retErr error) {
 	}
 	ctx, timeoutCancelFunc := context.WithTimeout(context.Background(), cleanupTimeout)
 	defer timeoutCancelFunc()
-	if _, err := dc.ImageRemove(ctx, s.ImageName, image.RemoveOptions{Force: true, PruneChildren: true}); err != nil {
+	if _, err := dc.ImageRemove(ctx, s.ImageName, client.ImageRemoveOptions{Force: true, PruneChildren: true}); err != nil {
+		if errdefs.IsNotFound(err) {
+			return nil
+		}
 		return err
 	}
 	return nil
