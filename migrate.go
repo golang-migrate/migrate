@@ -756,6 +756,9 @@ func (m *Migrate) runMigrations(ret <-chan interface{}) error {
 						return err
 					}
 					for _, step := range bytes.Split(content, m.MigrationSplitter) {
+						if len(step) == 0 {
+							continue
+						}
 						if err := m.databaseDrv.Run(bytes.NewReader(step)); err != nil {
 							return err
 						}

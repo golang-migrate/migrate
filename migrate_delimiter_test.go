@@ -100,3 +100,21 @@ func TestMigrationSplitterAbsentInContent(t *testing.T) {
 		t.Errorf("MigrationSequence = %q, want %q", dbDrv.MigrationSequence, want)
 	}
 }
+
+// TestMigrationSplitterTrailingDelimiterSkipsEmptyStep verifies that when a
+// migration ends with the splitter delimiter, the final empty split fragment
+// is not executed.
+func TestMigrationSplitterTrailingDelimiterSkipsEmptyStep(t *testing.T) {
+	const content = "stmt1;\n---\nstmt2;\n---\n"
+	m, dbDrv := newMigrateWithContent(t, content)
+	m.MigrationSplitter = []byte("\n---\n")
+
+	if err := m.Up(); err != nil {
+		t.Fatal(err)
+	}
+
+	want := []string{"stmt1;", "stmt2;"}
+	if !dbDrv.EqualSequence(want) {
+		t.Errorf("MigrationSequence = %q, want %q", dbDrv.MigrationSequence, want)
+	}
+}
