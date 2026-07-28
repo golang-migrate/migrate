@@ -26,13 +26,13 @@ func newMigrateWithContent(t *testing.T, content string) (*Migrate, *dStub.Stub)
 	return m, dbDrv
 }
 
-// TestStatementDelimiterSplitsFragments verifies that when StatementDelimiter is
+// TestMigrationSplitterSplitsIntoSteps verifies that when MigrationSplitter is
 // set, each fragment between delimiter lines is passed to the driver as a
 // separate Run call.
-func TestStatementDelimiterSplitsFragments(t *testing.T) {
+func TestMigrationSplitterSplitsIntoSteps(t *testing.T) {
 	const content = "stmt1;\n---\nstmt2;"
 	m, dbDrv := newMigrateWithContent(t, content)
-	m.StatementDelimiter = []byte("\n---\n")
+	m.MigrationSplitter = []byte("\n---\n")
 
 	if err := m.Up(); err != nil {
 		t.Fatal(err)
@@ -45,13 +45,13 @@ func TestStatementDelimiterSplitsFragments(t *testing.T) {
 	}
 }
 
-// TestStatementDelimiterDollarQuotedBody verifies that a migration containing a
+// TestMigrationSplitterDollarQuotedBody verifies that a migration containing a
 // DO $$ ... $$; block (which contains semicolons) is split correctly when a
 // newline-anchored delimiter is used, so the inner semicolons are never split on.
-func TestStatementDelimiterDollarQuotedBody(t *testing.T) {
+func TestMigrationSplitterDollarQuotedBody(t *testing.T) {
 	const content = "CREATE TABLE foo (id INT);\n---\nDO $$ BEGIN RAISE NOTICE 'hi'; END $$;"
 	m, dbDrv := newMigrateWithContent(t, content)
-	m.StatementDelimiter = []byte("\n---\n")
+	m.MigrationSplitter = []byte("\n---\n")
 
 	if err := m.Up(); err != nil {
 		t.Fatal(err)
@@ -66,13 +66,13 @@ func TestStatementDelimiterDollarQuotedBody(t *testing.T) {
 	}
 }
 
-// TestStatementDelimiterNilPreservesExistingBehavior verifies that when
-// StatementDelimiter is nil (the default), the migration body is passed to the
+// TestMigrationSplitterNilPreservesExistingBehavior verifies that when
+// MigrationSplitter is nil (the default), the migration body is passed to the
 // driver in a single Run call with its content unchanged.
-func TestStatementDelimiterNilPreservesExistingBehavior(t *testing.T) {
+func TestMigrationSplitterNilPreservesExistingBehavior(t *testing.T) {
 	const content = "stmt1; stmt2;"
 	m, dbDrv := newMigrateWithContent(t, content)
-	// StatementDelimiter is nil by default — no split should occur.
+	// MigrationSplitter is nil by default — no split should occur.
 
 	if err := m.Up(); err != nil {
 		t.Fatal(err)
@@ -84,13 +84,13 @@ func TestStatementDelimiterNilPreservesExistingBehavior(t *testing.T) {
 	}
 }
 
-// TestStatementDelimiterAbsentInContent verifies that when the delimiter is set
+// TestMigrationSplitterAbsentInContent verifies that when the splitter is set
 // but does not appear in the migration body, the entire body is passed as a
 // single statement.
-func TestStatementDelimiterAbsentInContent(t *testing.T) {
+func TestMigrationSplitterAbsentInContent(t *testing.T) {
 	const content = "CREATE TABLE bar (id INT);"
 	m, dbDrv := newMigrateWithContent(t, content)
-	m.StatementDelimiter = []byte("\n---\n")
+	m.MigrationSplitter = []byte("\n---\n")
 
 	if err := m.Up(); err != nil {
 		t.Fatal(err)

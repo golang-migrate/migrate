@@ -68,7 +68,7 @@ func Main(version string) {
 	pathPtr := flag.String("path", "", "")
 	databasePtr := flag.String("database", "", "")
 	sourcePtr := flag.String("source", "", "")
-	statementDelimiterPtr := flag.String("statement-delimiter", "", "")
+	migrationSplitterPtr := flag.String("migration-splitter", "", "")
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr,
@@ -81,7 +81,7 @@ Options:
   -database             Run migrations against this database (driver://url)
   -prefetch N           Number of migrations to load in advance before executing (default 10)
   -lock-timeout N       Allow N seconds to acquire database lock (default 15)
-  -statement-delimiter  Split migrations on lines matching this literal string before executing
+  -migration-splitter   Split migrations into sequential steps on lines matching this literal string
   -verbose              Print verbose logging
   -version              Print version
   -help                 Print usage
@@ -136,8 +136,8 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 		migrater.Log = log
 		migrater.PrefetchMigrations = *prefetchPtr
 		migrater.LockTimeout = time.Duration(int64(*lockTimeoutPtr)) * time.Second
-		if *statementDelimiterPtr != "" {
-			migrater.StatementDelimiter = []byte("\n" + *statementDelimiterPtr + "\n")
+		if *migrationSplitterPtr != "" {
+			migrater.MigrationSplitter = []byte("\n" + *migrationSplitterPtr + "\n")
 		}
 
 		// handle Ctrl+c

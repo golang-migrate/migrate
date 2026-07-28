@@ -81,12 +81,12 @@ type Migrate struct {
 	// but can be set per Migrate instance.
 	LockTimeout time.Duration
 
-	// StatementDelimiter, if non-nil, is used to split each migration into
-	// individual statements before passing them to the database driver.
-	// The delimiter is matched as a literal byte sequence. To require it to
+	// MigrationSplitter, if non-nil, splits each migration into delimiter-separated
+	// steps before passing each step to the database driver in order.
+	// The splitter is matched as a literal byte sequence. To require it to
 	// appear on its own line, include surrounding newlines (e.g. []byte("\n---\n")).
 	// If nil (the default), each migration is passed to the driver as-is.
-	StatementDelimiter []byte
+	MigrationSplitter []byte
 }
 
 // New returns a new Migrate instance from a source URL and a database URL.
@@ -750,13 +750,13 @@ func (m *Migrate) runMigrations(ret <-chan interface{}) error {
 
 			if migr.Body != nil {
 				m.logVerbosePrintf("Read and execute %v\n", migr.LogString())
-				if m.StatementDelimiter != nil {
+				if m.MigrationSplitter != nil {
 					content, err := io.ReadAll(migr.BufferedBody)
 					if err != nil {
 						return err
 					}
-					for _, stmt := range bytes.SplitAfter(content, m.StatementDelimiter) {
-						if err := m.databaseDrv.Run(bytes.NewReader(stmt)); err != nil {
+					for _, step := range bytes.SplitAfter(content, m.MigrationSplitter) {
+						if err := m.databaseDrv.Run(bytes.NewReader(step)); err != nil {
 							return err
 						}
 					}

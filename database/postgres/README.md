@@ -38,17 +38,17 @@ behavior is not desirable because some statements can be only run outside of tra
 `CREATE INDEX CONCURRENTLY`). If you want to use `CREATE INDEX CONCURRENTLY` without activating multi-statement mode
 you have to put such statements in a separate migration files.
 
-### Custom statement delimiter
+### Custom migration splitter
 
 If your migrations contain SQL bodies with embedded semicolons (e.g. `DO $$ BEGIN ... END $$;`), the
 semicolon-based splitting used by `x-multi-statement` will produce incorrect statement boundaries. Instead, you
-can use the CLI `-statement-delimiter` flag to split migrations on a delimiter line you control:
+can use the CLI `-migration-splitter` flag to split a migration into steps using a delimiter line you control:
 
 ```
 migrate -database "$DATABASE_URL" -source "file://migrations" \
-  -statement-delimiter '---' up
+  -migration-splitter '---' up
 ```
 
-Place a line containing only `---` between each statement in your migration file. The delimiter is matched
-as a whole line and works with any database driver — no URL modification required.
-
+Place a line containing only `---` between each step in your migration file. The splitter is matched
+as a whole line, and each step is executed sequentially in a separate database call. This works with
+any database driver — no URL modification required.
