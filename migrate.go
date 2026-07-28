@@ -5,8 +5,10 @@
 package migrate
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"sync"
 	"time"
@@ -78,6 +80,13 @@ type Migrate struct {
 	// LockTimeout defaults to DefaultLockTimeout,
 	// but can be set per Migrate instance.
 	LockTimeout time.Duration
+
+	// StatementDelimiter, if non-nil, is used to split each migration into
+	// individual statements before passing them to the database driver.
+	// The delimiter is matched as a literal byte sequence. To require it to
+	// appear on its own line, include surrounding newlines (e.g. []byte("\n---\n")).
+	// If nil (the default), each migration is passed to the driver as-is.
+	StatementDelimiter []byte
 }
 
 // New returns a new Migrate instance from a source URL and a database URL.
@@ -741,8 +750,20 @@ func (m *Migrate) runMigrations(ret <-chan interface{}) error {
 
 			if migr.Body != nil {
 				m.logVerbosePrintf("Read and execute %v\n", migr.LogString())
-				if err := m.databaseDrv.Run(migr.BufferedBody); err != nil {
-					return err
+				if m.StatementDelimiter != nil {
+					content, err := io.ReadAll(migr.BufferedBody)
+					if err != nil {
+						return err
+					}
+					for _, stmt := range bytes.SplitAfter(content, m.StatementDelimiter) {
+						if err := m.databaseDrv.Run(bytes.NewReader(stmt)); err != nil {
+							return err
+						}
+					}
+				} else {
+					if err := m.databaseDrv.Run(migr.BufferedBody); err != nil {
+						return err
+					}
 				}
 			}
 
