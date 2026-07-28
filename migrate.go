@@ -799,56 +799,21 @@ func splitMigrationSteps(content, splitter []byte) [][]byte {
 	if len(splitter) == 0 {
 		return [][]byte{content}
 	}
-	return splitMigrationStepsByLine(content, splitter)
-}
 
-func splitMigrationStepsByLine(content, splitter []byte) [][]byte {
 	steps := make([][]byte, 0, 1)
 	currentStep := make([]byte, 0, len(content))
 
-	for lineStart := 0; lineStart < len(content); {
-		nextLineBreakOffset := bytes.IndexByte(content[lineStart:], '\n')
-		lineEnd := len(content)
-		if nextLineBreakOffset >= 0 {
-			lineEnd = lineStart + nextLineBreakOffset + 1
-		}
-
-		line := content[lineStart:lineEnd]
-		lineForMatch := line
-		if len(lineForMatch) > 0 && lineForMatch[len(lineForMatch)-1] == '\n' {
-			lineForMatch = lineForMatch[:len(lineForMatch)-1]
-		}
-		if len(lineForMatch) > 0 && lineForMatch[len(lineForMatch)-1] == '\r' {
-			lineForMatch = lineForMatch[:len(lineForMatch)-1]
-		}
-
-		if bytes.Equal(lineForMatch, splitter) {
-			steps = append(steps, trimTrailingLineEnding(currentStep))
-			currentStep = make([]byte, 0, len(content)-lineEnd)
+	for _, line := range bytes.SplitAfter(content, []byte("\n")) {
+		if bytes.Equal(bytes.TrimRight(line, "\r\n"), splitter) {
+			steps = append(steps, currentStep)
+			currentStep = make([]byte, 0, len(content)-len(currentStep))
 		} else {
 			currentStep = append(currentStep, line...)
 		}
-
-		lineStart = lineEnd
 	}
 
 	steps = append(steps, currentStep)
 	return steps
-}
-
-func trimTrailingLineEnding(step []byte) []byte {
-	if len(step) == 0 {
-		return step
-	}
-
-	if step[len(step)-1] == '\n' {
-		step = step[:len(step)-1]
-		if len(step) > 0 && step[len(step)-1] == '\r' {
-			step = step[:len(step)-1]
-		}
-	}
-
-	return step
 }
 
 // versionExists checks the source if either the up or down migration for
