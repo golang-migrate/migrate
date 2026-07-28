@@ -749,16 +749,21 @@ func (m *Migrate) runMigrations(ret <-chan interface{}) error {
 
 			if migr.Body != nil {
 				m.logVerbosePrintf("Read and execute %v\n", migr.LogString())
-				content, err := io.ReadAll(migr.BufferedBody)
-				if err != nil {
-					return err
-				}
-				for _, step := range splitMigrationSteps(content, m.MigrationSplitter) {
-					if err := m.databaseDrv.Run(bytes.NewReader(step)); err != nil {
+				if len(m.MigrationSplitter) == 0 {
+					if err := m.databaseDrv.Run(migr.BufferedBody); err != nil {
 						return err
 					}
+				} else {
+					content, err := io.ReadAll(migr.BufferedBody)
+					if err != nil {
+						return err
+					}
+					for _, step := range splitMigrationSteps(content, m.MigrationSplitter) {
+						if err := m.databaseDrv.Run(bytes.NewReader(step)); err != nil {
+							return err
+						}
+					}
 				}
-
 			}
 
 			// set clean state
@@ -792,19 +797,25 @@ func splitMigrationSteps(content, splitter []byte) [][]byte {
 	}
 
 	steps := make([][]byte, 0, 1)
-	currentStep := make([]byte, 0, len(content))
+	stepStart := 0
+	offset := 0
 
-	for _, line := range bytes.SplitAfter(content, []byte("\n")) {
-		if bytes.Equal(bytes.TrimRight(line, "\r\n"), splitter) {
-			steps = append(steps, currentStep)
-			currentStep = make([]byte, 0, len(content)-len(currentStep))
+	for offset < len(content) {
+		lineStart := offset
+		lineEnd := bytes.IndexByte(content[offset:], '\n')
+		if lineEnd < 0 {
+			offset = len(content)
 		} else {
-			currentStep = append(currentStep, line...)
+			offset += lineEnd + 1
+		}
+
+		if bytes.Equal(bytes.TrimRight(content[lineStart:offset], "\r\n"), splitter) {
+			steps = append(steps, content[stepStart:lineStart])
+			stepStart = offset
 		}
 	}
 
-	steps = append(steps, currentStep)
-	return steps
+	return append(steps, content[stepStart:])
 }
 
 // versionExists checks the source if either the up or down migration for
