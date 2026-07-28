@@ -27,7 +27,7 @@ func newMigrateWithContent(t *testing.T, content string) (*Migrate, *dStub.Stub)
 }
 
 // TestMigrationSplitterSplitsIntoSteps verifies that when MigrationSplitter is
-// set, each fragment between delimiter lines is passed to the driver as a
+// set, each step between delimiter lines is passed to the driver as a
 // separate Run call.
 func TestMigrationSplitterSplitsIntoSteps(t *testing.T) {
 	const content = "stmt1;\n---\nstmt2;"
@@ -38,8 +38,7 @@ func TestMigrationSplitterSplitsIntoSteps(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// multistmt.Parse includes the delimiter bytes in the first fragment.
-	want := []string{"stmt1;\n---\n", "stmt2;"}
+	want := []string{"stmt1;", "stmt2;"}
 	if !dbDrv.EqualSequence(want) {
 		t.Errorf("MigrationSequence = %q, want %q", dbDrv.MigrationSequence, want)
 	}
@@ -58,7 +57,7 @@ func TestMigrationSplitterDollarQuotedBody(t *testing.T) {
 	}
 
 	want := []string{
-		"CREATE TABLE foo (id INT);\n---\n",
+		"CREATE TABLE foo (id INT);",
 		"DO $$ BEGIN RAISE NOTICE 'hi'; END $$;",
 	}
 	if !dbDrv.EqualSequence(want) {
