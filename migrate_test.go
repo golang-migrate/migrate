@@ -1428,6 +1428,23 @@ func newMigrateWithContent(t *testing.T, content string) (*Migrate, *dStub.Stub)
 	return m, dbDrv
 }
 
+var errEmptyMigrationBody = errors.New("empty migration body")
+
+type emptyRejectingStub struct {
+	*dStub.Stub
+}
+
+func (s *emptyRejectingStub) Run(migration io.Reader) error {
+	m, err := io.ReadAll(migration)
+	if err != nil {
+		return err
+	}
+	if len(bytes.TrimSpace(m)) == 0 {
+		return errEmptyMigrationBody
+	}
+	return s.Stub.Run(bytes.NewReader(m))
+}
+
 // TestMigrationSplitterSplitsIntoSteps verifies that when MigrationSplitter is
 // set, each step between delimiter lines is passed to the driver as a
 // separate Run call.
@@ -1485,6 +1502,18 @@ func TestMigrationSplitterNilPreservesExistingBehavior(t *testing.T) {
 	}
 }
 
+// TestMigrationSplitterNilDoesNotSkipEmptyMigration verifies that when
+// MigrationSplitter is nil, empty migration bodies are still passed through.
+func TestMigrationSplitterNilDoesNotSkipEmptyMigration(t *testing.T) {
+	m, _ := newMigrateWithContent(t, "")
+	m.databaseDrv = &emptyRejectingStub{Stub: m.databaseDrv.(*dStub.Stub)}
+
+	err := m.Up()
+	if !errors.Is(err, errEmptyMigrationBody) {
+		t.Fatalf("expected %v, got %v", errEmptyMigrationBody, err)
+	}
+}
+
 // TestMigrationSplitterAbsentInContent verifies that when the splitter is set
 // but does not appear in the migration body, the entire body is passed as a
 // single statement.
@@ -1498,24 +1527,6 @@ func TestMigrationSplitterAbsentInContent(t *testing.T) {
 	}
 
 	want := []string{content}
-	if !dbDrv.EqualSequence(want) {
-		t.Errorf("MigrationSequence = %q, want %q", dbDrv.MigrationSequence, want)
-	}
-}
-
-// TestMigrationSplitterTrailingDelimiterSkipsEmptyStep verifies that when a
-// migration ends with the splitter delimiter, the final empty split fragment
-// is not executed.
-func TestMigrationSplitterTrailingDelimiterSkipsEmptyStep(t *testing.T) {
-	const content = "stmt1;\n---\nstmt2;\n---\n"
-	m, dbDrv := newMigrateWithContent(t, content)
-	m.MigrationSplitter = []byte("---")
-
-	if err := m.Up(); err != nil {
-		t.Fatal(err)
-	}
-
-	want := []string{"stmt1;\n", "stmt2;\n"}
 	if !dbDrv.EqualSequence(want) {
 		t.Errorf("MigrationSequence = %q, want %q", dbDrv.MigrationSequence, want)
 	}
@@ -1538,9 +1549,9 @@ func TestMigrationSplitterEmptyPreservesExistingBehavior(t *testing.T) {
 	}
 }
 
-// TestMigrationSplitterSkipsWhitespaceOnlySteps verifies that fragments
-// containing only whitespace between splitter lines are not executed.
-func TestMigrationSplitterSkipsWhitespaceOnlySteps(t *testing.T) {
+// TestMigrationSplitterIncludesWhitespaceOnlySteps verifies that fragments
+// containing only whitespace between splitter lines are executed as-is.
+func TestMigrationSplitterIncludesWhitespaceOnlySteps(t *testing.T) {
 	const content = "stmt1;\n---\n \t \r\n---\nstmt2;"
 	m, dbDrv := newMigrateWithContent(t, content)
 	m.MigrationSplitter = []byte("---")
@@ -1549,7 +1560,7 @@ func TestMigrationSplitterSkipsWhitespaceOnlySteps(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	want := []string{"stmt1;\n", "stmt2;"}
+	want := []string{"stmt1;\n", " \t \r\n", "stmt2;"}
 	if !dbDrv.EqualSequence(want) {
 		t.Errorf("MigrationSequence = %q, want %q", dbDrv.MigrationSequence, want)
 	}
@@ -1573,7 +1584,7 @@ func TestMigrationSplitterSupportsCRLF(t *testing.T) {
 }
 
 // TestMigrationSplitterAtFileBoundaries verifies splitter lines are recognized
-// at both the start and end of a file.
+// at both the start and end of a file, including empty boundary fragments.
 func TestMigrationSplitterAtFileBoundaries(t *testing.T) {
 	const content = "---\nstmt1;\n---\nstmt2;\n---"
 	m, dbDrv := newMigrateWithContent(t, content)
@@ -1583,7 +1594,7 @@ func TestMigrationSplitterAtFileBoundaries(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	want := []string{"stmt1;\n", "stmt2;\n"}
+	want := []string{"", "stmt1;\n", "stmt2;\n", ""}
 	if !dbDrv.EqualSequence(want) {
 		t.Errorf("MigrationSequence = %q, want %q", dbDrv.MigrationSequence, want)
 	}

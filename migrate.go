@@ -749,21 +749,12 @@ func (m *Migrate) runMigrations(ret <-chan interface{}) error {
 
 			if migr.Body != nil {
 				m.logVerbosePrintf("Read and execute %v\n", migr.LogString())
-				if len(m.MigrationSplitter) > 0 {
-					content, err := io.ReadAll(migr.BufferedBody)
-					if err != nil {
-						return err
-					}
-					for _, step := range splitMigrationSteps(content, m.MigrationSplitter) {
-						if len(bytes.TrimSpace(step)) == 0 {
-							continue
-						}
-						if err := m.databaseDrv.Run(bytes.NewReader(step)); err != nil {
-							return err
-						}
-					}
-				} else {
-					if err := m.databaseDrv.Run(migr.BufferedBody); err != nil {
+				content, err := io.ReadAll(migr.BufferedBody)
+				if err != nil {
+					return err
+				}
+				for _, step := range splitMigrationSteps(content, m.MigrationSplitter) {
+					if err := m.databaseDrv.Run(bytes.NewReader(step)); err != nil {
 						return err
 					}
 				}
