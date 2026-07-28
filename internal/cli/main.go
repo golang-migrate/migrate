@@ -81,7 +81,7 @@ Options:
   -database             Run migrations against this database (driver://url)
   -prefetch N           Number of migrations to load in advance before executing (default 10)
   -lock-timeout N       Allow N seconds to acquire database lock (default 15)
-  -migration-splitter   Split migrations into sequential steps on lines matching this literal string
+  -migration-splitter   Split migrations into sequential steps when a whole line equals this string
   -verbose              Print verbose logging
   -version              Print version
   -help                 Print usage
@@ -137,7 +137,7 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 		migrater.PrefetchMigrations = *prefetchPtr
 		migrater.LockTimeout = time.Duration(int64(*lockTimeoutPtr)) * time.Second
 		if *migrationSplitterPtr != "" {
-			migrater.MigrationSplitter = []byte("\n" + *migrationSplitterPtr + "\n")
+			migrater.MigrationSplitter = []byte(*migrationSplitterPtr)
 		}
 
 		// handle Ctrl+c

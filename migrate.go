@@ -81,11 +81,10 @@ type Migrate struct {
 	// but can be set per Migrate instance.
 	LockTimeout time.Duration
 
-	// MigrationSplitter, if non-nil, splits each migration into delimiter-separated
-	// steps before passing each step to the database driver in order.
-	// The splitter is matched as a literal byte sequence. To require it to
-	// appear on its own line, include surrounding newlines (e.g. []byte("\n---\n")).
-	// If nil (the default), each migration is passed to the driver as-is.
+	// MigrationSplitter, if non-empty, splits each migration into sequential steps.
+	// A splitter matches only when a full logical line equals this token.
+	// Both LF and CRLF input line endings are recognized.
+	// If nil or empty, each migration is passed to the driver as-is.
 	MigrationSplitter []byte
 }
 
@@ -750,13 +749,13 @@ func (m *Migrate) runMigrations(ret <-chan interface{}) error {
 
 			if migr.Body != nil {
 				m.logVerbosePrintf("Read and execute %v\n", migr.LogString())
-				if m.MigrationSplitter != nil {
+				if len(m.MigrationSplitter) > 0 {
 					content, err := io.ReadAll(migr.BufferedBody)
 					if err != nil {
 						return err
 					}
-					for _, step := range bytes.Split(content, m.MigrationSplitter) {
-						if len(step) == 0 {
+					for _, step := range splitMigrationSteps(content, m.MigrationSplitter) {
+						if len(bytes.TrimSpace(step)) == 0 {
 							continue
 						}
 						if err := m.databaseDrv.Run(bytes.NewReader(step)); err != nil {
@@ -768,6 +767,7 @@ func (m *Migrate) runMigrations(ret <-chan interface{}) error {
 						return err
 					}
 				}
+
 			}
 
 			// set clean state
@@ -793,6 +793,59 @@ func (m *Migrate) runMigrations(ret <-chan interface{}) error {
 		}
 	}
 	return nil
+}
+
+func splitMigrationSteps(content, splitter []byte) [][]byte {
+	if len(splitter) == 0 {
+		return [][]byte{content}
+	}
+
+	steps := make([][]byte, 0, 1)
+	currentStep := make([]byte, 0, len(content))
+
+	for lineStart := 0; lineStart < len(content); {
+		nextLineBreakOffset := bytes.IndexByte(content[lineStart:], '\n')
+		lineEnd := len(content)
+		if nextLineBreakOffset >= 0 {
+			lineEnd = lineStart + nextLineBreakOffset + 1
+		}
+
+		line := content[lineStart:lineEnd]
+		lineForMatch := line
+		if len(lineForMatch) > 0 && lineForMatch[len(lineForMatch)-1] == '\n' {
+			lineForMatch = lineForMatch[:len(lineForMatch)-1]
+		}
+		if len(lineForMatch) > 0 && lineForMatch[len(lineForMatch)-1] == '\r' {
+			lineForMatch = lineForMatch[:len(lineForMatch)-1]
+		}
+
+		if bytes.Equal(lineForMatch, splitter) {
+			steps = append(steps, trimTrailingLineEnding(currentStep))
+			currentStep = make([]byte, 0, len(content)-lineEnd)
+		} else {
+			currentStep = append(currentStep, line...)
+		}
+
+		lineStart = lineEnd
+	}
+
+	steps = append(steps, currentStep)
+	return steps
+}
+
+func trimTrailingLineEnding(step []byte) []byte {
+	if len(step) == 0 {
+		return step
+	}
+
+	if step[len(step)-1] == '\n' {
+		step = step[:len(step)-1]
+		if len(step) > 0 && step[len(step)-1] == '\r' {
+			step = step[:len(step)-1]
+		}
+	}
+
+	return step
 }
 
 // versionExists checks the source if either the up or down migration for
