@@ -36,7 +36,7 @@ require (
 	github.com/snowflakedb/gosnowflake v1.6.19
 	github.com/stretchr/testify v1.11.1
 	github.com/xanzy/go-gitlab v0.15.0
-	github.com/ydb-platform/ydb-go-sdk/v3 v3.125.1
+	github.com/ydb-platform/ydb-go-sdk/v3 v3.146.0
 	go.mongodb.org/mongo-driver v1.7.5
 	golang.org/x/oauth2 v0.34.0
 	golang.org/x/tools/godoc v0.1.0-deprecated
@@ -70,7 +70,7 @@ require (
 	github.com/moby/sys/sequential v0.6.0 // indirect
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.6.0 // indirect
-	github.com/ydb-platform/ydb-go-genproto v0.0.0-20251125145508-6d7ef87db5cb // indirect
+	github.com/ydb-platform/ydb-go-genproto v0.0.0-20260428144813-1c07baab7f7b // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/detectors/gcp v1.39.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.61.0 // indirect
