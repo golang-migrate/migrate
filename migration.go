@@ -37,9 +37,9 @@ type Migration struct {
 	// BufferSize defaults to DefaultBufferSize
 	BufferSize uint
 
-	// bufferWriter holds an io.WriteCloser and pipes to BufferBody.
+	// bufferWriter holds the write half of the pipe to BufferedBody.
 	// It's an *Closer for flow control.
-	bufferWriter io.WriteCloser
+	bufferWriter *io.PipeWriter
 
 	// Scheduled is the time when the migration was scheduled/ queued.
 	Scheduled time.Time
@@ -131,8 +131,14 @@ func (m *Migration) Buffer() (berr error) {
 	// defer closing buffer writer and body.
 	defer func() {
 		// close bufferWriter so Buffer knows that there is no
-		// more data coming.
-		if err := m.bufferWriter.Close(); err != nil {
+		// more data coming. If reading the body failed, close with that
+		// error instead: a plain Close would signal a clean io.EOF and the
+		// database driver would run a truncated migration and report success.
+		if berr != nil {
+			if err := m.bufferWriter.CloseWithError(berr); err != nil {
+				berr = errors.Join(berr, err)
+			}
+		} else if err := m.bufferWriter.Close(); err != nil {
 			berr = errors.Join(berr, err)
 		}
 
