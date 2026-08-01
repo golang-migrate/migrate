@@ -5,7 +5,41 @@ import (
 	"io"
 	"log"
 	"strings"
+	"testing"
 )
+
+func TestMigrationBufferStripsUTF8BOM(t *testing.T) {
+	const migrationBody = "CREATE TABLE users (id INT);"
+	migration, err := NewMigration(
+		io.NopCloser(strings.NewReader("\xEF\xBB\xBF"+migrationBody)),
+		"create_users_table",
+		1,
+		2,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bufferErr := make(chan error, 1)
+	go func() {
+		bufferErr <- migration.Buffer()
+	}()
+
+	buffered, err := io.ReadAll(migration.BufferedBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := <-bufferErr; err != nil {
+		t.Fatal(err)
+	}
+
+	if got := string(buffered); got != migrationBody {
+		t.Fatalf("buffered migration = %q, want %q", got, migrationBody)
+	}
+	if migration.BytesRead != int64(len(migrationBody)) {
+		t.Fatalf("bytes read = %d, want %d", migration.BytesRead, len(migrationBody))
+	}
+}
 
 func ExampleNewMigration() {
 	// Create a dummy migration body, this is coming from the source usually.

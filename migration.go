@@ -2,6 +2,7 @@ package migrate
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -142,6 +143,13 @@ func (m *Migration) Buffer() (berr error) {
 		}
 
 	}()
+
+	utf8BOM := []byte{0xEF, 0xBB, 0xBF}
+	if prefix, err := b.Peek(len(utf8BOM)); err == nil && bytes.Equal(prefix, utf8BOM) {
+		if _, err := b.Discard(len(utf8BOM)); err != nil {
+			return err
+		}
+	}
 
 	// start reading from body, peek won't move the read pointer though
 	// poor man's solution?
