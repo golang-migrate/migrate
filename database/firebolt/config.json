@@ -1,0 +1,12 @@
+{
+    "nodes": [
+        {
+            "host": "localhost"
+        }
+    ],
+    "config": {
+        "io_uring_mode": "off",
+        "logger_use_files": false,
+        "logger_console": true
+    }
+}
