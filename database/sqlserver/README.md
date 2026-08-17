@@ -16,9 +16,24 @@
 | `dial+timeout` | | in seconds (default is 15), set to 0 for no timeout. |
 | `encrypt` | | `disable` - Data send between client and server is not encrypted. `false` - Data sent between client and server is not encrypted beyond the login packet (Default). `true` - Data sent between client and server is encrypted. |
 | `app+name` || The application name (default is go-mssqldb). |
-| `useMsi` | | `true` - Use Azure MSI Authentication for connecting to Sql Server. Must be running from an Azure VM/an instance with MSI enabled. `false` - Use password authentication (Default). See [here for Azure MSI Auth details](https://docs.microsoft.com/en-us/azure/app-service/app-service-web-tutorial-connect-msi). NOTE: Since this cannot be tested locally, this is not officially supported.
+| `fedauth` | | Use Microsoft Entra ID (formerly Azure AD) authentication. One of `ActiveDirectoryDefault`, `ActiveDirectoryManagedIdentity` (or `ActiveDirectoryMSI`), `ActiveDirectoryServicePrincipal` (or `ActiveDirectoryApplication`), `ActiveDirectoryInteractive`, `ActiveDirectoryIntegrated` or `ActiveDirectoryPassword`. See the [Microsoft Entra ID section below](#microsoft-entra-id-authentication). NOTE: Since this cannot be tested locally, this is not officially supported. |
+| `useMsi` | | Deprecated alias for `fedauth=ActiveDirectoryManagedIdentity`. `true` - Use Azure Managed Identity Authentication for connecting to SQL Server. Must be running from an Azure VM/an instance with MSI enabled. `false` - Use password authentication (Default). See [here for Azure MSI Auth details](https://docs.microsoft.com/en-us/azure/app-service/app-service-web-tutorial-connect-msi). NOTE: Since this cannot be tested locally, this is not officially supported. |
 
 See https://github.com/microsoft/go-mssqldb for full parameter list.
+
+## Microsoft Entra ID authentication
+
+Authentication with Microsoft Entra ID (formerly Azure Active Directory) is supported via the
+[`azuread` package of go-mssqldb](https://github.com/microsoft/go-mssqldb#azure-active-directory-authentication),
+by adding a `fedauth` parameter to the URL. Examples:
+
+- `sqlserver://myserver.database.windows.net:1433?database=mydb&fedauth=ActiveDirectoryDefault`
+  uses the [`DefaultAzureCredential` chain](https://learn.microsoft.com/en-us/azure/developer/go/sdk/authentication/credential-chains#defaultazurecredential-overview)
+  (environment variables, workload identity, managed identity, Azure CLI, ...)
+- `sqlserver://myserver.database.windows.net:1433?database=mydb&fedauth=ActiveDirectoryManagedIdentity`
+  uses a system-assigned managed identity; add `user id=<client id>` for a user-assigned managed identity
+- `sqlserver://<app id>:<secret>@myserver.database.windows.net:1433?database=mydb&fedauth=ActiveDirectoryServicePrincipal`
+  authenticates as a service principal with a client secret
 
 ## Driver Support
 

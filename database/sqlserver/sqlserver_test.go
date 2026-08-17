@@ -311,6 +311,14 @@ func testOpenWithPasswordAndMSI(t *testing.T) {
 	})
 }
 
+func TestOpenWithUnsupportedFedauth(t *testing.T) {
+	p := &SQLServer{}
+	_, err := p.Open("sqlserver://server:1433?database=master&fedauth=ActiveDirectoryBogus")
+	if err == nil {
+		t.Fatal("Open should fail with an unsupported fedauth value.")
+	}
+}
+
 func testMsiFalse(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		SkipIfUnsupportedArch(t, c)

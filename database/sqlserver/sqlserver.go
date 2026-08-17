@@ -8,13 +8,12 @@ import (
 	"io"
 	nurl "net/url"
 	"strconv"
-	"strings"
 	"sync/atomic"
 
-	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 	mssql "github.com/microsoft/go-mssqldb" // mssql support
+	"github.com/microsoft/go-mssqldb/azuread"
 )
 
 func init() {
@@ -140,26 +139,27 @@ func (ss *SQLServer) Open(url string) (database.Driver, error) {
 		return nil, ErrMultipleAuthOptionsPassed
 	}
 
-	filteredURL := migrate.FilterCustomQuery(purl).String()
+	filteredURL := migrate.FilterCustomQuery(purl)
+
+	// useMsi is a legacy alias for fedauth=ActiveDirectoryManagedIdentity
+	fedauth := purl.Query().Get("fedauth")
+	if useMsi && fedauth == "" {
+		fedauth = azuread.ActiveDirectoryManagedIdentity
+		q := filteredURL.Query()
+		q.Set("fedauth", fedauth)
+		filteredURL.RawQuery = q.Encode()
+	}
 
 	var db *sql.DB
-	if useMsi {
-		resource := getAADResourceFromServerUri(purl)
-		tokenProvider, err := getMSITokenProvider(resource)
-		if err != nil {
-			return nil, err
-		}
-
-		connector, err := mssql.NewAccessTokenConnector(
-			filteredURL, tokenProvider)
+	if fedauth != "" {
+		connector, err := azuread.NewConnector(filteredURL.String())
 		if err != nil {
 			return nil, err
 		}
 
 		db = sql.OpenDB(connector)
-
 	} else {
-		db, err = sql.Open("sqlserver", filteredURL)
+		db, err = sql.Open("sqlserver", filteredURL.String())
 		if err != nil {
 			return nil, err
 		}
@@ -380,27 +380,4 @@ func (ss *SQLServer) ensureVersionTable() (err error) {
 
 func (ss *SQLServer) getMigrationTable() string {
 	return fmt.Sprintf("[%s].[%s]", ss.config.SchemaName, ss.config.MigrationsTable)
-}
-
-func getMSITokenProvider(resource string) (func() (string, error), error) {
-	msi, err := adal.NewServicePrincipalTokenFromManagedIdentity(resource, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return func() (string, error) {
-		err := msi.EnsureFresh()
-		if err != nil {
-			return "", err
-		}
-		token := msi.OAuthToken()
-		return token, nil
-	}, nil
-}
-
-// The sql server resource can change across clouds so get it
-// dynamically based on the server uri.
-// ex. <server name>.database.windows.net -> https://database.windows.net
-func getAADResourceFromServerUri(purl *nurl.URL) string {
-	return fmt.Sprintf("%s%s", "https://", strings.Join(strings.Split(purl.Hostname(), ".")[1:], "."))
 }
