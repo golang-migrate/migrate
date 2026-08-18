@@ -444,6 +444,49 @@ func (p *Postgres) Drop() (err error) {
 		}
 	}
 
+	// select all custom types (enums, domains, and standalone composite types) in the current schema.
+	// Excludes the row type Postgres automatically creates for every table (already gone via DROP TABLE
+	// above, or never a real user type to begin with) and the array type Postgres automatically creates
+	// alongside every type.
+	query = `SELECT t.typname FROM pg_catalog.pg_type t
+		LEFT JOIN pg_catalog.pg_class c ON c.oid = t.typrelid
+		WHERE t.typnamespace = (SELECT oid FROM pg_catalog.pg_namespace WHERE nspname = current_schema())
+		AND (t.typrelid = 0 OR c.relkind = 'c')
+		AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_type el WHERE el.typarray = t.oid)`
+	types, err := p.conn.QueryContext(context.Background(), query)
+	if err != nil {
+		return &database.Error{OrigErr: err, Query: []byte(query)}
+	}
+	defer func() {
+		if errClose := types.Close(); errClose != nil {
+			err = errors.Join(err, errClose)
+		}
+	}()
+
+	typeNames := make([]string, 0)
+	for types.Next() {
+		var typeName string
+		if err := types.Scan(&typeName); err != nil {
+			return err
+		}
+		if len(typeName) > 0 {
+			typeNames = append(typeNames, typeName)
+		}
+	}
+	if err := types.Err(); err != nil {
+		return &database.Error{OrigErr: err, Query: []byte(query)}
+	}
+
+	if len(typeNames) > 0 {
+		// delete one by one ...
+		for _, t := range typeNames {
+			query = `DROP TYPE IF EXISTS ` + pq.QuoteIdentifier(t) + ` CASCADE`
+			if _, err := p.conn.ExecContext(context.Background(), query); err != nil {
+				return &database.Error{OrigErr: err, Query: []byte(query)}
+			}
+		}
+	}
+
 	return nil
 }
 

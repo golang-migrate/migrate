@@ -99,6 +99,7 @@ func Test(t *testing.T) {
 	t.Run("testPostgresLock", testPostgresLock)
 	t.Run("testWithInstanceConcurrent", testWithInstanceConcurrent)
 	t.Run("testWithConnection", testWithConnection)
+	t.Run("testDropWithCustomTypes", testDropWithCustomTypes)
 
 	t.Cleanup(func() {
 		for _, spec := range specs {
@@ -129,6 +130,65 @@ func test(t *testing.T) {
 			}
 		}()
 		dt.Test(t, d, []byte("SELECT 1"))
+	})
+}
+
+// testDropWithCustomTypes is a regression test for Drop() not removing custom
+// types (enums, domains, standalone composite types), which left a database
+// unable to re-run a migration that (re-)creates one of those types. See
+// https://github.com/golang-migrate/migrate/issues/626.
+func testDropWithCustomTypes(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := pgConnectionString(ip, port)
+		p := &Postgres{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
+
+		db, err := sql.Open("postgres", addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := db.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
+
+		statements := []string{
+			`CREATE TYPE mood AS ENUM ('sad', 'ok', 'happy')`,
+			`CREATE TYPE point2d AS (x int, y int)`,
+			`CREATE DOMAIN posint AS int CHECK (VALUE > 0)`,
+			`CREATE TABLE widgets (id serial primary key, m mood, p point2d, n posint)`,
+		}
+		for _, s := range statements {
+			if _, err := db.Exec(s); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		if err := d.Drop(); err != nil {
+			t.Fatal(err)
+		}
+
+		// A truly clean database can re-create every type Drop() should have
+		// removed. Before the fix this failed with "type ... already exists".
+		for _, s := range statements[:3] {
+			if _, err := db.Exec(s); err != nil {
+				t.Fatalf("re-creating type after Drop() failed (Drop() left it behind): %v", err)
+			}
+		}
 	})
 }
 
