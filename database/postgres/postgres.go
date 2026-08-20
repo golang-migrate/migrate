@@ -446,13 +446,21 @@ func (p *Postgres) Drop() (err error) {
 
 	// select all custom types (enums, domains, and standalone composite types) in the current schema.
 	// Excludes the row type Postgres automatically creates for every table (already gone via DROP TABLE
-	// above, or never a real user type to begin with) and the array type Postgres automatically creates
-	// alongside every type.
+	// above, or never a real user type to begin with), the array type Postgres automatically creates
+	// alongside every type, and any type an extension or the system installed (an internal or
+	// extension pg_depend entry) -- those can't be dropped without dropping the extension itself,
+	// which is outside Drop()'s remit, and a range type's auto-generated multirange has an internal
+	// dependency on its range type that trips a plain DROP regardless of statement order.
 	query = `SELECT t.typname FROM pg_catalog.pg_type t
 		LEFT JOIN pg_catalog.pg_class c ON c.oid = t.typrelid
 		WHERE t.typnamespace = (SELECT oid FROM pg_catalog.pg_namespace WHERE nspname = current_schema())
 		AND (t.typrelid = 0 OR c.relkind = 'c')
-		AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_type el WHERE el.typarray = t.oid)`
+		AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_type el WHERE el.typarray = t.oid)
+		AND NOT EXISTS (
+			SELECT 1 FROM pg_catalog.pg_depend d
+			WHERE d.classid = 'pg_catalog.pg_type'::regclass AND d.objid = t.oid
+			AND d.deptype IN ('e', 'i')
+		)`
 	types, err := p.conn.QueryContext(context.Background(), query)
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}

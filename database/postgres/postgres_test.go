@@ -100,6 +100,7 @@ func Test(t *testing.T) {
 	t.Run("testWithInstanceConcurrent", testWithInstanceConcurrent)
 	t.Run("testWithConnection", testWithConnection)
 	t.Run("testDropWithCustomTypes", testDropWithCustomTypes)
+	t.Run("testDropWithExtensionAndRangeTypes", testDropWithExtensionAndRangeTypes)
 
 	t.Cleanup(func() {
 		for _, spec := range specs {
@@ -188,6 +189,71 @@ func testDropWithCustomTypes(t *testing.T) {
 			if _, err := db.Exec(s); err != nil {
 				t.Fatalf("re-creating type after Drop() failed (Drop() left it behind): %v", err)
 			}
+		}
+	})
+}
+
+// testDropWithExtensionAndRangeTypes is a regression test for two ways the
+// type-selection query in Drop() can pick up a type it must not try to drop:
+// a type an extension installed (dropping it fails -- only dropping the
+// extension itself can remove it), and a range type, whose auto-generated
+// multirange type has an internal dependency on it that a plain DROP TYPE
+// (even with CASCADE) cannot satisfy regardless of statement order.
+func testDropWithExtensionAndRangeTypes(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := pgConnectionString(ip, port)
+		p := &Postgres{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
+
+		db, err := sql.Open("postgres", addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := db.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
+
+		statements := []string{
+			`CREATE EXTENSION IF NOT EXISTS citext`,
+			`CREATE TYPE mood AS ENUM ('sad', 'ok', 'happy')`,
+			`CREATE TYPE floatrange AS RANGE (subtype = float8)`,
+		}
+		for _, s := range statements {
+			if _, err := db.Exec(s); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		if err := d.Drop(); err != nil {
+			t.Fatalf("Drop() failed on a database with an extension-owned type and a range type: %v", err)
+		}
+
+		var extant string
+		err = db.QueryRow(`SELECT typname FROM pg_type WHERE typname = 'citext'`).Scan(&extant)
+		if err != nil {
+			t.Fatalf("expected the extension-owned citext type to survive Drop(), got: %v", err)
+		}
+
+		if _, err := db.Exec(`CREATE TYPE mood AS ENUM ('sad', 'ok', 'happy')`); err != nil {
+			t.Fatalf("re-creating mood after Drop() failed: %v", err)
+		}
+		if _, err := db.Exec(`CREATE TYPE floatrange AS RANGE (subtype = float8)`); err != nil {
+			t.Fatalf("re-creating floatrange after Drop() failed: %v", err)
 		}
 	})
 }
