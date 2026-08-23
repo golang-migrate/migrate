@@ -9,6 +9,9 @@ linters:
     - unconvert
     - unparam
   settings:
+    goconst:
+      # Ignore tests to match goconst's default behavior.
+      ignore-tests: true
     misspell:
       locale: US
     revive:
