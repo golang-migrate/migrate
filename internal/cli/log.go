@@ -12,7 +12,7 @@ type Log struct {
 }
 
 // Printf prints out formatted string into a log
-func (l *Log) Printf(format string, v ...interface{}) {
+func (l *Log) Printf(format string, v ...any) {
 	if l.verbose {
 		logpkg.Printf(format, v...)
 	} else {
@@ -21,7 +21,7 @@ func (l *Log) Printf(format string, v ...interface{}) {
 }
 
 // Println prints out args into a log
-func (l *Log) Println(args ...interface{}) {
+func (l *Log) Println(args ...any) {
 	if l.verbose {
 		logpkg.Println(args...)
 	} else {
@@ -34,7 +34,7 @@ func (l *Log) Verbose() bool {
 	return l.verbose
 }
 
-func (l *Log) fatal(args ...interface{}) {
+func (l *Log) fatal(args ...any) {
 	l.Println(args...)
 	os.Exit(1)
 }

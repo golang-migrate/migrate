@@ -55,7 +55,7 @@ func (m *mockDriver) Drop() error {
 func TestRegisterTwice(t *testing.T) {
 	Register("mock", &mockDriver{})
 
-	var err interface{}
+	var err any
 	func() {
 		defer func() {
 			err = recover()

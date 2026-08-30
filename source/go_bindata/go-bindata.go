@@ -37,11 +37,9 @@ func (b *Bindata) Open(url string) (source.Driver, error) {
 	return nil, fmt.Errorf("not yet implemented")
 }
 
-var (
-	ErrNoAssetSource = fmt.Errorf("expects *AssetSource")
-)
+var ErrNoAssetSource = fmt.Errorf("expects *AssetSource")
 
-func WithInstance(instance interface{}) (source.Driver, error) {
+func WithInstance(instance any) (source.Driver, error) {
 	if _, ok := instance.(*AssetSource); !ok {
 		return nil, ErrNoAssetSource
 	}

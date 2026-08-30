@@ -471,7 +471,6 @@ func TestMigrate(t *testing.T) {
 		if (v.expectErr == os.ErrNotExist && !errors.Is(err, os.ErrNotExist)) ||
 			(v.expectErr != os.ErrNotExist && err != v.expectErr) {
 			t.Errorf("expected err %v, got %v, in %v", v.expectErr, err, i)
-
 		} else if err == nil {
 			version, _, err := m.Version()
 			if err != nil {
@@ -526,7 +525,8 @@ func TestSteps(t *testing.T) {
 			steps:         1,
 			expectVersion: 1,
 			expectSeq: migrationSequence{
-				mr("CREATE 1")},
+				mr("CREATE 1"),
+			},
 		},
 		{
 			steps:         1,
@@ -734,7 +734,6 @@ func TestSteps(t *testing.T) {
 		if (v.expectErr == os.ErrNotExist && !errors.Is(err, os.ErrNotExist)) ||
 			(v.expectErr != os.ErrNotExist && err != v.expectErr) {
 			t.Errorf("expected err %v, got %v, in %v", v.expectErr, err, i)
-
 		} else if err == nil {
 			version, _, err := m.Version()
 			if err != ErrNilVersion && err != nil {
@@ -742,7 +741,6 @@ func TestSteps(t *testing.T) {
 			}
 			if v.expectVersion == -1 && err != ErrNilVersion {
 				t.Errorf("expected ErrNilVersion, got %v, in %v", version, i)
-
 			} else if v.expectVersion >= 0 && version != uint(v.expectVersion) {
 				t.Errorf("expected version %v, got %v, in %v", v.expectVersion, version, i)
 			}
@@ -1139,7 +1137,7 @@ func TestRead(t *testing.T) {
 	}
 
 	for i, v := range tt {
-		ret := make(chan interface{})
+		ret := make(chan any)
 		go m.read(v.from, v.to, ret)
 		migrations, err := migrationsFromChannel(ret)
 
@@ -1216,7 +1214,7 @@ func TestReadUp(t *testing.T) {
 	}
 
 	for i, v := range tt {
-		ret := make(chan interface{})
+		ret := make(chan any)
 		go m.readUp(v.from, v.limit, ret)
 		migrations, err := migrationsFromChannel(ret)
 
@@ -1293,7 +1291,7 @@ func TestReadDown(t *testing.T) {
 	}
 
 	for i, v := range tt {
-		ret := make(chan interface{})
+		ret := make(chan any)
 		go m.readDown(v.from, v.limit, ret)
 		migrations, err := migrationsFromChannel(ret)
 
@@ -1319,7 +1317,7 @@ func TestLock(t *testing.T) {
 	}
 }
 
-func migrationsFromChannel(ret chan interface{}) ([]*Migration, error) {
+func migrationsFromChannel(ret chan any) ([]*Migration, error) {
 	slice := make([]*Migration, 0)
 	for r := range ret {
 		switch t := r.(type) {
@@ -1389,9 +1387,8 @@ func mr(value string) *Migration {
 func equalMigSeq(t *testing.T, i int, expected, got migrationSequence) {
 	if len(expected) != len(got) {
 		t.Errorf("expected migrations %v, got %v, in %v", expected, got, i)
-
 	} else {
-		for ii := 0; ii < len(expected); ii++ {
+		for ii := range expected {
 			if expected[ii].Version != got[ii].Version {
 				t.Errorf("expected version %v, got %v, in %v", expected[ii].Version, got[ii].Version, i)
 			}
