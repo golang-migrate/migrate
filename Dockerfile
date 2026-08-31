@@ -17,7 +17,8 @@ RUN make build-docker
 
 FROM alpine:3.24
 
-RUN apk add --no-cache ca-certificates
+RUN apk upgrade --no-cache \
+    && apk add --no-cache ca-certificates
 
 COPY --from=builder /go/src/github.com/golang-migrate/migrate/build/migrate.linux-386 /usr/local/bin/migrate
 RUN ln -s /usr/local/bin/migrate /migrate
