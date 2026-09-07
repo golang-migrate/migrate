@@ -20,7 +20,7 @@ require (
 	github.com/jackc/pgconn v1.14.3
 	github.com/jackc/pgerrcode v0.0.0-20220416144525-469b46aa5efa
 	github.com/jackc/pgx/v4 v4.18.2
-	github.com/jackc/pgx/v5 v5.7.6
+	github.com/jackc/pgx/v5 v5.9.2
 	github.com/ktrysmt/go-bitbucket v0.6.4
 	github.com/lib/pq v1.10.9
 	github.com/markbates/pkger v0.15.1
@@ -34,7 +34,7 @@ require (
 	github.com/snowflakedb/gosnowflake v1.6.19
 	github.com/stretchr/testify v1.11.1
 	github.com/xanzy/go-gitlab v0.15.0
-	go.mongodb.org/mongo-driver v1.7.5
+	go.mongodb.org/mongo-driver v1.17.7
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/tools/godoc v0.1.0-deprecated
 	google.golang.org/api v0.287.0
@@ -64,6 +64,7 @@ require (
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/sys/sequential v0.6.0 // indirect
+	github.com/montanaflynn/stats v0.7.1 // indirect
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.8.1 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
@@ -98,7 +99,7 @@ require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/andybalholm/brotli v1.0.4 // indirect
 	github.com/apache/arrow/go/v10 v10.0.1 // indirect
-	github.com/apache/thrift v0.16.0 // indirect
+	github.com/apache/thrift v0.24.0 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.16.16 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.4.8 // indirect
 	github.com/aws/aws-sdk-go-v2/credentials v1.12.20 // indirect
@@ -124,7 +125,6 @@ require (
 	github.com/envoyproxy/protoc-gen-validate v1.3.3 // indirect
 	github.com/form3tech-oss/jwt-go v3.2.5+incompatible // indirect
 	github.com/gabriel-vasile/mimetype v1.4.1 // indirect
-	github.com/go-stack/stack v1.8.0 // indirect
 	github.com/goccy/go-json v0.9.11 // indirect
 	github.com/godbus/dbus v0.0.0-20190726142602-4481cbc300e2 // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
@@ -152,7 +152,7 @@ require (
 	github.com/kardianos/osext v0.0.0-20190222173326-2bc1f35cddc0 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
 	github.com/klauspost/asmfmt v1.3.2 // indirect
-	github.com/klauspost/compress v1.15.11 // indirect
+	github.com/klauspost/compress v1.16.7 // indirect
 	github.com/klauspost/cpuid/v2 v2.0.9 // indirect
 	github.com/mattn/go-colorable v0.1.6 // indirect
 	github.com/mattn/go-isatty v0.0.16 // indirect
@@ -175,9 +175,9 @@ require (
 	github.com/shopspring/decimal v1.2.0 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
-	github.com/xdg-go/scram v1.1.1 // indirect
-	github.com/xdg-go/stringprep v1.0.3 // indirect
-	github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d // indirect
+	github.com/xdg-go/scram v1.1.2 // indirect
+	github.com/xdg-go/stringprep v1.0.4 // indirect
+	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
 	github.com/zeebo/xxh3 v1.0.2 // indirect
 	gitlab.com/nyarla/go-crypt v0.0.0-20160106005555-d9a5dc2b789b // indirect
 	go.opencensus.io v0.24.0 // indirect
