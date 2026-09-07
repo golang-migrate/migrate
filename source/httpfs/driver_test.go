@@ -1,6 +1,7 @@
 package httpfs_test
 
 import (
+	"context"
 	"net/http"
 	"testing"
 
@@ -32,7 +33,7 @@ func TestOpen(t *testing.T) {
 		t.Error("New() expected no error")
 		return
 	}
-	d, err = d.Open("")
+	d, err = d.Open(context.Background(), "")
 	if d != nil {
 		t.Error("Open() expected to return nil driver")
 	}

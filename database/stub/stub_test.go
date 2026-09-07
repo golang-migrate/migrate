@@ -1,6 +1,7 @@
 package stub
 
 import (
+	"context"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/source"
 	"github.com/golang-migrate/migrate/v4/source/stub"
@@ -10,8 +11,9 @@ import (
 )
 
 func Test(t *testing.T) {
+	ctx := context.Background()
 	s := &Stub{}
-	d, err := s.Open("")
+	d, err := s.Open(ctx, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -19,8 +21,9 @@ func Test(t *testing.T) {
 }
 
 func TestMigrate(t *testing.T) {
+	ctx := context.Background()
 	s := &Stub{}
-	d, err := s.Open("")
+	d, err := s.Open(ctx, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -29,12 +32,12 @@ func TestMigrate(t *testing.T) {
 	stubMigrations.Append(&source.Migration{Version: 1, Direction: source.Up, Identifier: "CREATE 1"})
 	stubMigrations.Append(&source.Migration{Version: 1, Direction: source.Down, Identifier: "DROP 1"})
 	src := &stub.Stub{}
-	srcDrv, err := src.Open("")
+	srcDrv, err := src.Open(ctx, "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	srcDrv.(*stub.Stub).Migrations = stubMigrations
-	m, err := migrate.NewWithInstance("stub", srcDrv, "", d)
+	m, err := migrate.NewWithInstance(ctx, "stub", srcDrv, "", d)
 	if err != nil {
 		t.Fatal(err)
 	}

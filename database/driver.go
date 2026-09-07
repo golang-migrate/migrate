@@ -5,6 +5,7 @@
 package database
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"sync"
@@ -46,43 +47,43 @@ type Driver interface {
 	// Open returns a new driver instance configured with parameters
 	// coming from the URL string. Migrate will call this function
 	// only once per instance.
-	Open(url string) (Driver, error)
+	Open(ctx context.Context, url string) (Driver, error)
 
 	// Close closes the underlying database instance managed by the driver.
 	// Migrate will call this function only once per instance.
-	Close() error
+	Close(ctx context.Context) error
 
 	// Lock should acquire a database lock so that only one migration process
 	// can run at a time. Migrate will call this function before Run is called.
 	// If the implementation can't provide this functionality, return nil.
 	// Return database.ErrLocked if database is already locked.
-	Lock() error
+	Lock(ctx context.Context) error
 
 	// Unlock should release the lock. Migrate will call this function after
 	// all migrations have been run.
-	Unlock() error
+	Unlock(ctx context.Context) error
 
 	// Run applies a migration to the database. migration is guaranteed to be not nil.
-	Run(migration io.Reader) error
+	Run(ctx context.Context, migration io.Reader) error
 
 	// SetVersion saves version and dirty state.
 	// Migrate will call this function before and after each call to Run.
 	// version must be >= -1. -1 means NilVersion.
-	SetVersion(version int, dirty bool) error
+	SetVersion(ctx context.Context, version int, dirty bool) error
 
 	// Version returns the currently active version and if the database is dirty.
 	// When no migration has been applied, it must return version -1.
 	// Dirty means, a previous migration failed and user interaction is required.
-	Version() (version int, dirty bool, err error)
+	Version(ctx context.Context) (version int, dirty bool, err error)
 
 	// Drop deletes everything in the database.
 	// Note that this is a breaking action, a new call to Open() is necessary to
 	// ensure subsequent calls work as expected.
-	Drop() error
+	Drop(ctx context.Context) error
 }
 
 // Open returns a new driver instance.
-func Open(url string) (Driver, error) {
+func Open(ctx context.Context, url string) (Driver, error) {
 	scheme, err := iurl.SchemeFromURL(url)
 	if err != nil {
 		return nil, err
@@ -95,7 +96,7 @@ func Open(url string) (Driver, error) {
 		return nil, fmt.Errorf("database driver: unknown driver %v (forgotten import?)", scheme)
 	}
 
-	return d.Open(url)
+	return d.Open(ctx, url)
 }
 
 // Register globally registers a driver.

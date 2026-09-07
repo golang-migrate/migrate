@@ -1,6 +1,7 @@
 package godoc_vfs_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/golang-migrate/migrate/v4/source/godoc_vfs"
@@ -20,7 +21,7 @@ func TestVFS(t *testing.T) {
 		"7_foobar.down.sql": "7 down",
 	})
 
-	d, err := godoc_vfs.WithInstance(fs, "")
+	d, err := godoc_vfs.WithInstance(context.Background(), fs, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -34,7 +35,7 @@ func TestOpen(t *testing.T) {
 		}
 	}()
 	b := &godoc_vfs.VFS{}
-	if _, err := b.Open(""); err != nil {
+	if _, err := b.Open(context.Background(), ""); err != nil {
 		t.Error(err)
 	}
 }

@@ -2,6 +2,7 @@ package bitbucket
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"testing"
 
@@ -24,7 +25,7 @@ func Test(t *testing.T) {
 
 	b := &Bitbucket{}
 
-	d, err := b.Open("bitbucket://" + BitbucketTestSecret + "@abhishekbipp/test-migration/migrations/test#master")
+	d, err := b.Open(context.Background(), "bitbucket://"+BitbucketTestSecret+"@abhishekbipp/test-migration/migrations/test#master")
 	if err != nil {
 		t.Fatal(err)
 	}

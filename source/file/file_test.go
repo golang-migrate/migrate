@@ -1,6 +1,7 @@
 package file
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -31,7 +32,7 @@ func Test(t *testing.T) {
 	mustWriteFile(t, tmpDir, "7_foobar.down.sql", "7 down")
 
 	f := &File{}
-	d, err := f.Open(scheme + tmpDir)
+	d, err := f.Open(context.Background(), scheme+tmpDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +51,7 @@ func TestOpen(t *testing.T) {
 	}
 
 	f := &File{}
-	_, err := f.Open(scheme + tmpDir) // absolute path
+	_, err := f.Open(context.Background(), scheme+tmpDir) // absolute path
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,24 +81,25 @@ func TestOpenWithRelativePath(t *testing.T) {
 
 	mustWriteFile(t, filepath.Join(tmpDir, "foo"), "1_foobar.up.sql", "")
 
+	ctx := context.Background()
 	f := &File{}
 
 	// dir: foo
-	d, err := f.Open("file://foo")
+	d, err := f.Open(ctx, "file://foo")
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = d.First()
+	_, err = d.First(ctx)
 	if err != nil {
 		t.Fatalf("expected first file in working dir %v for foo", tmpDir)
 	}
 
 	// dir: ./foo
-	d, err = f.Open("file://./foo")
+	d, err = f.Open(ctx, "file://./foo")
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = d.First()
+	_, err = d.First(ctx)
 	if err != nil {
 		t.Fatalf("expected first file in working dir %v for ./foo", tmpDir)
 	}
@@ -110,7 +112,7 @@ func TestOpenDefaultsToCurrentDirectory(t *testing.T) {
 	}
 
 	f := &File{}
-	d, err := f.Open(scheme)
+	d, err := f.Open(context.Background(), scheme)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,7 +129,7 @@ func TestOpenWithDuplicateVersion(t *testing.T) {
 	mustWriteFile(t, tmpDir, "1_bar.up.sql", "") // 1 up
 
 	f := &File{}
-	_, err := f.Open(scheme + tmpDir)
+	_, err := f.Open(context.Background(), scheme+tmpDir)
 	if err == nil {
 		t.Fatal("expected err")
 	}
@@ -137,12 +139,12 @@ func TestClose(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	f := &File{}
-	d, err := f.Open(scheme + tmpDir)
+	d, err := f.Open(context.Background(), scheme+tmpDir)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if d.Close() != nil {
+	if d.Close(context.Background()) != nil {
 		t.Fatal("expected nil")
 	}
 }
@@ -174,7 +176,7 @@ func BenchmarkOpen(b *testing.B) {
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		f := &File{}
-		_, err := f.Open(scheme + dir)
+		_, err := f.Open(context.Background(), scheme+dir)
 		if err != nil {
 			b.Error(err)
 		}
@@ -189,13 +191,14 @@ func BenchmarkNext(b *testing.B) {
 			b.Error(err)
 		}
 	}()
+	ctx := context.Background()
 	f := &File{}
-	d, _ := f.Open(scheme + dir)
+	d, _ := f.Open(ctx, scheme+dir)
 	b.ResetTimer()
-	v, err := d.First()
+	v, err := d.First(ctx)
 	for n := 0; n < b.N; n++ {
 		for !errors.Is(err, os.ErrNotExist) {
-			v, err = d.Next(v)
+			v, err = d.Next(ctx, v)
 		}
 	}
 	b.StopTimer()

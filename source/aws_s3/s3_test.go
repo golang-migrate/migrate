@@ -1,12 +1,14 @@
 package awss3
 
 import (
+	"context"
 	"errors"
 	"io"
 	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/service/s3"
 	st "github.com/golang-migrate/migrate/v4/source/testing"
 	"github.com/stretchr/testify/assert"
@@ -30,7 +32,7 @@ func Test(t *testing.T) {
 			"prod/migrations/0-random-stuff/whatever.txt": "",
 		},
 	}
-	driver, err := WithInstance(&s3Client, &Config{
+	driver, err := WithInstance(context.Background(), &s3Client, &Config{
 		Bucket: "some-bucket",
 		Prefix: "prod/migrations/",
 	})
@@ -94,7 +96,7 @@ type fakeS3 struct {
 	objects map[string]string
 }
 
-func (s *fakeS3) ListObjects(input *s3.ListObjectsInput) (*s3.ListObjectsOutput, error) {
+func (s *fakeS3) ListObjectsWithContext(_ aws.Context, input *s3.ListObjectsInput, _ ...request.Option) (*s3.ListObjectsOutput, error) {
 	bucket := aws.StringValue(input.Bucket)
 	if bucket != s.bucket {
 		return nil, errors.New("bucket not found")
@@ -114,7 +116,7 @@ func (s *fakeS3) ListObjects(input *s3.ListObjectsInput) (*s3.ListObjectsOutput,
 	return &output, nil
 }
 
-func (s *fakeS3) GetObject(input *s3.GetObjectInput) (*s3.GetObjectOutput, error) {
+func (s *fakeS3) GetObjectWithContext(_ aws.Context, input *s3.GetObjectInput, _ ...request.Option) (*s3.GetObjectOutput, error) {
 	bucket := aws.StringValue(input.Bucket)
 	if bucket != s.bucket {
 		return nil, errors.New("bucket not found")

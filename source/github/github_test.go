@@ -2,6 +2,7 @@ package github
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"testing"
@@ -25,7 +26,7 @@ func Test(t *testing.T) {
 	}
 
 	g := &Github{}
-	d, err := g.Open("github://" + GithubTestSecret + "@mattes/migrate_test_tmp/test#452b8003e7")
+	d, err := g.Open(context.Background(), "github://"+GithubTestSecret+"@mattes/migrate_test_tmp/test#452b8003e7")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -34,24 +35,25 @@ func Test(t *testing.T) {
 }
 
 func TestDefaultClient(t *testing.T) {
+	ctx := context.Background()
 	g := &Github{}
 	owner := "golang-migrate"
 	repo := "migrate"
 	path := "source/github/examples/migrations"
 
 	url := fmt.Sprintf("github://%s/%s/%s", owner, repo, path)
-	d, err := g.Open(url)
+	d, err := g.Open(ctx, url)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	ver, err := d.First()
+	ver, err := d.First(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	assert.Equal(t, uint(1085649617), ver)
 
-	ver, err = d.Next(ver)
+	ver, err = d.Next(ctx, ver)
 	if err != nil {
 		t.Fatal(err)
 	}

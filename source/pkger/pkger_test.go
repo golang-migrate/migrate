@@ -1,6 +1,7 @@
 package pkger
 
 import (
+	"context"
 	"errors"
 	"os"
 	"testing"
@@ -14,6 +15,7 @@ import (
 
 func Test(t *testing.T) {
 	t.Run("WithInstance", func(t *testing.T) {
+		ctx := context.Background()
 		i := testInstance(t)
 
 		createPkgerFile(t, i, "/1_foobar.up.sql")
@@ -25,7 +27,7 @@ func Test(t *testing.T) {
 		createPkgerFile(t, i, "/7_foobar.up.sql")
 		createPkgerFile(t, i, "/7_foobar.down.sql")
 
-		d, err := WithInstance(i, "/")
+		d, err := WithInstance(ctx, i, "/")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -34,6 +36,7 @@ func Test(t *testing.T) {
 	})
 
 	t.Run("Open", func(t *testing.T) {
+		ctx := context.Background()
 		i := testInstance(t)
 
 		createPkgerFile(t, i, "/1_foobar.up.sql")
@@ -47,7 +50,7 @@ func Test(t *testing.T) {
 
 		registerPackageLevelInstance(t, i)
 
-		d, err := (&Pkger{}).Open("pkger:///")
+		d, err := (&Pkger{}).Open(ctx, "pkger:///")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -58,6 +61,7 @@ func Test(t *testing.T) {
 }
 
 func TestWithInstance(t *testing.T) {
+	ctx := context.Background()
 	t.Run("Subdir", func(t *testing.T) {
 		i := testInstance(t)
 
@@ -65,14 +69,14 @@ func TestWithInstance(t *testing.T) {
 		// initialize.
 		createPkgerSubdir(t, i, "/subdir")
 
-		_, err := WithInstance(i, "/subdir")
+		_, err := WithInstance(ctx, i, "/subdir")
 		if err != nil {
 			t.Fatal("")
 		}
 	})
 
 	t.Run("NilInstance", func(t *testing.T) {
-		_, err := WithInstance(nil, "")
+		_, err := WithInstance(ctx, nil, "")
 		if err == nil {
 			t.Fatal(err)
 		}
@@ -81,7 +85,7 @@ func TestWithInstance(t *testing.T) {
 	t.Run("FailInit", func(t *testing.T) {
 		i := testInstance(t)
 
-		_, err := WithInstance(i, "/fail")
+		_, err := WithInstance(ctx, i, "/fail")
 		if err == nil {
 			t.Fatal(err)
 		}
@@ -92,12 +96,12 @@ func TestWithInstance(t *testing.T) {
 
 		createPkgerSubdir(t, i, "/")
 
-		d, err := WithInstance(i, "/")
+		d, err := WithInstance(ctx, i, "/")
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		if _, err := d.First(); !errors.Is(err, os.ErrNotExist) {
+		if _, err := d.First(ctx); !errors.Is(err, os.ErrNotExist) {
 			t.Fatal(err)
 		}
 
@@ -105,23 +109,24 @@ func TestWithInstance(t *testing.T) {
 }
 
 func TestOpen(t *testing.T) {
+	ctx := context.Background()
 
 	t.Run("InvalidURL", func(t *testing.T) {
-		_, err := (&Pkger{}).Open(":///")
+		_, err := (&Pkger{}).Open(ctx, ":///")
 		if err == nil {
 			t.Fatal(err)
 		}
 	})
 
 	t.Run("Root", func(t *testing.T) {
-		_, err := (&Pkger{}).Open("pkger:///")
+		_, err := (&Pkger{}).Open(ctx, "pkger:///")
 		if err != nil {
 			t.Fatal(err)
 		}
 	})
 
 	t.Run("FailInit", func(t *testing.T) {
-		_, err := (&Pkger{}).Open("pkger:///subdir")
+		_, err := (&Pkger{}).Open(ctx, "pkger:///subdir")
 		if err == nil {
 			t.Fatal(err)
 		}
@@ -136,7 +141,7 @@ func TestOpen(t *testing.T) {
 	registerPackageLevelInstance(t, i)
 
 	t.Run("Subdir", func(t *testing.T) {
-		_, err := (&Pkger{}).Open("pkger:///subdir")
+		_, err := (&Pkger{}).Open(ctx, "pkger:///subdir")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -144,11 +149,12 @@ func TestOpen(t *testing.T) {
 }
 
 func TestClose(t *testing.T) {
-	d, err := (&Pkger{}).Open("pkger:///")
+	ctx := context.Background()
+	d, err := (&Pkger{}).Open(ctx, "pkger:///")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := d.Close(); err != nil {
+	if err := d.Close(ctx); err != nil {
 		t.Fatal(err)
 	}
 }

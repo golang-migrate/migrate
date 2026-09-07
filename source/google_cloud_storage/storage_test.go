@@ -1,6 +1,7 @@
 package googlecloudstorage
 
 import (
+	"context"
 	"testing"
 
 	"github.com/fsouza/fake-gcs-server/fakestorage"
@@ -29,7 +30,7 @@ func Test(t *testing.T) {
 		prefix:     "prod/migrations/",
 		migrations: source.NewMigrations(),
 	}
-	err := driver.loadMigrations()
+	err := driver.loadMigrations(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
