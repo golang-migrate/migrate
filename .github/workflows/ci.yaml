@@ -82,7 +82,7 @@ jobs:
 
       - uses: goreleaser/goreleaser-action@v5
         with:
-          version: latest
+          version: v1.26.2
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
