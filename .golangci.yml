@@ -3,6 +3,7 @@ linters:
   enable:
     - goconst
     - misspell
+    - modernize
     - nakedret
     - prealloc
     - revive

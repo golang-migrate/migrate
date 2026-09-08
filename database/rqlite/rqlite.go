@@ -186,7 +186,7 @@ func (r *Rqlite) SetVersion(version int, dirty bool) error {
 	if version >= 0 || (version == database.NilVersion && dirty) {
 		statements = append(statements, gorqlite.ParameterizedStatement{
 			Query: insertQuery,
-			Arguments: []interface{}{
+			Arguments: []any{
 				version,
 				dirty,
 			},

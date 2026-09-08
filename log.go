@@ -5,7 +5,7 @@ package migrate
 type Logger interface {
 
 	// Printf is like fmt.Printf
-	Printf(format string, v ...interface{})
+	Printf(format string, v ...any)
 
 	// Verbose should return true when verbose logging output is wanted
 	Verbose() bool

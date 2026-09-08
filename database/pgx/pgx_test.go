@@ -694,7 +694,7 @@ func TestWithInstance_Concurrent(t *testing.T) {
 		defer wg.Wait()
 
 		wg.Add(concurrency)
-		for i := 0; i < concurrency; i++ {
+		for i := range concurrency {
 			go func(i int) {
 				defer wg.Done()
 				_, err := WithInstance(db, &Config{})

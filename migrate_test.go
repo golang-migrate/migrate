@@ -1139,7 +1139,7 @@ func TestRead(t *testing.T) {
 	}
 
 	for i, v := range tt {
-		ret := make(chan interface{})
+		ret := make(chan any)
 		go m.read(v.from, v.to, ret)
 		migrations, err := migrationsFromChannel(ret)
 
@@ -1216,7 +1216,7 @@ func TestReadUp(t *testing.T) {
 	}
 
 	for i, v := range tt {
-		ret := make(chan interface{})
+		ret := make(chan any)
 		go m.readUp(v.from, v.limit, ret)
 		migrations, err := migrationsFromChannel(ret)
 
@@ -1293,7 +1293,7 @@ func TestReadDown(t *testing.T) {
 	}
 
 	for i, v := range tt {
-		ret := make(chan interface{})
+		ret := make(chan any)
 		go m.readDown(v.from, v.limit, ret)
 		migrations, err := migrationsFromChannel(ret)
 
@@ -1319,7 +1319,7 @@ func TestLock(t *testing.T) {
 	}
 }
 
-func migrationsFromChannel(ret chan interface{}) ([]*Migration, error) {
+func migrationsFromChannel(ret chan any) ([]*Migration, error) {
 	slice := make([]*Migration, 0)
 	for r := range ret {
 		switch t := r.(type) {
@@ -1391,7 +1391,7 @@ func equalMigSeq(t *testing.T, i int, expected, got migrationSequence) {
 		t.Errorf("expected migrations %v, got %v, in %v", expected, got, i)
 
 	} else {
-		for ii := 0; ii < len(expected); ii++ {
+		for ii := range expected {
 			if expected[ii].Version != got[ii].Version {
 				t.Errorf("expected version %v, got %v, in %v", expected[ii].Version, got[ii].Version, i)
 			}
