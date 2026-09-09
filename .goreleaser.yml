@@ -17,9 +17,12 @@ builds:
     goarm:
       - 7
     ignore:
-      # The 32-bit windows/arm port is unsupported by Go 1.26 and later.
       - goos: windows
         goarch: arm
+      - goos: darwin
+        goarch: arm
+      - goos: darwin
+        goarch: 386
     main: ./cmd/migrate
     ldflags:
       - '-w -s -X main.Version={{ .Version }} -extldflags "static"'
