@@ -444,6 +444,32 @@ func (p *Postgres) Drop() (err error) {
 		}
 	}
 
+	// Drop all custom enum types in current schema
+	query = `SELECT typname FROM pg_type t JOIN pg_namespace n ON t.typnamespace = n.oid WHERE n.nspname = (SELECT current_schema()) AND t.typtype = 'e'`
+	types, err := p.conn.QueryContext(context.Background(), query)
+	if err != nil {
+		return &database.Error{OrigErr: err, Query: []byte(query)}
+	}
+	defer func() {
+		if errClose := types.Close(); errClose != nil {
+			err = errors.Join(err, errClose)
+		}
+	}()
+
+	for types.Next() {
+		var typeName string
+		if err := types.Scan(&typeName); err != nil {
+			return err
+		}
+		query = `DROP TYPE IF EXISTS ` + pq.QuoteIdentifier(typeName) + ` CASCADE`
+		if _, err := p.conn.ExecContext(context.Background(), query); err != nil {
+			return &database.Error{OrigErr: err, Query: []byte(query)}
+		}
+	}
+	if err := types.Err(); err != nil {
+		return &database.Error{OrigErr: err, Query: []byte(query)}
+	}
+
 	return nil
 }
 
