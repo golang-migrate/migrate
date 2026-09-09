@@ -37,3 +37,18 @@ In PostgreSQL running multiple SQL statements in one `Exec` executes them inside
 behavior is not desirable because some statements can be only run outside of transaction (e.g.
 `CREATE INDEX CONCURRENTLY`). If you want to use `CREATE INDEX CONCURRENTLY` without activating multi-statement mode
 you have to put such statements in a separate migration files.
+
+### Custom migration splitter
+
+If your migrations contain SQL bodies with embedded semicolons (e.g. `DO $$ BEGIN ... END $$;`), the
+semicolon-based splitting used by `x-multi-statement` will produce incorrect statement boundaries. Instead, you
+can use the CLI `-migration-splitter` flag to split a migration into steps using a delimiter line you control:
+
+```
+migrate -database "$DATABASE_URL" -source "file://migrations" \
+  -migration-splitter '---' up
+```
+
+Place a line containing only `---` between each step in your migration file. The splitter matches when
+a whole line exactly equals the token (supports both LF and CRLF line endings), and each step is
+executed sequentially in a separate database call.

@@ -5,8 +5,10 @@
 package migrate
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"sync"
 	"time"
@@ -78,6 +80,12 @@ type Migrate struct {
 	// LockTimeout defaults to DefaultLockTimeout,
 	// but can be set per Migrate instance.
 	LockTimeout time.Duration
+
+	// MigrationSplitter, if non-empty, splits each migration into sequential steps.
+	// A splitter matches only when a full logical line equals this token.
+	// Both LF and CRLF input line endings are recognized.
+	// If nil or empty, each migration is passed to the driver as-is.
+	MigrationSplitter []byte
 }
 
 // New returns a new Migrate instance from a source URL and a database URL.
@@ -741,8 +749,20 @@ func (m *Migrate) runMigrations(ret <-chan interface{}) error {
 
 			if migr.Body != nil {
 				m.logVerbosePrintf("Read and execute %v\n", migr.LogString())
-				if err := m.databaseDrv.Run(migr.BufferedBody); err != nil {
-					return err
+				if len(m.MigrationSplitter) == 0 {
+					if err := m.databaseDrv.Run(migr.BufferedBody); err != nil {
+						return err
+					}
+				} else {
+					content, err := io.ReadAll(migr.BufferedBody)
+					if err != nil {
+						return err
+					}
+					for _, step := range splitMigrationSteps(content, m.MigrationSplitter) {
+						if err := m.databaseDrv.Run(bytes.NewReader(step)); err != nil {
+							return err
+						}
+					}
 				}
 			}
 
@@ -769,6 +789,33 @@ func (m *Migrate) runMigrations(ret <-chan interface{}) error {
 		}
 	}
 	return nil
+}
+
+func splitMigrationSteps(content, splitter []byte) [][]byte {
+	if len(splitter) == 0 {
+		return [][]byte{content}
+	}
+
+	steps := make([][]byte, 0, 1)
+	stepStart := 0
+	offset := 0
+
+	for offset < len(content) {
+		lineStart := offset
+		lineEnd := bytes.IndexByte(content[offset:], '\n')
+		if lineEnd < 0 {
+			offset = len(content)
+		} else {
+			offset += lineEnd + 1
+		}
+
+		if bytes.Equal(bytes.TrimRight(content[lineStart:offset], "\r\n"), splitter) {
+			steps = append(steps, content[stepStart:lineStart])
+			stepStart = offset
+		}
+	}
+
+	return append(steps, content[stepStart:])
 }
 
 // versionExists checks the source if either the up or down migration for
