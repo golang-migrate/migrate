@@ -219,7 +219,7 @@ func (ss *SQLServer) Lock() error {
 	})
 }
 
-// Unlock froms the migration lock from the database
+// Unlock removes the migration lock from the database
 func (ss *SQLServer) Unlock() error {
 	return database.CasRestoreOnErr(&ss.isLocked, true, false, database.ErrNotLocked, func() error {
 		aid, err := database.GenerateAdvisoryLockId(ss.config.DatabaseName, ss.config.SchemaName)
