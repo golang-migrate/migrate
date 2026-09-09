@@ -95,6 +95,11 @@ func TestCleanStatements(t *testing.T) {
 			expected:       []string{"CREATE TABLE table_name (\n  id UUID NOT NULL,\n) PRIMARY KEY(id)"},
 		},
 		{
+			name:           "can clean NEW_UUID function",
+			multiStatement: "CREATE TABLE table_name (id uuid DEFAULT (NEW_UUID())) PRIMARY KEY (id);",
+			expected:       []string{"CREATE TABLE table_name (\n  id UUID DEFAULT (NEW_UUID()),\n) PRIMARY KEY(id)"},
+		},
+		{
 			name: "single statement, multi line, with semicolon, no comment",
 			multiStatement: `CREATE TABLE table_name (
 			id STRING(255) NOT NULL,
