@@ -150,10 +150,12 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	}
 
 	if err := px.ensureLockTable(); err != nil {
+		_ = conn.Close()
 		return nil, err
 	}
 
 	if err := px.ensureVersionTable(); err != nil {
+		_ = conn.Close()
 		return nil, err
 	}
 
