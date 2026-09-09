@@ -132,6 +132,33 @@ func TestMigrate(t *testing.T) {
 	})
 }
 
+func TestMigrateLockTable(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := pgConnectionString(ip, port, "x-lock-strategy=table", "x-lock-table=lock_table")
+		fmt.Println(addr)
+		p := &Postgres{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
+		m, err := migrate.NewWithDatabaseInstance("file://../examples/migrations", "pgx", d)
+		if err != nil {
+			t.Fatal(err)
+		}
+		dt.TestMigrate(t, m)
+	})
+}
+
 func TestMultipleStatements(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.FirstPort()
