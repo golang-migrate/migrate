@@ -30,17 +30,11 @@ as described in [README.md#database-urls](../../README.md#database-urls)
 > 1496601752/u add_index_on_user_emails (2m12.155787369s)
 > 1496602638/u create_books_table (2m30.77299181s)
 
-## DDL with comments
+## DDL & DML with comments
 
 At the moment the GCP Spanner backed does not seem to allow for comments (See https://issuetracker.google.com/issues/159730604)
 so in order to be able to use migration with DDL containing comments `x-clean-statements` is required
 
 ## Multiple statements
 
-In order to be able to use more than 1 DDL statement in the same migration file, the file has to be parsed and therefore the `x-clean-statements` flag is required
-
-## Testing
-
-To unit test the `spanner` driver, `SPANNER_DATABASE` needs to be set. You'll
-need to sign-up to Google Cloud Platform (GCP) and have a running Spanner
-instance since it is not possible to run Google Spanner outside GCP.
+In order to be able to use more than 1 DDL or DML statement in the same migration file, the file has to be parsed and therefore the `x-clean-statements` flag is required
