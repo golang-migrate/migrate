@@ -214,19 +214,14 @@ func (m *Migrate) Migrate(version uint) error {
 		return err
 	}
 
-	curVersion, dirty, err := m.databaseDrv.Version()
+	curVersion, err := m.versionClean()
 	if err != nil {
 		return m.unlockErr(err)
 	}
 
-	if dirty {
-		return m.unlockErr(ErrDirty{curVersion})
-	}
-
-	ret := make(chan interface{}, m.PrefetchMigrations)
-	go m.read(curVersion, int(version), ret)
-
-	return m.unlockErr(m.runMigrations(ret))
+	return m.unlockErr(m.runMigrations(func(h *providerHelper) error {
+		return m.read(curVersion, int(version), h)
+	}))
 }
 
 // Steps looks at the currently active migration version.
@@ -240,24 +235,18 @@ func (m *Migrate) Steps(n int) error {
 		return err
 	}
 
-	curVersion, dirty, err := m.databaseDrv.Version()
+	curVersion, err := m.versionClean()
 	if err != nil {
 		return m.unlockErr(err)
 	}
 
-	if dirty {
-		return m.unlockErr(ErrDirty{curVersion})
-	}
+	return m.unlockErr(m.runMigrations(func(h *providerHelper) error {
+		if n > 0 {
+			return m.readUp(curVersion, n, h)
+		}
 
-	ret := make(chan interface{}, m.PrefetchMigrations)
-
-	if n > 0 {
-		go m.readUp(curVersion, n, ret)
-	} else {
-		go m.readDown(curVersion, -n, ret)
-	}
-
-	return m.unlockErr(m.runMigrations(ret))
+		return m.readDown(curVersion, -n, h)
+	}))
 }
 
 // Up looks at the currently active migration version
@@ -267,19 +256,14 @@ func (m *Migrate) Up() error {
 		return err
 	}
 
-	curVersion, dirty, err := m.databaseDrv.Version()
+	curVersion, err := m.versionClean()
 	if err != nil {
 		return m.unlockErr(err)
 	}
 
-	if dirty {
-		return m.unlockErr(ErrDirty{curVersion})
-	}
-
-	ret := make(chan interface{}, m.PrefetchMigrations)
-
-	go m.readUp(curVersion, -1, ret)
-	return m.unlockErr(m.runMigrations(ret))
+	return m.unlockErr(m.runMigrations(func(h *providerHelper) error {
+		return m.readUp(curVersion, -1, h)
+	}))
 }
 
 // Down looks at the currently active migration version
@@ -289,18 +273,14 @@ func (m *Migrate) Down() error {
 		return err
 	}
 
-	curVersion, dirty, err := m.databaseDrv.Version()
+	curVersion, err := m.versionClean()
 	if err != nil {
 		return m.unlockErr(err)
 	}
 
-	if dirty {
-		return m.unlockErr(ErrDirty{curVersion})
-	}
-
-	ret := make(chan interface{}, m.PrefetchMigrations)
-	go m.readDown(curVersion, -1, ret)
-	return m.unlockErr(m.runMigrations(ret))
+	return m.unlockErr(m.runMigrations(func(h *providerHelper) error {
+		return m.readDown(curVersion, -1, h)
+	}))
 }
 
 // Drop deletes everything in the database.
@@ -327,19 +307,12 @@ func (m *Migrate) Run(migration ...*Migration) error {
 		return err
 	}
 
-	curVersion, dirty, err := m.databaseDrv.Version()
+	_, err := m.versionClean()
 	if err != nil {
 		return m.unlockErr(err)
 	}
 
-	if dirty {
-		return m.unlockErr(ErrDirty{curVersion})
-	}
-
-	ret := make(chan interface{}, m.PrefetchMigrations)
-
-	go func() {
-		defer close(ret)
+	return m.unlockErr(m.runMigrations(func(h *providerHelper) error {
 		for _, migr := range migration {
 			if m.PrefetchMigrations > 0 && migr.Body != nil {
 				m.logVerbosePrintf("Start buffering %v\n", migr.LogString())
@@ -347,16 +320,14 @@ func (m *Migrate) Run(migration ...*Migration) error {
 				m.logVerbosePrintf("Scheduled %v\n", migr.LogString())
 			}
 
-			ret <- migr
-			go func(migr *Migration) {
-				if err := migr.Buffer(); err != nil {
-					m.logErr(err)
-				}
-			}(migr)
+			pushed := h.pushMigration(migr)
+			if !pushed {
+				return nil
+			}
 		}
-	}()
 
-	return m.unlockErr(m.runMigrations(ret))
+		return nil
+	}))
 }
 
 // Force sets a migration version.
@@ -393,33 +364,41 @@ func (m *Migrate) Version() (version uint, dirty bool, err error) {
 	return suint(v), d, nil
 }
 
+// versionClean returns the currently active migration version
+// while making assertion that the active migration is clean (not dirty).
+func (m *Migrate) versionClean() (version int, err error) {
+	v, d, err := m.databaseDrv.Version()
+	if err != nil {
+		return 0, err
+	}
+
+	if d {
+		return 0, ErrDirty{v}
+	}
+
+	return v, nil
+}
+
 // read reads either up or down migrations from source `from` to `to`.
 // Each migration is then written to the ret channel.
-// If an error occurs during reading, that error is written to the ret channel, too.
-// Once read is done reading it will close the ret channel.
-func (m *Migrate) read(from int, to int, ret chan<- interface{}) {
-	defer close(ret)
-
+func (m *Migrate) read(from int, to int, h *providerHelper) error {
 	// check if from version exists
 	if from >= 0 {
 		if err := m.versionExists(suint(from)); err != nil {
-			ret <- err
-			return
+			return err
 		}
 	}
 
 	// check if to version exists
 	if to >= 0 {
 		if err := m.versionExists(suint(to)); err != nil {
-			ret <- err
-			return
+			return err
 		}
 	}
 
 	// no change?
 	if from == to {
-		ret <- ErrNoChange
-		return
+		return ErrNoChange
 	}
 
 	if from < to {
@@ -428,22 +407,18 @@ func (m *Migrate) read(from int, to int, ret chan<- interface{}) {
 		if from == -1 {
 			firstVersion, err := m.sourceDrv.First()
 			if err != nil {
-				ret <- err
-				return
+				return err
 			}
 
 			migr, err := m.newMigration(firstVersion, int(firstVersion))
 			if err != nil {
-				ret <- err
-				return
+				return err
 			}
 
-			ret <- migr
-			go func() {
-				if err := migr.Buffer(); err != nil {
-					m.logErr(err)
-				}
-			}()
+			pushed := h.pushMigration(migr)
+			if !pushed {
+				return nil
+			}
 
 			from = int(firstVersion)
 		}
@@ -451,27 +426,23 @@ func (m *Migrate) read(from int, to int, ret chan<- interface{}) {
 		// run until we reach target ...
 		for from < to {
 			if m.stop() {
-				return
+				return nil
 			}
 
 			next, err := m.sourceDrv.Next(suint(from))
 			if err != nil {
-				ret <- err
-				return
+				return err
 			}
 
 			migr, err := m.newMigration(next, int(next))
 			if err != nil {
-				ret <- err
-				return
+				return err
 			}
 
-			ret <- migr
-			go func() {
-				if err := migr.Buffer(); err != nil {
-					m.logErr(err)
-				}
-			}()
+			pushed := h.pushMigration(migr)
+			if !pushed {
+				return nil
+			}
 
 			from = int(next)
 		}
@@ -481,7 +452,7 @@ func (m *Migrate) read(from int, to int, ret chan<- interface{}) {
 		// run until we reach target ...
 		for from > to && from >= 0 {
 			if m.stop() {
-				return
+				return nil
 			}
 
 			prev, err := m.sourceDrv.Prev(suint(from))
@@ -489,88 +460,75 @@ func (m *Migrate) read(from int, to int, ret chan<- interface{}) {
 				// apply nil migration
 				migr, err := m.newMigration(suint(from), -1)
 				if err != nil {
-					ret <- err
-					return
+					return err
 				}
-				ret <- migr
-				go func() {
-					if err := migr.Buffer(); err != nil {
-						m.logErr(err)
-					}
-				}()
 
-				return
+				pushed := h.pushMigration(migr)
+				if !pushed {
+					return nil
+				}
+
+				return nil
 
 			} else if err != nil {
-				ret <- err
-				return
+				return err
 			}
 
 			migr, err := m.newMigration(suint(from), int(prev))
 			if err != nil {
-				ret <- err
-				return
+				return err
 			}
 
-			ret <- migr
-			go func() {
-				if err := migr.Buffer(); err != nil {
-					m.logErr(err)
-				}
-			}()
+			pushed := h.pushMigration(migr)
+			if !pushed {
+				return nil
+			}
 
 			from = int(prev)
 		}
 	}
+
+	return nil
 }
 
 // readUp reads up migrations from `from` limited by `limit`.
 // limit can be -1, implying no limit and reading until there are no more migrations.
 // Each migration is then written to the ret channel.
-// If an error occurs during reading, that error is written to the ret channel, too.
-// Once readUp is done reading it will close the ret channel.
-func (m *Migrate) readUp(from int, limit int, ret chan<- interface{}) {
-	defer close(ret)
-
+func (m *Migrate) readUp(from int, limit int, h *providerHelper) error {
 	// check if from version exists
 	if from >= 0 {
 		if err := m.versionExists(suint(from)); err != nil {
-			ret <- err
-			return
+			return err
 		}
 	}
 
 	if limit == 0 {
-		ret <- ErrNoChange
-		return
+		return ErrNoChange
 	}
 
 	count := 0
 	for count < limit || limit == -1 {
 		if m.stop() {
-			return
+			return nil
 		}
 
 		// apply first migration if from is nil version
 		if from == -1 {
 			firstVersion, err := m.sourceDrv.First()
 			if err != nil {
-				ret <- err
-				return
+				return err
 			}
 
 			migr, err := m.newMigration(firstVersion, int(firstVersion))
 			if err != nil {
-				ret <- err
-				return
+				return err
 			}
 
-			ret <- migr
-			go func() {
-				if err := migr.Buffer(); err != nil {
-					m.logErr(err)
-				}
-			}()
+			pushed := h.pushMigration(migr)
+			if !pushed {
+				return nil
+			}
+
 			from = int(firstVersion)
 			count++
 			continue
@@ -581,86 +539,74 @@ func (m *Migrate) readUp(from int, limit int, ret chan<- interface{}) {
 		if errors.Is(err, os.ErrNotExist) {
 			// no limit, but no migrations applied?
 			if limit == -1 && count == 0 {
-				ret <- ErrNoChange
-				return
+				return ErrNoChange
 			}
 
 			// no limit, reached end
 			if limit == -1 {
-				return
+				return nil
 			}
 
 			// reached end, and didn't apply any migrations
 			if limit > 0 && count == 0 {
-				ret <- os.ErrNotExist
-				return
+				return os.ErrNotExist
 			}
 
 			// applied less migrations than limit?
 			if count < limit {
-				ret <- ErrShortLimit{suint(limit - count)}
-				return
+				return ErrShortLimit{suint(limit - count)}
 			}
 		}
 		if err != nil {
-			ret <- err
-			return
+			return err
 		}
 
 		migr, err := m.newMigration(next, int(next))
 		if err != nil {
-			ret <- err
-			return
+			return err
 		}
 
-		ret <- migr
-		go func() {
-			if err := migr.Buffer(); err != nil {
-				m.logErr(err)
-			}
-		}()
+		pushed := h.pushMigration(migr)
+		if !pushed {
+			return nil
+		}
+
 		from = int(next)
 		count++
 	}
+
+	return nil
 }
 
 // readDown reads down migrations from `from` limited by `limit`.
 // limit can be -1, implying no limit and reading until there are no more migrations.
 // Each migration is then written to the ret channel.
-// If an error occurs during reading, that error is written to the ret channel, too.
-// Once readDown is done reading it will close the ret channel.
-func (m *Migrate) readDown(from int, limit int, ret chan<- interface{}) {
-	defer close(ret)
-
+func (m *Migrate) readDown(from int, limit int, h *providerHelper) error {
 	// check if from version exists
 	if from >= 0 {
 		if err := m.versionExists(suint(from)); err != nil {
-			ret <- err
-			return
+			return err
 		}
 	}
 
 	if limit == 0 {
-		ret <- ErrNoChange
-		return
+		return ErrNoChange
 	}
 
 	// no change if already at nil version
 	if from == -1 && limit == -1 {
-		ret <- ErrNoChange
-		return
+		return ErrNoChange
 	}
 
 	// can't go over limit if already at nil version
 	if from == -1 && limit > 0 {
-		ret <- os.ErrNotExist
-		return
+		return os.ErrNotExist
 	}
 
 	count := 0
 	for count < limit || limit == -1 {
 		if m.stop() {
-			return
+			return nil
 		}
 
 		prev, err := m.sourceDrv.Prev(suint(from))
@@ -669,70 +615,83 @@ func (m *Migrate) readDown(from int, limit int, ret chan<- interface{}) {
 			if limit == -1 || limit-count > 0 {
 				firstVersion, err := m.sourceDrv.First()
 				if err != nil {
-					ret <- err
-					return
+					return err
 				}
 
 				migr, err := m.newMigration(firstVersion, -1)
 				if err != nil {
-					ret <- err
-					return
+					return err
 				}
-				ret <- migr
-				go func() {
-					if err := migr.Buffer(); err != nil {
-						m.logErr(err)
-					}
-				}()
+
+				pushed := h.pushMigration(migr)
+				if !pushed {
+					return nil
+				}
+
 				count++
 			}
 
 			if count < limit {
-				ret <- ErrShortLimit{suint(limit - count)}
+				return ErrShortLimit{suint(limit - count)}
 			}
-			return
+
+			return nil
 		}
 		if err != nil {
-			ret <- err
-			return
+			return err
 		}
 
 		migr, err := m.newMigration(suint(from), int(prev))
 		if err != nil {
-			ret <- err
-			return
+			return err
 		}
 
-		ret <- migr
-		go func() {
-			if err := migr.Buffer(); err != nil {
-				m.logErr(err)
-			}
-		}()
-		from = int(prev)
-		count++
-	}
-}
-
-// runMigrations reads *Migration and error from a channel. Any other type
-// sent on this channel will result in a panic. Each migration is then
-// proxied to the database driver and run against the database.
-// Before running a newly received migration it will check if it's supposed
-// to stop execution because it might have received a stop signal on the
-// GracefulStop channel.
-func (m *Migrate) runMigrations(ret <-chan interface{}) error {
-	for r := range ret {
-
-		if m.stop() {
+		pushed := h.pushMigration(migr)
+		if !pushed {
 			return nil
 		}
 
-		switch r := r.(type) {
-		case error:
-			return r
+		from = int(prev)
+		count++
+	}
 
-		case *Migration:
-			migr := r
+	return nil
+}
+
+// runMigrations reads *Migration from channel that background provider concurrently writes to.
+// Each migration is then proxied to the database driver and run against the database.
+// Before running a newly received migration it will check if it's supposed
+// to stop execution because it might have received a stop signal on the
+// GracefulStop channel.
+func (m *Migrate) runMigrations(providerFn func(h *providerHelper) error) error {
+	providerDone := make(chan error, 1)
+	runnerDone := make(chan bool)
+
+	// Channel of migrations for background provider
+	// to write to and runner to read from.
+	// Closed after provider finishes its job.
+	ret := make(chan *Migration, m.PrefetchMigrations)
+
+	// Start the background provider.
+	go func() {
+		h := providerHelper{
+			m:    m,
+			ch:   ret,
+			exit: runnerDone,
+		}
+
+		providerDone <- providerFn(&h)
+		close(ret)
+	}()
+
+	// Start the migration runner.
+	err := func() error {
+		defer close(runnerDone)
+
+		for migr := range ret {
+			if m.stop() {
+				return nil
+			}
 
 			// set version with dirty state
 			if err := m.databaseDrv.SetVersion(migr.TargetVersion, true); err != nil {
@@ -763,12 +722,18 @@ func (m *Migrate) runMigrations(ret <-chan interface{}) error {
 					m.logPrintf("%v (%v)\n", migr.LogString(), readTime+runTime)
 				}
 			}
-
-		default:
-			return fmt.Errorf("unknown type: %T with value: %+v", r, r)
 		}
+
+		return nil
+	}()
+
+	// Runner has finished.
+	// Now wait for provider to finish.
+	if perr := <-providerDone; perr != nil {
+		return perr
 	}
-	return nil
+
+	return err
 }
 
 // versionExists checks the source if either the up or down migration for
@@ -975,5 +940,32 @@ func (m *Migrate) logVerbosePrintf(format string, v ...interface{}) {
 func (m *Migrate) logErr(err error) {
 	if m.Log != nil {
 		m.Log.Printf("error: %v", err)
+	}
+}
+
+// providerHelper represents a helper for migration provider
+// that groups together the original *Migrate used for migrations,
+// a channel to read/write migrations from and a channel,
+// that signals that provider may exit.
+type providerHelper struct {
+	m    *Migrate
+	ch   chan<- *Migration
+	exit <-chan bool
+}
+
+// pushMigration pushes migration to provider channel for runner to read from.
+// Returns true if push was successful.
+func (h *providerHelper) pushMigration(migr *Migration) (pushed bool) {
+	select {
+	case <-h.exit:
+		return false
+	case h.ch <- migr:
+		go func() {
+			if err := migr.Buffer(); err != nil {
+				h.m.logErr(err)
+			}
+		}()
+
+		return true
 	}
 }
