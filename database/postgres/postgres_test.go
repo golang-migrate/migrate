@@ -91,6 +91,7 @@ func Test(t *testing.T) {
 	t.Run("testMultipleStatementsInMultiStatementMode", testMultipleStatementsInMultiStatementMode)
 	t.Run("testErrorParsing", testErrorParsing)
 	t.Run("testFilterCustomQuery", testFilterCustomQuery)
+	t.Run("testHostQueryParam", testHostQueryParam)
 	t.Run("testWithSchema", testWithSchema)
 	t.Run("testMigrationTableOption", testMigrationTableOption)
 	t.Run("testFailToCreateTableWithoutPermissions", testFailToCreateTableWithoutPermissions)
@@ -272,6 +273,32 @@ func testFilterCustomQuery(t *testing.T) {
 				t.Error(err)
 			}
 		}()
+	})
+}
+
+func testHostQueryParam(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Test that host specified as a query parameter (instead of in the URL
+		// authority) is correctly used for the connection. This is the pattern
+		// used for unix socket connections: postgres:///db?host=/var/run/postgresql
+		addr := fmt.Sprintf("postgres://postgres:%s@/postgres?host=%s&port=%s&sslmode=disable",
+			pgPassword, ip, port)
+		p := &Postgres{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
+		dt.Test(t, d, []byte("SELECT 1"))
 	})
 }
 
