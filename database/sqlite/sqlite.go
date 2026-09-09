@@ -7,7 +7,6 @@ import (
 	"io"
 	nurl "net/url"
 	"strconv"
-	"strings"
 	"sync/atomic"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -92,7 +91,14 @@ func (m *Sqlite) Open(url string) (database.Driver, error) {
 	if err != nil {
 		return nil, err
 	}
-	dbfile := strings.Replace(migrate.FilterCustomQuery(purl).String(), "sqlite://", "", 1)
+	// Build the DSN from the decoded path so percent-encoded characters (e.g.
+	// spaces as %20) resolve to the real file name. Using purl.String() here
+	// would re-encode the path and sql.Open would look for a literal "%20".
+	filtered := migrate.FilterCustomQuery(purl)
+	dbfile := filtered.Host + filtered.Path
+	if filtered.RawQuery != "" {
+		dbfile += "?" + filtered.RawQuery
+	}
 	db, err := sql.Open("sqlite", dbfile)
 	if err != nil {
 		return nil, err
