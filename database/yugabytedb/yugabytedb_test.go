@@ -5,8 +5,10 @@ package yugabytedb
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -97,6 +99,7 @@ func Test(t *testing.T) {
 	t.Run("testMigrate", testMigrate)
 	t.Run("testMultiStatement", testMultiStatement)
 	t.Run("testFilterCustomQuery", testFilterCustomQuery)
+	t.Run("testNoLockWorks", testNoLockWorks)
 
 	t.Cleanup(func() {
 		for _, spec := range specs {
@@ -177,6 +180,55 @@ func testMultiStatement(t *testing.T) {
 		}
 		if !exists {
 			t.Fatal("expected table bar to exist")
+		}
+	})
+}
+
+func TestNoLockParamValidation(t *testing.T) {
+	c := &YugabyteDB{}
+	_, err := c.Open("yugabyte://yugabyte@localhost/migrate?x-no-lock=not-a-bool")
+	if !errors.Is(err, strconv.ErrSyntax) {
+		t.Fatal("Expected syntax error when passing a non-bool as x-no-lock parameter")
+	}
+}
+
+func testNoLockWorks(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, ci dktest.ContainerInfo) {
+		createDB(t, ci)
+
+		ip, port, err := ci.Port(defaultPort)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := getConnectionString(ip, port)
+		c := &YugabyteDB{}
+		d, err := c.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		lock := d.(*YugabyteDB)
+
+		c = &YugabyteDB{}
+		d, err = c.Open(getConnectionString(ip, port, "x-no-lock=true"))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		noLock := d.(*YugabyteDB)
+
+		if err = lock.Lock(); err != nil {
+			t.Fatal(err)
+		}
+		if err = noLock.Lock(); err != nil {
+			t.Fatal(err)
+		}
+		if err = lock.Unlock(); err != nil {
+			t.Fatal(err)
+		}
+		if err = noLock.Unlock(); err != nil {
+			t.Fatal(err)
 		}
 	})
 }

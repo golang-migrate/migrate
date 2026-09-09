@@ -5,11 +5,14 @@ package cockroachdb
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
-	"github.com/golang-migrate/migrate/v4"
 	"log"
+	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/golang-migrate/migrate/v4"
 )
 
 import (
@@ -151,6 +154,55 @@ func TestMultiStatement(t *testing.T) {
 		}
 		if !exists {
 			t.Fatalf("expected table bar to exist")
+		}
+	})
+}
+
+func TestNoLockParamValidation(t *testing.T) {
+	c := &CockroachDb{}
+	_, err := c.Open("cockroach://root@localhost/migrate?x-no-lock=not-a-bool")
+	if !errors.Is(err, strconv.ErrSyntax) {
+		t.Fatal("Expected syntax error when passing a non-bool as x-no-lock parameter")
+	}
+}
+
+func TestNoLockWorks(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, ci dktest.ContainerInfo) {
+		createDB(t, ci)
+
+		ip, port, err := ci.Port(defaultPort)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := fmt.Sprintf("cockroach://root@%v:%v/migrate?sslmode=disable", ip, port)
+		c := &CockroachDb{}
+		d, err := c.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		lock := d.(*CockroachDb)
+
+		c = &CockroachDb{}
+		d, err = c.Open(addr + "&x-no-lock=true")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		noLock := d.(*CockroachDb)
+
+		if err = lock.Lock(); err != nil {
+			t.Fatal(err)
+		}
+		if err = noLock.Lock(); err != nil {
+			t.Fatal(err)
+		}
+		if err = lock.Unlock(); err != nil {
+			t.Fatal(err)
+		}
+		if err = noLock.Unlock(); err != nil {
+			t.Fatal(err)
 		}
 	})
 }

@@ -6,6 +6,7 @@
 | URL Query  | WithInstance Config | Description |
 |------------|---------------------|-------------|
 | `x-migrations-table` | `MigrationsTable` | Name of the migrations table |
+| `x-no-lock` | `NoLock` | Set to `true` to skip `sp_getapplock`/`sp_releaseapplock` calls. Useful for read-only checks. Only run migrations from one host when this is enabled. |
 | `username` | |  enter the SQL Server Authentication user id or the Windows Authentication user id in the DOMAIN\User format. On Windows, if user id is empty or missing Single-Sign-On is used. |
 | `password` | | The user's password. | 
 | `host` | | The host to connect to. |
