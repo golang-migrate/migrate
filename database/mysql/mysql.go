@@ -247,7 +247,7 @@ func (m *Mysql) Open(url string) (database.Driver, error) {
 	if statementTimeoutParam != "" {
 		statementTimeout, err = strconv.Atoi(statementTimeoutParam)
 		if err != nil {
-			return nil, fmt.Errorf("could not parse x-statement-timeout as float: %w", err)
+			return nil, fmt.Errorf("could not parse x-statement-timeout as integer: %w", err)
 		}
 	}
 
