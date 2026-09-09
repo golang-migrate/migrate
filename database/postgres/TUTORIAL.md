@@ -1,5 +1,11 @@
 # PostgreSQL tutorial for beginners
 
+## Install `migrate` with postgres support
+
+```
+go install -tags postgres github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+```
+
 ## Create/configure database
 
 For the purpose of this tutorial let's create PostgreSQL database called `example`.
