@@ -17,6 +17,7 @@
 | `x-tls-cert` | | The location of the client certificate file. Must be used with `x-tls-key`. |
 | `x-tls-key` | | The location of the private key file. Must be used with `x-tls-cert`. |
 | `x-tls-insecure-skip-verify` | | Whether or not to use SSL (true\|false) | 
+| `x-tx-isolation` | `TxIsolation` | Set transaction isolation level (Default: SERIALIZABLE). |
 
 ## Use with existing client
 
