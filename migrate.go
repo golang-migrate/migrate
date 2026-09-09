@@ -105,7 +105,7 @@ func New(sourceURL, databaseURL string) (*Migrate, error) {
 
 	databaseDrv, err := database.Open(databaseURL)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open database: %w", err)
+		return nil, fmt.Errorf("failed to open database: %w", database.RedactPassword(err))
 	}
 	m.databaseDrv = databaseDrv
 
