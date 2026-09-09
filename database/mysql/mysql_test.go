@@ -19,11 +19,12 @@ import (
 
 	"github.com/dhui/dktest"
 	"github.com/go-sql-driver/mysql"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/golang-migrate/migrate/v4"
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
 	"github.com/golang-migrate/migrate/v4/dktesting"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
-	"github.com/stretchr/testify/assert"
 )
 
 const defaultPort = 3306
@@ -275,6 +276,17 @@ func TestNoLockWorks(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
+}
+
+func TestLockTimeoutValidation(t *testing.T) {
+	ip := "127.0.0.1"
+	port := 3306
+	addr := fmt.Sprintf("mysql://root:root@tcp(%v:%v)/public", ip, port)
+	p := &Mysql{}
+	_, err := p.Open(addr + "?x-try-lock-timeout=not-an-int")
+	if !errors.Is(err, strconv.ErrSyntax) {
+		t.Fatal("Expected syntax error when passing a non-int as x-try-lock-timeout parameter")
+	}
 }
 
 func TestExtractCustomQueryParams(t *testing.T) {
