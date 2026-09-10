@@ -5,6 +5,8 @@
 | URL Query  | WithInstance Config | Description |
 |------------|---------------------|-------------|
 | `x-migrations-table` | `MigrationsTable` | Name of the migrations table |
+| `x-multi-statement` | `MultiStatementEnabled` | Enable multi-statement execution (default: false) |
+| `x-multi-statement-max-size` | `MultiStatementMaxSize` | Maximum size of single statement in bytes (default: 10MB) |
 | `auth_plugin_name` | | Authentication plugin name. Srp256/Srp/Legacy_Auth are available. (default is Srp) |
 | `column_name_to_lower` | | Force column name to lower. (default is false) |
 | `role` | | Role name |
