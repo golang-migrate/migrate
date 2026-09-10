@@ -76,25 +76,33 @@ func parseURI(uri string) (*Config, error) {
 }
 
 func (s *s3Driver) loadMigrations() error {
-	output, err := s.s3client.ListObjects(&s3.ListObjectsInput{
+	input := &s3.ListObjectsInput{
 		Bucket:    aws.String(s.config.Bucket),
 		Prefix:    aws.String(s.config.Prefix),
 		Delimiter: aws.String("/"),
+	}
+	// ListObjects returns at most 1000 keys per response, so paginate over
+	// every page; otherwise migrations beyond the first 1000 objects are
+	// silently dropped and never applied.
+	var appendErr error
+	err := s.s3client.ListObjectsPages(input, func(output *s3.ListObjectsOutput, _ bool) bool {
+		for _, object := range output.Contents {
+			_, fileName := path.Split(aws.StringValue(object.Key))
+			m, err := source.DefaultParse(fileName)
+			if err != nil {
+				continue
+			}
+			if !s.migrations.Append(m) {
+				appendErr = fmt.Errorf("unable to parse file %v", aws.StringValue(object.Key))
+				return false
+			}
+		}
+		return true
 	})
 	if err != nil {
 		return err
 	}
-	for _, object := range output.Contents {
-		_, fileName := path.Split(aws.StringValue(object.Key))
-		m, err := source.DefaultParse(fileName)
-		if err != nil {
-			continue
-		}
-		if !s.migrations.Append(m) {
-			return fmt.Errorf("unable to parse file %v", aws.StringValue(object.Key))
-		}
-	}
-	return nil
+	return appendErr
 }
 
 func (s *s3Driver) Close() error {

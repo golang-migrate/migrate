@@ -16,6 +16,13 @@ builds:
       - 386
     goarm:
       - 7
+    ignore:
+      - goos: windows
+        goarch: arm
+      - goos: darwin
+        goarch: arm
+      - goos: darwin
+        goarch: 386
     main: ./cmd/migrate
     ldflags:
       - '-w -s -X main.Version={{ .Version }} -extldflags "static"'
