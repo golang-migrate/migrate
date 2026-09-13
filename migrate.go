@@ -78,6 +78,10 @@ type Migrate struct {
 	// LockTimeout defaults to DefaultLockTimeout,
 	// but can be set per Migrate instance.
 	LockTimeout time.Duration
+
+	// EnableTemplating makes Migrate consider migration files as Go Templates
+	// and will render them before running the migration.
+	EnableTemplating bool
 }
 
 // New returns a new Migrate instance from a source URL and a database URL.
@@ -846,7 +850,11 @@ func (m *Migrate) newMigration(version uint, targetVersion int) (*Migration, err
 
 		} else {
 			// create migration from up source
-			migr, err = NewMigration(r, identifier, version, targetVersion)
+			if m.EnableTemplating {
+				migr, err = NewTemplatedMigration(r, identifier, version, targetVersion)
+			} else {
+				migr, err = NewMigration(r, identifier, version, targetVersion)
+			}
 			if err != nil {
 				return nil, err
 			}
@@ -866,7 +874,11 @@ func (m *Migrate) newMigration(version uint, targetVersion int) (*Migration, err
 
 		} else {
 			// create migration from down source
-			migr, err = NewMigration(r, identifier, version, targetVersion)
+			if m.EnableTemplating {
+				migr, err = NewTemplatedMigration(r, identifier, version, targetVersion)
+			} else {
+				migr, err = NewMigration(r, identifier, version, targetVersion)
+			}
 			if err != nil {
 				return nil, err
 			}

@@ -54,3 +54,25 @@ func ExampleNewMigration_nilVersion() {
 	// Output:
 	// 1486686016/d drop_users_table
 }
+
+func ExampleNewMigration_template() {
+	// Create a dummy migration body, this is coming from the source usually.
+	body := io.NopCloser(strings.NewReader("dumy migration that creates {{ \"Hello World!\" | base64Encode }} table"))
+
+	// Create a new Migration that represents version 1486686016.
+	// Once this migration has been applied to the database, the new
+	// migration version will be 1486689359.
+	migr, err := NewTemplatedMigration(body, "create_users_table", 1486686016, 1486689359)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	bodyBytes, err := io.ReadAll(migr.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Print(string(bodyBytes))
+	// Output:
+	// dumy migration that creates SGVsbG8gV29ybGQh table
+}

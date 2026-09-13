@@ -2,11 +2,30 @@ package migrate
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
+	"sync"
+	"text/template"
 	"time"
+
+	"github.com/go-sprout/sprout"
+	"github.com/go-sprout/sprout/group/all"
 )
+
+// templateFuncs returns the sprout function map used to render templated
+// migrations. The handler is built once and reused across migrations.
+var templateFuncs = sync.OnceValue(func() template.FuncMap {
+	handler := sprout.New()
+	// WARNING: all.RegistryGroup includes env, filesystem, and network helpers; only enable templating for trusted migrations.
+	if err := handler.AddGroups(all.RegistryGroup()); err != nil {
+		slog.Error(fmt.Sprintf("Failed to add sprout groups: %v", err))
+		return template.FuncMap{}
+	}
+	return handler.Build()
+})
 
 // DefaultBufferSize sets the in memory buffer size (in Bytes) for every
 // pre-read migration (see DefaultPrefetchMigrations).
@@ -97,6 +116,55 @@ func NewMigration(body io.ReadCloser, identifier string,
 
 	br, bw := io.Pipe()
 	m.Body = body // want to simulate low latency? newSlowReader(body)
+	m.BufferSize = DefaultBufferSize
+	m.BufferedBody = br
+	m.bufferWriter = bw
+	return m, nil
+}
+
+func NewTemplatedMigration(body io.ReadCloser, identifier string,
+	version uint, targetVersion int) (*Migration, error) {
+	tnow := time.Now()
+	m := &Migration{
+		Identifier:    identifier,
+		Version:       version,
+		TargetVersion: targetVersion,
+		Scheduled:     tnow,
+	}
+
+	if body == nil {
+		if len(identifier) == 0 {
+			m.Identifier = "<empty>"
+		}
+
+		m.StartedBuffering = tnow
+		m.FinishedBuffering = tnow
+		m.FinishedReading = tnow
+		return m, nil
+	}
+
+	bodyBytes, err := io.ReadAll(body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read migration body: %w", err)
+	}
+
+	if err := body.Close(); err != nil {
+		return nil, fmt.Errorf("failed to close migration body: %w", err)
+	}
+
+	tmpl, err := template.New("migration").Funcs(templateFuncs()).Parse(string(bodyBytes))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse migration template: %w", err)
+	}
+
+	var renderedBody bytes.Buffer
+
+	if err := tmpl.Execute(&renderedBody, nil); err != nil {
+		return nil, fmt.Errorf("failed to execute migration template: %w", err)
+	}
+
+	br, bw := io.Pipe()
+	m.Body = io.NopCloser(&renderedBody)
 	m.BufferSize = DefaultBufferSize
 	m.BufferedBody = br
 	m.bufferWriter = bw
