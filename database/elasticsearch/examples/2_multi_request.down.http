@@ -1,0 +1,2 @@
+---
+DELETE /books HTTP/1.1

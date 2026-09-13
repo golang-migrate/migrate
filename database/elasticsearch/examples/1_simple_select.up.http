@@ -1,0 +1,10 @@
+---
+PUT /simple_index HTTP/1.1
+Content-Type: application/json
+
+{
+  "settings": {
+    "number_of_shards": 3,
+    "number_of_replicas": 2
+  }
+}
