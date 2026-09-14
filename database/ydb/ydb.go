@@ -3,16 +3,20 @@ package ydb
 import (
 	"context"
 	"crypto/tls"
-	"database/sql"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
+	"path"
+	"sort"
+	"strconv"
+	"strings"
 	"sync/atomic"
+	"time"
 
-	"github.com/hashicorp/go-multierror"
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
-	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
+	"github.com/ydb-platform/ydb-go-sdk/v3/query"
+	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
@@ -23,9 +27,13 @@ func init() {
 }
 
 const (
-	defaultMigrationsTable = "schema_migrations"
-	defaultLockTable       = "schema_lock"
+	systemDirectory         = ".sys"
+	systemMetadataDirectory = ".metadata"
+	defaultMigrationsTable  = "schema_migrations"
+	defaultLockTable        = "schema_lock"
+	defaultStatementTimeout = 5 * time.Minute
 
+	queryParamStatementTimeout          = "x-statement-timeout"
 	queryParamAuthToken                 = "x-auth-token"
 	queryParamMigrationsTable           = "x-migrations-table"
 	queryParamLockTable                 = "x-lock-table"
@@ -42,51 +50,61 @@ var (
 )
 
 type Config struct {
-	MigrationsTable string
-	LockTable       string
-	DatabaseName    string
+	MigrationsTable  string
+	LockTable        string
+	DatabaseName     string
+	StatementTimeout time.Duration
 }
 
 type YDB struct {
-	// locking and unlocking need to use the same connection
-	conn     *sql.Conn
-	db       *sql.DB
+	db       *ydb.Driver
 	isLocked atomic.Bool
-
-	config *Config
+	config   *Config
+	dropped  bool
 }
 
-func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
+// WithInstance initializes the migration tables using a native YDB driver.
+// Ownership transfers on success: Close closes instance. On failure, the caller
+// remains responsible for closing instance.
+func WithInstance(instance *ydb.Driver, config *Config) (database.Driver, error) {
 	if config == nil {
 		return nil, ErrNilConfig
 	}
-
-	if err := instance.Ping(); err != nil {
+	if instance == nil {
+		return nil, errors.New("nil YDB driver")
+	}
+	cfg := *config
+	if cfg.StatementTimeout < 0 {
+		return nil, errors.New("statement timeout must be positive")
+	}
+	if cfg.StatementTimeout == 0 {
+		cfg.StatementTimeout = defaultStatementTimeout
+	}
+	if cfg.DatabaseName == "" {
+		cfg.DatabaseName = instance.Name()
+	}
+	if cfg.DatabaseName != instance.Name() {
+		return nil, errors.New("database name does not match YDB driver")
+	}
+	if cfg.MigrationsTable == "" {
+		cfg.MigrationsTable = defaultMigrationsTable
+	}
+	if cfg.LockTable == "" {
+		cfg.LockTable = defaultLockTable
+	}
+	for _, name := range []string{cfg.MigrationsTable, cfg.LockTable} {
+		if name == "." || name == ".." || strings.ContainsAny(name, "/`\\\x00") {
+			return nil, fmt.Errorf("invalid migration table name %q", name)
+		}
+	}
+	if cfg.MigrationsTable == cfg.LockTable {
+		return nil, errors.New("migration and lock tables must differ")
+	}
+	db := &YDB{db: instance, config: &cfg}
+	if err := db.ensureLockTable(); err != nil {
 		return nil, err
 	}
-
-	if len(config.MigrationsTable) == 0 {
-		config.MigrationsTable = defaultMigrationsTable
-	}
-
-	if len(config.LockTable) == 0 {
-		config.LockTable = defaultLockTable
-	}
-
-	conn, err := instance.Conn(context.Background())
-	if err != nil {
-		return nil, err
-	}
-
-	db := &YDB{
-		conn:   conn,
-		db:     instance,
-		config: config,
-	}
-	if err = db.ensureLockTable(); err != nil {
-		return nil, err
-	}
-	if err = db.ensureVersionTable(); err != nil {
+	if err := db.ensureVersionTable(); err != nil {
 		return nil, err
 	}
 	return db, nil
@@ -97,57 +115,62 @@ func (y *YDB) Open(dsn string) (database.Driver, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	if len(purl.Path) == 0 {
+	if purl.Path == "" {
 		return nil, ErrNoDatabaseName
 	}
-
 	pquery, err := url.ParseQuery(purl.RawQuery)
 	if err != nil {
 		return nil, err
 	}
-
-	switch {
-	case pquery.Has(queryParamUseGRPCS):
-		purl.Scheme = "grpcs"
-	default:
-		purl.Scheme = "grpc"
+	secure, err := parseBoolOption(pquery, queryParamUseGRPCS)
+	if err != nil {
+		return nil, err
 	}
-
+	purl.Scheme = "grpc"
+	if secure {
+		purl.Scheme = "grpcs"
+	}
 	purl = migrate.FilterCustomQuery(purl)
-
 	credentials := y.parseCredentialsOptions(purl, pquery)
 	tlsOptions, err := y.parseTLSOptions(purl, pquery)
 	if err != nil {
 		return nil, err
 	}
-
-	nativeDriver, err := ydb.Open(
-		context.Background(),
-		purl.String(),
-		append(tlsOptions, credentials, ydb.WithBalancer(balancers.SingleConn()))...,
-	)
+	timeout := defaultStatementTimeout
+	if pquery.Has(queryParamStatementTimeout) {
+		millis, err := strconv.ParseInt(pquery.Get(queryParamStatementTimeout), 10, 64)
+		if err != nil || millis <= 0 || millis > int64((1<<63-1)/time.Millisecond) {
+			return nil, errors.New("x-statement-timeout must be a positive number of milliseconds")
+		}
+		timeout = time.Duration(millis) * time.Millisecond
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	nativeDriver, err := ydb.Open(ctx, purl.String(), append(tlsOptions, credentials)...)
 	if err != nil {
 		return nil, err
 	}
-
-	connector, err := ydb.Connector(nativeDriver,
-		ydb.WithQueryService(true),
-	)
+	db, err := WithInstance(nativeDriver, &Config{MigrationsTable: pquery.Get(queryParamMigrationsTable), LockTable: pquery.Get(queryParamLockTable), DatabaseName: purl.Path, StatementTimeout: timeout})
 	if err != nil {
-		return nil, err
+		closeCtx, closeCancel := context.WithTimeout(context.Background(), timeout)
+		defer closeCancel()
+		return nil, errors.Join(err, nativeDriver.Close(closeCtx))
 	}
-
-	db, err := WithInstance(sql.OpenDB(connector), &Config{
-		MigrationsTable: pquery.Get(queryParamMigrationsTable),
-		LockTable:       pquery.Get(queryParamLockTable),
-		DatabaseName:    purl.Path,
-	})
-	if err != nil {
-		return nil, err
-	}
-
 	return db, nil
+}
+
+func parseBoolOption(values url.Values, name string) (bool, error) {
+	if !values.Has(name) {
+		return false, nil
+	}
+	if values.Get(name) == "" {
+		return true, nil
+	}
+	value, err := strconv.ParseBool(values.Get(name))
+	if err != nil {
+		return false, fmt.Errorf("invalid %s: %w", name, err)
+	}
+	return value, nil
 }
 
 func (y *YDB) parseCredentialsOptions(url *url.URL, query url.Values) (credentials ydb.Option) {
@@ -169,7 +192,11 @@ func (y *YDB) parseTLSOptions(_ *url.URL, query url.Values) (options []ydb.Optio
 	if query.Has(queryParamTLSCertificateAuthorities) {
 		options = append(options, ydb.WithCertificatesFromFile(query.Get(queryParamTLSCertificateAuthorities)))
 	}
-	if query.Has(queryParamTLSInsecureSkipVerify) {
+	insecure, err := parseBoolOption(query, queryParamTLSInsecureSkipVerify)
+	if err != nil {
+		return nil, err
+	}
+	if insecure {
 		options = append(options, ydb.WithTLSSInsecureSkipVerify())
 	}
 	if query.Has(queryParamTLSMinVersion) {
@@ -189,215 +216,231 @@ func (y *YDB) parseTLSOptions(_ *url.URL, query url.Values) (options []ydb.Optio
 	return options, nil
 }
 
+func (y *YDB) context() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), y.config.StatementTimeout)
+}
+
 func (y *YDB) Close() error {
-	connErr := y.conn.Close()
-	var dbErr error
-	if y.db != nil {
-		dbErr = y.db.Close()
-	}
-	if connErr != nil || dbErr != nil {
-		return fmt.Errorf("conn: %v, db: %v", connErr, dbErr)
+	ctx, cancel := y.context()
+	defer cancel()
+	return y.db.Close(ctx)
+}
+
+func quotePath(name string) string {
+	return "`" + strings.ReplaceAll(strings.ReplaceAll(name, "\\", "\\\\"), "`", "\\`") + "`"
+}
+
+func (y *YDB) table(name string) string { return quotePath(path.Join(y.config.DatabaseName, name)) }
+
+func (y *YDB) exec(sql string, opts ...query.ExecuteOption) error {
+	ctx, cancel := y.context()
+	defer cancel()
+	return y.execContext(ctx, sql, opts...)
+}
+
+func (y *YDB) execContext(ctx context.Context, sql string, opts ...query.ExecuteOption) error {
+	if err := y.db.Query().Exec(ctx, sql, opts...); err != nil {
+		return &database.Error{OrigErr: err, Query: []byte(sql)}
 	}
 	return nil
 }
 
 func (y *YDB) Run(migration io.Reader) error {
-	rawMigrations, err := io.ReadAll(migration)
+	raw, err := io.ReadAll(migration)
 	if err != nil {
 		return err
 	}
-
-	if _, err = y.conn.ExecContext(context.Background(), string(rawMigrations)); err != nil {
-		return database.Error{OrigErr: err, Err: "migration failed", Query: rawMigrations}
-	}
-	return nil
+	ctx, cancel := y.context()
+	defer cancel()
+	return y.db.Query().Do(ctx, func(ctx context.Context, session query.Session) error {
+		if err := session.Exec(ctx, string(raw)); err != nil {
+			// A migration can commit some statements before failing. database.Error
+			// intentionally hides SDK retry classification (it has no Unwrap), so Do
+			// may retry session acquisition but never a failed migration execution.
+			return &database.Error{OrigErr: err, Err: "migration failed", Query: raw}
+		}
+		return nil
+	}, query.WithIdempotent(false))
 }
 
 func (y *YDB) SetVersion(version int, dirty bool) error {
-	deleteVersionQuery := fmt.Sprintf(`
-		DELETE FROM %s 
-	`, y.config.MigrationsTable)
-
-	insertVersionQuery := fmt.Sprintf(`
-		INSERT INTO %s (version, dirty, created) VALUES (%d, %t, CurrentUtcTimestamp())
-	`, y.config.MigrationsTable, version, dirty)
-
-	tx, err := y.conn.BeginTx(context.Background(), &sql.TxOptions{})
-	if err != nil {
-		return &database.Error{OrigErr: err, Err: "transaction start failed"}
-	}
-
-	if _, err := tx.Exec(deleteVersionQuery); err != nil {
-		if errRollback := tx.Rollback(); errRollback != nil {
-			err = multierror.Append(err, errRollback)
-		}
-		return &database.Error{OrigErr: err, Query: []byte(deleteVersionQuery)}
-	}
-
-	// Also re-write the schema version for nil dirty versions to prevent
-	// empty schema version for failed down migration on the first migration
-	// See: https://github.com/golang-migrate/migrate/issues/330
+	sql := "DELETE FROM " + y.table(y.config.MigrationsTable) + ";"
+	// Keep the dirty nil version after a failed first down migration (issue #330).
+	// Encode the -1 sentinel as Uint64 and convert it back in Version to preserve
+	// compatibility with the existing migration table schema.
 	if version >= 0 || (version == database.NilVersion && dirty) {
-		if _, err := tx.Exec(insertVersionQuery, version, dirty); err != nil {
-			if errRollback := tx.Rollback(); errRollback != nil {
-				err = multierror.Append(err, errRollback)
-			}
-			return &database.Error{OrigErr: err, Query: []byte(insertVersionQuery)}
-		}
+		sql = "DECLARE $version AS Uint64; DECLARE $dirty AS Bool; " + sql + " INSERT INTO " + y.table(y.config.MigrationsTable) + " (version, dirty, created) VALUES ($version, $dirty, CurrentUtcTimestamp());"
 	}
-
-	if err := tx.Commit(); err != nil {
-		return &database.Error{OrigErr: err, Err: "transaction commit failed"}
+	ctx, cancel := y.context()
+	defer cancel()
+	err := y.db.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
+		if version >= 0 || (version == database.NilVersion && dirty) {
+			return tx.Exec(ctx, sql, query.WithParameters(ydb.ParamsBuilder().Param("$version").Uint64(uint64(version)).Param("$dirty").Bool(dirty).Build()))
+		}
+		return tx.Exec(ctx, sql)
+	}, query.WithIdempotent())
+	if err != nil {
+		return &database.Error{OrigErr: err, Query: []byte(sql)}
 	}
 	return nil
 }
 
-func (y *YDB) Version() (version int, dirty bool, err error) {
-	getVersionQuery := fmt.Sprintf(`
-		SELECT version, dirty FROM %s LIMIT 1
-	`, y.config.MigrationsTable)
-
-	var v uint64
-	err = y.conn.QueryRowContext(context.Background(), getVersionQuery).Scan(&v, &dirty)
-	switch {
-	case err == sql.ErrNoRows:
+func (y *YDB) Version() (int, bool, error) {
+	sql := "SELECT version, dirty FROM " + y.table(y.config.MigrationsTable) + " LIMIT 1"
+	ctx, cancel := y.context()
+	defer cancel()
+	row, err := y.db.Query().QueryRow(ctx, sql, query.WithIdempotent())
+	if errors.Is(err, query.ErrNoRows) {
 		return database.NilVersion, false, nil
-	case err != nil:
-		return 0, false, &database.Error{OrigErr: err, Query: []byte(getVersionQuery)}
-	default:
-		return int(v), dirty, nil
 	}
+	if err != nil {
+		return 0, false, &database.Error{OrigErr: err, Query: []byte(sql)}
+	}
+	var version uint64
+	var dirty bool
+	if err := row.Scan(&version, &dirty); err != nil {
+		return 0, false, &database.Error{OrigErr: err, Query: []byte(sql)}
+	}
+	return int(version), dirty, nil
 }
 
-func (y *YDB) Drop() (err error) {
-	listQuery := "SELECT DISTINCT Path FROM `.sys/partition_stats` WHERE Path NOT LIKE '%/.sys%'"
-	rs, err := y.conn.QueryContext(context.Background(), listQuery)
+type dropEntry struct {
+	name string
+	kind scheme.EntryType
+}
+
+// dropPlan validates the entire tree before deleting anything. Unsupported
+// objects must not silently survive a successful Drop.
+func (y *YDB) dropPlan(ctx context.Context, dir string, entries *[]dropEntry) error {
+	listing, err := y.db.Scheme().ListDirectory(ctx, dir)
 	if err != nil {
-		return &database.Error{OrigErr: err, Query: []byte(listQuery)}
+		return err
 	}
-	defer func() {
-		if closeErr := rs.Close(); closeErr != nil {
-			err = multierror.Append(err, closeErr)
+	for _, child := range listing.Children {
+		// YDB owns these database-root directories; they are not user schema.
+		if dir == y.config.DatabaseName && (child.Name == systemDirectory || child.Name == systemMetadataDirectory) {
+			continue
 		}
-	}()
+		name := path.Join(dir, child.Name)
+		switch child.Type {
+		case scheme.EntryDirectory, scheme.EntryColumnStore:
+			if err := y.dropPlan(ctx, name, entries); err != nil {
+				return err
+			}
+		case scheme.EntryTable, scheme.EntryColumnTable, scheme.EntryTopic, scheme.EntryPersQueueGroup, scheme.EntryExternalTable, scheme.EntryExternalDataSource:
+		default:
+			return fmt.Errorf("cannot drop unsupported YDB object %q (type %s)", name, child.Type)
+		}
+		*entries = append(*entries, dropEntry{name, child.Type})
+	}
+	return nil
+}
 
-	paths := make([]string, 0)
-	for rs.Next() {
-		var path string
-		if err = rs.Scan(&path); err != nil {
-			return err
+func (y *YDB) Drop() error {
+	ctx, cancel := y.context()
+	defer cancel()
+	var entries []dropEntry
+	if err := y.dropPlan(ctx, y.config.DatabaseName, &entries); err != nil {
+		return err
+	}
+	lockPath := path.Join(y.config.DatabaseName, y.config.LockTable)
+	// External tables precede sources; all ordinary objects precede containers.
+	// Preserve postorder for nested directories and delete the migration lock last.
+	priority := func(e dropEntry) int {
+		if e.name == lockPath {
+			return 4
 		}
-		if len(path) != 0 {
-			paths = append(paths, path)
+		switch e.kind {
+		case scheme.EntryExternalDataSource:
+			return 1
+		case scheme.EntryColumnStore:
+			return 2
+		case scheme.EntryDirectory:
+			return 3
+		default:
+			return 0
 		}
 	}
-	if err = rs.Err(); err != nil {
-		return &database.Error{OrigErr: err, Query: []byte(listQuery)}
-	}
-
-	for _, path := range paths {
-		dropQuery := fmt.Sprintf("DROP TABLE IF EXISTS `%s`", path)
-		if _, err = y.conn.ExecContext(context.Background(), dropQuery); err != nil {
-			return &database.Error{OrigErr: err, Query: []byte(dropQuery)}
+	sort.SliceStable(entries, func(i, j int) bool { return priority(entries[i]) < priority(entries[j]) })
+	for _, e := range entries {
+		var err error
+		switch e.kind {
+		case scheme.EntryDirectory:
+			err = y.db.Scheme().RemoveDirectory(ctx, e.name)
+		case scheme.EntryTopic, scheme.EntryPersQueueGroup:
+			err = y.db.Topic().Drop(ctx, e.name)
+		case scheme.EntryExternalTable:
+			err = y.execContext(ctx, "DROP EXTERNAL TABLE "+quotePath(e.name))
+		case scheme.EntryExternalDataSource:
+			err = y.execContext(ctx, "DROP EXTERNAL DATA SOURCE "+quotePath(e.name))
+		case scheme.EntryColumnStore:
+			err = y.execContext(ctx, "DROP TABLESTORE "+quotePath(e.name))
+		default:
+			err = y.execContext(ctx, "DROP TABLE "+quotePath(e.name))
+		}
+		if err != nil {
+			return fmt.Errorf("drop %q: %w", e.name, err)
 		}
 	}
+	y.dropped = true
 	return nil
 }
 
 func (y *YDB) Lock() error {
-	return database.CasRestoreOnErr(&y.isLocked, false, true, database.ErrLocked, func() (err error) {
-		return retry.DoTx(context.Background(), y.db, func(ctx context.Context, tx *sql.Tx) (err error) {
-			aid, err := database.GenerateAdvisoryLockId(y.config.DatabaseName)
-			if err != nil {
-				return err
-			}
-
-			getLockQuery := fmt.Sprintf("SELECT * FROM %s WHERE lock_id = '%s'", y.config.LockTable, aid)
-			rows, err := tx.Query(getLockQuery, aid)
-			if err != nil {
-				return database.Error{OrigErr: err, Err: "failed to fetch migration lock", Query: []byte(getLockQuery)}
-			}
-			defer func() {
-				if errClose := rows.Close(); errClose != nil {
-					err = multierror.Append(err, errClose)
-				}
-			}()
-
-			// If row exists at all, lock is present
-			locked := rows.Next()
-			if locked {
-				return database.ErrLocked
-			}
-
-			setLockQuery := fmt.Sprintf("INSERT INTO %s (lock_id) VALUES ('%s')", y.config.LockTable, aid)
-			if _, err = tx.Exec(setLockQuery); err != nil {
-				return database.Error{OrigErr: err, Err: "failed to set migration lock", Query: []byte(setLockQuery)}
-			}
-			return nil
-		}, retry.WithTxOptions(&sql.TxOptions{Isolation: sql.LevelSerializable}))
-	})
-}
-
-func (y *YDB) Unlock() error {
-	return database.CasRestoreOnErr(&y.isLocked, true, false, database.ErrNotLocked, func() (err error) {
+	return database.CasRestoreOnErr(&y.isLocked, false, true, database.ErrLocked, func() error {
 		aid, err := database.GenerateAdvisoryLockId(y.config.DatabaseName)
 		if err != nil {
 			return err
 		}
-
-		releaseLockQuery := fmt.Sprintf("DELETE FROM %s WHERE lock_id = '%s'", y.config.LockTable, aid)
-		if _, err = y.conn.ExecContext(context.Background(), releaseLockQuery); err != nil {
-			// On drops, the lock table is fully removed; This is fine, and is a valid "unlocked" state for the schema.
-			if ydb.IsOperationErrorSchemeError(err) {
-				return nil
+		parameters := query.WithParameters(ydb.ParamsBuilder().Param("$id").Bytes([]byte(aid)).Build())
+		// DoTx uses serializable read-write isolation. Do not retry an ambiguous
+		// successful commit: a persistent lock has no expiration or owner recovery.
+		ctx, cancel := y.context()
+		defer cancel()
+		err = y.db.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
+			sql := "DECLARE $id AS String; SELECT lock_id FROM " + y.table(y.config.LockTable) + " WHERE lock_id = $id"
+			_, err := tx.QueryRow(ctx, sql, parameters)
+			if err == nil {
+				return database.ErrLocked
 			}
-			return database.Error{OrigErr: err, Err: "failed to release migration lock", Query: []byte(releaseLockQuery)}
+			if !errors.Is(err, query.ErrNoRows) {
+				return err
+			}
+			sql = "DECLARE $id AS String; INSERT INTO " + y.table(y.config.LockTable) + " (lock_id) VALUES ($id)"
+			if err := tx.Exec(ctx, sql, parameters); err != nil {
+				return err
+			}
+			return nil
+		}, query.WithIdempotent(false))
+		if err != nil && !errors.Is(err, database.ErrLocked) {
+			return &database.Error{OrigErr: err, Err: "failed to acquire migration lock"}
 		}
-
-		return nil
+		return err
 	})
 }
 
-// ensureLockTable checks if lock table exists and, if not, creates it.
-func (y *YDB) ensureLockTable() (err error) {
-	createLockTableQuery := fmt.Sprintf(`
-		CREATE TABLE IF NOT EXISTS %s (
-			lock_id String NOT NULL,
-			PRIMARY KEY(lock_id)
-		)
-	`, y.config.LockTable)
-	if _, err = y.conn.ExecContext(context.Background(), createLockTableQuery); err != nil {
-		return &database.Error{OrigErr: err, Query: []byte(createLockTableQuery)}
-	}
-	return nil
+func (y *YDB) Unlock() error {
+	return database.CasRestoreOnErr(&y.isLocked, true, false, database.ErrNotLocked, func() error {
+		// Only a completed Drop justifies skipping the missing lock table.
+		if y.dropped {
+			return nil
+		}
+		aid, err := database.GenerateAdvisoryLockId(y.config.DatabaseName)
+		if err != nil {
+			return err
+		}
+		return y.exec("DECLARE $id AS String; DELETE FROM "+y.table(y.config.LockTable)+" WHERE lock_id = $id", query.WithParameters(ydb.ParamsBuilder().Param("$id").Bytes([]byte(aid)).Build()), query.WithIdempotent(false))
+	})
 }
 
-// ensureVersionTable checks if versions table exists and, if not, creates it.
+func (y *YDB) ensureLockTable() error {
+	return y.exec("CREATE TABLE IF NOT EXISTS " + y.table(y.config.LockTable) + " (lock_id String NOT NULL, PRIMARY KEY(lock_id))")
+}
+
 func (y *YDB) ensureVersionTable() (err error) {
 	if err = y.Lock(); err != nil {
 		return err
 	}
-
-	defer func() {
-		if unlockErr := y.Unlock(); unlockErr != nil {
-			if err == nil {
-				err = unlockErr
-			} else {
-				err = multierror.Append(err, unlockErr)
-			}
-		}
-	}()
-
-	createVersionTableQuery := fmt.Sprintf(`
-		CREATE TABLE IF NOT EXISTS %s (
-			version Uint64 NOT NULL,
-			dirty Bool NOT NULL,
-			created Timestamp NOT NULL,
-			PRIMARY KEY(version)
-		)
-	`, y.config.MigrationsTable)
-	if _, err = y.conn.ExecContext(context.Background(), createVersionTableQuery); err != nil {
-		return &database.Error{OrigErr: err, Query: []byte(createVersionTableQuery)}
-	}
-	return nil
+	defer func() { err = errors.Join(err, y.Unlock()) }()
+	return y.exec("CREATE TABLE IF NOT EXISTS " + y.table(y.config.MigrationsTable) + " (version Uint64 NOT NULL, dirty Bool NOT NULL, created Timestamp NOT NULL, PRIMARY KEY(version))")
 }
