@@ -18,7 +18,7 @@
 | `x-use-grpcs` | Enables TLS when bare or `true`; `false` keeps plaintext gRPC. |
 |          `x-tls-ca`          |                     The location of the CA (certificate authority) file.                     |
 | `x-tls-insecure-skip-verify` | Disables certificate verification when bare or `true`; default and `false` verify certificates. |
-|     `x-tls-min-version`      | Controls the minimum TLS version that is acceptable, use 1.0, 1.1, 1.2 or 1.3 (default 1.2). |
+|     `x-tls-min-version`      | Controls the minimum TLS version that is acceptable, use 1.2 or 1.3 (default 1.2). |
 
 `x-statement-timeout` sets the operation timeout in positive milliseconds (default
 `300000`, five minutes). The same limit is available as `Config.StatementTimeout`

@@ -430,3 +430,19 @@ func TestDropExternalObjects(t *testing.T) {
 		}
 	})
 }
+
+func TestTLSMinVersion(t *testing.T) {
+	for _, version := range []string{"1.2", "1.3", "1.0", "1.1", "", "invalid"} {
+		t.Run(version, func(t *testing.T) {
+			values := url.Values{queryParamTLSMinVersion: {version}}
+			_, err := (&YDB{}).parseTLSOptions(nil, values)
+			if version == "1.2" || version == "1.3" {
+				if err != nil {
+					t.Fatal(err)
+				}
+			} else if !errors.Is(err, ErrUnsupportedTLSVersion) {
+				t.Fatalf("expected unsupported TLS version, got %v", err)
+			}
+		})
+	}
+}

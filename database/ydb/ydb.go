@@ -46,7 +46,7 @@ const (
 var (
 	ErrNilConfig             = fmt.Errorf("no config")
 	ErrNoDatabaseName        = fmt.Errorf("no database name")
-	ErrUnsupportedTLSVersion = fmt.Errorf("unsupported tls version: use 1.0, 1.1, 1.2 or 1.3")
+	ErrUnsupportedTLSVersion = fmt.Errorf("unsupported tls version: use 1.2 or 1.3")
 )
 
 type Config struct {
@@ -150,7 +150,12 @@ func (y *YDB) Open(dsn string) (database.Driver, error) {
 	if err != nil {
 		return nil, err
 	}
-	db, err := WithInstance(nativeDriver, &Config{MigrationsTable: pquery.Get(queryParamMigrationsTable), LockTable: pquery.Get(queryParamLockTable), DatabaseName: purl.Path, StatementTimeout: timeout})
+	db, err := WithInstance(nativeDriver, &Config{
+		MigrationsTable:  pquery.Get(queryParamMigrationsTable),
+		LockTable:        pquery.Get(queryParamLockTable),
+		DatabaseName:     purl.Path,
+		StatementTimeout: timeout,
+	})
 	if err != nil {
 		closeCtx, closeCancel := context.WithTimeout(context.Background(), timeout)
 		defer closeCancel()
@@ -201,10 +206,6 @@ func (y *YDB) parseTLSOptions(_ *url.URL, query url.Values) (options []ydb.Optio
 	}
 	if query.Has(queryParamTLSMinVersion) {
 		switch query.Get(queryParamTLSMinVersion) {
-		case "1.0":
-			options = append(options, ydb.WithMinTLSVersion(tls.VersionTLS10))
-		case "1.1":
-			options = append(options, ydb.WithMinTLSVersion(tls.VersionTLS11))
 		case "1.2":
 			options = append(options, ydb.WithMinTLSVersion(tls.VersionTLS12))
 		case "1.3":
@@ -269,13 +270,20 @@ func (y *YDB) SetVersion(version int, dirty bool) error {
 	// Encode the -1 sentinel as Uint64 and convert it back in Version to preserve
 	// compatibility with the existing migration table schema.
 	if version >= 0 || (version == database.NilVersion && dirty) {
-		sql = "DECLARE $version AS Uint64; DECLARE $dirty AS Bool; " + sql + " INSERT INTO " + y.table(y.config.MigrationsTable) + " (version, dirty, created) VALUES ($version, $dirty, CurrentUtcTimestamp());"
+		sql = "DECLARE $version AS Uint64; DECLARE $dirty AS Bool; " + sql +
+			" INSERT INTO " + y.table(y.config.MigrationsTable) +
+			" (version, dirty, created) VALUES ($version, $dirty, CurrentUtcTimestamp());"
 	}
 	ctx, cancel := y.context()
 	defer cancel()
 	err := y.db.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
 		if version >= 0 || (version == database.NilVersion && dirty) {
-			return tx.Exec(ctx, sql, query.WithParameters(ydb.ParamsBuilder().Param("$version").Uint64(uint64(version)).Param("$dirty").Bool(dirty).Build()))
+			return tx.Exec(ctx, sql, query.WithParameters(
+				ydb.ParamsBuilder().
+					Param("$version").Uint64(uint64(version)).
+					Param("$dirty").Bool(dirty).
+					Build(),
+			))
 		}
 		return tx.Exec(ctx, sql)
 	}, query.WithIdempotent())
@@ -327,7 +335,9 @@ func (y *YDB) dropPlan(ctx context.Context, dir string, entries *[]dropEntry) er
 			if err := y.dropPlan(ctx, name, entries); err != nil {
 				return err
 			}
-		case scheme.EntryTable, scheme.EntryColumnTable, scheme.EntryTopic, scheme.EntryPersQueueGroup, scheme.EntryExternalTable, scheme.EntryExternalDataSource:
+		case scheme.EntryTable, scheme.EntryColumnTable,
+			scheme.EntryTopic, scheme.EntryPersQueueGroup,
+			scheme.EntryExternalTable, scheme.EntryExternalDataSource:
 		default:
 			return fmt.Errorf("cannot drop unsupported YDB object %q (type %s)", name, child.Type)
 		}
@@ -429,12 +439,17 @@ func (y *YDB) Unlock() error {
 		if err != nil {
 			return err
 		}
-		return y.exec("DECLARE $id AS String; DELETE FROM "+y.table(y.config.LockTable)+" WHERE lock_id = $id", query.WithParameters(ydb.ParamsBuilder().Param("$id").Bytes([]byte(aid)).Build()), query.WithIdempotent(false))
+		return y.exec(
+			"DECLARE $id AS String; DELETE FROM "+y.table(y.config.LockTable)+" WHERE lock_id = $id",
+			query.WithParameters(ydb.ParamsBuilder().Param("$id").Bytes([]byte(aid)).Build()),
+			query.WithIdempotent(false),
+		)
 	})
 }
 
 func (y *YDB) ensureLockTable() error {
-	return y.exec("CREATE TABLE IF NOT EXISTS " + y.table(y.config.LockTable) + " (lock_id String NOT NULL, PRIMARY KEY(lock_id))")
+	return y.exec("CREATE TABLE IF NOT EXISTS " + y.table(y.config.LockTable) +
+		" (lock_id String NOT NULL, PRIMARY KEY(lock_id))")
 }
 
 func (y *YDB) ensureVersionTable() (err error) {
@@ -442,5 +457,6 @@ func (y *YDB) ensureVersionTable() (err error) {
 		return err
 	}
 	defer func() { err = errors.Join(err, y.Unlock()) }()
-	return y.exec("CREATE TABLE IF NOT EXISTS " + y.table(y.config.MigrationsTable) + " (version Uint64 NOT NULL, dirty Bool NOT NULL, created Timestamp NOT NULL, PRIMARY KEY(version))")
+	return y.exec("CREATE TABLE IF NOT EXISTS " + y.table(y.config.MigrationsTable) +
+		" (version Uint64 NOT NULL, dirty Bool NOT NULL, created Timestamp NOT NULL, PRIMARY KEY(version))")
 }
