@@ -16,6 +16,7 @@ require (
 	github.com/gobuffalo/here v0.6.0
 	github.com/gocql/gocql v0.0.0-20210515062232-b7ef815b4556
 	github.com/google/go-github/v39 v39.2.0
+	github.com/hashicorp/go-multierror v1.1.1
 	github.com/jackc/pgconn v1.14.3
 	github.com/jackc/pgerrcode v0.0.0-20220416144525-469b46aa5efa
 	github.com/jackc/pgx/v4 v4.18.2
@@ -33,6 +34,7 @@ require (
 	github.com/snowflakedb/gosnowflake v1.6.19
 	github.com/stretchr/testify v1.11.1
 	github.com/xanzy/go-gitlab v0.15.0
+	github.com/ydb-platform/ydb-go-sdk/v3 v3.146.0
 	go.mongodb.org/mongo-driver v1.17.7
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/tools/godoc v0.1.0-deprecated
@@ -58,11 +60,14 @@ require (
 	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
+	github.com/hashicorp/errwrap v1.0.0 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
+	github.com/jonboulle/clockwork v0.5.0 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/montanaflynn/stats v0.7.1 // indirect
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.8.1 // indirect
+	github.com/ydb-platform/ydb-go-genproto v0.0.0-20260428144813-1c07baab7f7b // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/detectors/gcp v1.44.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.69.0 // indirect
