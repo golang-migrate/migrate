@@ -29,6 +29,7 @@ func init() {
 const (
 	systemDirectory         = ".sys"
 	systemMetadataDirectory = ".metadata"
+	systemHealthDirectory   = ".sys_health"
 	defaultMigrationsTable  = "schema_migrations"
 	defaultLockTable        = "schema_lock"
 	defaultStatementTimeout = 5 * time.Minute
@@ -326,8 +327,11 @@ func (y *YDB) dropPlan(ctx context.Context, dir string, entries *[]dropEntry) er
 	}
 	for _, child := range listing.Children {
 		// YDB owns these database-root directories; they are not user schema.
-		if dir == y.config.DatabaseName && (child.Name == systemDirectory || child.Name == systemMetadataDirectory) {
-			continue
+		if dir == y.config.DatabaseName {
+			switch child.Name {
+			case systemDirectory, systemMetadataDirectory, systemHealthDirectory:
+				continue
+			}
 		}
 		name := path.Join(dir, child.Name)
 		switch child.Type {

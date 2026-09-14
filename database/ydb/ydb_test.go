@@ -234,7 +234,10 @@ func TestMigrate(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, child := range listing.Children {
-			if child.Name != systemDirectory && child.Name != systemMetadataDirectory {
+			switch child.Name {
+			case systemDirectory, systemMetadataDirectory, systemHealthDirectory:
+				continue
+			default:
 				t.Fatalf("Drop left object: %+v", child)
 			}
 		}
@@ -424,7 +427,10 @@ func TestDropExternalObjects(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, child := range listing.Children {
-			if child.Name != systemDirectory && child.Name != systemMetadataDirectory {
+			switch child.Name {
+			case systemDirectory, systemMetadataDirectory, systemHealthDirectory:
+				continue
+			default:
 				t.Fatalf("Drop left object: %+v", child)
 			}
 		}

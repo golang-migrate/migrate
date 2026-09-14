@@ -90,7 +90,8 @@ transaction may be retried within the operation timeout.
 ### Drop
 
 `drop` removes objects from the configured YDB database, including tables, topics
-and nested directories. It preserves the database itself and its reserved `.sys` and `.metadata` directories. The driver enumerates
+and nested directories. It preserves the database itself and its reserved `.sys`, `.metadata`, and `.sys_health` directories.
+The driver enumerates
 objects through the Scheme Service before deleting them and rejects unsupported
 object types instead of reporting a complete cleanup.
 
