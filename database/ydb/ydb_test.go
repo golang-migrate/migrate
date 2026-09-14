@@ -101,15 +101,24 @@ func withServer(t *testing.T, test func(*testing.T, string)) {
 		test(t, *testDSN)
 		return
 	}
-	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
-		ip, port, err := containerAddress(c)
-		if err != nil {
-			t.Fatal(err)
+	// Each local YDB instance is memory-intensive. Run versions sequentially;
+	// dktest.Run stops and removes its container before the next subtest starts.
+	for i, spec := range specs {
+		if i > 0 && testing.Short() {
+			break
 		}
-		t.Run("driver", func(t *testing.T) {
-			test(t, fmt.Sprintf("grpc://%s:%s/%s", ip, port, databaseName))
+		t.Run(spec.ImageName, func(t *testing.T) {
+			dktest.Run(t, spec.ImageName, spec.Options, func(t *testing.T, c dktest.ContainerInfo) {
+				ip, port, err := containerAddress(c)
+				if err != nil {
+					t.Fatal(err)
+				}
+				t.Run("driver", func(t *testing.T) {
+					test(t, fmt.Sprintf("grpc://%s:%s/%s", ip, port, databaseName))
+				})
+			})
 		})
-	})
+	}
 }
 
 func nativeClient(t *testing.T, dsn string) *ydb.Driver {

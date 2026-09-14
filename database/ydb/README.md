@@ -96,7 +96,8 @@ object types instead of reporting a complete cleanup.
 
 ### Tests
 
-The default tests start disposable Docker containers. The external-object test
+The default tests start disposable Docker containers sequentially, with at most one
+test YDB container running at a time within a package test run. The external-object test
 requires server support for external data sources and reports a skip if the server
 explicitly disables that feature:
 
