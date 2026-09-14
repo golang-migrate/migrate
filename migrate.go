@@ -721,6 +721,12 @@ func (m *Migrate) readDown(from int, limit int, ret chan<- interface{}) {
 // to stop execution because it might have received a stop signal on the
 // GracefulStop channel.
 func (m *Migrate) runMigrations(ret <-chan interface{}) error {
+	// Drain remaining items on early return so the reader goroutine can
+	// exit and release its resources (migration file handles, HTTP bodies).
+	defer func() {
+		for range ret {
+		}
+	}()
 	for r := range ret {
 
 		if m.stop() {
