@@ -99,6 +99,7 @@ func Test(t *testing.T) {
 	t.Run("testPostgresLock", testPostgresLock)
 	t.Run("testWithInstanceConcurrent", testWithInstanceConcurrent)
 	t.Run("testWithConnection", testWithConnection)
+	t.Run("testExplicitTransactionRolledBackOnError", testExplicitTransactionRolledBackOnError)
 
 	t.Cleanup(func() {
 		for _, spec := range specs {
@@ -155,6 +156,47 @@ func testMigrate(t *testing.T) {
 			t.Fatal(err)
 		}
 		dt.TestMigrate(t, m)
+	})
+}
+
+// testExplicitTransactionRolledBackOnError verifies #581: an explicit
+// BEGIN/COMMIT migration block that errors before COMMIT must not leave the
+// connection in Postgres's aborted-transaction state. Unlike an implicit
+// (no BEGIN/COMMIT) migration, which Postgres's simple query protocol rolls
+// back automatically on error, an explicit BEGIN requires an explicit
+// ROLLBACK -- without it, every subsequent statement on that connection
+// (including the advisory-unlock call migrate issues after a failed run)
+// fails with "current transaction is aborted".
+func testExplicitTransactionRolledBackOnError(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := pgConnectionString(ip, port)
+		p := &Postgres{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
+
+		if err := d.Run(strings.NewReader("BEGIN;\nSELECT 1/0;\nCOMMIT;")); err == nil {
+			t.Fatal("expected an error from the division by zero, got nil")
+		}
+
+		var one int
+		if err := d.(*Postgres).conn.QueryRowContext(context.Background(), "SELECT 1").Scan(&one); err != nil {
+			t.Fatalf("connection left in an unusable state after the failed explicit transaction: %v", err)
+		}
+		if one != 1 {
+			t.Fatalf("expected 1, got %d", one)
+		}
 	})
 }
 
