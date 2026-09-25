@@ -411,12 +411,7 @@ func waitForReplicaInit(client *mongo.Client) error {
 			//during replica set initialization, the first node first becomes a secondary and then becomes the primary
 			//should consider that initialization is completed only after the node has become the primary
 			result := client.Database("admin").RunCommand(context.TODO(), bson.D{bson.E{Key: "isMaster", Value: 1}})
-			r, err := result.DecodeBytes()
-			if err != nil {
-				return err
-			}
-			err = bson.Unmarshal(r, &status)
-			if err != nil {
+			if err := result.Decode(&status); err != nil {
 				return err
 			}
 			if status.IsMaster {
