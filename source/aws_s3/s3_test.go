@@ -2,7 +2,9 @@ package awss3
 
 import (
 	"errors"
+	"fmt"
 	"io"
+	"os"
 	"strings"
 	"testing"
 
@@ -38,6 +40,64 @@ func Test(t *testing.T) {
 		t.Fatal(err)
 	}
 	st.Test(t, driver)
+}
+
+func TestLoadMigrationsPaginates(t *testing.T) {
+	// A single ListObjects response is capped at 1000 keys by S3. Spread the
+	// migrations across several pages (via pageSize) to ensure loadMigrations
+	// walks every page instead of silently stopping after the first one.
+	const migrationCount = 300
+	objects := make(map[string]string, migrationCount*2)
+	for i := 1; i <= migrationCount; i++ {
+		objects[fmt.Sprintf("prod/migrations/%d_foobar.up.sql", i)] = fmt.Sprintf("%d up", i)
+		objects[fmt.Sprintf("prod/migrations/%d_foobar.down.sql", i)] = fmt.Sprintf("%d down", i)
+	}
+	s3Client := fakeS3{
+		bucket:   "some-bucket",
+		pageSize: 50,
+		objects:  objects,
+	}
+	driver, err := WithInstance(&s3Client, &Config{
+		Bucket: "some-bucket",
+		Prefix: "prod/migrations/",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	first, err := driver.First()
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, uint(1), first)
+
+	version := first
+	count := 1
+	for {
+		next, err := driver.Next(version)
+		if errors.Is(err, os.ErrNotExist) {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		version = next
+		count++
+	}
+	assert.Equal(t, migrationCount, count, "every migration across all pages should be loaded")
+	assert.Equal(t, uint(migrationCount), version, "the highest-numbered migration should be loaded")
+
+	r, identifier, err := driver.ReadUp(uint(migrationCount))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = r.Close() }()
+	assert.Equal(t, "foobar", identifier)
+	body, err := io.ReadAll(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, fmt.Sprintf("%d up", migrationCount), string(body))
 }
 
 func TestParseURI(t *testing.T) {
@@ -90,8 +150,11 @@ func TestParseURI(t *testing.T) {
 
 type fakeS3 struct {
 	s3.S3
-	bucket  string
-	objects map[string]string
+	bucket string
+	// pageSize caps how many objects each ListObjectsPages page returns so
+	// tests can exercise the multi-page path; 0 means a single page.
+	pageSize int
+	objects  map[string]string
 }
 
 func (s *fakeS3) ListObjects(input *s3.ListObjectsInput) (*s3.ListObjectsOutput, error) {
@@ -112,6 +175,29 @@ func (s *fakeS3) ListObjects(input *s3.ListObjectsInput) (*s3.ListObjectsOutput,
 		}
 	}
 	return &output, nil
+}
+
+func (s *fakeS3) ListObjectsPages(input *s3.ListObjectsInput, fn func(*s3.ListObjectsOutput, bool) bool) error {
+	output, err := s.ListObjects(input)
+	if err != nil {
+		return err
+	}
+	contents := output.Contents
+	pageSize := s.pageSize
+	if pageSize <= 0 {
+		pageSize = len(contents)
+	}
+	for start := 0; start < len(contents); start += pageSize {
+		end := start + pageSize
+		if end > len(contents) {
+			end = len(contents)
+		}
+		lastPage := end == len(contents)
+		if !fn(&s3.ListObjectsOutput{Contents: contents[start:end]}, lastPage) {
+			break
+		}
+	}
+	return nil
 }
 
 func (s *fakeS3) GetObject(input *s3.GetObjectInput) (*s3.GetObjectOutput, error) {
