@@ -35,6 +35,7 @@ type Migration struct {
 // to keep track of Migration order.
 type Migrations struct {
 	index      uintSlice
+	dirty      bool
 	migrations map[uint]map[Direction]*Migration
 }
 
@@ -60,7 +61,7 @@ func (i *Migrations) Append(m *Migration) (ok bool) {
 	}
 
 	i.migrations[m.Version][m.Direction] = m
-	i.buildIndex()
+	i.dirty = true
 
 	return true
 }
@@ -73,9 +74,17 @@ func (i *Migrations) buildIndex() {
 	sort.Slice(i.index, func(x, y int) bool {
 		return i.index[x] < i.index[y]
 	})
+	i.dirty = false
+}
+
+func (i *Migrations) ensureIndex() {
+	if i.dirty {
+		i.buildIndex()
+	}
 }
 
 func (i *Migrations) First() (version uint, ok bool) {
+	i.ensureIndex()
 	if len(i.index) == 0 {
 		return 0, false
 	}
@@ -117,6 +126,7 @@ func (i *Migrations) Down(version uint) (m *Migration, ok bool) {
 }
 
 func (i *Migrations) findPos(version uint) int {
+	i.ensureIndex()
 	if len(i.index) > 0 {
 		ix := i.index.Search(version)
 		if ix < len(i.index) && i.index[ix] == version {
