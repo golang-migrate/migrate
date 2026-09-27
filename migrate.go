@@ -32,6 +32,10 @@ var (
 	ErrInvalidVersion = errors.New("version must be >= -1")
 	ErrLocked         = errors.New("database locked")
 	ErrLockTimeout    = errors.New("timeout: can't acquire database lock")
+	// ErrNoMigrationFiles is returned when the source contains no migration
+	// files, which usually means the source path is wrong or the directory is
+	// empty. It wraps os.ErrNotExist for backwards compatibility.
+	ErrNoMigrationFiles = fmt.Errorf("no migration files found in source: %w", os.ErrNotExist)
 )
 
 // ErrShortLimit is an error returned when not enough migrations
@@ -428,7 +432,11 @@ func (m *Migrate) read(from int, to int, ret chan<- interface{}) {
 		if from == -1 {
 			firstVersion, err := m.sourceDrv.First()
 			if err != nil {
-				ret <- err
+				if errors.Is(err, os.ErrNotExist) {
+					ret <- ErrNoMigrationFiles
+				} else {
+					ret <- err
+				}
 				return
 			}
 
@@ -555,7 +563,11 @@ func (m *Migrate) readUp(from int, limit int, ret chan<- interface{}) {
 		if from == -1 {
 			firstVersion, err := m.sourceDrv.First()
 			if err != nil {
-				ret <- err
+				if errors.Is(err, os.ErrNotExist) {
+					ret <- ErrNoMigrationFiles
+				} else {
+					ret <- err
+				}
 				return
 			}
 
