@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/golang-migrate/migrate/v4"
 
@@ -96,9 +97,11 @@ func Test(t *testing.T) {
 	t.Run("testFailToCreateTableWithoutPermissions", testFailToCreateTableWithoutPermissions)
 	t.Run("testCheckBeforeCreateTable", testCheckBeforeCreateTable)
 	t.Run("testParallelSchema", testParallelSchema)
+	t.Run("testPostgresConcurrentMigrations", testPostgresConcurrentMigrations)
 	t.Run("testPostgresLock", testPostgresLock)
 	t.Run("testWithInstanceConcurrent", testWithInstanceConcurrent)
 	t.Run("testWithConnection", testWithConnection)
+	t.Run("testWithConnectionLockContext", testWithConnectionLockContext)
 
 	t.Cleanup(func() {
 		for _, spec := range specs {
@@ -628,6 +631,61 @@ func testParallelSchema(t *testing.T) {
 	})
 }
 
+func testPostgresConcurrentMigrations(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
+		addr := pgConnectionString(ip, port, "x-lock-retry-max-interval=2000")
+
+		// GIVEN - a set of concurrent processes running migrations
+		const concurrency = 3
+		errs := make(chan error, concurrency)
+
+		// WHEN
+		var wg sync.WaitGroup
+		for range concurrency {
+			wg.Go(func() {
+				errs <- migrateUp(addr)
+			})
+		}
+		wg.Wait()
+		close(errs)
+
+		// THEN - only one of them applies the migrations
+		applied := 0
+		for err := range errs {
+			switch {
+			case err == nil:
+				applied++
+			case !errors.Is(err, migrate.ErrNoChange):
+				t.Error(err)
+			}
+		}
+		if applied != 1 {
+			t.Errorf("migrations applied %d times, want 1", applied)
+		}
+	})
+}
+
+func migrateUp(addr string) (err error) {
+	p := &Postgres{}
+	d, err := p.Open(addr)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		err = errors.Join(err, d.Close())
+	}()
+
+	m, err := migrate.NewWithDatabaseInstance("file://./examples/migrations", "postgres", d)
+	if err != nil {
+		return err
+	}
+	return m.Up()
+}
+
 func testPostgresLock(t *testing.T) {
 	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
 		ip, port, err := c.FirstPort()
@@ -748,6 +806,72 @@ func testWithConnection(t *testing.T) {
 	})
 }
 
+func testWithConnectionLockContext(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.FirstPort()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		db, err := sql.Open("postgres", pgConnectionString(ip, port))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := db.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
+
+		// GIVEN - lock held by another connection
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		waiterConn, err := db.Conn(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		waiter, err := WithConnection(ctx, waiterConn, &Config{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := waiter.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
+
+		holderConn, err := db.Conn(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		holder, err := WithConnection(context.Background(), holderConn, &Config{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := holder.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
+		if err := holder.Lock(); err != nil {
+			t.Fatal(err)
+		}
+
+		time.AfterFunc(500*time.Millisecond, cancel)
+
+		// WHEN
+		err = waiter.Lock()
+
+		// THEN
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("expected %v, got %v", context.Canceled, err)
+		}
+		if err := holder.Unlock(); err != nil {
+			t.Fatal(err)
+		}
+	})
+}
+
 func Test_computeLineFromPos(t *testing.T) {
 	testcases := []struct {
 		pos      int
@@ -824,6 +948,55 @@ func Test_computeLineFromPos(t *testing.T) {
 			run(true, false)
 			run(false, true)
 			run(true, true)
+		})
+	}
+}
+
+func TestLockConfig_applyDefaults(t *testing.T) {
+	defaults := LockConfig{
+		InitialRetryInterval: DefaultLockInitialRetryInterval,
+		MaxRetryInterval:     DefaultLockMaxRetryInterval,
+	}
+
+	tests := []struct {
+		name   string
+		config LockConfig
+		want   LockConfig
+	}{
+		{
+			name:   "unset",
+			config: LockConfig{},
+			want:   defaults,
+		},
+		{
+			name:   "negative",
+			config: LockConfig{InitialRetryInterval: -1, MaxRetryInterval: -1},
+			want:   defaults,
+		},
+		{
+			name:   "custom max",
+			config: LockConfig{MaxRetryInterval: 5 * time.Second},
+			want:   LockConfig{InitialRetryInterval: DefaultLockInitialRetryInterval, MaxRetryInterval: 5 * time.Second},
+		},
+		{
+			name:   "max below initial",
+			config: LockConfig{MaxRetryInterval: 50 * time.Millisecond},
+			want:   LockConfig{InitialRetryInterval: DefaultLockInitialRetryInterval, MaxRetryInterval: DefaultLockInitialRetryInterval},
+		},
+		{
+			name:   "initial above default max",
+			config: LockConfig{InitialRetryInterval: 2 * time.Second},
+			want:   LockConfig{InitialRetryInterval: 2 * time.Second, MaxRetryInterval: 2 * time.Second},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.config
+			got.applyDefaults()
+			if got != tt.want {
+				t.Errorf("applyDefaults() = %+v, want %+v", got, tt.want)
+			}
 		})
 	}
 }

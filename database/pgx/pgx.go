@@ -15,6 +15,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/golang-migrate/migrate/v4/database/multistmt"
@@ -42,6 +43,9 @@ var (
 	DefaultMultiStatementMaxSize = 10 * 1 << 20 // 10 MB
 	DefaultLockTable             = "schema_lock"
 	DefaultLockStrategy          = LockStrategyAdvisory
+
+	DefaultLockInitialRetryInterval = 100 * time.Millisecond
+	DefaultLockMaxRetryInterval     = 1000 * time.Millisecond
 )
 
 var (
@@ -63,6 +67,17 @@ type Config struct {
 	MigrationsTableQuoted bool
 	MultiStatementEnabled bool
 	MultiStatementMaxSize int
+	Locking               LockConfig
+}
+
+type LockConfig struct {
+	// InitialRetryInterval the initial (minimum) retry interval used for exponential backoff
+	// to try acquire a lock
+	InitialRetryInterval time.Duration
+
+	// MaxRetryInterval the maximum retry interval. Once the exponential backoff reaches this limit,
+	// the retry interval remains the same
+	MaxRetryInterval time.Duration
 }
 
 type Postgres struct {
@@ -123,6 +138,8 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	if len(config.LockStrategy) == 0 {
 		config.LockStrategy = DefaultLockStrategy
 	}
+
+	config.Locking.applyDefaults()
 
 	config.migrationsSchemaName = config.SchemaName
 	config.migrationsTableName = config.MigrationsTable
@@ -219,6 +236,15 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 	lockStrategy := purl.Query().Get("x-lock-strategy")
 	lockTable := purl.Query().Get("x-lock-table")
 
+	var lockConfig LockConfig
+	if s := purl.Query().Get("x-lock-retry-max-interval"); len(s) > 0 {
+		maxRetryIntervalMillis, err := strconv.Atoi(s)
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse option x-lock-retry-max-interval: %w", err)
+		}
+		lockConfig.MaxRetryInterval = time.Duration(maxRetryIntervalMillis) * time.Millisecond
+	}
+
 	px, err := WithInstance(db, &Config{
 		DatabaseName:          purl.Path,
 		MigrationsTable:       migrationsTable,
@@ -228,6 +254,7 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 		MultiStatementMaxSize: multiStatementMaxSize,
 		LockStrategy:          lockStrategy,
 		LockTable:             lockTable,
+		Locking:               lockConfig,
 	})
 
 	if err != nil {
@@ -272,19 +299,38 @@ func (p *Postgres) Unlock() error {
 	})
 }
 
+// applyAdvisoryLock tries to acquire an advisory lock and retries indefinitely with an exponential backoff strategy
 // https://www.postgresql.org/docs/9.6/static/explicit-locking.html#ADVISORY-LOCKS
 func (p *Postgres) applyAdvisoryLock() error {
+	return backoff.Retry(func() error {
+		ok, err := p.tryAdvisoryLock()
+		if err != nil {
+			return backoff.Permanent(err)
+		}
+
+		if ok {
+			return nil
+		}
+
+		return fmt.Errorf("could not acquire lock") // causes retry
+	}, p.config.Locking.nonStopBackoff())
+}
+
+func (p *Postgres) tryAdvisoryLock() (bool, error) {
 	aid, err := database.GenerateAdvisoryLockId(p.config.DatabaseName, p.config.migrationsSchemaName, p.config.migrationsTableName)
 	if err != nil {
-		return err
+		return false, err
 	}
 
-	// This will wait indefinitely until the lock can be acquired.
-	query := `SELECT pg_advisory_lock($1)`
-	if _, err := p.conn.ExecContext(context.Background(), query, aid); err != nil {
-		return &database.Error{OrigErr: err, Err: "try lock failed", Query: []byte(query)}
+	// https://www.postgresql.org/docs/current/functions-admin.html#FUNCTIONS-ADVISORY-LOCKS
+	// should always return true or false
+	query := `SELECT pg_try_advisory_lock($1)`
+	var ok bool
+	if err := p.conn.QueryRowContext(context.Background(), query, aid).Scan(&ok); err != nil {
+		return false, &database.Error{OrigErr: err, Err: "pg_try_advisory_lock failed", Query: []byte(query)}
 	}
-	return nil
+
+	return ok, nil
 }
 
 func (p *Postgres) applyTableLock() error {
@@ -614,4 +660,27 @@ func quoteIdentifier(name string) string {
 		name = name[:end]
 	}
 	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
+}
+
+func (l *LockConfig) applyDefaults() {
+	if l.InitialRetryInterval <= 0 {
+		l.InitialRetryInterval = DefaultLockInitialRetryInterval
+	}
+
+	if l.MaxRetryInterval <= 0 {
+		l.MaxRetryInterval = DefaultLockMaxRetryInterval
+	}
+
+	// a max below the initial interval would already be exceeded by the first retry
+	l.MaxRetryInterval = max(l.MaxRetryInterval, l.InitialRetryInterval)
+}
+
+func (l *LockConfig) nonStopBackoff() backoff.BackOff {
+	b := backoff.NewExponentialBackOff()
+	b.InitialInterval = l.InitialRetryInterval
+	b.MaxInterval = l.MaxRetryInterval
+	b.MaxElapsedTime = 0 // this backoff won't stop
+	b.Reset()
+
+	return b
 }

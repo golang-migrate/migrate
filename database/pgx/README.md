@@ -13,6 +13,7 @@ This package is for [pgx/v4](https://pkg.go.dev/github.com/jackc/pgx/v4). A back
 | `x-multi-statement-max-size` | `MultiStatementMaxSize` | Maximum size of single statement in bytes (default: 10MB) |
 | `x-lock-strategy` | `LockStrategy` | Strategy used for locking during migration (default: advisory) |
 | `x-lock-table` | `LockTable` | Name of the table which maintains the migration lock (default: schema_lock) |
+| `x-lock-retry-max-interval` | `Locking` | When acquiring a lock fails, retries are used with an exponential backoff. This parameter specifies what is the maximum interval between retries in milliseconds (default: 1000ms). Values below the initial retry interval (100ms) are raised to it. Only used with the advisory lock strategy. |
 | `dbname` | `DatabaseName` | The name of the database to connect to |
 | `search_path` | | This variable specifies the order in which schemas are searched when an object is referenced by a simple name with no schema specified. |
 | `user` | | The user to sign in as |
