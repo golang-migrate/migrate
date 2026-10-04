@@ -88,6 +88,11 @@ func (m *Sqlite) ensureVersionTable() (err error) {
 }
 
 func (m *Sqlite) Open(url string) (database.Driver, error) {
+	// A SQLite file URI is an opaque URI, not a URL authority. Parsing the
+	// sqlite:// wrapper first would interpret its filename as a port.
+	if strings.HasPrefix(url, "sqlite://file:") {
+		url = strings.TrimPrefix(url, "sqlite://")
+	}
 	purl, err := nurl.Parse(url)
 	if err != nil {
 		return nil, err
