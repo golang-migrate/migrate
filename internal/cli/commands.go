@@ -82,9 +82,10 @@ func createCmd(dir string, startTime time.Time, format string, name string, ext 
 
 	dir = filepath.Clean(dir)
 	ext = "." + strings.TrimPrefix(ext, ".")
+	globDir := escapeGlobPath(dir)
 
 	if seq {
-		matches, err := filepath.Glob(filepath.Join(dir, "*"+ext))
+		matches, err := filepath.Glob(filepath.Join(globDir, "*"+ext))
 
 		if err != nil {
 			return err
@@ -103,7 +104,7 @@ func createCmd(dir string, startTime time.Time, format string, name string, ext 
 		}
 	}
 
-	versionGlob := filepath.Join(dir, version+"_*"+ext)
+	versionGlob := filepath.Join(globDir, version+"_*"+ext)
 	matches, err := filepath.Glob(versionGlob)
 
 	if err != nil {
@@ -133,6 +134,14 @@ func createCmd(dir string, startTime time.Time, format string, name string, ext 
 	}
 
 	return nil
+}
+
+// escapeGlobPath keeps directory names literal while leaving the filename pattern separate.
+func escapeGlobPath(dir string) string {
+	if filepath.Separator != '\\' {
+		dir = strings.ReplaceAll(dir, "\\", "\\\\")
+	}
+	return strings.NewReplacer("*", "[*]", "?", "[?]", "[", "[[]").Replace(dir)
 }
 
 func createFile(filename string) error {
