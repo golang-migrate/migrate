@@ -36,6 +36,7 @@ var (
 		{ImageName: "mongo:6.0", Options: opts},
 		{ImageName: "mongo:7.0", Options: opts},
 		{ImageName: "mongo:8.0", Options: opts},
+		{ImageName: "mongo:9.0", Options: opts},
 	}
 )
 
