@@ -88,6 +88,7 @@ func (s *CreateCmdSuite) TestNextSeqVersion() {
 		{"Single digit no int", []string{"bad_bad"}, 1, "", errors.New(`strconv.ParseUint: parsing "bad": invalid syntax`)},
 		{"Single digit negative seq", []string{"-5_test"}, 1, "", errors.New(`strconv.ParseUint: parsing "-5": invalid syntax`)},
 		{"Single digit increment", []string{"3_test", "4_test"}, 1, "5", nil},
+		{"Multi digit lexical order", []string{"0_x", "10_x", "11_x", "1_x", "2_x", "9_x"}, 6, "000012", nil},
 		{"Single digit overflow", []string{"9_test"}, 1, "", errors.New("next sequence number 10 too large, at most 1 digits are allowed")},
 		{"Zero-pad initialize", []string{}, 6, "000001", nil},
 		{"Zero-pad malformed", []string{"bad"}, 6, "", errors.New("malformed migration filename: bad")},
