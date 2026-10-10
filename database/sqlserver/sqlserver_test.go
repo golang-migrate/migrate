@@ -13,12 +13,12 @@ import (
 
 	"github.com/dhui/dktest"
 	"github.com/docker/go-connections/nat"
-	"github.com/golang-migrate/migrate/v4"
+	"github.com/fabiomarini/migrate/v4"
 
-	dt "github.com/golang-migrate/migrate/v4/database/testing"
-	"github.com/golang-migrate/migrate/v4/dktesting"
+	dt "github.com/fabiomarini/migrate/v4/database/testing"
+	"github.com/fabiomarini/migrate/v4/dktesting"
 
-	_ "github.com/golang-migrate/migrate/v4/source/file"
+	_ "github.com/fabiomarini/migrate/v4/source/file"
 )
 
 const defaultPort = 1433

@@ -12,8 +12,8 @@ import (
 	"go.uber.org/atomic"
 
 	"github.com/gocql/gocql"
-	"github.com/golang-migrate/migrate/v4/database"
-	"github.com/golang-migrate/migrate/v4/database/multistmt"
+	"github.com/fabiomarini/migrate/v4/database"
+	"github.com/fabiomarini/migrate/v4/database/multistmt"
 	"github.com/hashicorp/go-multierror"
 )
 

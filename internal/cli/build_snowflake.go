@@ -4,5 +4,5 @@
 package cli
 
 import (
-	_ "github.com/golang-migrate/migrate/v4/database/snowflake"
+	_ "github.com/fabiomarini/migrate/v4/database/snowflake"
 )

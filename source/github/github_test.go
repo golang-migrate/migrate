@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	st "github.com/golang-migrate/migrate/v4/source/testing"
+	st "github.com/fabiomarini/migrate/v4/source/testing"
 	"github.com/stretchr/testify/assert"
 )
 

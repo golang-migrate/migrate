@@ -10,10 +10,10 @@ import (
 	"github.com/dhui/dktest"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
 
-	"github.com/golang-migrate/migrate/v4"
-	dt "github.com/golang-migrate/migrate/v4/database/testing"
-	"github.com/golang-migrate/migrate/v4/dktesting"
-	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/fabiomarini/migrate/v4"
+	dt "github.com/fabiomarini/migrate/v4/database/testing"
+	"github.com/fabiomarini/migrate/v4/dktesting"
+	_ "github.com/fabiomarini/migrate/v4/source/file"
 )
 
 var (

@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/golang-migrate/migrate/v4"
+	"github.com/fabiomarini/migrate/v4"
 	"io"
 	"strconv"
 	"strings"
@@ -22,10 +22,10 @@ import (
 )
 
 import (
-	"github.com/golang-migrate/migrate/v4/database"
-	dt "github.com/golang-migrate/migrate/v4/database/testing"
-	"github.com/golang-migrate/migrate/v4/dktesting"
-	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/fabiomarini/migrate/v4/database"
+	dt "github.com/fabiomarini/migrate/v4/database/testing"
+	"github.com/fabiomarini/migrate/v4/dktesting"
+	_ "github.com/fabiomarini/migrate/v4/source/file"
 )
 
 var (
