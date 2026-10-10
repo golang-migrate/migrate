@@ -146,30 +146,30 @@ func (n *Neo4j) Run(migration io.Reader) (err error) {
 	}()
 
 	if n.config.MultiStatement {
-		_, err = session.WriteTransaction(func(transaction neo4j.Transaction) (interface{}, error) {
-			var stmtRunErr error
-			if err := multistmt.Parse(migration, StatementSeparator, n.config.MultiStatementMaxSize, func(stmt []byte) bool {
-				trimStmt := bytes.TrimSpace(stmt)
-				if len(trimStmt) == 0 {
-					return true
-				}
-				trimStmt = bytes.TrimSuffix(trimStmt, StatementSeparator)
-				if len(trimStmt) == 0 {
-					return true
-				}
-
-				result, err := transaction.Run(string(trimStmt), nil)
-				if _, err := neo4j.Collect(result, err); err != nil {
-					stmtRunErr = err
-					return false
-				}
+		// Run each statement in its own implicit (autocommit) transaction rather
+		// than wrapping the whole migration in one explicit WriteTransaction.
+		// Neo4j 5/2025 forbids mixing schema modifications (CREATE/DROP
+		// CONSTRAINT/INDEX) with data writes in a single transaction, and a
+		// migration file may legitimately contain both (e.g. copy-then-drop).
+		var stmtRunErr error
+		if err := multistmt.Parse(migration, StatementSeparator, n.config.MultiStatementMaxSize, func(stmt []byte) bool {
+			trimStmt := bytes.TrimSpace(stmt)
+			trimStmt = bytes.TrimSuffix(trimStmt, StatementSeparator)
+			trimStmt = bytes.TrimSpace(trimStmt)
+			if len(trimStmt) == 0 {
 				return true
-			}); err != nil {
-				return nil, err
 			}
-			return nil, stmtRunErr
-		})
-		return err
+
+			result, err := session.Run(string(trimStmt), nil)
+			if _, err := neo4j.Collect(result, err); err != nil {
+				stmtRunErr = err
+				return false
+			}
+			return true
+		}); err != nil {
+			return err
+		}
+		return stmtRunErr
 	}
 
 	body, err := io.ReadAll(migration)
@@ -296,10 +296,17 @@ func (n *Neo4j) ensureVersionConstraint() (err error) {
 	}
 
 	var query string
-	switch neo4jVersion {
-	case "v5":
+	// Neo4j switched to calendar versioning (2025.x, 2026.x, ...); semver.Major
+	// yields "v2025" for those. Compare the major numerically so every release
+	// from 5.x onward (including all calendar versions) uses the REQUIRE syntax.
+	var major int
+	if len(neo4jVersion) > 1 {
+		major, _ = strconv.Atoi(neo4jVersion[1:]) // "v2025" -> 2025, "v5" -> 5
+	}
+	switch {
+	case major >= 5:
 		query = fmt.Sprintf("CREATE CONSTRAINT FOR (a:%s) REQUIRE a.version IS UNIQUE", n.config.MigrationsLabel)
-	case "v3", "v4":
+	case major >= 3: // v3, v4
 		query = fmt.Sprintf("CREATE CONSTRAINT ON (a:%s) ASSERT a.version IS UNIQUE", n.config.MigrationsLabel)
 	default:
 		return fmt.Errorf("unsupported neo4j version %v", neo4jVersion)
