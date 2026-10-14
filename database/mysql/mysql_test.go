@@ -15,6 +15,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/dhui/dktest"
@@ -146,6 +147,44 @@ func TestMigrate(t *testing.T) {
 		// check again
 		if err := d.(*Mysql).ensureVersionTable(); err != nil {
 			t.Fatal(err)
+		}
+	})
+}
+
+func TestDropViews(t *testing.T) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+		ip, port, err := c.Port(defaultPort)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addr := fmt.Sprintf("mysql://root:root@tcp(%v:%v)/public", ip, port)
+		p := &Mysql{}
+		d, err := p.Open(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := d.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
+
+		if err := d.Run(strings.NewReader("CREATE TABLE foo (id INT); CREATE VIEW foo_view AS SELECT id FROM foo;")); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := d.Drop(); err != nil {
+			t.Fatal(err)
+		}
+
+		var count int
+		query := "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE()"
+		if err := d.(*Mysql).conn.QueryRowContext(context.Background(), query).Scan(&count); err != nil {
+			t.Fatal(err)
+		}
+		if count != 0 {
+			t.Fatalf("expected no tables or views after Drop, found %d", count)
 		}
 	})
 }
