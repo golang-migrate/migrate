@@ -129,6 +129,9 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	if config.MigrationsTableQuoted {
 		re := regexp.MustCompile(`"(.*?)"`)
 		result := re.FindAllStringSubmatch(config.MigrationsTable, -1)
+		if len(result) == 0 {
+			return nil, fmt.Errorf("\"%s\" MigrationsTable is not quoted", config.MigrationsTable)
+		}
 		config.migrationsTableName = result[len(result)-1][1]
 		if len(result) == 2 {
 			config.migrationsSchemaName = result[0][1]
