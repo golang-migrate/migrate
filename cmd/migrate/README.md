@@ -79,6 +79,7 @@ Options:
   -source          Location of the migrations (driver://url)
   -path            Shorthand for -source=file://path
   -database        Run migrations against this database (driver://url)
+  -database-env    Read the database URL from the named environment variable
   -prefetch N      Number of migrations to load in advance before executing (default 10)
   -lock-timeout N  Allow N seconds to acquire database lock (default 15)
   -verbose         Print verbose logging
@@ -122,9 +123,20 @@ Send SIGKILL for immediate halt.
 
 ### ENV variables
 
+Use `-database-env` to read the connection string inside the CLI, keeping it out of
+the process arguments. For a variable supplied by your shell or CI environment:
+
 ```bash
-$ migrate -database "$MY_MIGRATE_DATABASE"
+$ migrate -path ./migrations -database-env MY_MIGRATE_DATABASE up
 ```
+
+`-database` and `-database-env` are mutually exclusive. The named variable must be
+set and nonempty. No environment variables are read automatically. `-help` and
+`-version` do not require the variable to be set.
+
+Expanding a variable with `-database "$MY_MIGRATE_DATABASE"` puts its value in the
+process arguments. Environment variables may still be accessible to processes
+running as the same user; `-database-env` does not make them a secret store.
 
 ### JSON files
 
