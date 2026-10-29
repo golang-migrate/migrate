@@ -9,6 +9,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang-migrate/migrate/v4"
+	dStub "github.com/golang-migrate/migrate/v4/database/stub"
+	"github.com/golang-migrate/migrate/v4/source"
+	sStub "github.com/golang-migrate/migrate/v4/source/stub"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -288,5 +292,48 @@ func TestNumDownFromArgs(t *testing.T) {
 				t.Error("Expected error: " + c.expectedErrStr + " but got nil instead")
 			}
 		})
+	}
+}
+
+func TestCheckCmd(t *testing.T) {
+	sDrv, err := sStub.WithInstance(nil, &sStub.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	dbDrv, err := dStub.WithInstance(nil, &dStub.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, err := migrate.NewWithInstance("stub", sDrv, "stub", dbDrv)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := checkCmd(m); err != nil {
+		t.Fatalf("expected nil error for empty source, got %v", err)
+	}
+
+	migrations := source.NewMigrations()
+	migrations.Append(&source.Migration{Version: 1, Direction: source.Up, Identifier: "CREATE 1"})
+	migrations.Append(&source.Migration{Version: 2, Direction: source.Up, Identifier: "CREATE 2"})
+	sDrv.(*sStub.Stub).Migrations = migrations
+
+	if err := checkCmd(m); !errors.Is(err, errPendingMigrations) {
+		t.Fatalf("expected %v, got %v", errPendingMigrations, err)
+	}
+
+	if err := m.Up(); err != nil {
+		t.Fatal(err)
+	}
+	if err := checkCmd(m); err != nil {
+		t.Fatalf("expected nil error when all migrations applied, got %v", err)
+	}
+
+	if err := dbDrv.SetVersion(2, true); err != nil {
+		t.Fatal(err)
+	}
+	var dirtyErr migrate.ErrDirty
+	if err := checkCmd(m); !errors.As(err, &dirtyErr) {
+		t.Fatalf("expected ErrDirty, got %v", err)
 	}
 }

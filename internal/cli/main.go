@@ -92,6 +92,7 @@ Commands:
   %s
   %s
   version      Print current migration version
+  check        Check if database has pending migrations
 
 Source drivers: `+strings.Join(source.List(), ", ")+`
 Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoUsage, upUsage, downUsage, dropUsage, forceUsage)
@@ -368,6 +369,15 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 		}
 
 		if err := versionCmd(migrater); err != nil {
+			log.fatalErr(err)
+		}
+
+	case "check":
+		if migraterErr != nil {
+			log.fatalErr(migraterErr)
+		}
+
+		if err := checkCmd(migrater); err != nil {
 			log.fatalErr(err)
 		}
 

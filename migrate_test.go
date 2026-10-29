@@ -945,6 +945,68 @@ func TestVersion(t *testing.T) {
 	}
 }
 
+func TestCheck(t *testing.T) {
+	m, _ := New("stub://", "stub://")
+
+	pending, err := m.Check()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pending != 0 {
+		t.Fatalf("expected 0 pending for empty source, got %v", pending)
+	}
+
+	m.sourceDrv.(*sStub.Stub).Migrations = sourceStubMigrations
+
+	pending, err = m.Check()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pending != 5 {
+		t.Fatalf("expected 5 pending, got %v", pending)
+	}
+	if m.PrefetchMigrations != DefaultPrefetchMigrations {
+		t.Fatalf("expected PrefetchMigrations %v, got %v", DefaultPrefetchMigrations, m.PrefetchMigrations)
+	}
+
+	if err := m.Steps(3); err != nil {
+		t.Fatal(err)
+	}
+
+	pending, err = m.Check()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pending != 2 {
+		t.Fatalf("expected 2 pending, got %v", pending)
+	}
+
+	if err := m.Up(); err != nil {
+		t.Fatal(err)
+	}
+
+	pending, err = m.Check()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pending != 0 {
+		t.Fatalf("expected 0 pending, got %v", pending)
+	}
+}
+
+func TestCheckDirty(t *testing.T) {
+	m, _ := New("stub://", "stub://")
+	dbDrv := m.databaseDrv.(*dStub.Stub)
+	if err := dbDrv.SetVersion(0, true); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := m.Check()
+	if _, ok := err.(ErrDirty); !ok {
+		t.Fatalf("expected ErrDirty, got %v", err)
+	}
+}
+
 func TestRun(t *testing.T) {
 	m, _ := New("stub://", "stub://")
 
