@@ -31,8 +31,11 @@ import (
 var (
 	// mongo:8.0 sets glibc.pthread.rseq=0, so mongod refuses to start on kernels 6.19 to 7.0.13:
 	// https://jira.mongodb.org/browse/SERVER-121912
-	opts = dktest.Options{PortRequired: true, ReadyFunc: isReady,
-		Env: map[string]string{"GLIBC_TUNABLES": "glibc.pthread.rseq=1"}}
+	opts = dktest.Options{
+		Env:          map[string]string{"GLIBC_TUNABLES": "glibc.pthread.rseq=1"},
+		PortRequired: true,
+		ReadyFunc:    isReady,
+	}
 	// Supported versions: https://www.mongodb.com/support-policy
 	specs = []dktesting.ContainerSpec{
 		{ImageName: "mongo:5.0", Options: opts},
