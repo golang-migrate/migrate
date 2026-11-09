@@ -13,6 +13,29 @@
 | `host` | The host to connect to. |
 | `port` | The port to bind to. |
 | `x-multi-statement` | false | Enable multiple statements to be ran in a single migration (See note below) |
+| `x-jwt-token` | A JWT to authenticate with instead of `username` and `password` (ClickHouse Cloud, see below) |
+| `x-jwt-token-file` | A file containing a JWT, read for every new connection so that a renewed token is picked up |
+
+The driver uses [clickhouse-go v2](https://github.com/ClickHouse/clickhouse-go), so the [clickhouse-go v2 connection parameters](https://github.com/ClickHouse/clickhouse-go#dsn) such as `secure`, `skip_verify`, `dial_timeout` and `read_timeout` are accepted. Any other parameter without an `x-` prefix is sent to the server as a ClickHouse setting.
+
+## JWT authentication
+
+ClickHouse Cloud services can accept a JWT issued by your identity provider instead of a password. Pass the token with `x-jwt-token`, or point `x-jwt-token-file` at a file your platform keeps current, and leave out `username` and `password`:
+
+`clickhouse://host:9440?secure=true&database=clicks&x-jwt-token-file=/var/run/secrets/clickhouse/token`
+
+JWT authentication requires `secure=true`, so the token is never sent in clear text.
+
+## Upgrading from clickhouse-go v1
+
+Earlier versions of this driver used clickhouse-go v1. Existing URLs keep working:
+
+* `read_timeout` and `timeout` given in seconds, as v1 expected, are converted (`timeout` becomes `dial_timeout`). A value of `0`, which disabled the timeout in v1, becomes a timeout of 100 years, because clickhouse-go v2 cannot disable it.
+* `alt_hosts` is added to the host list, and `connection_open_strategy=time_random` becomes `random`.
+* `block_size`, `no_delay`, `pool_size` and `write_timeout` have no clickhouse-go v2 equivalent and are ignored.
+* `tls_config` is no longer supported: it referred to a TLS configuration registered in code. Use `secure`, `skip_verify` and `tls_server_name` instead.
+
+If your program also uses clickhouse-go v1 directly, move it to v2 as well: both versions register the `clickhouse` database/sql driver, and a binary that links both panics at startup.
 
 ## Notes
 
