@@ -24,13 +24,13 @@ ClickHouse Cloud services can accept a JWT issued by your identity provider inst
 
 `clickhouse://host:9440?secure=true&database=clicks&x-jwt-token-file=/var/run/secrets/clickhouse/token`
 
-ClickHouse Cloud requires `secure=true` for JWT authentication.
+JWT authentication requires `secure=true`, so the token is never sent in clear text.
 
 ## Upgrading from clickhouse-go v1
 
 Earlier versions of this driver used clickhouse-go v1. Existing URLs keep working:
 
-* `read_timeout` and `timeout` given in seconds, as v1 expected, are converted (`timeout` becomes `dial_timeout`).
+* `read_timeout` and `timeout` given in seconds, as v1 expected, are converted (`timeout` becomes `dial_timeout`). A value of `0`, which disabled the timeout in v1, becomes a timeout of 100 years, because clickhouse-go v2 cannot disable it.
 * `alt_hosts` is added to the host list, and `connection_open_strategy=time_random` becomes `random`.
 * `block_size`, `no_delay`, `pool_size` and `write_timeout` have no clickhouse-go v2 equivalent and are ignored.
 * `tls_config` is no longer supported: it referred to a TLS configuration registered in code. Use `secure`, `skip_verify` and `tls_server_name` instead.

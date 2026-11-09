@@ -54,6 +54,27 @@ func TestOptionsFromURL(t *testing.T) {
 		}
 	})
 
+	t.Run("adds IPv6 alternate hosts after the primary", func(t *testing.T) {
+		opts, err := parse(t, "clickhouse://[::1]:9000?alt_hosts=[::2]:9000,host3:9000")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, want := strings.Join(opts.Addr, ","), "[::1]:9000,[::2]:9000,host3:9000"; got != want {
+			t.Errorf("Addr = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("keeps v1 zero timeouts disabled", func(t *testing.T) {
+		// clickhouse-go v2 replaces a zero timeout with its default.
+		opts, err := parse(t, "clickhouse://host:9000?read_timeout=0&timeout=0")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if opts.ReadTimeout != noTimeout || opts.DialTimeout != noTimeout {
+			t.Errorf("ReadTimeout = %v, DialTimeout = %v, want %v", opts.ReadTimeout, opts.DialTimeout, noTimeout)
+		}
+	})
+
 	t.Run("sends a literal JWT", func(t *testing.T) {
 		opts, err := parse(t, "clickhouse://host:9440?secure=true&database=db&x-jwt-token=token-a")
 		if err != nil {
@@ -106,6 +127,7 @@ func TestOptionsFromURL(t *testing.T) {
 		{"rejects two JWT sources", "clickhouse://host:9440?x-jwt-token=a&x-jwt-token-file=/tmp/t", "x-jwt-token-file"},
 		{"rejects a JWT with a username", "clickhouse://host:9440?username=user&x-jwt-token=a", "username"},
 		{"rejects a JWT with credentials in the host", "clickhouse://user:pass@host:9440?x-jwt-token=a", "username"},
+		{"rejects a JWT without TLS", "clickhouse://host:9000?x-jwt-token=a", "secure=true"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := parse(t, tc.dsn)
