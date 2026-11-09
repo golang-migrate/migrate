@@ -8,7 +8,7 @@ import (
 	"log"
 	"testing"
 
-	_ "github.com/ClickHouse/clickhouse-go"
+	_ "github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/dhui/dktest"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/clickhouse"
@@ -42,13 +42,19 @@ func clickhouseConnectionString(host, port, engine string) string {
 		host, port)
 }
 
+// driverConnectionString is a clickhouse-go DSN for opening the database
+// directly, without the x- parameters that only migrate understands.
+func driverConnectionString(host, port string) string {
+	return fmt.Sprintf("clickhouse://%v:%v?username=user&password=password&database=db", host, port)
+}
+
 func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 	ip, port, err := c.Port(defaultPort)
 	if err != nil {
 		return false
 	}
 
-	db, err := sql.Open("clickhouse", clickhouseConnectionString(ip, port, ""))
+	db, err := sql.Open("clickhouse", driverConnectionString(ip, port))
 
 	if err != nil {
 		log.Println("open error", err)
@@ -113,8 +119,7 @@ func testSimpleWithInstanceDefaultConfigValues(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		addr := clickhouseConnectionString(ip, port, "")
-		conn, err := sql.Open("clickhouse", addr)
+		conn, err := sql.Open("clickhouse", driverConnectionString(ip, port))
 		if err != nil {
 			t.Fatal(err)
 		}

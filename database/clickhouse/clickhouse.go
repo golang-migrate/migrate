@@ -1,16 +1,19 @@
 package clickhouse
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
 	"io"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
 
+	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/golang-migrate/migrate/v4/database/multistmt"
@@ -71,12 +74,11 @@ func (ch *ClickHouse) Open(dsn string) (database.Driver, error) {
 	if err != nil {
 		return nil, err
 	}
-	q := migrate.FilterCustomQuery(purl)
-	q.Scheme = "tcp"
-	conn, err := sql.Open("clickhouse", q.String())
+	opts, err := optionsFromURL(purl)
 	if err != nil {
 		return nil, err
 	}
+	conn := clickhouse.OpenDB(opts)
 
 	multiStatementMaxSize := DefaultMultiStatementMaxSize
 	if s := purl.Query().Get("x-multi-statement-max-size"); len(s) > 0 {
@@ -108,6 +110,102 @@ func (ch *ClickHouse) Open(dsn string) (database.Driver, error) {
 	}
 
 	return ch, nil
+}
+
+// optionsFromURL builds the clickhouse-go options for a migrate URL. It
+// translates the connection parameters of clickhouse-go v1, which this driver
+// used before, and sets up JWT authentication when x-jwt-token or
+// x-jwt-token-file is present.
+func optionsFromURL(purl *url.URL) (*clickhouse.Options, error) {
+	q := migrate.FilterCustomQuery(purl)
+	if err := translateV1Params(q); err != nil {
+		return nil, err
+	}
+	q.Scheme = "tcp"
+	opts, err := clickhouse.ParseDSN(q.String())
+	if err != nil {
+		return nil, err
+	}
+
+	token := purl.Query().Get("x-jwt-token")
+	tokenFile := purl.Query().Get("x-jwt-token-file")
+	if token == "" && tokenFile == "" {
+		return opts, nil
+	}
+	if token != "" && tokenFile != "" {
+		return nil, errors.New("clickhouse: set only one of x-jwt-token and x-jwt-token-file")
+	}
+	if opts.Auth.Username != "" || opts.Auth.Password != "" {
+		return nil, errors.New("clickhouse: JWT authentication cannot be combined with a username or password")
+	}
+	if token != "" {
+		opts.GetJWT = func(context.Context) (string, error) { return token, nil }
+		return opts, nil
+	}
+	// Read on every new connection, so that a token the platform renews in
+	// the file is picked up during a long migration.
+	opts.GetJWT = func(context.Context) (string, error) {
+		b, err := os.ReadFile(tokenFile)
+		if err != nil {
+			return "", fmt.Errorf("clickhouse: read x-jwt-token-file: %w", err)
+		}
+		token := strings.TrimSpace(string(b))
+		if token == "" {
+			return "", fmt.Errorf("clickhouse: x-jwt-token-file %s is empty", tokenFile)
+		}
+		return token, nil
+	}
+	return opts, nil
+}
+
+// translateV1Params rewrites connection parameters that clickhouse-go v1
+// accepted into their clickhouse-go v2 form. clickhouse-go v2 sends any
+// parameter it does not know to the server as a setting, which the server
+// rejects, so v1 parameters without a v2 equivalent are removed.
+func translateV1Params(u *url.URL) error {
+	q := u.Query()
+	if q.Has("tls_config") {
+		return errors.New("clickhouse: tls_config is no longer supported, use secure, skip_verify and tls_server_name")
+	}
+	// v1 tuning knobs with no v2 equivalent. pool_size sized a byte buffer
+	// pool in v1, not the connection pool.
+	for _, name := range []string{"block_size", "no_delay", "pool_size", "write_timeout"} {
+		q.Del(name)
+	}
+	// v1 read timeouts in seconds, v2 reads Go durations.
+	if q.Has("read_timeout") {
+		q.Set("read_timeout", secondsToDuration(q.Get("read_timeout")))
+	}
+	if q.Has("timeout") {
+		if !q.Has("dial_timeout") {
+			q.Set("dial_timeout", secondsToDuration(q.Get("timeout")))
+		}
+		q.Del("timeout")
+	}
+	if q.Get("connection_open_strategy") == "time_random" {
+		q.Set("connection_open_strategy", "random")
+	}
+	// v2 takes additional hosts as a comma separated host list.
+	if altHosts := q.Get("alt_hosts"); altHosts != "" {
+		for _, host := range strings.Split(altHosts, ",") {
+			if host != "" {
+				u.Host += "," + host
+			}
+		}
+	}
+	q.Del("alt_hosts")
+	u.RawQuery = q.Encode()
+	return nil
+}
+
+// secondsToDuration turns a number of seconds into a Go duration string and
+// leaves any other value, such as one that already has a unit, unchanged.
+func secondsToDuration(value string) string {
+	seconds, err := strconv.ParseFloat(value, 64)
+	if err != nil {
+		return value
+	}
+	return time.Duration(seconds * float64(time.Second)).String()
 }
 
 func (ch *ClickHouse) init() error {
