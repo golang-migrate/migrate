@@ -7,6 +7,7 @@
 | `x-migrations-table` | `MigrationsTable` | Name of the migrations table |
 | `x-no-lock` | `NoLock` | Set to `true` to skip `GET_LOCK`/`RELEASE_LOCK` statements. Useful for [multi-master MySQL flavors](https://www.percona.com/doc/percona-xtradb-cluster/LATEST/features/pxc-strict-mode.html#explicit-table-locking). Only run migrations from one host when this is enabled. |
 | `x-statement-timeout` | `StatementTimeout` | Abort any statement that takes more than the specified number of milliseconds, functionally similar to [Server-side SELECT statement timeouts](https://dev.mysql.com/blog-archive/server-side-select-statement-timeouts/) but enforced by the client. Available for all versions of MySQL, not just >=5.7. | 
+| `x-try-lock-timeout` | `TryLockTimeoutSec` | Timeout in seconds to try to obtain migrations lock. A negative value means infinite timeout. Default value is `10` |
 | `dbname` | `DatabaseName` | The name of the database to connect to |
 | `user` | | The user to sign in as |
 | `password` | | The user's password | 
@@ -17,6 +18,10 @@
 | `x-tls-cert` | | The location of the client certificate file. Must be used with `x-tls-key`. |
 | `x-tls-key` | | The location of the private key file. Must be used with `x-tls-cert`. |
 | `x-tls-insecure-skip-verify` | | Whether or not to use SSL (true\|false) | 
+
+Keep `x-try-lock-timeout` (or `Config.TryLockTimeoutSec`) finite and strictly shorter than `Migrate.LockTimeout`, allowing a margin for query overhead. `Migrate.LockTimeout` defaults to 15 seconds in both the embedded library and the CLI. Set it on the migration instance before running migrations (for example, `m.LockTimeout = 60 * time.Second`), or use the CLI flag `-lock-timeout 60`.
+
+The outer timeout does not cancel the driver's `GET_LOCK` query. If it expires first, the query can later acquire and retain the migration lock, and `Close()` can block while the query is pending. Callers are responsible for configuring these timeouts consistently.
 
 ## Use with existing client
 
