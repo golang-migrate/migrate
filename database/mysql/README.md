@@ -19,6 +19,10 @@
 | `x-tls-key` | | The location of the private key file. Must be used with `x-tls-cert`. |
 | `x-tls-insecure-skip-verify` | | Whether or not to use SSL (true\|false) | 
 
+Keep `x-try-lock-timeout` (or `Config.TryLockTimeoutSec`) finite and strictly shorter than `Migrate.LockTimeout`, allowing a margin for query overhead. `Migrate.LockTimeout` defaults to 15 seconds in both the embedded library and the CLI. Set it on the migration instance before running migrations (for example, `m.LockTimeout = 60 * time.Second`), or use the CLI flag `-lock-timeout 60`.
+
+The outer timeout does not cancel the driver's `GET_LOCK` query. If it expires first, the query can later acquire and retain the migration lock, and `Close()` can block while the query is pending. Callers are responsible for configuring these timeouts consistently.
+
 ## Use with existing client
 
 If you use the MySQL driver with existing database client, you must create the client with parameter `multiStatements=true`:
