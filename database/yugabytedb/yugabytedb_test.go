@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dhui/dktest"
 	"github.com/golang-migrate/migrate/v4"
 
 	_ "github.com/lib/pq"
@@ -25,7 +24,7 @@ import (
 const defaultPort = 5433
 
 var (
-	opts = dktest.Options{
+	opts = dktesting.Options{
 		Cmd:          []string{"bin/yugabyted", "start", "--daemon=false"},
 		PortRequired: true,
 		ReadyFunc:    isReady,
@@ -40,7 +39,7 @@ var (
 	}
 )
 
-func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
+func isReady(ctx context.Context, c dktesting.ContainerInfo) bool {
 	ip, port, err := c.Port(defaultPort)
 	if err != nil {
 		log.Println("port error:", err)
@@ -62,7 +61,7 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 	return true
 }
 
-func createDB(t *testing.T, c dktest.ContainerInfo) {
+func createDB(t *testing.T, c dktesting.ContainerInfo) {
 	ip, port, err := c.Port(defaultPort)
 	if err != nil {
 		t.Fatal(err)
@@ -109,7 +108,7 @@ func Test(t *testing.T) {
 }
 
 func test(t *testing.T) {
-	dktesting.ParallelTest(t, specs, func(t *testing.T, ci dktest.ContainerInfo) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, ci dktesting.ContainerInfo) {
 		createDB(t, ci)
 
 		ip, port, err := ci.Port(defaultPort)
@@ -128,7 +127,7 @@ func test(t *testing.T) {
 }
 
 func testMigrate(t *testing.T) {
-	dktesting.ParallelTest(t, specs, func(t *testing.T, ci dktest.ContainerInfo) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, ci dktesting.ContainerInfo) {
 		createDB(t, ci)
 
 		ip, port, err := ci.Port(defaultPort)
@@ -152,7 +151,7 @@ func testMigrate(t *testing.T) {
 }
 
 func testMultiStatement(t *testing.T) {
-	dktesting.ParallelTest(t, specs, func(t *testing.T, ci dktest.ContainerInfo) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, ci dktesting.ContainerInfo) {
 		createDB(t, ci)
 
 		ip, port, err := ci.Port(defaultPort)
@@ -182,7 +181,7 @@ func testMultiStatement(t *testing.T) {
 }
 
 func testFilterCustomQuery(t *testing.T) {
-	dktesting.ParallelTest(t, specs, func(t *testing.T, ci dktest.ContainerInfo) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, ci dktesting.ContainerInfo) {
 		createDB(t, ci)
 
 		ip, port, err := ci.Port(defaultPort)
