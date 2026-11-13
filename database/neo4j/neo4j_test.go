@@ -7,7 +7,6 @@ import (
 	"log"
 	"testing"
 
-	"github.com/dhui/dktest"
 	"github.com/neo4j/neo4j-go-driver/neo4j"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -17,7 +16,7 @@ import (
 )
 
 var (
-	opts = dktest.Options{PortRequired: true, ReadyFunc: isReady,
+	opts = dktesting.Options{PortRequired: true, ReadyFunc: isReady,
 		Env: map[string]string{"NEO4J_AUTH": "neo4j/migratetest", "NEO4J_ACCEPT_LICENSE_AGREEMENT": "yes"}}
 	specs = []dktesting.ContainerSpec{
 		{ImageName: "neo4j:4.0", Options: opts},
@@ -31,7 +30,7 @@ func neoConnectionString(host, port string) string {
 	return fmt.Sprintf("bolt://neo4j:migratetest@%s:%s", host, port)
 }
 
-func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
+func isReady(ctx context.Context, c dktesting.ContainerInfo) bool {
 	ip, port, err := c.Port(7687)
 	if err != nil {
 		return false
@@ -66,7 +65,7 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 }
 
 func Test(t *testing.T) {
-	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktesting.ContainerInfo) {
 		ip, port, err := c.Port(7687)
 		if err != nil {
 			t.Fatal(err)
@@ -87,7 +86,7 @@ func Test(t *testing.T) {
 }
 
 func TestMigrate(t *testing.T) {
-	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktesting.ContainerInfo) {
 		ip, port, err := c.Port(7687)
 		if err != nil {
 			t.Fatal(err)
@@ -113,7 +112,7 @@ func TestMigrate(t *testing.T) {
 }
 
 func TestMalformed(t *testing.T) {
-	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktesting.ContainerInfo) {
 		ip, port, err := c.Port(7687)
 		if err != nil {
 			t.Fatal(err)

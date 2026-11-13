@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/dhui/dktest"
 	"github.com/rqlite/gorqlite"
 	"github.com/stretchr/testify/assert"
 
@@ -20,7 +19,7 @@ import (
 
 var defaultPort uint16 = 4001
 
-var opts = dktest.Options{
+var opts = dktesting.Options{
 	Env:          map[string]string{"NODE_ID": "1"},
 	PortRequired: true,
 	ReadyFunc:    isReady,
@@ -32,7 +31,7 @@ var specs = []dktesting.ContainerSpec{
 	{ImageName: "rqlite/rqlite:8.12.3", Options: opts},
 }
 
-func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
+func isReady(ctx context.Context, c dktesting.ContainerInfo) bool {
 	ip, port, err := c.Port(defaultPort)
 	if err != nil {
 		fmt.Println("error getting port")
@@ -74,7 +73,7 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 }
 
 func Test(t *testing.T) {
-	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktesting.ContainerInfo) {
 		ip, port, err := c.Port(defaultPort)
 		assert.NoError(t, err)
 
@@ -90,7 +89,7 @@ func Test(t *testing.T) {
 }
 
 func TestMigrate(t *testing.T) {
-	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktesting.ContainerInfo) {
 		ip, port, err := c.Port(defaultPort)
 		assert.NoError(t, err)
 
@@ -115,7 +114,7 @@ func TestMigrate(t *testing.T) {
 }
 
 func TestBadConnectInsecureParam(t *testing.T) {
-	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktesting.ContainerInfo) {
 		ip, port, err := c.Port(defaultPort)
 		assert.NoError(t, err)
 
@@ -128,7 +127,7 @@ func TestBadConnectInsecureParam(t *testing.T) {
 }
 
 func TestBadProtocol(t *testing.T) {
-	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktesting.ContainerInfo) {
 		ip, port, err := c.Port(defaultPort)
 		assert.NoError(t, err)
 
@@ -141,7 +140,7 @@ func TestBadProtocol(t *testing.T) {
 }
 
 func TestNoConfig(t *testing.T) {
-	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktesting.ContainerInfo) {
 		ip, port, err := c.Port(defaultPort)
 		assert.NoError(t, err)
 
@@ -157,7 +156,7 @@ func TestNoConfig(t *testing.T) {
 }
 
 func TestWithInstanceEmptyConfig(t *testing.T) {
-	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktesting.ContainerInfo) {
 		ip, port, err := c.Port(defaultPort)
 		assert.NoError(t, err)
 
@@ -195,7 +194,7 @@ func TestWithInstanceEmptyConfig(t *testing.T) {
 }
 
 func TestMigrationTable(t *testing.T) {
-	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktesting.ContainerInfo) {
 		ip, port, err := c.Port(defaultPort)
 		assert.NoError(t, err)
 

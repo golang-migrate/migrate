@@ -17,7 +17,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/dhui/dktest"
 	"github.com/go-sql-driver/mysql"
 	"github.com/golang-migrate/migrate/v4"
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
@@ -29,11 +28,11 @@ import (
 const defaultPort = 3306
 
 var (
-	opts = dktest.Options{
+	opts = dktesting.Options{
 		Env:          map[string]string{"MYSQL_ROOT_PASSWORD": "root", "MYSQL_DATABASE": "public"},
 		PortRequired: true, ReadyFunc: isReady,
 	}
-	optsAnsiQuotes = dktest.Options{
+	optsAnsiQuotes = dktesting.Options{
 		Env:          map[string]string{"MYSQL_ROOT_PASSWORD": "root", "MYSQL_DATABASE": "public"},
 		PortRequired: true, ReadyFunc: isReady,
 		Cmd: []string{"--sql-mode=ANSI_QUOTES"},
@@ -51,7 +50,7 @@ var (
 	}
 )
 
-func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
+func isReady(ctx context.Context, c dktesting.ContainerInfo) bool {
 	ip, port, err := c.Port(defaultPort)
 	if err != nil {
 		return false
@@ -82,7 +81,7 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 func Test(t *testing.T) {
 	// mysql.SetLogger(mysql.Logger(log.New(io.Discard, "", log.Ltime)))
 
-	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktesting.ContainerInfo) {
 		ip, port, err := c.Port(defaultPort)
 		if err != nil {
 			t.Fatal(err)
@@ -115,7 +114,7 @@ func Test(t *testing.T) {
 func TestMigrate(t *testing.T) {
 	// mysql.SetLogger(mysql.Logger(log.New(io.Discard, "", log.Ltime)))
 
-	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktesting.ContainerInfo) {
 		ip, port, err := c.Port(defaultPort)
 		if err != nil {
 			t.Fatal(err)
@@ -153,7 +152,7 @@ func TestMigrate(t *testing.T) {
 func TestMigrateAnsiQuotes(t *testing.T) {
 	// mysql.SetLogger(mysql.Logger(log.New(io.Discard, "", log.Ltime)))
 
-	dktesting.ParallelTest(t, specsAnsiQuotes, func(t *testing.T, c dktest.ContainerInfo) {
+	dktesting.ParallelTest(t, specsAnsiQuotes, func(t *testing.T, c dktesting.ContainerInfo) {
 		ip, port, err := c.Port(defaultPort)
 		if err != nil {
 			t.Fatal(err)
@@ -189,7 +188,7 @@ func TestMigrateAnsiQuotes(t *testing.T) {
 }
 
 func TestLockWorks(t *testing.T) {
-	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktesting.ContainerInfo) {
 		ip, port, err := c.Port(defaultPort)
 		if err != nil {
 			t.Fatal(err)
@@ -238,7 +237,7 @@ func TestNoLockParamValidation(t *testing.T) {
 }
 
 func TestNoLockWorks(t *testing.T) {
-	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktesting.ContainerInfo) {
 		ip, port, err := c.Port(defaultPort)
 		if err != nil {
 			t.Fatal(err)
