@@ -92,7 +92,7 @@ Source drivers read migrations from local or remote sources. [Add a new source?]
 ### Basic usage
 
 ```bash
-$ migrate -source file://path/to/migrations -database postgres://localhost:5432/database up 2
+$ migrate -path file://path/to/migrations -database postgres://localhost:5432/database up 2
 ```
 
 ### Docker usage
