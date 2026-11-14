@@ -1,5 +1,7 @@
 # MongoDB
 
+This package uses [MongoDB Go driver v1](https://pkg.go.dev/go.mongodb.org/mongo-driver). A backend for [v2](v2) is also available.
+
 * Driver work with mongo through [db.runCommands](https://docs.mongodb.com/manual/reference/command/)
 * Migrations support json format. It contains array of commands for `db.runCommand`. Every command is executed in separate request to database 
 * All keys have to be in quotes `"`
