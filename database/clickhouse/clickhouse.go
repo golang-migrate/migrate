@@ -192,7 +192,16 @@ func (ch *ClickHouse) SetVersion(version int, dirty bool) error {
 	}
 
 	query := "INSERT INTO " + ch.config.MigrationsTable + " (version, dirty, sequence) VALUES (?, ?, ?)"
-	if _, err := tx.Exec(query, version, bool(dirty), time.Now().UnixNano()); err != nil {
+	stmt, err := tx.Prepare(query)
+	if err != nil {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			return fmt.Errorf("error during prepare statement %w and rollback %s", err, rollbackErr)
+		}
+
+		return err
+	}
+
+	if _, err := stmt.Exec(int64(version), bool(dirty), uint64(time.Now().UnixNano())); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
 
