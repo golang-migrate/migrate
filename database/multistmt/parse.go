@@ -24,9 +24,80 @@ func splitWithDelimiter(delimiter []byte) func(d []byte, atEOF bool) (int, []byt
 			}
 			return len(d), d, nil
 		}
-		if i := bytes.Index(d, delimiter); i >= 0 {
-			return i + len(delimiter), d[:i+len(delimiter)], nil
+
+		inLineComment := false
+		inBlockComment := false
+		inSingleQuote := false
+		inDoubleQuote := false
+
+		delLen := len(delimiter)
+		for i := 0; i < len(d); i++ {
+			c := d[i]
+
+			// State machine to ignore delimiters inside comments and strings
+			if inLineComment {
+				if c == '\n' {
+					inLineComment = false
+				}
+				continue
+			}
+
+			if inBlockComment {
+				if c == '*' && i+1 < len(d) && d[i+1] == '/' {
+					inBlockComment = false
+					i++
+				}
+				continue
+			}
+
+			if inSingleQuote {
+				if c == '\'' {
+					if i+1 < len(d) && d[i+1] == '\'' {
+						i++ // escaped single quote ''
+					} else {
+						inSingleQuote = false
+					}
+				}
+				continue
+			}
+
+			if inDoubleQuote {
+				if c == '"' {
+					if i+1 < len(d) && d[i+1] == '"' {
+						i++ // escaped double quote ""
+					} else {
+						inDoubleQuote = false
+					}
+				}
+				continue
+			}
+
+			// Check for comments start
+			if c == '-' && i+1 < len(d) && d[i+1] == '-' {
+				inLineComment = true
+				i++
+				continue
+			}
+			if c == '/' && i+1 < len(d) && d[i+1] == '*' {
+				inBlockComment = true
+				i++
+				continue
+			}
+			if c == '\'' {
+				inSingleQuote = true
+				continue
+			}
+			if c == '"' {
+				inDoubleQuote = true
+				continue
+			}
+
+			// Check for delimiter match outside comments/strings
+			if i+delLen <= len(d) && bytes.Equal(d[i:i+delLen], delimiter) {
+				return i + delLen, d[:i+delLen], nil
+			}
 		}
+
 		return 0, nil, nil
 	}
 }
