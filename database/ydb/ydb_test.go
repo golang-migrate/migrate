@@ -7,14 +7,14 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net/netip"
 	"net/url"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/dhui/dktest"
-	"github.com/docker/go-connections/nat"
+	"github.com/moby/moby/api/types/network"
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -29,25 +29,25 @@ import (
 const databaseName = "local"
 
 var (
-	getOptions = func(port string) dktest.Options {
-		return dktest.Options{
+	getOptions = func(port string) dktesting.Options {
+		return dktesting.Options{
 			Env: map[string]string{
 				"GRPC_TLS_PORT": "2135",
 				"GRPC_PORT":     port,
 				"MON_PORT":      "8765",
 			},
-			PortBindings: nat.PortMap{
-				nat.Port(port + "/tcp"): []nat.PortBinding{
+			PortBindings: network.PortMap{
+				network.MustParsePort(port + "/tcp"): []network.PortBinding{
 					{
-						HostIP:   "0.0.0.0",
+						HostIP:   netip.IPv4Unspecified(),
 						HostPort: port,
 					},
 				},
 			},
-			ExposedPorts: nat.PortSet{nat.Port(port + "/tcp"): {}},
+			ExposedPorts: network.PortSet{network.MustParsePort(port + "/tcp"): {}},
 			PortRequired: true,
 			Hostname:     "127.0.0.1",
-			ReadyTimeout: 15 * time.Second,
+			Timeout:      15 * time.Second,
 			ReadyFunc:    isReady,
 		}
 	}
@@ -59,7 +59,7 @@ var (
 	}
 )
 
-func containerAddress(c dktest.ContainerInfo) (string, string, error) {
+func containerAddress(c dktesting.ContainerInfo) (string, string, error) {
 	for _, port := range []uint16{22000, 22001} {
 		host, mapped, err := c.Port(port)
 		if err == nil {
@@ -69,7 +69,7 @@ func containerAddress(c dktest.ContainerInfo) (string, string, error) {
 	return "", "", fmt.Errorf("YDB gRPC port not published")
 }
 
-func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
+func isReady(ctx context.Context, c dktesting.ContainerInfo) bool {
 	ip, port, err := containerAddress(c)
 	if err != nil {
 		log.Println("port error:", err)
@@ -102,13 +102,13 @@ func withServer(t *testing.T, test func(*testing.T, string)) {
 		return
 	}
 	// Each local YDB instance is memory-intensive. Run versions sequentially;
-	// dktest.Run stops and removes its container before the next subtest starts.
+	// dktesting.Run stops and removes its container before the next subtest starts.
 	for i, spec := range specs {
 		if i > 0 && testing.Short() {
 			break
 		}
 		t.Run(spec.ImageName, func(t *testing.T) {
-			dktest.Run(t, spec.ImageName, spec.Options, func(t *testing.T, c dktest.ContainerInfo) {
+			dktesting.Run(t, spec, func(t *testing.T, c dktesting.ContainerInfo) {
 				ip, port, err := containerAddress(c)
 				if err != nil {
 					t.Fatal(err)

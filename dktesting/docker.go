@@ -46,7 +46,10 @@ type Options struct {
 	// Env is the container environment.
 	Env map[string]string
 	// Cmd overrides the image's default command.
-	Cmd []string
+	Cmd          []string
+	Hostname     string
+	ExposedPorts network.PortSet
+	PortBindings network.PortMap
 	// PortRequired fails the run if the container publishes no ports.
 	PortRequired bool
 	// ReadyFunc reports whether the container is ready for tests. It is polled
@@ -115,10 +118,10 @@ func newClient() (*client.Client, error) {
 	return client.New(client.FromEnv, client.WithAPIVersion(dockerAPIVersion))
 }
 
-// run pulls the spec's image, starts a container from it, waits for
+// Run pulls the spec's image, starts a container from it, waits for
 // Options.ReadyFunc, runs testFunc, and then removes the container.
 // Any failure fails t.
-func run(t *testing.T, spec ContainerSpec, testFunc func(*testing.T, ContainerInfo)) {
+func Run(t *testing.T, spec ContainerSpec, testFunc func(*testing.T, ContainerInfo)) {
 	t.Helper()
 	opts := spec.Options
 	if opts.PullTimeout <= 0 {
@@ -237,12 +240,14 @@ func pullOnce(dc *client.Client, imageName string, timeout time.Duration) error 
 func startContainer(ctx context.Context, dc *client.Client, imageName string, opts Options) (ContainerInfo, error) {
 	created, err := dc.ContainerCreate(ctx, client.ContainerCreateOptions{
 		Config: &container.Config{
-			Image:  imageName,
-			Env:    opts.env(),
-			Cmd:    opts.Cmd,
-			Labels: map[string]string{containerLabel: "true"},
+			Image:        imageName,
+			Env:          opts.env(),
+			Cmd:          opts.Cmd,
+			Hostname:     opts.Hostname,
+			ExposedPorts: opts.ExposedPorts,
+			Labels:       map[string]string{containerLabel: "true"},
 		},
-		HostConfig: &container.HostConfig{PublishAllPorts: true},
+		HostConfig: &container.HostConfig{PublishAllPorts: true, PortBindings: opts.PortBindings},
 	})
 	if err != nil {
 		return ContainerInfo{}, fmt.Errorf("creating container: %w", err)
