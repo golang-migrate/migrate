@@ -155,7 +155,7 @@ In the first run (with an empty database) the migrate table is created in `publi
 When the migrations create the `$user` schema, the next run will store (a new) migrate table in this schema (due to order of schemas in `search_path`) and tries to apply all migrations again (most likely failing).
 
 To solve this you need to change the default `search_path` by removing the `$user` component, so the migrate table is always stored in the (available) `public` schema.
-This can be done using the [`search_path` query parameter in the URL](https://github.com/jexia/migrate/blob/fix-postgres-version-table/database/postgres/README.md#postgres).
+This can be done using the [`search_path` query parameter in the URL](README.md#postgres).
 
 For example to force the migrations table in the public schema you can use:
 ```

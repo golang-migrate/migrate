@@ -19,7 +19,7 @@ And in the `.down.sql` let's delete it:
 ```
 MATCH (u:User) WHERE u.name IN ["Peter", "Paul", "Mary"] DELETE u
 ```
-Ideally your migrations should be idempotent. You can read more about idempotency in [getting started](GETTING_STARTED.md#create-migrations)
+Ideally your migrations should be idempotent. You can read more about idempotency in [getting started](../../GETTING_STARTED.md#create-migrations)
 
 ## Run migrations
 ```
