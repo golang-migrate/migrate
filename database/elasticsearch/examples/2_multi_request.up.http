@@ -1,0 +1,24 @@
+---
+PUT /books HTTP/1.1
+Content-Type: application/json
+
+{
+  "mappings": {
+    "properties": {
+      "title": { "type": "text" },
+      "published_year": { "type": "integer" },
+      "author": { "type": "text" }
+    }
+  }
+}
+
+---
+# Requests are separated by a line holding only "---" and run in order.
+POST /books/_doc/1?refresh=true HTTP/1.1
+Content-Type: application/json
+
+{
+  "title": "The Hitchhiker's Guide to the Galaxy",
+  "published_year": 1979,
+  "author": "Douglas Adams"
+}
