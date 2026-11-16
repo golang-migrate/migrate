@@ -408,8 +408,8 @@ func (m *Mysql) Version() (version int, dirty bool, err error) {
 }
 
 func (m *Mysql) Drop() (err error) {
-	// select all tables
-	query := `SHOW TABLES LIKE '%'`
+	// select all tables and views
+	query := `SHOW FULL TABLES`
 	tables, err := m.conn.QueryContext(context.Background(), query)
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
@@ -422,17 +422,31 @@ func (m *Mysql) Drop() (err error) {
 
 	// delete one table after another
 	tableNames := make([]string, 0)
+	viewNames := make([]string, 0)
 	for tables.Next() {
-		var tableName string
-		if err := tables.Scan(&tableName); err != nil {
+		var tableName, tableType string
+		if err := tables.Scan(&tableName, &tableType); err != nil {
 			return err
 		}
-		if len(tableName) > 0 {
+		if len(tableName) == 0 {
+			continue
+		}
+		// DROP TABLE does not remove views, so they have to be dropped separately
+		if tableType == "VIEW" {
+			viewNames = append(viewNames, tableName)
+		} else {
 			tableNames = append(tableNames, tableName)
 		}
 	}
 	if err := tables.Err(); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
+	}
+
+	for _, v := range viewNames {
+		query = "DROP VIEW IF EXISTS `" + v + "`"
+		if _, err := m.conn.ExecContext(context.Background(), query); err != nil {
+			return &database.Error{OrigErr: err, Query: []byte(query)}
+		}
 	}
 
 	if len(tableNames) > 0 {
