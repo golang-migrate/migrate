@@ -281,6 +281,29 @@ func (p *Postgres) runStatement(statement []byte) error {
 		return nil
 	}
 	if _, err := p.conn.ExecContext(ctx, query); err != nil {
+		// An explicit BEGIN/COMMIT in the migration script (unlike the
+		// implicit transaction Postgres's simple query protocol wraps
+		// around it by default) is not automatically rolled back on
+		// error, leaving the connection in an aborted-transaction state
+		// that fails every subsequent statement -- including the
+		// advisory-unlock call issued after a failed run. Issuing a
+		// ROLLBACK here is a safe no-op when no explicit transaction was
+		// open (Postgres reports only a WARNING, not an error). See #581.
+		//
+		// Give the rollback its own fresh timeout window derived from the
+		// same configured StatementTimeout, rather than reusing ctx
+		// (which may already be expired -- e.g. if that's what caused
+		// the statement to fail) or leaving it unbounded.
+		rollbackCtx := context.Background()
+		if p.config.StatementTimeout != 0 {
+			var cancel context.CancelFunc
+			rollbackCtx, cancel = context.WithTimeout(rollbackCtx, p.config.StatementTimeout)
+			defer cancel()
+		}
+		var rollbackErr error
+		if _, rbErr := p.conn.ExecContext(rollbackCtx, "ROLLBACK"); rbErr != nil {
+			rollbackErr = rbErr
+		}
 
 		if pgErr, ok := err.(*pgconn.PgError); ok {
 			var line uint
@@ -294,7 +317,15 @@ func (p *Postgres) runStatement(statement []byte) error {
 			if pgErr.Detail != "" {
 				message = fmt.Sprintf("%s, %s", message, pgErr.Detail)
 			}
+			if rollbackErr != nil {
+				message = fmt.Sprintf("%s (additionally, rolling back the aborted transaction failed: %s)", message, rollbackErr)
+				return database.Error{OrigErr: errors.Join(err, rollbackErr), Err: message, Query: statement, Line: line}
+			}
 			return database.Error{OrigErr: err, Err: message, Query: statement, Line: line}
+		}
+		if rollbackErr != nil {
+			message := fmt.Sprintf("migration failed (additionally, rolling back the aborted transaction failed: %s)", rollbackErr)
+			return database.Error{OrigErr: errors.Join(err, rollbackErr), Err: message, Query: statement}
 		}
 		return database.Error{OrigErr: err, Err: "migration failed", Query: statement}
 	}
