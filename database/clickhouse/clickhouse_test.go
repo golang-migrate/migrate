@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	_ "github.com/ClickHouse/clickhouse-go/v2"
-	"github.com/dhui/dktest"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/clickhouse"
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
@@ -21,7 +20,7 @@ const defaultPort = 9000
 
 var (
 	tableEngines = []string{"TinyLog", "MergeTree"}
-	opts         = dktest.Options{
+	opts         = dktesting.Options{
 		Env:          map[string]string{"CLICKHOUSE_USER": "user", "CLICKHOUSE_PASSWORD": "password", "CLICKHOUSE_DB": "db"},
 		PortRequired: true, ReadyFunc: isReady,
 	}
@@ -48,7 +47,7 @@ func driverConnectionString(host, port string) string {
 	return fmt.Sprintf("clickhouse://%v:%v?username=user&password=password&database=db", host, port)
 }
 
-func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
+func isReady(ctx context.Context, c dktesting.ContainerInfo) bool {
 	ip, port, err := c.Port(defaultPort)
 	if err != nil {
 		return false
@@ -90,7 +89,7 @@ func TestCases(t *testing.T) {
 }
 
 func testSimple(t *testing.T, engine string) {
-	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktesting.ContainerInfo) {
 		ip, port, err := c.Port(defaultPort)
 		if err != nil {
 			t.Fatal(err)
@@ -113,7 +112,7 @@ func testSimple(t *testing.T, engine string) {
 }
 
 func testSimpleWithInstanceDefaultConfigValues(t *testing.T) {
-	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktesting.ContainerInfo) {
 		ip, port, err := c.Port(defaultPort)
 		if err != nil {
 			t.Fatal(err)
@@ -139,7 +138,7 @@ func testSimpleWithInstanceDefaultConfigValues(t *testing.T) {
 }
 
 func testMigrate(t *testing.T, engine string) {
-	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktesting.ContainerInfo) {
 		ip, port, err := c.Port(defaultPort)
 		if err != nil {
 			t.Fatal(err)
@@ -166,7 +165,7 @@ func testMigrate(t *testing.T, engine string) {
 }
 
 func testVersion(t *testing.T, engine string) {
-	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktesting.ContainerInfo) {
 		expectedVersion := 1
 
 		ip, port, err := c.Port(defaultPort)
@@ -203,7 +202,7 @@ func testVersion(t *testing.T, engine string) {
 }
 
 func testDrop(t *testing.T, engine string) {
-	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktesting.ContainerInfo) {
 		ip, port, err := c.Port(defaultPort)
 		if err != nil {
 			t.Fatal(err)

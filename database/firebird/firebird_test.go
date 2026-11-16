@@ -12,8 +12,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dhui/dktest"
-
 	dt "github.com/golang-migrate/migrate/v4/database/testing"
 	"github.com/golang-migrate/migrate/v4/dktesting"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
@@ -28,7 +26,7 @@ const (
 )
 
 var (
-	opts = dktest.Options{
+	opts = dktesting.Options{
 		PortRequired: true,
 		ReadyFunc:    isReady,
 		Env: map[string]string{
@@ -49,7 +47,7 @@ func fbConnectionString(host, port string) string {
 	return fmt.Sprintf("firebird://%s:%s@%s:%s//firebird/data/%s", user, password, host, port, dbName)
 }
 
-func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
+func isReady(ctx context.Context, c dktesting.ContainerInfo) bool {
 	ip, port, err := c.FirstPort()
 	if err != nil {
 		return false
@@ -79,7 +77,7 @@ func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
 }
 
 func Test(t *testing.T) {
-	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktesting.ContainerInfo) {
 		ip, port, err := c.FirstPort()
 		if err != nil {
 			t.Fatal(err)
@@ -101,7 +99,7 @@ func Test(t *testing.T) {
 }
 
 func TestMigrate(t *testing.T) {
-	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktesting.ContainerInfo) {
 		ip, port, err := c.FirstPort()
 		if err != nil {
 			t.Fatal(err)
@@ -127,7 +125,7 @@ func TestMigrate(t *testing.T) {
 }
 
 func TestErrorParsing(t *testing.T) {
-	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktesting.ContainerInfo) {
 		ip, port, err := c.FirstPort()
 		if err != nil {
 			t.Fatal(err)
@@ -161,7 +159,7 @@ TABLEE
 }
 
 func TestFilterCustomQuery(t *testing.T) {
-	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktesting.ContainerInfo) {
 		ip, port, err := c.FirstPort()
 		if err != nil {
 			t.Fatal(err)
@@ -182,7 +180,7 @@ func TestFilterCustomQuery(t *testing.T) {
 }
 
 func Test_Lock(t *testing.T) {
-	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktesting.ContainerInfo) {
 		ip, port, err := c.FirstPort()
 		if err != nil {
 			t.Fatal(err)

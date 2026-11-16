@@ -16,7 +16,6 @@ import (
 )
 
 import (
-	"github.com/dhui/dktest"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -29,7 +28,7 @@ import (
 )
 
 var (
-	opts = dktest.Options{PortRequired: true, ReadyFunc: isReady}
+	opts = dktesting.Options{PortRequired: true, ReadyFunc: isReady}
 	// Supported versions: https://www.mongodb.com/support-policy
 	specs = []dktesting.ContainerSpec{
 		{ImageName: "mongo:5.0", Options: opts},
@@ -45,7 +44,7 @@ func mongoConnectionString(host, port string) string {
 	return fmt.Sprintf("mongodb://%s:%s/testMigration?connect=direct", host, port)
 }
 
-func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
+func isReady(ctx context.Context, c dktesting.ContainerInfo) bool {
 	ip, port, err := c.FirstPort()
 	if err != nil {
 		return false
@@ -90,7 +89,7 @@ func Test(t *testing.T) {
 }
 
 func test(t *testing.T) {
-	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktesting.ContainerInfo) {
 		ip, port, err := c.FirstPort()
 		if err != nil {
 			t.Fatal(err)
@@ -116,7 +115,7 @@ func test(t *testing.T) {
 }
 
 func testMigrate(t *testing.T) {
-	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktesting.ContainerInfo) {
 		ip, port, err := c.FirstPort()
 		if err != nil {
 			t.Fatal(err)
@@ -142,7 +141,7 @@ func testMigrate(t *testing.T) {
 }
 
 func testWithAuth(t *testing.T) {
-	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktesting.ContainerInfo) {
 		ip, port, err := c.FirstPort()
 		if err != nil {
 			t.Fatal(err)
@@ -197,7 +196,7 @@ func testWithAuth(t *testing.T) {
 }
 
 func testLockWorks(t *testing.T) {
-	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktesting.ContainerInfo) {
 		ip, port, err := c.FirstPort()
 		if err != nil {
 			t.Fatal(err)
@@ -254,7 +253,7 @@ func testLockWorks(t *testing.T) {
 
 func TestTransaction(t *testing.T) {
 	transactionSpecs := []dktesting.ContainerSpec{
-		{ImageName: "mongo:4", Options: dktest.Options{PortRequired: true, ReadyFunc: isReady,
+		{ImageName: "mongo:4", Options: dktesting.Options{PortRequired: true, ReadyFunc: isReady,
 			Cmd: []string{"mongod", "--bind_ip_all", "--replSet", "rs0"}}},
 	}
 	t.Cleanup(func() {
@@ -266,7 +265,7 @@ func TestTransaction(t *testing.T) {
 		}
 	})
 
-	dktesting.ParallelTest(t, transactionSpecs, func(t *testing.T, c dktest.ContainerInfo) {
+	dktesting.ParallelTest(t, transactionSpecs, func(t *testing.T, c dktesting.ContainerInfo) {
 		ip, port, err := c.FirstPort()
 		if err != nil {
 			t.Fatal(err)

@@ -9,7 +9,6 @@ import (
 )
 
 import (
-	"github.com/dhui/dktest"
 	"github.com/gocql/gocql"
 )
 
@@ -20,7 +19,7 @@ import (
 )
 
 var (
-	opts = dktest.Options{PortRequired: true, ReadyFunc: isReady}
+	opts = dktesting.Options{PortRequired: true, ReadyFunc: isReady}
 	// Supported versions: http://cassandra.apache.org/download/
 	// Although Cassandra 2.x is supported by the Apache Foundation,
 	// the migrate db driver only supports Cassandra 3.x since it uses
@@ -33,7 +32,7 @@ var (
 	}
 )
 
-func isReady(ctx context.Context, c dktest.ContainerInfo) bool {
+func isReady(ctx context.Context, c dktesting.ContainerInfo) bool {
 	// Cassandra exposes 5 ports (7000, 7001, 7199, 9042 & 9160)
 	// We only need the port bound to 9042
 	ip, portStr, err := c.Port(9042)
@@ -75,7 +74,7 @@ func Test(t *testing.T) {
 }
 
 func test(t *testing.T) {
-	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktesting.ContainerInfo) {
 		ip, port, err := c.Port(9042)
 		if err != nil {
 			t.Fatal("Unable to get mapped port:", err)
@@ -96,7 +95,7 @@ func test(t *testing.T) {
 }
 
 func testMigrate(t *testing.T) {
-	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktest.ContainerInfo) {
+	dktesting.ParallelTest(t, specs, func(t *testing.T, c dktesting.ContainerInfo) {
 		ip, port, err := c.Port(9042)
 		if err != nil {
 			t.Fatal("Unable to get mapped port:", err)
