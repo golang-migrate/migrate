@@ -54,7 +54,7 @@ func ParallelTest(t *testing.T, specs []ContainerSpec,
 		} else {
 			t.Run(spec.ImageName, func(t *testing.T) {
 				t.Parallel()
-				run(t, spec, testFunc)
+				Run(t, spec, testFunc)
 			})
 		}
 	}
