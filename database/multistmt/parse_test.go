@@ -27,6 +27,12 @@ func TestParse(t *testing.T) {
 			expected: []string{"statement one;", " statement two"}, expectedErr: nil},
 		{name: "two statements, with trailing delimiter", multiStmt: "statement one; statement two;", delimiter: ";",
 			expected: []string{"statement one;", " statement two;"}, expectedErr: nil},
+		{name: "semicolon inside line comment", multiStmt: "-- comment; still comment\nCREATE TABLE example (id UInt32);", delimiter: ";",
+			expected: []string{"-- comment; still comment\nCREATE TABLE example (id UInt32);"}, expectedErr: nil},
+		{name: "semicolon inside block comment", multiStmt: "/* comment; still comment */ CREATE TABLE example (id UInt32);", delimiter: ";",
+			expected: []string{"/* comment; still comment */ CREATE TABLE example (id UInt32);"}, expectedErr: nil},
+		{name: "semicolon inside single quoted string", multiStmt: "INSERT INTO tbl VALUES ('foo;bar'); SELECT 1;", delimiter: ";",
+			expected: []string{"INSERT INTO tbl VALUES ('foo;bar');", " SELECT 1;"}, expectedErr: nil},
 	}
 
 	for _, tc := range testCases {
