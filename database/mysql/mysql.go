@@ -359,7 +359,7 @@ func (m *Mysql) SetVersion(version int, dirty bool) error {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
 	}
 
-	query := "DELETE FROM `" + m.config.MigrationsTable + "` LIMIT 1"
+	query := fmt.Sprintf("DELETE FROM `%s`.`%s` LIMIT 1", m.config.DatabaseName, m.config.MigrationsTable)
 	if _, err := tx.ExecContext(context.Background(), query); err != nil {
 		if errRollback := tx.Rollback(); errRollback != nil {
 			err = errors.Join(err, errRollback)
@@ -371,7 +371,7 @@ func (m *Mysql) SetVersion(version int, dirty bool) error {
 	// empty schema version for failed down migration on the first migration
 	// See: https://github.com/golang-migrate/migrate/issues/330
 	if version >= 0 || (version == database.NilVersion && dirty) {
-		query := "INSERT INTO `" + m.config.MigrationsTable + "` (version, dirty) VALUES (?, ?)"
+		query := fmt.Sprintf("INSERT INTO `%s`.`%s` (version, dirty) VALUES (?, ?)", m.config.DatabaseName, m.config.MigrationsTable)
 		if _, err := tx.ExecContext(context.Background(), query, version, dirty); err != nil {
 			if errRollback := tx.Rollback(); errRollback != nil {
 				err = errors.Join(err, errRollback)
@@ -388,7 +388,7 @@ func (m *Mysql) SetVersion(version int, dirty bool) error {
 }
 
 func (m *Mysql) Version() (version int, dirty bool, err error) {
-	query := "SELECT version, dirty FROM `" + m.config.MigrationsTable + "` LIMIT 1"
+	query := fmt.Sprintf("SELECT version, dirty FROM `%s`.`%s` LIMIT 1", m.config.DatabaseName, m.config.MigrationsTable)
 	err = m.conn.QueryRowContext(context.Background(), query).Scan(&version, &dirty)
 	switch {
 	case err == sql.ErrNoRows:
@@ -409,7 +409,7 @@ func (m *Mysql) Version() (version int, dirty bool, err error) {
 
 func (m *Mysql) Drop() (err error) {
 	// select all tables
-	query := `SHOW TABLES LIKE '%'`
+	query := fmt.Sprintf("SHOW TABLES FROM `%s`", m.config.DatabaseName)
 	tables, err := m.conn.QueryContext(context.Background(), query)
 	if err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
@@ -449,7 +449,7 @@ func (m *Mysql) Drop() (err error) {
 
 		// delete one by one ...
 		for _, t := range tableNames {
-			query = "DROP TABLE IF EXISTS `" + t + "`"
+			query = fmt.Sprintf("DROP TABLE IF EXISTS `%s`.`%s`", m.config.DatabaseName, t)
 			if _, err := m.conn.ExecContext(context.Background(), query); err != nil {
 				return &database.Error{OrigErr: err, Query: []byte(query)}
 			}
@@ -475,7 +475,7 @@ func (m *Mysql) ensureVersionTable() (err error) {
 
 	// check if migration table exists
 	var result string
-	query := `SHOW TABLES LIKE '` + m.config.MigrationsTable + `'`
+	query := fmt.Sprintf("SHOW TABLES FROM `%s` LIKE '%s'", m.config.DatabaseName, m.config.MigrationsTable)
 	if err := m.conn.QueryRowContext(context.Background(), query).Scan(&result); err != nil {
 		if err != sql.ErrNoRows {
 			return &database.Error{OrigErr: err, Query: []byte(query)}
@@ -485,7 +485,7 @@ func (m *Mysql) ensureVersionTable() (err error) {
 	}
 
 	// if not, create the empty migration table
-	query = "CREATE TABLE `" + m.config.MigrationsTable + "` (version bigint not null primary key, dirty boolean not null)"
+	query = fmt.Sprintf("CREATE TABLE `%s`.`%s` (version bigint not null primary key, dirty boolean not null)", m.config.DatabaseName, m.config.MigrationsTable)
 	if _, err := m.conn.ExecContext(context.Background(), query); err != nil {
 		return &database.Error{OrigErr: err, Query: []byte(query)}
 	}
