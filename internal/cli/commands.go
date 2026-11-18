@@ -18,6 +18,7 @@ var (
 	errInvalidSequenceWidth     = errors.New("digits must be positive")
 	errIncompatibleSeqAndFormat = errors.New("the seq and format options are mutually exclusive")
 	errInvalidTimeFormat        = errors.New("time format may not be empty")
+	errPendingMigrations        = errors.New("there are pending migrations")
 )
 
 func nextSeqVersion(matches []string, seqDigits int) (string, error) {
@@ -219,6 +220,20 @@ func versionCmd(m *migrate.Migrate) error {
 	} else {
 		log.Println(v)
 	}
+	return nil
+}
+
+func checkCmd(m *migrate.Migrate) error {
+	pending, err := m.Check()
+	if err != nil {
+		return err
+	}
+
+	log.Printf("%v pending migration(s)\n", pending)
+	if pending > 0 {
+		return errPendingMigrations
+	}
+
 	return nil
 }
 

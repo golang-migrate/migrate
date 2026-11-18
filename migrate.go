@@ -393,6 +393,50 @@ func (m *Migrate) Version() (version uint, dirty bool, err error) {
 	return suint(v), d, nil
 }
 
+// Check returns number of pending migrations.
+func (m *Migrate) Check() (pending int, err error) {
+	curVersion, dirty, err := m.databaseDrv.Version()
+	if err != nil {
+		return 0, err
+	}
+
+	if dirty {
+		return 0, ErrDirty{curVersion}
+	}
+
+	from := curVersion
+	if from == database.NilVersion {
+		firstVersion, err := m.sourceDrv.First()
+		if errors.Is(err, os.ErrNotExist) {
+			return 0, nil
+		}
+		if err != nil {
+			return 0, err
+		}
+		from = int(firstVersion)
+		pending++
+	} else {
+		if err := m.versionExists(suint(from)); err != nil {
+			return 0, err
+		}
+	}
+
+	for {
+		next, err := m.sourceDrv.Next(suint(from))
+		if errors.Is(err, os.ErrNotExist) {
+			break
+		}
+		if err != nil {
+			return 0, err
+		}
+
+		from = int(next)
+		pending++
+	}
+
+	return pending, nil
+}
+
 // read reads either up or down migrations from source `from` to `to`.
 // Each migration is then written to the ret channel.
 // If an error occurs during reading, that error is written to the ret channel, too.
