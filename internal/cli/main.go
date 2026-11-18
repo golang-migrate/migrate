@@ -67,6 +67,7 @@ func Main(version string) {
 	lockTimeoutPtr := flag.Uint("lock-timeout", 15, "")
 	pathPtr := flag.String("path", "", "")
 	databasePtr := flag.String("database", "", "")
+	databaseEnvPtr := flag.String("database-env", "", "")
 	sourcePtr := flag.String("source", "", "")
 
 	flag.Usage = func() {
@@ -78,6 +79,7 @@ Options:
   -source          Location of the migrations (driver://url)
   -path            Shorthand for -source=file://path
   -database        Run migrations against this database (driver://url)
+  -database-env    Read the database URL from the named environment variable
   -prefetch N      Number of migrations to load in advance before executing (default 10)
   -lock-timeout N  Allow N seconds to acquire database lock (default 15)
   -verbose         Print verbose logging
@@ -112,6 +114,17 @@ Database drivers: `+strings.Join(database.List(), ", ")+"\n", createUsage, gotoU
 	if *helpPtr {
 		flag.Usage()
 		os.Exit(0)
+	}
+
+	// resolve the database URL without passing it in process arguments
+	if *databaseEnvPtr != "" {
+		if *databasePtr != "" {
+			log.fatal("error: -database and -database-env are mutually exclusive")
+		}
+		*databasePtr = os.Getenv(*databaseEnvPtr)
+		if *databasePtr == "" {
+			log.fatal(fmt.Sprintf("error: environment variable %q is not set or is empty", *databaseEnvPtr))
+		}
 	}
 
 	// translate -path into -source if given
