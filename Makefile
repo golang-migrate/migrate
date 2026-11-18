@@ -105,6 +105,9 @@ echo-database:
 	@echo "$(DATABASE)"
 
 
+lint:
+	golangci-lint run -c .golangci.yml
+
 define external_deps
 	@echo '-- $(1)';  go list -f '{{join .Deps "\n"}}' $(1) | grep -v github.com/$(REPO_OWNER)/migrate | xargs go list -f '{{if not .Standard}}{{.ImportPath}}{{end}}'
 
@@ -113,7 +116,8 @@ endef
 
 .PHONY: build build-docker build-cli clean test-short test test-with-flags html-coverage \
         restore-import-paths rewrite-import-paths list-external-deps release \
-		docs kill-docs open-docs kill-orphaned-docker-containers echo-source echo-database
+		docs kill-docs open-docs kill-orphaned-docker-containers echo-source echo-database \
+		lint
 
 SHELL = /bin/sh
 RAND = $(shell echo $$RANDOM)
