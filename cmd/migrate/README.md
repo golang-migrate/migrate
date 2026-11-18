@@ -2,6 +2,63 @@
 
 ## Installation
 
+### With Go toolchain
+
+#### Versioned
+
+<details open>
+<summary>Go 1.16+ (Recommended)</summary>
+
+ ```bash
+ $ go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@$TAG
+ ```
+</details>
+
+<details>
+<summary>Go 1.15 and below</summary>
+
+```bash
+$ go get -u -d github.com/golang-migrate/migrate/cmd/migrate
+$ cd $GOPATH/src/github.com/golang-migrate/migrate/cmd/migrate
+$ git checkout $TAG  # e.g. v4.1.0
+$ # Go 1.15 and below
+$ go build -tags 'postgres' -ldflags="-X main.Version=$(git describe --tags)" -o $GOPATH/bin/migrate $GOPATH/src/github.com/golang-migrate/migrate/cmd/migrate
+ ```
+</details>
+
+
+#### Unversioned
+
+<details open>
+<summary>Go 1.16+</summary>
+
+```bash
+$ go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+```
+</details>
+
+<details>
+<summary>Go 1.15 and below</summary>
+
+```bash
+$ go get -tags 'postgres' -u github.com/golang-migrate/migrate/cmd/migrate
+```
+</details>
+
+
+#### Notes
+
+1. Requires a version of Go that [supports modules](https://golang.org/cmd/go/#hdr-Preliminary_module_support). e.g. Go 1.11+
+1. These examples build the cli which will only work with postgres.  In order
+   to build the cli for use with other databases, replace the `postgres` build tag
+   with the appropriate database tag(s) for the databases desired.  The tags
+   correspond to the names of the sub-packages underneath the
+   [`database`](../../database) package.
+1. Similarly to the database build tags, if you need to support other sources, use the appropriate build tag(s).
+1. Support for build constraints will be removed in the future: https://github.com/golang-migrate/migrate/issues/60
+1. For versions of Go 1.15 and lower, [make sure](https://github.com/golang-migrate/migrate/pull/257#issuecomment-705249902) you're not installing the `migrate` CLI from a module. e.g. there should not be any `go.mod` files in your current directory or any directory from your current directory to the root
+
+
 ### Download pre-built binary (Windows, MacOS, or Linux)
 
 [Release Downloads](https://github.com/golang-migrate/migrate/releases)
@@ -33,40 +90,6 @@ $ apt-get update
 $ apt-get install -y migrate
 ```
 
-### With Go toolchain
-
-#### Versioned
-
-```bash
-$ go get -u -d github.com/golang-migrate/migrate/cmd/migrate
-$ cd $GOPATH/src/github.com/golang-migrate/migrate/cmd/migrate
-$ git checkout $TAG  # e.g. v4.1.0
-$ # Go 1.15 and below
-$ go build -tags 'postgres' -ldflags="-X main.Version=$(git describe --tags)" -o $GOPATH/bin/migrate $GOPATH/src/github.com/golang-migrate/migrate/cmd/migrate
-$ # Go 1.16+
-$ go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@$TAG
-```
-
-#### Unversioned
-
-```bash
-$ # Go 1.15 and below
-$ go get -tags 'postgres' -u github.com/golang-migrate/migrate/cmd/migrate
-$ # Go 1.16+
-$ go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
-```
-
-#### Notes
-
-1. Requires a version of Go that [supports modules](https://golang.org/cmd/go/#hdr-Preliminary_module_support). e.g. Go 1.11+
-1. These examples build the cli which will only work with postgres.  In order
-to build the cli for use with other databases, replace the `postgres` build tag
-with the appropriate database tag(s) for the databases desired.  The tags
-correspond to the names of the sub-packages underneath the
-[`database`](../../database) package.
-1. Similarly to the database build tags, if you need to support other sources, use the appropriate build tag(s).
-1. Support for build constraints will be removed in the future: https://github.com/golang-migrate/migrate/issues/60
-1. For versions of Go 1.15 and lower, [make sure](https://github.com/golang-migrate/migrate/pull/257#issuecomment-705249902) you're not installing the `migrate` CLI from a module. e.g. there should not be any `go.mod` files in your current directory or any directory from your current directory to the root
 
 ## Usage
 
