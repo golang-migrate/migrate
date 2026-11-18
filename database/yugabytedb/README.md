@@ -7,6 +7,7 @@
 | `x-migrations-table` | `MigrationsTable` | Name of the migrations table |
 | `x-lock-table` | `LockTable` | Name of the table which maintains the migration lock |
 | `x-force-lock` | `ForceLock` | Force lock acquisition to fix faulty migrations which may not have released the schema lock (Boolean, default is `false`) |
+| `x-no-lock` | `NoLock` | Set to `true` to skip lock table acquisition. Useful for read-only checks. Only run migrations from one host when this is enabled. |
 | `x-max-retries` | `MaxRetries` | How many times retry queries on retryable errors (40001, 40P01, 08006, XX000). Default is 10 |
 | `x-max-retry-interval` | `MaxRetryInterval` | Interval between retries increases exponentially. This option specifies maximum duration between retries. Default is 15s |
 | `x-max-retry-elapsed-time` | `MaxRetryElapsedTime` | Total retries timeout. Default is 30s |

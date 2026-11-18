@@ -63,6 +63,7 @@ type Config struct {
 	MigrationsTableQuoted bool
 	MultiStatementEnabled bool
 	MultiStatementMaxSize int
+	NoLock                bool
 }
 
 type Postgres struct {
@@ -219,6 +220,14 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 	lockStrategy := purl.Query().Get("x-lock-strategy")
 	lockTable := purl.Query().Get("x-lock-table")
 
+	noLock := false
+	if s := purl.Query().Get("x-no-lock"); len(s) > 0 {
+		noLock, err = strconv.ParseBool(s)
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse option x-no-lock: %w", err)
+		}
+	}
+
 	px, err := WithInstance(db, &Config{
 		DatabaseName:          purl.Path,
 		MigrationsTable:       migrationsTable,
@@ -228,6 +237,7 @@ func (p *Postgres) Open(url string) (database.Driver, error) {
 		MultiStatementMaxSize: multiStatementMaxSize,
 		LockStrategy:          lockStrategy,
 		LockTable:             lockTable,
+		NoLock:                noLock,
 	})
 
 	if err != nil {
@@ -248,6 +258,10 @@ func (p *Postgres) Close() error {
 
 func (p *Postgres) Lock() error {
 	return database.CasRestoreOnErr(&p.isLocked, false, true, database.ErrLocked, func() error {
+		if p.config.NoLock {
+			return nil
+		}
+
 		switch p.config.LockStrategy {
 		case LockStrategyAdvisory:
 			return p.applyAdvisoryLock()
@@ -261,6 +275,10 @@ func (p *Postgres) Lock() error {
 
 func (p *Postgres) Unlock() error {
 	return database.CasRestoreOnErr(&p.isLocked, true, false, database.ErrNotLocked, func() error {
+		if p.config.NoLock {
+			return nil
+		}
+
 		switch p.config.LockStrategy {
 		case LockStrategyAdvisory:
 			return p.releaseAdvisoryLock()
