@@ -30,11 +30,12 @@ func init() {
 var DefaultMigrationsTable = "schema_migrations"
 
 var (
-	ErrDatabaseDirty    = fmt.Errorf("database is dirty")
-	ErrNilConfig        = fmt.Errorf("no config")
-	ErrNoDatabaseName   = fmt.Errorf("no database name")
-	ErrAppendPEM        = fmt.Errorf("failed to append PEM")
-	ErrTLSCertKeyConfig = fmt.Errorf("to use TLS client authentication, both x-tls-cert and x-tls-key must not be empty")
+	ErrDatabaseDirty         = fmt.Errorf("database is dirty")
+	ErrNilConfig             = fmt.Errorf("no config")
+	ErrNoDatabaseName        = fmt.Errorf("no database name")
+	ErrAppendPEM             = fmt.Errorf("failed to append PEM")
+	ErrTLSCertKeyConfig      = fmt.Errorf("to use TLS client authentication, both x-tls-cert and x-tls-key must not be empty")
+	ErrInvalidIsolationLevel = fmt.Errorf("invalid isolation level given in x-tx-isolation")
 )
 
 type Config struct {
@@ -42,6 +43,7 @@ type Config struct {
 	DatabaseName     string
 	NoLock           bool
 	StatementTimeout time.Duration
+	TxIsolation      sql.IsolationLevel
 }
 
 type Mysql struct {
@@ -251,6 +253,15 @@ func (m *Mysql) Open(url string) (database.Driver, error) {
 		}
 	}
 
+	txIsolationParam := customParams["x-tx-isolation"]
+	txIsolation := sql.LevelSerializable
+	if txIsolationParam != "" {
+		txIsolation, err = getIsolationLevel(txIsolationParam)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	db, err := sql.Open("mysql", config.FormatDSN())
 	if err != nil {
 		return nil, err
@@ -261,6 +272,7 @@ func (m *Mysql) Open(url string) (database.Driver, error) {
 		MigrationsTable:  customParams["x-migrations-table"],
 		NoLock:           noLock,
 		StatementTimeout: time.Duration(statementTimeout) * time.Millisecond,
+		TxIsolation:      txIsolation,
 	})
 	if err != nil {
 		return nil, err
@@ -354,7 +366,7 @@ func (m *Mysql) Run(migration io.Reader) error {
 }
 
 func (m *Mysql) SetVersion(version int, dirty bool) error {
-	tx, err := m.conn.BeginTx(context.Background(), &sql.TxOptions{Isolation: sql.LevelSerializable})
+	tx, err := m.conn.BeginTx(context.Background(), &sql.TxOptions{Isolation: m.config.TxIsolation})
 	if err != nil {
 		return &database.Error{OrigErr: err, Err: "transaction start failed"}
 	}
@@ -505,4 +517,27 @@ func readBool(input string) (value bool, valid bool) {
 
 	// Not a valid bool value
 	return
+}
+
+func getIsolationLevel(input string) (sql.IsolationLevel, error) {
+	switch input {
+	case "DEFAULT":
+		return sql.LevelDefault, nil
+	case "READ-UNCOMMITTED":
+		return sql.LevelReadUncommitted, nil
+	case "READ-COMMITTED":
+		return sql.LevelReadCommitted, nil
+	case "WRITE-COMMITTED":
+		return sql.LevelWriteCommitted, nil
+	case "REPEATABLE-READ":
+		return sql.LevelRepeatableRead, nil
+	case "SNAPSHOT":
+		return sql.LevelSnapshot, nil
+	case "SERIALIZABLE":
+		return sql.LevelSerializable, nil
+	case "LINEARIZABLE":
+		return sql.LevelLinearizable, nil
+	default:
+		return sql.LevelSerializable, ErrInvalidIsolationLevel
+	}
 }
