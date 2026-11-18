@@ -27,8 +27,10 @@ func nextSeqVersion(matches []string, seqDigits int) (string, error) {
 
 	nextSeq := uint64(1)
 
-	if len(matches) > 0 {
-		filename := matches[len(matches)-1]
+	// filepath.Glob returns matches in lexical order, so the highest sequence
+	// number is not necessarily last (e.g. "9_" sorts after "10_"). Scan every
+	// match and use the numeric maximum.
+	for _, filename := range matches {
 		matchSeqStr := filepath.Base(filename)
 		idx := strings.Index(matchSeqStr, "_")
 
@@ -36,15 +38,16 @@ func nextSeqVersion(matches []string, seqDigits int) (string, error) {
 			return "", fmt.Errorf("malformed migration filename: %s", filename)
 		}
 
-		var err error
 		matchSeqStr = matchSeqStr[0:idx]
-		nextSeq, err = strconv.ParseUint(matchSeqStr, 10, 64)
+		matchSeq, err := strconv.ParseUint(matchSeqStr, 10, 64)
 
 		if err != nil {
 			return "", err
 		}
 
-		nextSeq++
+		if matchSeq >= nextSeq {
+			nextSeq = matchSeq + 1
+		}
 	}
 
 	version := fmt.Sprintf("%0[2]*[1]d", nextSeq, seqDigits)
