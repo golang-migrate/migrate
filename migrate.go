@@ -532,13 +532,8 @@ func (m *Migrate) read(from int, to int, ret chan<- interface{}) {
 func (m *Migrate) readUp(from int, limit int, ret chan<- interface{}) {
 	defer close(ret)
 
-	// check if from version exists
-	if from >= 0 {
-		if err := m.versionExists(suint(from)); err != nil {
-			ret <- err
-			return
-		}
-	}
+	// No need to check if from version exists as we do not use it here.
+	// Supports case where the (up) asset for the current migration version is not present.
 
 	if limit == 0 {
 		ret <- ErrNoChange
