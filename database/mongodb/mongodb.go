@@ -55,6 +55,7 @@ type Locking struct {
 	Interval       int
 }
 type Config struct {
+	Canonical            *bool
 	DatabaseName         string
 	MigrationsCollection string
 	TransactionMode      bool
@@ -93,6 +94,10 @@ func WithInstance(instance *mongo.Client, config *Config) (database.Driver, erro
 	}
 	if config.Locking.Interval <= 0 {
 		config.Locking.Interval = DefaultLockTimeoutInterval
+	}
+	if config.Canonical == nil {
+		var defaultCanonical = true
+		config.Canonical = &defaultCanonical
 	}
 
 	mc := &Mongo{
@@ -246,7 +251,11 @@ func (m *Mongo) Run(migration io.Reader) error {
 		return err
 	}
 	var cmds []bson.D
-	err = bson.UnmarshalExtJSON(migr, true, &cmds)
+	var canonical = true
+	if m.config.Canonical != nil {
+		canonical = *m.config.Canonical
+	}
+	err = bson.UnmarshalExtJSON(migr, canonical, &cmds)
 	if err != nil {
 		return fmt.Errorf("unmarshaling json error: %s", err)
 	}
