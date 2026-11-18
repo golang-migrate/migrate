@@ -143,6 +143,7 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 
 	px, err := WithConnection(ctx, conn, config)
 	if err != nil {
+		_ = conn.Close()
 		return nil, err
 	}
 	px.db = instance
