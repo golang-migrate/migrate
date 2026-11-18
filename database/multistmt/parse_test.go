@@ -27,6 +27,14 @@ func TestParse(t *testing.T) {
 			expected: []string{"statement one;", " statement two"}, expectedErr: nil},
 		{name: "two statements, with trailing delimiter", multiStmt: "statement one; statement two;", delimiter: ";",
 			expected: []string{"statement one;", " statement two;"}, expectedErr: nil},
+		{name: "delimiter inside single-quoted string is ignored", multiStmt: "SELECT 'hello;world'; SELECT 1;", delimiter: ";",
+			expected: []string{"SELECT 'hello;world';", " SELECT 1;"}, expectedErr: nil},
+		{name: "delimiter inside double-quoted string is ignored", multiStmt: `SELECT "hello;world"; SELECT 1;`, delimiter: ";",
+			expected: []string{`SELECT "hello;world";`, " SELECT 1;"}, expectedErr: nil},
+		{name: "escaped single quote inside string", multiStmt: "SELECT 'it''s;here'; SELECT 1;", delimiter: ";",
+			expected: []string{"SELECT 'it''s;here';", " SELECT 1;"}, expectedErr: nil},
+		{name: "delimiter in SETTINGS string", multiStmt: "CREATE TABLE t1(id Int32);\nSETTINGS(format_csv_delimiter = ';');", delimiter: ";",
+			expected: []string{"CREATE TABLE t1(id Int32);", "\nSETTINGS(format_csv_delimiter = ';');"}, expectedErr: nil},
 	}
 
 	for _, tc := range testCases {
