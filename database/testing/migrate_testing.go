@@ -5,9 +5,7 @@ package testing
 
 import (
 	"testing"
-)
 
-import (
 	"github.com/golang-migrate/migrate/v4"
 )
 
