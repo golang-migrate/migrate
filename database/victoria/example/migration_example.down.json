@@ -1,0 +1,2 @@
+-- This is just a placeholder as VictoriaMetrics doesn't have a way to revert imports
+-- Instead, you would typically filter by time range or labels to exclude the data

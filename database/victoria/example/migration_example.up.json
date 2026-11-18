@@ -1,0 +1,3 @@
+{"metric":{"__name__":"up","job":"migrate_test"},"values":[1],"timestamps":[1596698684000]}
+{"metric":{"__name__":"cpu_usage","instance":"server1","job":"migrate_test"},"values":[0.45,0.52,0.48],"timestamps":[1596698684000,1596698694000,1596698704000]}
+{"metric":{"__name__":"memory_usage","instance":"server1","job":"migrate_test"},"values":[0.25,0.28,0.22],"timestamps":[1596698684000,1596698694000,1596698704000]}
