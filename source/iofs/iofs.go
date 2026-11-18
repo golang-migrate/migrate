@@ -59,7 +59,14 @@ func (d *PartialDriver) Init(fsys fs.FS, path string) error {
 		}
 		m, err := source.DefaultParse(e.Name())
 		if err != nil {
-			continue
+			if errors.Is(err, source.ErrParse) {
+				// not a migration file, ignore
+				continue
+			}
+			// the file matches the migration naming scheme, but its version
+			// number cannot be parsed (e.g. it overflows uint64). Fail instead
+			// of silently skipping a migration.
+			return fmt.Errorf("failed to parse migration file %s: %w", e.Name(), err)
 		}
 		file, err := e.Info()
 		if err != nil {
