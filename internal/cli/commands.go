@@ -3,6 +3,7 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -16,6 +17,7 @@ import (
 
 var (
 	errInvalidSequenceWidth     = errors.New("digits must be positive")
+	errSequenceOverflow         = errors.New("next sequence number would overflow uint64")
 	errIncompatibleSeqAndFormat = errors.New("the seq and format options are mutually exclusive")
 	errInvalidTimeFormat        = errors.New("time format may not be empty")
 )
@@ -27,8 +29,7 @@ func nextSeqVersion(matches []string, seqDigits int) (string, error) {
 
 	nextSeq := uint64(1)
 
-	if len(matches) > 0 {
-		filename := matches[len(matches)-1]
+	for _, filename := range matches {
 		matchSeqStr := filepath.Base(filename)
 		idx := strings.Index(matchSeqStr, "_")
 
@@ -36,15 +37,17 @@ func nextSeqVersion(matches []string, seqDigits int) (string, error) {
 			return "", fmt.Errorf("malformed migration filename: %s", filename)
 		}
 
-		var err error
-		matchSeqStr = matchSeqStr[0:idx]
-		nextSeq, err = strconv.ParseUint(matchSeqStr, 10, 64)
-
+		matchSeq, err := strconv.ParseUint(matchSeqStr[:idx], 10, 64)
 		if err != nil {
 			return "", err
 		}
+		if matchSeq == math.MaxUint64 {
+			return "", errSequenceOverflow
+		}
 
-		nextSeq++
+		if matchSeq >= nextSeq {
+			nextSeq = matchSeq + 1
+		}
 	}
 
 	version := fmt.Sprintf("%0[2]*[1]d", nextSeq, seqDigits)
