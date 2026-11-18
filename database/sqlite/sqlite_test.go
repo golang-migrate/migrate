@@ -3,6 +3,8 @@ package sqlite
 import (
 	"database/sql"
 	"fmt"
+	nurl "net/url"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -22,6 +24,34 @@ func Test(t *testing.T) {
 	d, err := p.Open(addr)
 	if err != nil {
 		t.Fatal(err)
+	}
+	dt.Test(t, d, []byte("CREATE TABLE t (Qty int, Name string);"))
+}
+
+func TestOpenWithPercentEncodedPath(t *testing.T) {
+	// Regression for https://github.com/golang-migrate/migrate/issues/1256:
+	// a percent-encoded path (a space encoded as %20) must resolve to the real
+	// file name instead of a literal "%20".
+	dir := filepath.Join(t.TempDir(), "Magic Data")
+	if err := os.Mkdir(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	dbPath := filepath.Join(dir, "sqlite.db")
+
+	addr := (&nurl.URL{Scheme: "sqlite", Path: dbPath}).String()
+	p := &Sqlite{}
+	d, err := p.Open(addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := d.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
+
+	if _, err := os.Stat(dbPath); err != nil {
+		t.Fatalf("expected database file at %q: %v", dbPath, err)
 	}
 	dt.Test(t, d, []byte("CREATE TABLE t (Qty int, Name string);"))
 }
