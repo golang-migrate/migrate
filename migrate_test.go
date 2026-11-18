@@ -41,6 +41,14 @@ func init() {
 
 type DummyInstance struct{ Name string }
 
+type sourceWithNoMigrationFiles struct {
+	source.Driver
+}
+
+func (sourceWithNoMigrationFiles) First() (uint, error) {
+	return 0, os.ErrNotExist
+}
+
 func TestNew(t *testing.T) {
 	m, err := New("stub://", "stub://")
 	if err != nil {
@@ -229,6 +237,45 @@ func TestClose(t *testing.T) {
 	}
 	if databaseErr != nil {
 		t.Error(databaseErr)
+	}
+}
+
+func TestUpWithNoMigrationFiles(t *testing.T) {
+	// A fresh database with an empty source used to fail with the cryptic
+	// "first .: file does not exist". It should now report that no migration
+	// files were found, while still satisfying errors.Is(os.ErrNotExist).
+	m, err := New("stub://", "stub://")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = m.Up()
+	if !errors.Is(err, ErrNoMigrationFiles) {
+		t.Fatalf("expected ErrNoMigrationFiles, got %v", err)
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected error to wrap os.ErrNotExist, got %v", err)
+	}
+}
+
+func TestMigrateWithNoMigrationFiles(t *testing.T) {
+	m, err := New("stub://", "stub://")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Migrate checks that its target version exists before read() looks for the
+	// first migration. Keep that preflight successful, then make First report an
+	// empty source so this test reaches read() through the public API.
+	m.sourceDrv.(*sStub.Stub).Migrations = sourceStubMigrations
+	m.sourceDrv = sourceWithNoMigrationFiles{Driver: m.sourceDrv}
+
+	err = m.Migrate(1)
+	if !errors.Is(err, ErrNoMigrationFiles) {
+		t.Fatalf("expected ErrNoMigrationFiles, got %v", err)
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected error to wrap os.ErrNotExist, got %v", err)
 	}
 }
 
