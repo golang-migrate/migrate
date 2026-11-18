@@ -26,10 +26,10 @@ jobs:
       #    version: 19.03.13
           # docker_layer_caching: true
       - run: curl -sL -o ~/bin/gimme https://raw.githubusercontent.com/travis-ci/gimme/master/gimme
-      - run: curl -sfL -o ~/bin/golangci-lint.sh https://install.goreleaser.com/github.com/golangci/golangci-lint.sh
+      - run: curl -sfL -o ~/bin/golangci-lint.sh https://golangci-lint.run/install.sh
       - run: chmod +x ~/bin/gimme ~/bin/golangci-lint.sh
       - run: eval "$(gimme $GO_VERSION)"
-      - run: golangci-lint.sh -b ~/bin v1.37.0
+      - run: golangci-lint.sh -b ~/bin v2.13.1
       - checkout
       - restore_cache:
           keys:
