@@ -71,6 +71,13 @@ type Migrate struct {
 	isGracefulStop bool
 	isLocked       bool
 
+	// lockPending is true while a database Lock call that already hit
+	// LockTimeout is still in flight in the background. No new lock
+	// attempt may start until that call returns, otherwise the two
+	// attempts could acquire the lock out of order and the late one
+	// would hold it without anyone left to release it.
+	lockPending bool
+
 	// PrefetchMigrations defaults to DefaultPrefetchMigrations,
 	// but can be set per Migrate instance.
 	PrefetchMigrations uint
@@ -888,48 +895,64 @@ func (m *Migrate) lock() error {
 	m.isLockedMu.Lock()
 	defer m.isLockedMu.Unlock()
 
-	if m.isLocked {
+	if m.isLocked || m.lockPending {
 		return ErrLocked
 	}
 
-	// create done channel, used in the timeout goroutine
-	done := make(chan bool, 1)
-	defer func() {
-		done <- true
-	}()
-
-	// use errchan to signal error back to this context
-	errchan := make(chan error, 2)
-
-	// start timeout goroutine
-	timeout := time.After(m.LockTimeout)
+	// lockResult receives the outcome of the database Lock call. It is
+	// buffered so the goroutine running Lock can always report back,
+	// even if lock has already returned because of a timeout.
+	lockResult := make(chan error, 1)
 	go func() {
-		for {
-			select {
-			case <-done:
-				return
-			case <-timeout:
-				errchan <- ErrLockTimeout
-				return
-			}
-		}
+		lockResult <- m.databaseDrv.Lock()
 	}()
 
-	// now try to acquire the lock
-	go func() {
-		if err := m.databaseDrv.Lock(); err != nil {
-			errchan <- err
-		} else {
-			errchan <- nil
-		}
-	}()
-
-	// wait until we either receive ErrLockTimeout or error from Lock operation
-	err := <-errchan
-	if err == nil {
-		m.isLocked = true
+	lockTimeout := m.LockTimeout
+	if lockTimeout < 0 {
+		lockTimeout = 0
 	}
-	return err
+	timer := time.NewTimer(lockTimeout)
+	defer timer.Stop()
+
+	// wait until we either receive ErrLockTimeout or the result of the
+	// Lock operation
+	select {
+	case err := <-lockResult:
+		if err == nil {
+			m.isLocked = true
+		}
+		return err
+
+	case <-timer.C:
+		// The Lock call is still in flight and cannot be cancelled:
+		// the driver may acquire the database lock at any moment, long
+		// after this call returned ErrLockTimeout. Leaving it alone
+		// would leak that lock, because this Migrate instance does not
+		// consider itself locked and will never call Unlock for it,
+		// while the driver does. Hand the pending call over to a
+		// goroutine that releases the lock if it is ever acquired,
+		// and refuse new lock attempts until it has finished.
+		m.lockPending = true
+		go m.releaseTimedOutLock(lockResult)
+		return ErrLockTimeout
+	}
+}
+
+// releaseTimedOutLock waits for a database Lock call that outlived its
+// LockTimeout to return. If the call eventually acquired the lock, it
+// releases the lock again right away: the operation that asked for it
+// already failed with ErrLockTimeout, so nobody else will unlock it.
+// Afterwards the Migrate instance accepts new lock attempts again.
+func (m *Migrate) releaseTimedOutLock(lockResult <-chan error) {
+	if err := <-lockResult; err == nil {
+		if err := m.databaseDrv.Unlock(); err != nil {
+			m.logErr(err)
+		}
+	}
+
+	m.isLockedMu.Lock()
+	m.lockPending = false
+	m.isLockedMu.Unlock()
 }
 
 // unlock is a thread safe helper function to unlock the database.
