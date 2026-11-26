@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/golang-migrate/migrate/v4"
 
@@ -756,4 +757,40 @@ func Test_computeLineFromPos(t *testing.T) {
 			run(true, true)
 		})
 	}
+}
+
+type failingConn struct{}
+
+func (c *failingConn) Prepare(string) (sqldriver.Stmt, error) {
+	return nil, errors.New("prepare unsupported")
+}
+func (c *failingConn) Close() error { return nil }
+func (c *failingConn) Begin() (sqldriver.Tx, error) {
+	return nil, errors.New("transactions unsupported")
+}
+func (c *failingConn) Ping(context.Context) error { return nil }
+
+type failingConnector struct{}
+
+func (c *failingConnector) Connect(context.Context) (sqldriver.Conn, error) {
+	return &failingConn{}, nil
+}
+func (c *failingConnector) Driver() sqldriver.Driver { return nil }
+
+func TestWithInstanceClosesConnWhenEnsureVersionTableFails(t *testing.T) {
+	db := sql.OpenDB(&failingConnector{})
+	defer func() { _ = db.Close() }()
+	db.SetMaxOpenConns(1)
+
+	if _, err := WithInstance(db, &Config{DatabaseName: "postgres", SchemaName: "public"}); err == nil {
+		t.Fatal("expected version table error")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		t.Fatalf("WithInstance did not release the connection: %v", err)
+	}
+	_ = conn.Close()
 }
