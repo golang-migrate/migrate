@@ -13,8 +13,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/golang-migrate/migrate/v4"
 
@@ -759,36 +759,38 @@ func Test_computeLineFromPos(t *testing.T) {
 	}
 }
 
-type failingConn struct{ closes *int32 }
+type failingConn struct{}
 
 func (c *failingConn) Prepare(string) (sqldriver.Stmt, error) {
 	return nil, errors.New("prepare unsupported")
 }
-func (c *failingConn) Close() error { atomic.AddInt32(c.closes, 1); return nil }
+func (c *failingConn) Close() error { return nil }
 func (c *failingConn) Begin() (sqldriver.Tx, error) {
 	return nil, errors.New("transactions unsupported")
 }
 func (c *failingConn) Ping(context.Context) error { return nil }
-func (c *failingConn) QueryContext(context.Context, string, []sqldriver.NamedValue) (sqldriver.Rows, error) {
-	return nil, errors.New("version table check failed")
-}
 
-type failingConnector struct{ closes *int32 }
+type failingConnector struct{}
 
 func (c *failingConnector) Connect(context.Context) (sqldriver.Conn, error) {
-	return &failingConn{closes: c.closes}, nil
+	return &failingConn{}, nil
 }
 func (c *failingConnector) Driver() sqldriver.Driver { return nil }
 
 func TestWithInstanceClosesConnWhenEnsureVersionTableFails(t *testing.T) {
-	var closes int32
-	db := sql.OpenDB(&failingConnector{closes: &closes})
-	defer db.Close()
+	db := sql.OpenDB(&failingConnector{})
+	defer func() { _ = db.Close() }()
+	db.SetMaxOpenConns(1)
 
-	if _, err := WithInstance(db, &Config{DatabaseName: "postgres"}); err == nil {
+	if _, err := WithInstance(db, &Config{DatabaseName: "postgres", SchemaName: "public"}); err == nil {
 		t.Fatal("expected version table error")
 	}
-	if got := atomic.LoadInt32(&closes); got != 1 {
-		t.Fatalf("WithInstance closed the sql.Conn %d times, want 1", got)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		t.Fatalf("WithInstance did not release the connection: %v", err)
 	}
+	_ = conn.Close()
 }
